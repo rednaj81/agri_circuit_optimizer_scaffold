@@ -1,0 +1,10 @@
+node_id,node_type,is_source,is_sink,is_pure_source,is_final_sink,x_m,y_m,footprint_w_m,footprint_d_m
+W,water_tank,1,0,1,0,0.10,0.40,0.10,0.10
+P1,product_tank,1,1,0,0,0.25,0.40,0.10,0.10
+P2,product_tank,1,1,0,0,0.40,0.40,0.10,0.10
+P3,product_tank,1,1,0,0,0.55,0.40,0.10,0.10
+P4,product_tank,1,1,0,0,0.70,0.40,0.10,0.10
+M,mixer_tank,1,1,0,0,0.85,0.40,0.10,0.10
+I,incorporator_tank,1,1,0,0,0.30,0.12,0.10,0.10
+IR,incorporator_return,0,1,0,0,0.32,0.12,0.05,0.05
+S,external_outlet,0,1,0,1,0.92,0.12,0.05,0.05
