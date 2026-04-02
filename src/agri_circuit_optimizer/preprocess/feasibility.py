@@ -3,6 +3,59 @@ from __future__ import annotations
 from typing import Any, Dict
 
 
+def option_is_selectively_closable(option: Dict[str, Any]) -> bool:
+    metadata = option.get("metadata", {})
+    if "selectively_closable" in option:
+        return bool(option["selectively_closable"])
+    if "selectively_closable" in metadata:
+        return bool(metadata["selectively_closable"])
+    return bool(metadata.get("contains_valve", False))
+
+
+def summarize_route_selectivity(
+    *,
+    route: Dict[str, Any],
+    source_selection: Dict[str, Dict[str, Any]],
+    destination_selection: Dict[str, Dict[str, Any]],
+) -> Dict[str, Any]:
+    source_node = str(route["source"])
+    sink_node = str(route["sink"])
+    source_option = source_selection.get(source_node)
+    destination_option = destination_selection.get(sink_node)
+
+    conflicting_source_nodes = sorted(
+        node_id
+        for node_id, option in source_selection.items()
+        if node_id != source_node and not option_is_selectively_closable(option)
+    )
+    conflicting_sink_nodes = sorted(
+        node_id
+        for node_id, option in destination_selection.items()
+        if node_id != sink_node and not option_is_selectively_closable(option)
+    )
+    open_suction_branch_count = (1 if source_option is not None else 0) + len(conflicting_source_nodes)
+    open_discharge_branch_count = (1 if destination_option is not None else 0) + len(conflicting_sink_nodes)
+    selectable = (
+        source_option is not None
+        and destination_option is not None
+        and open_suction_branch_count == 1
+        and open_discharge_branch_count == 1
+    )
+
+    return {
+        "source_branch_selected": source_option["option_id"] if source_option is not None else None,
+        "discharge_branch_selected": (
+            destination_option["option_id"] if destination_option is not None else None
+        ),
+        "open_suction_branch_count": open_suction_branch_count,
+        "open_discharge_branch_count": open_discharge_branch_count,
+        "extra_open_branch_conflict": bool(conflicting_source_nodes or conflicting_sink_nodes),
+        "selective_route_realizable": selectable,
+        "conflicting_source_nodes": conflicting_source_nodes,
+        "conflicting_sink_nodes": conflicting_sink_nodes,
+    }
+
+
 def meter_compatibility(route: Dict[str, Any], meter: Dict[str, Any]) -> Dict[str, Any]:
     measurement_required = bool(route.get("measurement_required", False))
     meter_is_bypass = bool(meter.get("is_bypass", False))

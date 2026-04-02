@@ -8,6 +8,20 @@ def add_structure_constraints(model: Any) -> None:
 
     payload = model._payload
 
+    def selected_source_closable_expr(model: Any, node_id: str) -> Any:
+        return sum(
+            int(bool(payload["source_options"][option_id].get("selectively_closable", False)))
+            * model.source_option_selected[node_id, option_id]
+            for option_id in payload["source_option_ids_by_node"][node_id]
+        )
+
+    def selected_destination_closable_expr(model: Any, node_id: str) -> Any:
+        return sum(
+            int(bool(payload["destination_options"][option_id].get("selectively_closable", False)))
+            * model.destination_option_selected[node_id, option_id]
+            for option_id in payload["destination_option_ids_by_node"][node_id]
+        )
+
     model.single_system_class = pyo.Constraint(
         expr=sum(model.system_class_selected[system_class] for system_class in model.SYSTEM_CLASSES) == 1
     )
@@ -262,6 +276,34 @@ def add_structure_constraints(model: Any) -> None:
 
     model.route_meter_slot_activation = pyo.Constraint(
         model.ROUTE_METER_ASSIGNMENT_KEYS, rule=route_meter_slot_activation_rule
+    )
+
+    def route_selective_suction_rule(model: Any, route_id: str) -> Any:
+        other_nodes = payload["route_other_source_nodes"][route_id]
+        if not other_nodes:
+            return pyo.Constraint.Skip
+        extra_open_conflict = sum(
+            model.source_node_active[node_id] - selected_source_closable_expr(model, node_id)
+            for node_id in other_nodes
+        )
+        return extra_open_conflict <= len(other_nodes) * (1 - model.route_active[route_id])
+
+    model.route_selective_suction = pyo.Constraint(
+        model.ROUTES, rule=route_selective_suction_rule
+    )
+
+    def route_selective_discharge_rule(model: Any, route_id: str) -> Any:
+        other_nodes = payload["route_other_sink_nodes"][route_id]
+        if not other_nodes:
+            return pyo.Constraint.Skip
+        extra_open_conflict = sum(
+            model.sink_node_active[node_id] - selected_destination_closable_expr(model, node_id)
+            for node_id in other_nodes
+        )
+        return extra_open_conflict <= len(other_nodes) * (1 - model.route_active[route_id])
+
+    model.route_selective_discharge = pyo.Constraint(
+        model.ROUTES, rule=route_selective_discharge_rule
     )
 
     def meter_option_usage_required_rule(model: Any, slot: int, option_id: str) -> Any:

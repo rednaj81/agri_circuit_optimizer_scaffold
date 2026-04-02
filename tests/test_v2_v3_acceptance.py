@@ -171,7 +171,29 @@ def test_v3_pyomo_and_fallback_agree_on_loss_driven_topology_upgrade() -> None:
     assert pyomo_solution["topology"]["discharge_trunk_option_id"] == fallback_solution["topology"]["discharge_trunk_option_id"]
     assert pyomo_solution["summary"]["system_class"] == fallback_solution["summary"]["system_class"]
     assert {item["route_id"] for item in pyomo_solution["routes"]} == {item["route_id"] for item in fallback_solution["routes"]}
-    assert pyomo_solution["bom"] == fallback_solution["bom"]
+    pyomo_bom = sorted(
+        (
+            {
+                key: value
+                for key, value in item.items()
+                if key not in {"qty_suction", "qty_discharge", "qty_other"}
+            }
+            for item in pyomo_solution["bom"]
+        ),
+        key=lambda item: item["component_id"],
+    )
+    fallback_bom = sorted(
+        (
+            {
+                key: value
+                for key, value in item.items()
+                if key not in {"qty_suction", "qty_discharge", "qty_other"}
+            }
+            for item in fallback_solution["bom"]
+        ),
+        key=lambda item: item["component_id"],
+    )
+    assert pyomo_bom == fallback_bom
     for py_item, fb_item in zip(
         sorted(pyomo_solution["hydraulics"], key=lambda item: item["route_id"]),
         sorted(fallback_solution["hydraulics"], key=lambda item: item["route_id"]),
@@ -223,6 +245,10 @@ def test_v3_example_regression_keeps_v1_v2_contracts_and_new_reports() -> None:
         assert "meter_q_range_ok" in route
         assert "meter_dose_ok" in route
         assert "meter_error_ok" in route
+        assert "selective_route_realizable" in route
+        assert "source_branch_selected" in route
+        assert "discharge_branch_selected" in route
+        assert route["selective_route_realizable"] is True
 
     for hydraulic in solution["hydraulics"]:
         assert "total_loss_lpm_equiv" in hydraulic

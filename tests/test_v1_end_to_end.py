@@ -34,6 +34,9 @@ def test_v1_example_solves_end_to_end_and_respects_frozen_rules():
     measurement_routes = [route for route in solution["routes"] if route["measurement_required"]]
     assert measurement_routes
     assert all(not route["meter_is_bypass"] for route in measurement_routes)
+    assert all(route["selective_route_realizable"] for route in solution["routes"])
+    assert all(route["open_suction_branch_count"] == 1 for route in solution["routes"])
+    assert all(route["open_discharge_branch_count"] == 1 for route in solution["routes"])
 
 
 def test_v1_reports_are_written_to_output_dir():

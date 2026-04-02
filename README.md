@@ -17,6 +17,7 @@ Encontrar a menor rede hidráulica instrumentada que:
 - atende às rotas obrigatórias
 - permite limpeza entre operações
 - garante medição direta nas rotas de dosagem
+- garante seletividade operacional em arquitetura estrela com manifolds
 - respeita compatibilidade física de bitolas
 - é hidraulicamente viável no modelo simplificado
 - atende vazões mínimas exigidas
@@ -33,6 +34,7 @@ Encontrar a menor rede hidráulica instrumentada que:
 6. Limpeza entre operações existe, mas no MVP entra como custo operacional fixo.
 7. Hidráulica é simplificada por capacidade em L/min e perdas lineares equivalentes.
 8. Bitolas são tratadas por classe de sistema; adaptadores entram como itens de material.
+9. Seletividade em estrela é tratada como realizabilidade operacional da rota, não como perda hidráulica.
 
 ## Superestrutura escolhida
 
@@ -143,6 +145,14 @@ Observações:
 - modo hidráulico `bottleneck_plus_length`
 - resumo de estoque com `hose_total_used_m`, `tee_total_used` e `base_vs_extra_usage`
 
+### Seletividade operacional
+- ramos de sucção e descarga têm papel funcional explícito
+- uma rota `A -> B` só é válida se puder operar com exatamente:
+  - `1` ramo aberto na sucção: o da origem `A`
+  - `1` ramo aberto na descarga: o do destino `B`
+- ramo extra aberto invalida a rota como operação seletiva
+- nós bidirecionais exigem isolamento independente nos dois lados usando o mesmo SKU físico de solenoide
+
 ## Relatórios gerados
 
 Em `data/output/example_v3/`:
@@ -163,6 +173,12 @@ Os relatórios de rota incluem:
 - `meter_q_range_ok`
 - `meter_dose_ok`
 - `meter_error_ok`
+- `source_branch_selected`
+- `discharge_branch_selected`
+- `selective_route_realizable`
+- `extra_open_branch_conflict`
+- `open_suction_branch_count`
+- `open_discharge_branch_count`
 
 Os relatórios hidráulicos incluem:
 - `total_loss_lpm_equiv`
@@ -176,6 +192,9 @@ O resumo da maquete também inclui:
 - `hose_total_used_m`
 - `tee_total_used`
 - `base_vs_extra_usage`
+- `solenoid_suction_total`
+- `solenoid_discharge_total`
+- `solenoid_total`
 
 ## Testes
 
@@ -192,6 +211,8 @@ Cobertura mínima de aceite já incluída:
 - loader, preprocessamento, hidráulica e relatórios do `maquete_core`
 - consistência Pyomo/fallback em slice reduzida da maquete
 - gargalo por T e sensibilidade a comprimento na maquete
+- inviabilidade por quebra de seletividade em estrela
+- validacão de isolamento independente para nós bidirecionais
 
 ## Roadmap
 
@@ -205,6 +226,7 @@ Concluído:
 - T10 — geometria e mangueira modular
 - T11 — modo `bottleneck_plus_length`
 - T12 — testes e relatórios da maquete
+- refinamento de seletividade operacional em arquitetura estrela
 
 Próximos passos naturais:
 - consolidar execução Pyomo real no ambiente com `pyomo` + HiGHS

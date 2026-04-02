@@ -10,6 +10,11 @@ from agri_circuit_optimizer.io.schemas import (
     ScenarioPaths,
 )
 
+BRANCH_ROLE_BY_TEMPLATE_TABLE = {
+    "source_branch_templates": "suction",
+    "destination_branch_templates": "discharge",
+}
+
 
 BOOLEAN_TRUE_VALUES = {"1", "true", "t", "yes", "y"}
 BOOLEAN_FALSE_VALUES = {"0", "false", "f", "no", "n"}
@@ -314,6 +319,41 @@ def _validate_nodes_routes_components(data: Dict[str, Any]) -> None:
             )
 
 
+def _derive_node_operational_role(node: Any) -> str:
+    is_source = bool(node["is_source"])
+    is_sink = bool(node["is_sink"])
+    if is_source and is_sink:
+        return "bidirectional"
+    if is_source:
+        return "source_only"
+    if is_sink:
+        return "sink_only"
+    return "isolated"
+
+
+def _annotate_operational_semantics(data: Dict[str, Any]) -> Dict[str, Any]:
+    normalized = dict(data)
+    nodes = normalized["nodes"].copy()
+    nodes["operational_role"] = nodes.apply(_derive_node_operational_role, axis=1)
+    normalized["nodes"] = nodes
+
+    for table_name, branch_role in BRANCH_ROLE_BY_TEMPLATE_TABLE.items():
+        frame = normalized[table_name].copy()
+        if "branch_role" not in frame.columns:
+            frame["branch_role"] = branch_role
+        else:
+            frame["branch_role"] = frame["branch_role"].replace("", branch_role).fillna(branch_role)
+            invalid_templates = frame.loc[frame["branch_role"] != branch_role, "template_id"].tolist()
+            if invalid_templates:
+                raise ScenarioValidationError(
+                    f"Table '{table_name}' has invalid branch_role values for templates "
+                    f"{invalid_templates}. Expected '{branch_role}'."
+                )
+        normalized[table_name] = frame
+
+    return normalized
+
+
 def _load_and_validate_csv(path: Path, table_name: str) -> Any:
     import pandas as pd
 
@@ -349,7 +389,7 @@ def load_scenario(base_dir: str | Path) -> Dict[str, Any]:
         "settings": settings,
     }
     _validate_nodes_routes_components(data)
-    return data
+    return _annotate_operational_semantics(data)
 
 
 def scenario_summary(data: Dict[str, Any]) -> Dict[str, Any]:

@@ -116,6 +116,9 @@ def _build_branch_options(
             continue
 
         node_id = node["node_id"]
+        branch_role = str(
+            "suction" if stage_kind == "source_branch" else "discharge"
+        )
         node_options: List[Dict[str, Any]] = []
 
         for template in templates:
@@ -169,6 +172,8 @@ def _build_branch_options(
                         metadata={
                             "template_id": template["template_id"],
                             "node_id": node_id,
+                            "branch_role": str(template.get("branch_role") or branch_role),
+                            "node_operational_role": str(node.get("operational_role") or ""),
                             "required_flags": {
                                 "require_valve": bool(template["require_valve"]),
                                 "require_check": bool(template["require_check"]),
@@ -176,6 +181,12 @@ def _build_branch_options(
                             "allowed_adaptor_pairs": sorted(allowed_adaptor_pairs),
                             "uses_adaptor": any(
                                 component["category"] == "adaptor" for component in adapted_components
+                            ),
+                            "contains_valve": any(
+                                component["category"] == "valve" for component in adapted_components
+                            ),
+                            "selectively_closable": any(
+                                component["category"] == "valve" for component in adapted_components
                             ),
                             "hose_length_m": hose_length_m,
                             "hose_modules_used": hose_modules_used,
@@ -435,6 +446,9 @@ def _compose_option(
         "base_component_counts": dict(base_component_counts),
         "extra_component_counts": dict(extra_component_counts),
         "category_profile": dict(category_profile),
+        "branch_role": metadata.get("branch_role"),
+        "contains_valve": bool(metadata.get("contains_valve", False)),
+        "selectively_closable": bool(metadata.get("selectively_closable", False)),
         "metadata": {
             **metadata,
             "hydraulic_mode": settings.get("hydraulic_loss_mode", "additive_lpm"),

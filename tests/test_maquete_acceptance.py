@@ -43,6 +43,10 @@ def test_maquete_options_compute_branch_lengths_and_keep_p4_participating() -> N
     p4_source = options["source_options"]["P4"][0]
     p4_destination = options["destination_options"]["P4"][0]
 
+    assert p4_source["branch_role"] == "suction"
+    assert p4_destination["branch_role"] == "discharge"
+    assert p4_source["selectively_closable"] is True
+    assert p4_destination["selectively_closable"] is True
     assert p4_source["hose_length_m"] >= 1.0
     assert p4_source["hose_modules_used"] == int(p4_source["hose_modules_used"])
     assert p4_source["component_counts"]["hose_g1_1m"] == p4_source["hose_modules_used"]
@@ -69,7 +73,11 @@ def test_maquete_core_solves_end_to_end_with_expected_inventory_and_metering() -
     assert solution["summary"]["routes_served"] == 23
     assert solution["summary"]["hose_total_used_m"] == pytest.approx(17.0)
     assert solution["summary"]["tee_total_used"] == 15
-    assert solution["summary"]["base_vs_extra_usage"]["extra"] == {"tee_extra_g1": 5}
+    assert solution["summary"]["solenoid_suction_total"] == 7
+    assert solution["summary"]["solenoid_discharge_total"] == 8
+    assert solution["summary"]["solenoid_total"] == 15
+    assert solution["summary"]["base_vs_extra_usage"]["extra"]["tee_extra_g1"] == 5
+    assert solution["summary"]["base_vs_extra_usage"]["extra"]["valve_extra_g1"] == 7
 
     route_ids = {route["route_id"] for route in solution["routes"]}
     assert "R013" in route_ids
@@ -82,6 +90,10 @@ def test_maquete_core_solves_end_to_end_with_expected_inventory_and_metering() -
         for route in solution["routes"]
         if route["measurement_required"]
     )
+    assert all(route["selective_route_realizable"] is True for route in solution["routes"])
+    assert all(route["extra_open_branch_conflict"] is False for route in solution["routes"])
+    assert all(route["open_suction_branch_count"] == 1 for route in solution["routes"])
+    assert all(route["open_discharge_branch_count"] == 1 for route in solution["routes"])
     assert all(
         route["hydraulic_mode"] == "bottleneck_plus_length"
         for route in solution["routes"]
@@ -93,7 +105,11 @@ def test_maquete_core_solves_end_to_end_with_expected_inventory_and_metering() -
 
     bom_ids = {item["component_id"] for item in solution["bom"]}
     assert "pump_extra_g1" not in bom_ids
-    assert "valve_extra_g1" not in bom_ids
+    assert "valve_extra_g1" in bom_ids
+    valve_extra = next(item for item in solution["bom"] if item["component_id"] == "valve_extra_g1")
+    assert valve_extra["qty"] == 7
+    assert valve_extra["qty_discharge"] > 0
+    assert valve_extra["qty_suction"] > 0
 
 
 def test_maquete_small_slice_keeps_pyomo_and_fallback_consistent() -> None:
@@ -111,7 +127,15 @@ def test_maquete_small_slice_keeps_pyomo_and_fallback_consistent() -> None:
     assert pyomo_solution["summary"]["system_class"] == fallback_solution["summary"]["system_class"]
     assert pyomo_solution["bom"] == fallback_solution["bom"]
     assert {route["route_id"] for route in pyomo_solution["routes"]} == {"R004", "R013"}
-    assert pyomo_solution["routes"] == fallback_solution["routes"]
+    pyomo_routes = [
+        {key: value for key, value in route.items() if key not in {"pump_slot", "meter_slot"}}
+        for route in pyomo_solution["routes"]
+    ]
+    fallback_routes = [
+        {key: value for key, value in route.items() if key not in {"pump_slot", "meter_slot"}}
+        for route in fallback_solution["routes"]
+    ]
+    assert pyomo_routes == fallback_routes
     assert pyomo_solution["hydraulics"] == fallback_solution["hydraulics"]
 
 
@@ -166,3 +190,4 @@ def test_maquete_small_meter_can_be_rejected_in_favor_of_mid_meter() -> None:
     assert route_r004["meter_q_range_ok"] is True
     assert route_r004["meter_dose_ok"] is True
     assert route_r004["meter_error_ok"] is True
+    assert route_r004["selective_route_realizable"] is True

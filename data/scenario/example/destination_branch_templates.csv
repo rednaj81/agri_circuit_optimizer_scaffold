@@ -1,2 +1,2 @@
-template_id,allowed_node_ids,require_valve,require_check,allowed_hose_diameters,allowed_adaptor_pairs,notes
-DST_STD,"P1|P2|P3|M|I|IR|S",1,0,"g1|g2","g1_to_g2|g2_to_g1","Standard destination branch"
+template_id,allowed_node_ids,require_valve,require_check,allowed_hose_diameters,allowed_adaptor_pairs,notes,branch_role
+DST_STD,"P1|P2|P3|M|I|IR|S",1,0,"g1|g2","g1_to_g2|g2_to_g1","Standard destination branch",discharge

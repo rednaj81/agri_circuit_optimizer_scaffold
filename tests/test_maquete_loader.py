@@ -11,9 +11,15 @@ def test_loader_accepts_maquete_core_with_optional_geometry_columns() -> None:
 
     assert "P4" in nodes["node_id"].tolist()
     assert {"x_m", "y_m", "footprint_w_m", "footprint_d_m"} <= set(nodes.columns)
+    assert "operational_role" in nodes.columns
+    assert nodes.loc[nodes["node_id"] == "W", "operational_role"].iloc[0] == "source_only"
+    assert nodes.loc[nodes["node_id"] == "IR", "operational_role"].iloc[0] == "sink_only"
+    assert nodes.loc[nodes["node_id"] == "P4", "operational_role"].iloc[0] == "bidirectional"
     assert ((routes["source"] == "I") & (routes["sink"] == "IR")).any()
     assert not (routes["sink"] == "W").any()
     assert not (routes["source"] == "S").any()
+    assert set(data["source_branch_templates"]["branch_role"]) == {"suction"}
+    assert set(data["destination_branch_templates"]["branch_role"]) == {"discharge"}
     assert settings["hydraulic_loss_mode"] == "bottleneck_plus_length"
     assert settings["hose_total_available_m"] == 20.0
     assert settings["maquette_trunks_consume_connectors"] is False

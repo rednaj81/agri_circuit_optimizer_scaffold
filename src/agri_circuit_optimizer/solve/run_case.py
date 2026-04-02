@@ -17,6 +17,7 @@ from agri_circuit_optimizer.postprocess.reports import (
 from agri_circuit_optimizer.preprocess.build_options import build_stage_options
 from agri_circuit_optimizer.preprocess.feasibility import (
     compute_route_min_flow,
+    summarize_route_selectivity,
     summarize_route_hydraulics,
 )
 
@@ -170,6 +171,21 @@ def _extract_solution(model: Any, results: Any, solver_name: str) -> Dict[str, A
     )
 
     assignment: Dict[str, Dict[str, Any]] = {}
+    selectivity_by_route = {
+        route_id: summarize_route_selectivity(
+            route=payload["routes"][route_id],
+            source_selection={
+                node_id: payload["source_options"][option_id]
+                for node_id, option_id in selected_source_options.items()
+            },
+            destination_selection={
+                node_id: payload["destination_options"][option_id]
+                for node_id, option_id in selected_destination_options.items()
+            },
+        )
+        for route_id in payload["route_ids"]
+        if pyo.value(model.route_active[route_id]) > 0.5
+    }
     for route_id in payload["route_ids"]:
         if pyo.value(model.route_active[route_id]) <= 0.5:
             continue
@@ -217,6 +233,7 @@ def _extract_solution(model: Any, results: Any, solver_name: str) -> Dict[str, A
             "flow_delivered_lpm": flow,
             "meter_flags": meter_flags,
             "hydraulics": hydraulics,
+            "selectivity": selectivity_by_route[route_id],
         }
 
     bom = _build_bom(
@@ -337,6 +354,18 @@ def _solve_case_fallback(data: Dict[str, Any], options: Dict[str, Any], solver_n
                 continue
 
             for branch_topology in branch_topologies:
+                topology_selectivity = {
+                    route["route_id"]: summarize_route_selectivity(
+                        route=route,
+                        source_selection=branch_topology["source_selection"],
+                        destination_selection=branch_topology["destination_selection"],
+                    )
+                    for route in active_routes
+                }
+                if not all(
+                    item["selective_route_realizable"] for item in topology_selectivity.values()
+                ):
+                    continue
                 for selected_pumps in _enumerate_slot_combinations(
                     slot_options=options["pump_slot_options"],
                     max_slots=int(settings["u_max_slots"]),
@@ -355,6 +384,7 @@ def _solve_case_fallback(data: Dict[str, Any], options: Dict[str, Any], solver_n
                             selected_meters=selected_meters,
                             suction_option=branch_topology["suction_option"],
                             discharge_option=branch_topology["discharge_option"],
+                            selectivity_by_route=topology_selectivity,
                         )
                         if assignment is None:
                             continue
@@ -632,12 +662,16 @@ def _assign_routes(
     selected_meters: Dict[int, Dict[str, Any]],
     suction_option: Dict[str, Any],
     discharge_option: Dict[str, Any],
+    selectivity_by_route: Dict[str, Dict[str, Any]],
 ) -> Dict[str, Dict[str, Any]] | None:
     assignment: Dict[str, Dict[str, Any]] = {}
     for route in active_routes:
         matched = None
         source_option = source_selection[route["source"]]
         destination_option = destination_selection[route["sink"]]
+        selectivity = selectivity_by_route[route["route_id"]]
+        if not bool(selectivity["selective_route_realizable"]):
+            return None
         for pump_slot, pump_option in selected_pumps.items():
             for meter_slot, meter_option in selected_meters.items():
                 meter_flags = _build_meter_flags(route, meter_option)
@@ -675,6 +709,7 @@ def _assign_routes(
                     "flow_delivered_lpm": flow,
                     "meter_flags": meter_flags,
                     "hydraulics": hydraulics,
+                    "selectivity": selectivity,
                 }
                 break
             if matched is not None:
@@ -703,16 +738,23 @@ def _build_bom_from_fallback(
 ) -> list[Dict[str, Any]] | None:
     component_index = {component["component_id"]: component for component in components}
     component_qty: Dict[str, int] = {}
+    role_qty: Dict[str, Dict[str, int]] = {}
 
-    for option in (
-        list(source_selection.values())
-        + list(destination_selection.values())
-        + list(selected_pumps.values())
-        + list(selected_meters.values())
-        + [suction_option, discharge_option]
-    ):
+    def accumulate(option: Dict[str, Any], role: str) -> None:
         for component_id, qty in option["component_counts"].items():
             component_qty[component_id] = component_qty.get(component_id, 0) + int(qty)
+            role_qty.setdefault(component_id, {"suction": 0, "discharge": 0, "other": 0})[role] += int(qty)
+
+    for option in source_selection.values():
+        accumulate(option, "suction")
+    for option in destination_selection.values():
+        accumulate(option, "discharge")
+    for option in selected_pumps.values():
+        accumulate(option, "other")
+    for option in selected_meters.values():
+        accumulate(option, "other")
+    accumulate(suction_option, "other")
+    accumulate(discharge_option, "other")
 
     for component_id, qty in component_qty.items():
         if qty > int(component_index[component_id]["available_qty"]):
@@ -731,6 +773,9 @@ def _build_bom_from_fallback(
                 "is_extra": bool(component_index[component_id].get("is_extra", False)),
                 "extra_penalty_group": component_index[component_id].get("extra_penalty_group", ""),
                 "hose_length_m": _float_or_default(component_index[component_id].get("hose_length_m")),
+                "qty_suction": int(role_qty.get(component_id, {}).get("suction", 0)),
+                "qty_discharge": int(role_qty.get(component_id, {}).get("discharge", 0)),
+                "qty_other": int(role_qty.get(component_id, {}).get("other", 0)),
             }
         )
     return bom
@@ -788,6 +833,7 @@ def _build_reports_from_assignment(
         meter_option = item["meter_option"]
         meter_flags = item["meter_flags"]
         hydraulics = item["hydraulics"]
+        selectivity = item["selectivity"]
         flow = float(item["flow_delivered_lpm"])
 
         routes_report.append(
@@ -812,6 +858,14 @@ def _build_reports_from_assignment(
                 "meter_error_ok": bool(meter_flags["error_ok"]),
                 "source_option_id": item["source_option"]["option_id"],
                 "destination_option_id": item["destination_option"]["option_id"],
+                "source_branch_selected": selectivity["source_branch_selected"],
+                "discharge_branch_selected": selectivity["discharge_branch_selected"],
+                "selective_route_realizable": bool(selectivity["selective_route_realizable"]),
+                "extra_open_branch_conflict": bool(selectivity["extra_open_branch_conflict"]),
+                "open_suction_branch_count": int(selectivity["open_suction_branch_count"]),
+                "open_discharge_branch_count": int(selectivity["open_discharge_branch_count"]),
+                "conflicting_source_nodes": list(selectivity["conflicting_source_nodes"]),
+                "conflicting_sink_nodes": list(selectivity["conflicting_sink_nodes"]),
                 "source_branch_hose_m": float(hydraulics["source_branch_hose_m"]),
                 "destination_branch_hose_m": float(hydraulics["destination_branch_hose_m"]),
                 "route_effective_q_max_lpm": float(hydraulics["route_effective_q_max_lpm"]),
@@ -858,21 +912,23 @@ def _build_bom(
     selected_discharge_trunk: str,
 ) -> list[Dict[str, Any]]:
     component_qty: Dict[str, int] = {}
+    role_qty: Dict[str, Dict[str, int]] = {}
 
-    def accumulate(option: Dict[str, Any]) -> None:
+    def accumulate(option: Dict[str, Any], role: str) -> None:
         for component_id, qty in option["component_counts"].items():
             component_qty[component_id] = component_qty.get(component_id, 0) + int(qty)
+            role_qty.setdefault(component_id, {"suction": 0, "discharge": 0, "other": 0})[role] += int(qty)
 
     for option_id in selected_source_options.values():
-        accumulate(payload["source_options"][option_id])
+        accumulate(payload["source_options"][option_id], "suction")
     for option_id in selected_destination_options.values():
-        accumulate(payload["destination_options"][option_id])
+        accumulate(payload["destination_options"][option_id], "discharge")
     for option_id in selected_pump_slots.values():
-        accumulate(payload["pump_options"][option_id])
+        accumulate(payload["pump_options"][option_id], "other")
     for option_id in selected_meter_slots.values():
-        accumulate(payload["meter_options"][option_id])
-    accumulate(payload["suction_trunk_options"][selected_suction_trunk])
-    accumulate(payload["discharge_trunk_options"][selected_discharge_trunk])
+        accumulate(payload["meter_options"][option_id], "other")
+    accumulate(payload["suction_trunk_options"][selected_suction_trunk], "other")
+    accumulate(payload["discharge_trunk_options"][selected_discharge_trunk], "other")
 
     bom = []
     for component_id, qty in sorted(component_qty.items()):
@@ -887,6 +943,9 @@ def _build_bom(
                 "is_extra": bool(payload["components"][component_id].get("is_extra", False)),
                 "extra_penalty_group": payload["components"][component_id].get("extra_penalty_group", ""),
                 "hose_length_m": _float_or_default(payload["components"][component_id].get("hose_length_m")),
+                "qty_suction": int(role_qty.get(component_id, {}).get("suction", 0)),
+                "qty_discharge": int(role_qty.get(component_id, {}).get("discharge", 0)),
+                "qty_other": int(role_qty.get(component_id, {}).get("other", 0)),
             }
         )
     return bom
@@ -903,6 +962,21 @@ def _inventory_summary(bom: list[Dict[str, Any]]) -> Dict[str, Any]:
         for item in bom
         if item.get("category") == "connector"
     )
+    solenoid_suction_total = sum(
+        int(item.get("qty_suction", 0))
+        for item in bom
+        if item.get("category") == "valve"
+    )
+    solenoid_discharge_total = sum(
+        int(item.get("qty_discharge", 0))
+        for item in bom
+        if item.get("category") == "valve"
+    )
+    solenoid_total = sum(
+        int(item["qty"])
+        for item in bom
+        if item.get("category") == "valve"
+    )
     base_usage: Dict[str, int] = {}
     extra_usage: Dict[str, int] = {}
     for item in bom:
@@ -911,6 +985,9 @@ def _inventory_summary(bom: list[Dict[str, Any]]) -> Dict[str, Any]:
     return {
         "hose_total_used_m": round(hose_total_used_m, 3),
         "tee_total_used": tee_total_used,
+        "solenoid_suction_total": solenoid_suction_total,
+        "solenoid_discharge_total": solenoid_discharge_total,
+        "solenoid_total": solenoid_total,
         "base_vs_extra_usage": {
             "base": base_usage,
             "extra": extra_usage,

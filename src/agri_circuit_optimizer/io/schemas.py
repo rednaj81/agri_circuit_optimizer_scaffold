@@ -178,6 +178,7 @@ SCENARIO_TABLE_SCHEMAS = {
             "notes",
         ),
         allow_blank_string_columns=("allowed_adaptor_pairs",),
+        optional_string_columns=("branch_role",),
     ),
     "destination_branch_templates": ScenarioTableSchema(
         required_columns=(
@@ -198,6 +199,7 @@ SCENARIO_TABLE_SCHEMAS = {
             "notes",
         ),
         allow_blank_string_columns=("allowed_adaptor_pairs",),
+        optional_string_columns=("branch_role",),
     ),
     "trunk_templates": ScenarioTableSchema(
         required_columns=("template_id", "stage_kind", "allowed_diameters", "notes"),

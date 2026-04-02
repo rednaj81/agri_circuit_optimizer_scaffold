@@ -10,6 +10,7 @@ def build_sets_and_parameters(data: Dict[str, Any], options: Dict[str, Any]) -> 
     """Normalize scenario and option data into a model-friendly payload."""
 
     routes = data["routes"].to_dict("records")
+    nodes = data["nodes"].to_dict("records")
     components = data["components"].to_dict("records")
     settings = data["settings"]
 
@@ -38,9 +39,11 @@ def build_sets_and_parameters(data: Dict[str, Any], options: Dict[str, Any]) -> 
         option["option_id"]: option for option in options["discharge_trunk_options"]
     }
     component_index = {component["component_id"]: component for component in components}
+    node_index = {node["node_id"]: node for node in nodes}
 
     payload = {
         "routes": {route["route_id"]: route for route in routes},
+        "nodes": node_index,
         "route_ids": route_ids,
         "mandatory_routes": [route["route_id"] for route in routes if route["mandatory"]],
         "optional_routes": [route["route_id"] for route in routes if not route["mandatory"]],
@@ -100,6 +103,24 @@ def build_sets_and_parameters(data: Dict[str, Any], options: Dict[str, Any]) -> 
         )
         for route_id, option_map in payload["route_meter_compatibility"].items()
     }
+    payload["route_other_source_nodes"] = {
+        route["route_id"]: sorted(node_id for node_id in source_nodes if node_id != route["source"])
+        for route in routes
+    }
+    payload["route_other_sink_nodes"] = {
+        route["route_id"]: sorted(node_id for node_id in sink_nodes if node_id != route["sink"])
+        for route in routes
+    }
+    payload["route_selectivity_source_keys"] = [
+        (route_id, node_id)
+        for route_id, node_ids in payload["route_other_source_nodes"].items()
+        for node_id in node_ids
+    ]
+    payload["route_selectivity_sink_keys"] = [
+        (route_id, node_id)
+        for route_id, node_ids in payload["route_other_sink_nodes"].items()
+        for node_id in node_ids
+    ]
 
     return {
         **payload,
