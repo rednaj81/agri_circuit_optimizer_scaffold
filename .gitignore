@@ -15,3 +15,4 @@ vendor/
 pytest-cache-files-*/
 data/output/*
 !data/output/.gitkeep
+pytest-cache-files/
