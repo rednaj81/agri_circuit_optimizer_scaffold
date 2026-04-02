@@ -1,0 +1,9 @@
+node_id,node_type,is_source,is_sink,is_pure_source,is_final_sink
+W,water_tank,1,0,1,0
+P1,product_tank,1,1,0,0
+P2,product_tank,1,1,0,0
+P3,product_tank,1,1,0,0
+M,mixer_tank,1,1,0,0
+I,incorporator_tank,1,1,0,0
+IR,incorporator_return,0,1,0,0
+S,external_outlet,0,1,0,1

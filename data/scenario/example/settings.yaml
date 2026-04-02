@@ -1,0 +1,10 @@
+project_name: example_scenario
+u_max_slots: 3
+v_max_slots: 3
+default_solver: highs
+optional_route_reward: 10.0
+robustness_weight: 0.1
+cleaning_cost_liters_per_operation: 5.0
+allowed_system_diameter_classes:
+  - g1
+  - g2

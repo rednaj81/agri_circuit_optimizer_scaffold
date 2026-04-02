@@ -1,0 +1,5 @@
+template_id,stage_kind,allowed_diameters,notes
+TSUC_G1,suction_trunk,g1,"Common suction trunk for g1"
+TSUC_G2,suction_trunk,g2,"Common suction trunk for g2"
+TDIS_G1,discharge_trunk,g1,"Common discharge trunk for g1"
+TDIS_G2,discharge_trunk,g2,"Common discharge trunk for g2"
