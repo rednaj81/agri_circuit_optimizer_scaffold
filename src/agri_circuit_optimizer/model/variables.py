@@ -116,4 +116,5 @@ def declare_variables(model: Any) -> None:
     model.discharge_trunk_selected = pyo.Var(model.DISCHARGE_TRUNK_OPTIONS, domain=pyo.Binary)
     model.flow_delivered_lpm = pyo.Var(model.ROUTES, domain=pyo.NonNegativeReals)
     model.total_loss_lpm_equiv = pyo.Var(model.ROUTES, domain=pyo.NonNegativeReals)
+    model.route_effective_q_max_lpm = pyo.Var(model.ROUTES, domain=pyo.NonNegativeReals)
     model.hydraulic_slack_lpm = pyo.Var(model.ROUTES, domain=pyo.NonNegativeReals)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from math import ceil, hypot, isnan
 from collections import Counter, defaultdict
 from itertools import product
 from typing import Any, Dict, Iterable, List
@@ -25,6 +26,7 @@ def build_stage_options(data: Dict[str, Any]) -> Dict[str, Any]:
         nodes=nodes,
         templates=data["source_branch_templates"].to_dict("records"),
         components=components,
+        settings=settings,
         stage_kind="source_branch",
         node_filter_key="is_source",
     )
@@ -32,14 +34,16 @@ def build_stage_options(data: Dict[str, Any]) -> Dict[str, Any]:
         nodes=nodes,
         templates=data["destination_branch_templates"].to_dict("records"),
         components=components,
+        settings=settings,
         stage_kind="destination_branch",
         node_filter_key="is_sink",
     )
-    pump_slot_options = _build_single_component_options(components, category="pump")
-    meter_slot_options = _build_single_component_options(components, category="meter")
+    pump_slot_options = _build_single_component_options(components, settings=settings, category="pump")
+    meter_slot_options = _build_single_component_options(components, settings=settings, category="meter")
     trunk_options = _build_trunk_options(
         templates=data["trunk_templates"].to_dict("records"),
         components=components,
+        settings=settings,
     )
 
     suction_trunk_options = trunk_options["suction_trunk"]
@@ -96,6 +100,7 @@ def _build_branch_options(
     nodes: List[Dict[str, Any]],
     templates: List[Dict[str, Any]],
     components: List[Dict[str, Any]],
+    settings: Dict[str, Any],
     stage_kind: str,
     node_filter_key: str,
 ) -> Dict[str, List[Dict[str, Any]]]:
@@ -134,7 +139,14 @@ def _build_branch_options(
                 valve_candidates,
                 check_candidates,
             ):
-                raw_components = [item for item in [hose, connector, valve, check] if item is not None]
+                raw_components = [item for item in [connector, valve, check] if item is not None]
+                modular_components, hose_length_m, hose_modules_used = _expand_hose_components(
+                    hose_component=hose,
+                    node=node,
+                    settings=settings,
+                    stage_kind=stage_kind,
+                )
+                raw_components = modular_components + raw_components
                 adapted_components = _attach_branch_adaptors(
                     system_class=hose["sys_diameter_class"],
                     raw_components=raw_components,
@@ -165,6 +177,8 @@ def _build_branch_options(
                             "uses_adaptor": any(
                                 component["category"] == "adaptor" for component in adapted_components
                             ),
+                            "hose_length_m": hose_length_m,
+                            "hose_modules_used": hose_modules_used,
                         },
                         dominance_key=(
                             stage_kind,
@@ -173,10 +187,18 @@ def _build_branch_options(
                             hose["sys_diameter_class"],
                             tuple(
                                 sorted(
+                                    component["component_id"]
+                                    for component in adapted_components
+                                    if bool(component.get("is_extra", False))
+                                )
+                            ),
+                            tuple(
+                                sorted(
                                     Counter(component["category"] for component in adapted_components).items()
                                 )
                             ),
                         ),
+                        settings=settings,
                     )
                 )
 
@@ -226,6 +248,7 @@ def _attach_branch_adaptors(
 
 def _build_single_component_options(
     components: List[Dict[str, Any]],
+    settings: Dict[str, Any],
     *,
     category: str,
 ) -> List[Dict[str, Any]]:
@@ -242,21 +265,28 @@ def _build_single_component_options(
             metadata={
                 "component_id": component["component_id"],
                 "is_bypass": bool(component["is_bypass"]),
+                "hose_length_m": _float_or_default(component.get("hose_length_m")),
+                "hose_modules_used": int(round(_float_or_default(component.get("hose_length_m")))),
             },
             dominance_key=(
                 category,
                 component["sys_diameter_class"],
                 bool(component["is_bypass"]),
+                tuple(
+                    [component["component_id"]] if bool(component.get("is_extra", False)) else []
+                ),
                 tuple(sorted(Counter([component["category"]]).items())),
             ),
+            settings=settings,
         )
         option["is_bypass"] = bool(component["is_bypass"])
         option["component_id"] = component["component_id"]
         if category == "meter":
-            option["meter_error_pct"] = float(component.get("meter_error_pct") or 0.0)
-            option["meter_batch_min_l"] = float(component.get("meter_batch_min_l") or 0.0)
-            option["meter_dose_q_max_lpm"] = float(
-                component.get("meter_dose_q_max_lpm") or component.get("q_max_lpm") or 0.0
+            option["meter_error_pct"] = _float_or_default(component.get("meter_error_pct"))
+            option["meter_batch_min_l"] = _float_or_default(component.get("meter_batch_min_l"))
+            option["meter_dose_q_max_lpm"] = _float_or_default(
+                component.get("meter_dose_q_max_lpm"),
+                default=_float_or_default(component.get("q_max_lpm")),
             )
         options.append(option)
 
@@ -267,6 +297,7 @@ def _build_trunk_options(
     *,
     templates: List[Dict[str, Any]],
     components: List[Dict[str, Any]],
+    settings: Dict[str, Any],
 ) -> Dict[str, List[Dict[str, Any]]]:
     hoses = [component for component in components if component["category"] == "hose"]
     connectors = [component for component in components if component["category"] == "connector"]
@@ -280,28 +311,57 @@ def _build_trunk_options(
             if component_matches_diameter(component, allowed_diameters)
         ]
         for hose in hose_candidates:
-            connector_candidates = [
-                component
-                for component in connectors
-                if component["sys_diameter_class"] == hose["sys_diameter_class"]
-            ]
+            consume_connector = _trunk_template_consumes_connector(template, settings)
+            connector_candidates = [None]
+            if consume_connector:
+                connector_candidates = [
+                    component
+                    for component in connectors
+                    if component["sys_diameter_class"] == hose["sys_diameter_class"]
+                ]
             for connector in connector_candidates:
+                modular_components, hose_length_m, hose_modules_used = _expand_trunk_hose_components(
+                    hose_component=hose,
+                    settings=settings,
+                    stage_kind=template["stage_kind"],
+                )
+                option_components = list(modular_components)
+                if connector is not None:
+                    option_components.append(connector)
                 options_by_stage[template["stage_kind"]].append(
                     _compose_option(
                         stage_kind=template["stage_kind"],
                         option_suffix=(
-                            f"{template['template_id']}_{hose['component_id']}_{connector['component_id']}"
+                            f"{template['template_id']}_{hose['component_id']}"
+                            + (f"_{connector['component_id']}" if connector is not None else "")
                         ),
                         sys_diameter_class=hose["sys_diameter_class"],
-                        components=[hose, connector],
+                        components=option_components,
                         applies_to=None,
-                        metadata={"template_id": template["template_id"]},
+                        metadata={
+                            "template_id": template["template_id"],
+                            "hose_length_m": hose_length_m,
+                            "hose_modules_used": hose_modules_used,
+                            "consume_connector": consume_connector,
+                        },
                         dominance_key=(
                             template["stage_kind"],
                             template["template_id"],
                             hose["sys_diameter_class"],
-                            tuple(sorted(Counter(["hose", "connector"]).items())),
+                            tuple(
+                                sorted(
+                                    component["component_id"]
+                                    for component in option_components
+                                    if bool(component.get("is_extra", False))
+                                )
+                            ),
+                            tuple(
+                                sorted(
+                                    Counter(component["category"] for component in option_components).items()
+                                )
+                            ),
                         ),
+                        settings=settings,
                     )
                 )
 
@@ -323,9 +383,35 @@ def _compose_option(
     applies_to: str | None,
     metadata: Dict[str, Any],
     dominance_key: Any,
+    settings: Dict[str, Any],
 ) -> Dict[str, Any]:
     component_ids = [component["component_id"] for component in components]
     category_profile = Counter(component["category"] for component in components)
+    hose_length_m = float(
+        _float_or_default(metadata.get("hose_length_m"))
+        or sum(_float_or_default(component.get("hose_length_m")) for component in components)
+    )
+    hose_modules_used = int(
+        metadata.get("hose_modules_used")
+        or round(sum(_float_or_default(component.get("hose_length_m")) for component in components))
+    )
+    q_local_base_lpm = float(min(float(component["q_max_lpm"]) for component in components))
+    bottleneck_component = min(
+        components,
+        key=lambda component: float(component["q_max_lpm"]),
+    )
+    q_max_effective, local_loss_lpm_equiv = _compute_effective_qmax(
+        components=components,
+        q_local_base_lpm=q_local_base_lpm,
+        hose_length_m=hose_length_m,
+        settings=settings,
+    )
+    base_component_counts = Counter(
+        component["component_id"] for component in components if not bool(component.get("is_extra", False))
+    )
+    extra_component_counts = Counter(
+        component["component_id"] for component in components if bool(component.get("is_extra", False))
+    )
 
     return {
         "option_id": f"{stage_kind}__{option_suffix}",
@@ -336,15 +422,155 @@ def _compose_option(
         "component_counts": dict(Counter(component_ids)),
         "cost": float(sum(float(component["cost"]) for component in components)),
         "q_min_lpm": float(max(float(component["q_min_lpm"]) for component in components)),
-        "q_max_lpm": float(min(float(component["q_max_lpm"]) for component in components)),
-        "loss_lpm_equiv": float(sum(float(component["loss_lpm_equiv"]) for component in components)),
+        "q_max_lpm": q_max_effective,
+        "loss_lpm_equiv": local_loss_lpm_equiv,
         "internal_volume_l": float(
             sum(float(component["internal_volume_l"]) for component in components)
         ),
+        "hose_length_m": hose_length_m,
+        "hose_modules_used": hose_modules_used,
+        "q_local_base_lpm": q_local_base_lpm,
+        "q_local_effective_lpm": q_max_effective,
+        "bottleneck_component_id": bottleneck_component["component_id"],
+        "base_component_counts": dict(base_component_counts),
+        "extra_component_counts": dict(extra_component_counts),
         "category_profile": dict(category_profile),
-        "metadata": metadata,
+        "metadata": {
+            **metadata,
+            "hydraulic_mode": settings.get("hydraulic_loss_mode", "additive_lpm"),
+            "q_local_base_lpm": q_local_base_lpm,
+            "q_local_effective_lpm": q_max_effective,
+            "bottleneck_component_id": bottleneck_component["component_id"],
+            "base_component_counts": dict(base_component_counts),
+            "extra_component_counts": dict(extra_component_counts),
+        },
         "dominance_key": dominance_key,
     }
+
+
+def _expand_hose_components(
+    *,
+    hose_component: Dict[str, Any],
+    node: Dict[str, Any],
+    settings: Dict[str, Any],
+    stage_kind: str,
+) -> tuple[List[Dict[str, Any]], float, int]:
+    if settings.get("hydraulic_loss_mode", "additive_lpm") != "bottleneck_plus_length":
+        return [hose_component], _float_or_default(hose_component.get("hose_length_m")), 1
+
+    required_hose_m = _compute_branch_hose_length(node=node, settings=settings, stage_kind=stage_kind)
+    module_m = _float_or_default(
+        hose_component.get("hose_length_m"),
+        default=_float_or_default(settings.get("hose_module_m"), default=1.0),
+    )
+    hose_modules_used = max(1, int(ceil(required_hose_m / module_m)))
+    hose_length_m = hose_modules_used * module_m
+    return [hose_component] * hose_modules_used, hose_length_m, hose_modules_used
+
+
+def _expand_trunk_hose_components(
+    *,
+    hose_component: Dict[str, Any],
+    settings: Dict[str, Any],
+    stage_kind: str,
+) -> tuple[List[Dict[str, Any]], float, int]:
+    if settings.get("hydraulic_loss_mode", "additive_lpm") != "bottleneck_plus_length":
+        return [hose_component], _float_or_default(hose_component.get("hose_length_m")), 1
+
+    required_hose_m = _float_or_default(
+        settings.get(f"trunk_length_{stage_kind.replace('_trunk', '')}_m")
+    )
+    module_m = _float_or_default(
+        hose_component.get("hose_length_m"),
+        default=_float_or_default(settings.get("hose_module_m"), default=1.0),
+    )
+    hose_modules_used = max(1, int(ceil(required_hose_m / module_m)))
+    hose_length_m = hose_modules_used * module_m
+    return [hose_component] * hose_modules_used, hose_length_m, hose_modules_used
+
+
+def _compute_branch_hose_length(
+    *,
+    node: Dict[str, Any],
+    settings: Dict[str, Any],
+    stage_kind: str,
+) -> float:
+    manifold_prefix = "suction" if stage_kind == "source_branch" else "discharge"
+    manifold_x = _float_or_default(settings.get(f"{manifold_prefix}_manifold_x_m"))
+    manifold_y = _float_or_default(settings.get(f"{manifold_prefix}_manifold_y_m"))
+    distance = hypot(
+        _float_or_default(node.get("x_m")) - manifold_x,
+        _float_or_default(node.get("y_m")) - manifold_y,
+    )
+    return max(
+        _float_or_default(settings.get("minimum_branch_hose_m")),
+        distance * _float_or_default(settings.get("bend_factor"), default=1.0)
+        + _float_or_default(settings.get("connection_margin_m")),
+    )
+
+
+def _compute_effective_qmax(
+    *,
+    components: List[Dict[str, Any]],
+    q_local_base_lpm: float,
+    hose_length_m: float,
+    settings: Dict[str, Any],
+) -> tuple[float, float]:
+    if settings.get("hydraulic_loss_mode", "additive_lpm") != "bottleneck_plus_length":
+        return q_local_base_lpm, float(sum(float(component["loss_lpm_equiv"]) for component in components))
+
+    hose_loss_pct_per_m = max(
+        [
+            _float_or_default(component.get("hose_loss_pct_per_m"))
+            for component in components
+            if component["category"] == "hose"
+        ]
+        or [0.0]
+    )
+    length_factor = max(
+        _float_or_default(settings.get("min_length_factor"), default=0.1),
+        1.0 - hose_loss_pct_per_m * hose_length_m,
+    )
+    q_local_effective = q_local_base_lpm * length_factor
+    return q_local_effective, q_local_base_lpm - q_local_effective
+
+
+def _trunk_template_consumes_connector(template: Dict[str, Any], settings: Dict[str, Any]) -> bool:
+    if "consume_connector" in template:
+        return _bool_or_default(template["consume_connector"])
+    if settings.get("hydraulic_loss_mode", "additive_lpm") == "bottleneck_plus_length":
+        return _bool_or_default(settings.get("maquette_trunks_consume_connectors"), default=True)
+    return True
+
+
+def _float_or_default(value: Any, default: float = 0.0) -> float:
+    if value is None:
+        return float(default)
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return float(default)
+    if isnan(numeric):
+        return float(default)
+    return numeric
+
+
+def _bool_or_default(value: Any, default: bool = False) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        if isinstance(value, float) and isnan(value):
+            return default
+        return bool(int(value))
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"1", "true", "yes", "y"}:
+            return True
+        if normalized in {"0", "false", "no", "n", ""}:
+            return False
+    return default
 
 
 def _build_route_class_feasibility(

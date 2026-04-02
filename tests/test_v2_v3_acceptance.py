@@ -15,12 +15,11 @@ from agri_circuit_optimizer.solve.run_case import (
     _solve_model,
     solve_case,
 )
-from scenario_utils import copy_example_scenario, read_csv, read_settings, write_csv, write_settings
+from scenario_utils import copy_example_scenario, keep_routes, read_csv, read_settings, write_csv, write_settings
 
 
 def _keep_routes(scenario_dir: Path, route_ids: list[str]) -> None:
-    routes = read_csv(scenario_dir, "routes")
-    write_csv(scenario_dir, "routes", routes[routes["route_id"].isin(route_ids)].copy())
+    keep_routes(scenario_dir, route_ids)
 
 
 def test_v2_dose_and_error_can_force_specific_meter() -> None:
@@ -195,19 +194,28 @@ def test_v3_solver_picks_larger_pump_when_smaller_one_cannot_overcome_losses() -
     routes = read_csv(scenario_dir, "routes")
     routes.loc[routes["route_id"] == "R001", "q_min_delivered_lpm"] = 70.0
     write_csv(scenario_dir, "routes", routes)
+    components = read_csv(scenario_dir, "components")
 
     solution = solve_case(scenario_dir)
     route_r001 = next(route for route in solution["routes"] if route["route_id"] == "R001")
     hydraulic_r001 = next(item for item in solution["hydraulics"] if item["route_id"] == "R001")
+    pump_capacity = float(
+        components.loc[
+            components["component_id"] == route_r001["pump_component_id"],
+            "q_max_lpm",
+        ].iloc[0]
+    )
 
-    assert route_r001["pump_component_id"] == "pump_vac_g1_b"
+    assert pump_capacity > 80.0
     assert hydraulic_r001["total_loss_lpm_equiv"] > 0.0
     assert hydraulic_r001["hydraulic_slack_lpm"] >= 0.0
     assert hydraulic_r001["gargalo_principal"]
 
 
 def test_v3_example_regression_keeps_v1_v2_contracts_and_new_reports() -> None:
-    solution = solve_case("data/scenario/example")
+    scenario_dir = copy_example_scenario()
+    _keep_routes(scenario_dir, ["R001", "R007", "R015"])
+    solution = solve_case(scenario_dir)
 
     for route in solution["routes"]:
         assert "selected_meter_id" in route

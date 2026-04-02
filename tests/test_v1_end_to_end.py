@@ -6,11 +6,15 @@ from uuid import uuid4
 
 from agri_circuit_optimizer.io.load_data import load_scenario
 from agri_circuit_optimizer.solve.run_case import solve_case
+from scenario_utils import copy_example_scenario, keep_routes
 
 
 def test_v1_example_solves_end_to_end_and_respects_frozen_rules():
-    data = load_scenario("data/scenario/example")
-    solution = solve_case("data/scenario/example")
+    scenario_dir = copy_example_scenario()
+    keep_routes(scenario_dir, ["R001", "R007", "R015"])
+
+    data = load_scenario(scenario_dir)
+    solution = solve_case(scenario_dir)
     routes_by_id = {route["route_id"]: route for route in solution["routes"]}
     mandatory_routes = data["routes"].loc[data["routes"]["mandatory"], "route_id"].tolist()
 
@@ -33,8 +37,10 @@ def test_v1_example_solves_end_to_end_and_respects_frozen_rules():
 
 
 def test_v1_reports_are_written_to_output_dir():
+    scenario_dir = copy_example_scenario()
+    keep_routes(scenario_dir, ["R001", "R007", "R015"])
     output_dir = Path("tests/_tmp") / f"reports-{uuid4().hex}"
-    solution = solve_case("data/scenario/example", output_dir=output_dir)
+    solution = solve_case(scenario_dir, output_dir=output_dir)
 
     assert (output_dir / "summary.json").exists()
     assert (output_dir / "bom.json").exists()

@@ -73,7 +73,7 @@ def _coerce_table_types(frame: Any, table_name: str) -> Any:
 
     for column in schema.string_columns:
         coerced[column] = coerced[column].fillna("").astype(str).str.strip()
-        if (coerced[column] == "").any():
+        if column not in schema.allow_blank_string_columns and (coerced[column] == "").any():
             raise ScenarioValidationError(
                 f"Table '{table_name}' contains blank values in required text column '{column}'."
             )
@@ -98,6 +98,43 @@ def _coerce_table_types(frame: Any, table_name: str) -> Any:
         coerced[column] = numeric.astype(float)
 
     for column in schema.nullable_float_columns:
+        coerced[column] = pd.to_numeric(coerced[column], errors="coerce")
+
+    for column in schema.optional_string_columns:
+        if column not in coerced.columns:
+            continue
+        coerced[column] = coerced[column].fillna("").astype(str).str.strip()
+
+    for column in schema.optional_boolean_columns:
+        if column not in coerced.columns:
+            continue
+        coerced[column] = coerced[column].map(
+            lambda value: _normalize_bool(value, column, table_name) if pd.notna(value) else False
+        )
+
+    for column in schema.optional_integer_columns:
+        if column not in coerced.columns:
+            continue
+        numeric = pd.to_numeric(coerced[column], errors="coerce")
+        if numeric.isna().any():
+            raise ScenarioValidationError(
+                f"Table '{table_name}' contains non-integer values in optional column '{column}'."
+            )
+        coerced[column] = numeric.astype(int)
+
+    for column in schema.optional_float_columns:
+        if column not in coerced.columns:
+            continue
+        numeric = pd.to_numeric(coerced[column], errors="coerce")
+        if numeric.isna().any():
+            raise ScenarioValidationError(
+                f"Table '{table_name}' contains non-numeric values in optional column '{column}'."
+            )
+        coerced[column] = numeric.astype(float)
+
+    for column in schema.optional_nullable_float_columns:
+        if column not in coerced.columns:
+            continue
         coerced[column] = pd.to_numeric(coerced[column], errors="coerce")
 
     return coerced
@@ -133,11 +170,64 @@ def _validate_settings(settings: Dict[str, Any]) -> Dict[str, Any]:
         for value in normalized.get("allowed_system_diameter_classes", [])
         if str(value).strip()
     ]
+    normalized["hydraulic_loss_mode"] = str(
+        normalized.get("hydraulic_loss_mode", "additive_lpm")
+    ).strip() or "additive_lpm"
+    normalized["hose_total_available_m"] = float(normalized.get("hose_total_available_m", 0.0))
+    normalized["hose_module_m"] = float(normalized.get("hose_module_m", 1.0))
+    normalized["bend_factor"] = float(normalized.get("bend_factor", 1.0))
+    normalized["connection_margin_m"] = float(normalized.get("connection_margin_m", 0.0))
+    normalized["minimum_branch_hose_m"] = float(normalized.get("minimum_branch_hose_m", 0.0))
+    normalized["suction_manifold_x_m"] = (
+        float(normalized["suction_manifold_x_m"])
+        if normalized.get("suction_manifold_x_m") is not None
+        else None
+    )
+    normalized["suction_manifold_y_m"] = (
+        float(normalized["suction_manifold_y_m"])
+        if normalized.get("suction_manifold_y_m") is not None
+        else None
+    )
+    normalized["discharge_manifold_x_m"] = (
+        float(normalized["discharge_manifold_x_m"])
+        if normalized.get("discharge_manifold_x_m") is not None
+        else None
+    )
+    normalized["discharge_manifold_y_m"] = (
+        float(normalized["discharge_manifold_y_m"])
+        if normalized.get("discharge_manifold_y_m") is not None
+        else None
+    )
+    normalized["trunk_length_suction_m"] = float(normalized.get("trunk_length_suction_m", 0.0))
+    normalized["trunk_length_discharge_m"] = float(normalized.get("trunk_length_discharge_m", 0.0))
+    normalized["prefer_shorter_hose_weight"] = float(normalized.get("prefer_shorter_hose_weight", 0.0))
+    normalized["count_external_hose_inside_total"] = _normalize_bool(
+        normalized.get("count_external_hose_inside_total", False),
+        "count_external_hose_inside_total",
+        "settings",
+    )
+    normalized["allow_meter_extra"] = _normalize_bool(
+        normalized.get("allow_meter_extra", True),
+        "allow_meter_extra",
+        "settings",
+    )
+    normalized["maquette_trunks_consume_connectors"] = _normalize_bool(
+        normalized.get("maquette_trunks_consume_connectors", True),
+        "maquette_trunks_consume_connectors",
+        "settings",
+    )
+    normalized["min_length_factor"] = float(normalized.get("min_length_factor", 0.1))
 
     if normalized["u_max_slots"] <= 0 or normalized["v_max_slots"] <= 0:
         raise ScenarioValidationError("settings.yaml slots must be positive integers.")
     if not normalized["default_solver"]:
         raise ScenarioValidationError("settings.yaml key 'default_solver' must not be blank.")
+    if normalized["hose_module_m"] <= 0:
+        raise ScenarioValidationError("settings.yaml key 'hose_module_m' must be positive.")
+    if normalized["bend_factor"] <= 0:
+        raise ScenarioValidationError("settings.yaml key 'bend_factor' must be positive.")
+    if normalized["min_length_factor"] <= 0 or normalized["min_length_factor"] > 1:
+        raise ScenarioValidationError("settings.yaml key 'min_length_factor' must be in (0, 1].")
 
     return normalized
 
@@ -201,6 +291,27 @@ def _validate_nodes_routes_components(data: Dict[str, Any]) -> None:
         raise ScenarioValidationError("components.csv must contain at least one pump.")
     if not (components["category"] == "meter").any():
         raise ScenarioValidationError("components.csv must contain at least one meter or bypass.")
+
+    if "hose_length_m" in components.columns:
+        invalid_hose_length = components.loc[
+            components["hose_length_m"].notna() & (components["hose_length_m"] <= 0), "component_id"
+        ].tolist()
+        if invalid_hose_length:
+            raise ScenarioValidationError(
+                f"Components with non-positive hose_length_m are invalid: {invalid_hose_length}."
+            )
+
+    if "x_m" in nodes.columns or "y_m" in nodes.columns:
+        x_series = nodes["x_m"] if "x_m" in nodes.columns else None
+        y_series = nodes["y_m"] if "y_m" in nodes.columns else None
+        if x_series is None or y_series is None:
+            missing_coordinates = nodes["node_id"].tolist()
+        else:
+            missing_coordinates = nodes.loc[x_series.isna() | y_series.isna(), "node_id"].tolist()
+        if missing_coordinates:
+            raise ScenarioValidationError(
+                f"Nodes with geometry must define both x_m and y_m: {missing_coordinates}."
+            )
 
 
 def _load_and_validate_csv(path: Path, table_name: str) -> Any:

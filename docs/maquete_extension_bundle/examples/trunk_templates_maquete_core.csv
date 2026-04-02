@@ -1,0 +1,3 @@
+template_id,stage_kind,allowed_diameters,notes,consume_connector
+TSUC_G1,suction_trunk,g1,Common suction trunk for maquette_core,0
+TDIS_G1,discharge_trunk,g1,Common discharge trunk for maquette_core,0

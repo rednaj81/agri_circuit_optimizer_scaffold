@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from math import isnan
 from itertools import combinations_with_replacement
 from pathlib import Path
 from typing import Any, Dict
@@ -18,6 +19,8 @@ from agri_circuit_optimizer.preprocess.feasibility import (
     compute_route_min_flow,
     summarize_route_hydraulics,
 )
+
+EXTRA_USAGE_EPSILON = 1e-3
 
 
 def parse_args() -> argparse.Namespace:
@@ -53,6 +56,8 @@ def solve_case(
     except Exception as exc:
         solution = _solve_case_fallback(data, options, solver_name or data["settings"]["default_solver"])
         solution["summary"]["solver_fallback_reason"] = str(exc)
+
+    solution["summary"].update(_inventory_summary(solution.get("bom", [])))
 
     if output_dir is not None:
         write_reports(solution, output_dir)
@@ -370,11 +375,20 @@ def _solve_case_fallback(data: Dict[str, Any], options: Dict[str, Any], solver_n
                             item["hydraulics"]["hydraulic_slack_lpm"] for item in assignment.values()
                         )
                         material_cost = sum(item["total_cost"] for item in bom)
+                        extra_usage_penalty = EXTRA_USAGE_EPSILON * sum(
+                            int(item["qty"]) for item in bom if bool(item.get("is_extra", False))
+                        )
                         cleaning_penalty = float(settings["cleaning_cost_liters_per_operation"]) * len(active_routes)
                         optional_reward = float(settings["optional_route_reward"]) * sum(
                             float(route["weight"]) for route in optional_subset
                         )
-                        objective_value = material_cost + cleaning_penalty - optional_reward - hydraulic_bonus
+                        objective_value = (
+                            material_cost
+                            + extra_usage_penalty
+                            + cleaning_penalty
+                            - optional_reward
+                            - hydraulic_bonus
+                        )
 
                         if best_objective is None or objective_value < best_objective:
                             topology_source_options = {
@@ -710,9 +724,13 @@ def _build_bom_from_fallback(
         bom.append(
             {
                 "component_id": component_id,
+                "category": component_index[component_id]["category"],
                 "qty": qty,
                 "unit_cost": unit_cost,
                 "total_cost": round(qty * unit_cost, 3),
+                "is_extra": bool(component_index[component_id].get("is_extra", False)),
+                "extra_penalty_group": component_index[component_id].get("extra_penalty_group", ""),
+                "hose_length_m": _float_or_default(component_index[component_id].get("hose_length_m")),
             }
         )
     return bom
@@ -794,6 +812,10 @@ def _build_reports_from_assignment(
                 "meter_error_ok": bool(meter_flags["error_ok"]),
                 "source_option_id": item["source_option"]["option_id"],
                 "destination_option_id": item["destination_option"]["option_id"],
+                "source_branch_hose_m": float(hydraulics["source_branch_hose_m"]),
+                "destination_branch_hose_m": float(hydraulics["destination_branch_hose_m"]),
+                "route_effective_q_max_lpm": float(hydraulics["route_effective_q_max_lpm"]),
+                "hydraulic_mode": hydraulics["hydraulic_mode"],
             }
         )
         hydraulics_report.append(
@@ -805,8 +827,12 @@ def _build_reports_from_assignment(
                 "flow_delivered_lpm": flow,
                 "q_min_required_lpm": float(route["q_min_delivered_lpm"]),
                 "total_loss_lpm_equiv": float(hydraulics["total_loss_lpm_equiv"]),
+                "route_effective_q_max_lpm": float(hydraulics["route_effective_q_max_lpm"]),
                 "hydraulic_slack_lpm": float(hydraulics["hydraulic_slack_lpm"]),
                 "gargalo_principal": hydraulics["bottleneck_label"],
+                "bottleneck_component_id": hydraulics["bottleneck_component_id"],
+                "route_hose_total_m": float(hydraulics["route_hose_total_m"]),
+                "hydraulic_mode": hydraulics["hydraulic_mode"],
             }
         )
 
@@ -854,12 +880,54 @@ def _build_bom(
         bom.append(
             {
                 "component_id": component_id,
+                "category": payload["components"][component_id]["category"],
                 "qty": qty,
                 "unit_cost": unit_cost,
                 "total_cost": round(qty * unit_cost, 3),
+                "is_extra": bool(payload["components"][component_id].get("is_extra", False)),
+                "extra_penalty_group": payload["components"][component_id].get("extra_penalty_group", ""),
+                "hose_length_m": _float_or_default(payload["components"][component_id].get("hose_length_m")),
             }
         )
     return bom
+
+
+def _inventory_summary(bom: list[Dict[str, Any]]) -> Dict[str, Any]:
+    hose_total_used_m = sum(
+        float(item.get("hose_length_m", 0.0)) * int(item["qty"])
+        for item in bom
+        if item.get("category") == "hose"
+    )
+    tee_total_used = sum(
+        int(item["qty"])
+        for item in bom
+        if item.get("category") == "connector"
+    )
+    base_usage: Dict[str, int] = {}
+    extra_usage: Dict[str, int] = {}
+    for item in bom:
+        target = extra_usage if item.get("is_extra", False) else base_usage
+        target[item["component_id"]] = int(item["qty"])
+    return {
+        "hose_total_used_m": round(hose_total_used_m, 3),
+        "tee_total_used": tee_total_used,
+        "base_vs_extra_usage": {
+            "base": base_usage,
+            "extra": extra_usage,
+        },
+    }
+
+
+def _float_or_default(value: Any, default: float = 0.0) -> float:
+    if value is None:
+        return float(default)
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return float(default)
+    if isnan(numeric):
+        return float(default)
+    return numeric
 
 
 def main() -> None:

@@ -25,6 +25,11 @@ class NodeRecord:
     is_sink: bool
     is_pure_source: bool
     is_final_sink: bool
+    x_m: Optional[float] = None
+    y_m: Optional[float] = None
+    footprint_w_m: Optional[float] = None
+    footprint_d_m: Optional[float] = None
+    mount_height_m: Optional[float] = None
 
 
 @dataclass(frozen=True)
@@ -60,6 +65,12 @@ class ComponentRecord:
     has_valve: bool = False
     is_bypass: bool = False
     is_empty_option: bool = False
+    hose_length_m: Optional[float] = None
+    hose_loss_pct_per_m: Optional[float] = None
+    is_extra: bool = False
+    extra_penalty_group: Optional[str] = None
+    consume_connector_in_trunk: Optional[bool] = None
+    preferred_for_maquette: Optional[bool] = None
 
 
 @dataclass(frozen=True)
@@ -70,6 +81,12 @@ class ScenarioTableSchema:
     float_columns: tuple[str, ...] = ()
     nullable_float_columns: tuple[str, ...] = ()
     string_columns: tuple[str, ...] = ()
+    optional_boolean_columns: tuple[str, ...] = ()
+    optional_integer_columns: tuple[str, ...] = ()
+    optional_float_columns: tuple[str, ...] = ()
+    optional_nullable_float_columns: tuple[str, ...] = ()
+    optional_string_columns: tuple[str, ...] = ()
+    allow_blank_string_columns: tuple[str, ...] = ()
 
 
 SCENARIO_TABLE_SCHEMAS = {
@@ -84,6 +101,7 @@ SCENARIO_TABLE_SCHEMAS = {
         ),
         boolean_columns=("is_source", "is_sink", "is_pure_source", "is_final_sink"),
         string_columns=("node_id", "node_type"),
+        optional_float_columns=("x_m", "y_m", "footprint_w_m", "footprint_d_m", "mount_height_m"),
     ),
     "routes": ScenarioTableSchema(
         required_columns=(
@@ -137,6 +155,9 @@ SCENARIO_TABLE_SCHEMAS = {
             "meter_dose_q_max_lpm",
         ),
         string_columns=("component_id", "category", "subtype", "sys_diameter_class"),
+        optional_nullable_float_columns=("hose_length_m", "hose_loss_pct_per_m"),
+        optional_boolean_columns=("is_extra", "consume_connector_in_trunk", "preferred_for_maquette"),
+        optional_string_columns=("extra_penalty_group",),
     ),
     "source_branch_templates": ScenarioTableSchema(
         required_columns=(
@@ -156,6 +177,7 @@ SCENARIO_TABLE_SCHEMAS = {
             "allowed_adaptor_pairs",
             "notes",
         ),
+        allow_blank_string_columns=("allowed_adaptor_pairs",),
     ),
     "destination_branch_templates": ScenarioTableSchema(
         required_columns=(
@@ -175,10 +197,12 @@ SCENARIO_TABLE_SCHEMAS = {
             "allowed_adaptor_pairs",
             "notes",
         ),
+        allow_blank_string_columns=("allowed_adaptor_pairs",),
     ),
     "trunk_templates": ScenarioTableSchema(
         required_columns=("template_id", "stage_kind", "allowed_diameters", "notes"),
         string_columns=("template_id", "stage_kind", "allowed_diameters", "notes"),
+        optional_boolean_columns=("consume_connector",),
     ),
 }
 

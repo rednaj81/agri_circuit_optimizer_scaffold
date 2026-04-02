@@ -245,6 +245,16 @@ def add_structure_constraints(model: Any) -> None:
         model.ROUTE_PUMP_ASSIGNMENT_KEYS, rule=route_pump_slot_activation_rule
     )
 
+    def pump_option_usage_required_rule(model: Any, slot: int, option_id: str) -> Any:
+        return model.pump_option_selected[slot, option_id] <= sum(
+            model.route_uses_pump_option[route_id, slot, option_id]
+            for route_id in payload["route_ids"]
+        )
+
+    model.pump_option_usage_required = pyo.Constraint(
+        model.PUMP_OPTION_KEYS, rule=pump_option_usage_required_rule
+    )
+
     def route_meter_slot_activation_rule(model: Any, route_id: str, slot: int) -> Any:
         return model.route_uses_meter_slot[route_id, slot] <= sum(
             model.meter_option_selected[slot, option_id] for option_id in payload["meter_option_ids"]
@@ -252,4 +262,14 @@ def add_structure_constraints(model: Any) -> None:
 
     model.route_meter_slot_activation = pyo.Constraint(
         model.ROUTE_METER_ASSIGNMENT_KEYS, rule=route_meter_slot_activation_rule
+    )
+
+    def meter_option_usage_required_rule(model: Any, slot: int, option_id: str) -> Any:
+        return model.meter_option_selected[slot, option_id] <= sum(
+            model.route_uses_meter_option[route_id, slot, option_id]
+            for route_id in payload["route_ids"]
+        )
+
+    model.meter_option_usage_required = pyo.Constraint(
+        model.METER_OPTION_KEYS, rule=meter_option_usage_required_rule
     )

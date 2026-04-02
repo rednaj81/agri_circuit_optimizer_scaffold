@@ -7,6 +7,7 @@ Implementação incremental de um solucionador para síntese de circuito hidráu
 - restrições de vazão mínima na saída
 - restrições de dosagem mínima com margem de erro
 - viabilidade hidráulica simplificada
+- validação física simplificada da maquete
 - evolução por versões V1, V2 e V3
 
 ## Objetivo do sistema
@@ -85,21 +86,29 @@ python -m agri_circuit_optimizer.solve.run_case --scenario data/scenario/example
 python -m agri_circuit_optimizer.solve.run_case --scenario data/scenario/example --output-dir data/output/example_v3
 ```
 
+### Cenário da maquete
+
+```powershell
+.\.venv\Scripts\activate
+python -m agri_circuit_optimizer.solve.run_case --scenario data/scenario/maquete_core --dry-run
+python -m agri_circuit_optimizer.solve.run_case --scenario data/scenario/maquete_core --output-dir data/output/maquete_core
+```
+
 ## Execução validada nesta máquina
 
 Os comandos abaixo foram executados com sucesso neste workspace:
 
 ```powershell
-$env:PYTHONPATH = 'src'
-pytest -q tests --basetemp tests/_tmp/pytest-basetemp
-C:\Python312\python.exe -m agri_circuit_optimizer.solve.run_case --scenario data/scenario/example --dry-run
-C:\Python312\python.exe -m agri_circuit_optimizer.solve.run_case --scenario data/scenario/example --output-dir data/output/example_v3
+.\.venv\Scripts\python.exe -m pytest -q tests --basetemp tests/_tmp/pytest-basetemp
+.\.venv\Scripts\python.exe -m agri_circuit_optimizer.solve.run_case --scenario data/scenario/example --dry-run
+.\.venv\Scripts\python.exe -m agri_circuit_optimizer.solve.run_case --scenario data/scenario/maquete_core --dry-run
+.\.venv\Scripts\python.exe -m agri_circuit_optimizer.solve.run_case --scenario data/scenario/maquete_core --output-dir data/output/maquete_core
 ```
 
 Observações:
-- O ambiente atual não tem `pyomo` instalado, então o runner usa o fallback enumerativo.
-- Quando `pyomo` e HiGHS estiverem disponíveis, `solve_case` tenta o caminho Pyomo primeiro.
-- Os relatórios são gravados em `data/output/example_v3/`.
+- A `.venv` deste workspace consegue importar `pyomo` e `highspy`.
+- `solve_case` tenta Pyomo primeiro e cai para o fallback enumerativo quando necessário.
+- Os relatórios são gravados em `data/output/example_v3/` e `data/output/maquete_core/`.
 
 ## O que está implementado
 
@@ -125,9 +134,24 @@ Observações:
 - `hydraulic_slack_lpm` por rota
 - relatórios de hidráulica com perda total, folga e gargalo principal
 
+### Extensão da maquete
+- cenário `data/scenario/maquete_core/`
+- colunas opcionais de geometria e mangueira no loader
+- mangueira modular de `1 m` com consumo físico na BOM
+- conectores T como itens reais de material
+- troncos sem consumo de T no modo da maquete
+- modo hidráulico `bottleneck_plus_length`
+- resumo de estoque com `hose_total_used_m`, `tee_total_used` e `base_vs_extra_usage`
+
 ## Relatórios gerados
 
 Em `data/output/example_v3/`:
+- `summary.json`
+- `bom.json`
+- `routes.json`
+- `hydraulics.json`
+
+Em `data/output/maquete_core/`:
 - `summary.json`
 - `bom.json`
 - `routes.json`
@@ -144,19 +168,30 @@ Os relatórios hidráulicos incluem:
 - `total_loss_lpm_equiv`
 - `hydraulic_slack_lpm`
 - `gargalo_principal`
+- `route_effective_q_max_lpm`
+- `route_hose_total_m`
+- `bottleneck_component_id`
+
+O resumo da maquete também inclui:
+- `hose_total_used_m`
+- `tee_total_used`
+- `base_vs_extra_usage`
 
 ## Testes
 
 Cobertura mínima de aceite já incluída:
 - validação do contrato e das regras congeladas
 - geração de opções e poda
-- regressão end-to-end do `example`
+- regressão end-to-end do `example` em fatia representativa
 - medidor específico por dose/erro
 - inviabilidade por medidor incompatível
 - bypass permitido sem medição obrigatória
 - incompatibilidade de classe
 - inviabilidade por perdas excessivas
 - escolha de bomba maior quando a menor não vence as perdas
+- loader, preprocessamento, hidráulica e relatórios do `maquete_core`
+- consistência Pyomo/fallback em slice reduzida da maquete
+- gargalo por T e sensibilidade a comprimento na maquete
 
 ## Roadmap
 
@@ -166,6 +201,10 @@ Concluído:
 - T03 — modelo/runner V1
 - T04 — medição e dosagem
 - T05 — bitolas e hidráulica simplificada
+- T09 — contrato e cenário da maquete
+- T10 — geometria e mangueira modular
+- T11 — modo `bottleneck_plus_length`
+- T12 — testes e relatórios da maquete
 
 Próximos passos naturais:
 - consolidar execução Pyomo real no ambiente com `pyomo` + HiGHS

@@ -75,6 +75,9 @@ def summarize_route_hydraulics(
     discharge_option: Dict[str, Any],
     flow_delivered_lpm: float | None = None,
 ) -> Dict[str, Any]:
+    hydraulic_mode = str(
+        source_option.get("metadata", {}).get("hydraulic_mode", "additive_lpm")
+    ).strip() or "additive_lpm"
     meter_effective_q_max = float(meter_option.get("q_max_lpm", 0.0))
     if bool(route.get("measurement_required", False)):
         meter_effective_q_max = min(
@@ -97,10 +100,13 @@ def summarize_route_hydraulics(
         "discharge_trunk": float(discharge_option.get("loss_lpm_equiv", 0.0)),
         "destination_branch": float(destination_option.get("loss_lpm_equiv", 0.0)),
     }
-    total_loss = sum(stage_losses.values())
-    effective_stage_capacity = {
-        **stage_qmax,
-        "pump_after_losses": max(0.0, stage_qmax["pump"] - total_loss),
+    stage_bottleneck_component = {
+        "source_branch": source_option.get("bottleneck_component_id"),
+        "suction_trunk": suction_option.get("bottleneck_component_id"),
+        "pump": pump_option.get("metadata", {}).get("component_id"),
+        "meter": meter_option.get("metadata", {}).get("component_id"),
+        "discharge_trunk": discharge_option.get("bottleneck_component_id"),
+        "destination_branch": destination_option.get("bottleneck_component_id"),
     }
     required_flow = flow_delivered_lpm
     if required_flow is None:
@@ -113,30 +119,47 @@ def summarize_route_hydraulics(
             suction_option=suction_option,
             discharge_option=discharge_option,
         )
-    route_capacity = min(
-        stage_qmax["source_branch"],
-        stage_qmax["suction_trunk"],
-        effective_stage_capacity["pump_after_losses"],
-        stage_qmax["meter"],
-        stage_qmax["discharge_trunk"],
-        stage_qmax["destination_branch"],
-    )
+    total_loss = sum(stage_losses.values())
+    if hydraulic_mode == "bottleneck_plus_length":
+        effective_stage_capacity = dict(stage_qmax)
+    else:
+        effective_stage_capacity = {
+            **stage_qmax,
+            "pump_after_losses": max(0.0, stage_qmax["pump"] - total_loss),
+        }
+    route_capacity = min(effective_stage_capacity.values())
     hydraulic_slack = route_capacity - float(required_flow)
     bottleneck_label = min(
         effective_stage_capacity,
         key=lambda label: effective_stage_capacity[label],
     )
     bottleneck_capacity = effective_stage_capacity[bottleneck_label]
+    bottleneck_component_id = (
+        stage_bottleneck_component.get(bottleneck_label)
+        if bottleneck_label in stage_bottleneck_component
+        else stage_bottleneck_component.get("pump")
+    )
     return {
+        "hydraulic_mode": hydraulic_mode,
         "required_flow_lpm": float(required_flow),
         "total_loss_lpm_equiv": total_loss,
         "route_capacity_lpm": route_capacity,
+        "route_effective_q_max_lpm": route_capacity,
         "hydraulic_slack_lpm": hydraulic_slack,
         "hydraulic_ok": hydraulic_slack >= -1e-9,
         "stage_losses_lpm_equiv": stage_losses,
         "effective_stage_capacity_lpm": effective_stage_capacity,
         "bottleneck_label": bottleneck_label,
         "bottleneck_capacity_lpm": bottleneck_capacity,
+        "bottleneck_component_id": bottleneck_component_id,
+        "route_hose_total_m": float(
+            source_option.get("hose_length_m", 0.0)
+            + suction_option.get("hose_length_m", 0.0)
+            + discharge_option.get("hose_length_m", 0.0)
+            + destination_option.get("hose_length_m", 0.0)
+        ),
+        "source_branch_hose_m": float(source_option.get("hose_length_m", 0.0)),
+        "destination_branch_hose_m": float(destination_option.get("hose_length_m", 0.0)),
     }
 
 

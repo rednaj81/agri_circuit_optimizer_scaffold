@@ -8,6 +8,7 @@ def add_objective(model: Any) -> None:
 
     payload = model._payload
     settings = payload["settings"]
+    extra_usage_epsilon = 1e-3
 
     material_cost = 0
     for node_id, option_ids in payload["source_option_ids_by_node"].items():
@@ -44,6 +45,41 @@ def add_objective(model: Any) -> None:
             option_id
         ]
 
+    extra_usage = 0
+    for node_id, option_ids in payload["source_option_ids_by_node"].items():
+        for option_id in option_ids:
+            extra_usage += sum(
+                payload["source_options"][option_id]["extra_component_counts"].values()
+            ) * model.source_option_selected[node_id, option_id]
+
+    for node_id, option_ids in payload["destination_option_ids_by_node"].items():
+        for option_id in option_ids:
+            extra_usage += sum(
+                payload["destination_options"][option_id]["extra_component_counts"].values()
+            ) * model.destination_option_selected[node_id, option_id]
+
+    for slot in payload["pump_slots"]:
+        for option_id in payload["pump_option_ids"]:
+            extra_usage += sum(
+                payload["pump_options"][option_id]["extra_component_counts"].values()
+            ) * model.pump_option_selected[slot, option_id]
+
+    for slot in payload["meter_slots"]:
+        for option_id in payload["meter_option_ids"]:
+            extra_usage += sum(
+                payload["meter_options"][option_id]["extra_component_counts"].values()
+            ) * model.meter_option_selected[slot, option_id]
+
+    for option_id in payload["suction_trunk_option_ids"]:
+        extra_usage += sum(
+            payload["suction_trunk_options"][option_id]["extra_component_counts"].values()
+        ) * model.suction_trunk_selected[option_id]
+
+    for option_id in payload["discharge_trunk_option_ids"]:
+        extra_usage += sum(
+            payload["discharge_trunk_options"][option_id]["extra_component_counts"].values()
+        ) * model.discharge_trunk_selected[option_id]
+
     optional_route_reward = float(settings["optional_route_reward"])
     cleaning_penalty = float(settings["cleaning_cost_liters_per_operation"])
     robustness_weight = float(settings["robustness_weight"])
@@ -57,10 +93,16 @@ def add_objective(model: Any) -> None:
 
     model.total_cost_expression = pyo.Expression(expr=material_cost + cleaning_term)
     model.optional_reward_expression = pyo.Expression(expr=reward_term)
+    model.extra_usage_expression = pyo.Expression(expr=extra_usage_epsilon * extra_usage)
     model.robustness_expression = pyo.Expression(
         expr=robustness_weight * sum(model.hydraulic_slack_lpm[route_id] for route_id in payload["route_ids"])
     )
     model.total_objective = pyo.Objective(
-        expr=model.total_cost_expression - model.optional_reward_expression - model.robustness_expression,
+        expr=(
+            model.total_cost_expression
+            + model.extra_usage_expression
+            - model.optional_reward_expression
+            - model.robustness_expression
+        ),
         sense=pyo.minimize,
     )
