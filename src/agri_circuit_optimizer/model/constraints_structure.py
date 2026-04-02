@@ -82,38 +82,6 @@ def add_structure_constraints(model: Any) -> None:
 
     model.route_class_feasibility = pyo.Constraint(model.ROUTES, rule=route_class_feasibility_rule)
 
-    def source_option_class_rule(model: Any, node_id: str, system_class: str) -> Any:
-        option_ids = [
-            option_id
-            for option_id in payload["source_option_ids_by_node"][node_id]
-            if payload["source_options"][option_id]["sys_diameter_class"] == system_class
-        ]
-        if not option_ids:
-            return pyo.Constraint.Skip
-        return sum(model.source_option_selected[node_id, option_id] for option_id in option_ids) <= (
-            model.system_class_selected[system_class]
-        )
-
-    model.source_option_class_compatibility = pyo.Constraint(
-        model.SOURCE_NODES, model.SYSTEM_CLASSES, rule=source_option_class_rule
-    )
-
-    def destination_option_class_rule(model: Any, node_id: str, system_class: str) -> Any:
-        option_ids = [
-            option_id
-            for option_id in payload["destination_option_ids_by_node"][node_id]
-            if payload["destination_options"][option_id]["sys_diameter_class"] == system_class
-        ]
-        if not option_ids:
-            return pyo.Constraint.Skip
-        return sum(
-            model.destination_option_selected[node_id, option_id] for option_id in option_ids
-        ) <= model.system_class_selected[system_class]
-
-    model.destination_option_class_compatibility = pyo.Constraint(
-        model.SINK_NODES, model.SYSTEM_CLASSES, rule=destination_option_class_rule
-    )
-
     def pump_slot_single_option_rule(model: Any, slot: int) -> Any:
         return (
             sum(
@@ -208,6 +176,66 @@ def add_structure_constraints(model: Any) -> None:
         model.ROUTES, rule=route_meter_assignment_rule
     )
 
+    def route_pump_option_count_rule(model: Any, route_id: str) -> Any:
+        route = payload["routes"][route_id]
+        required_options = model.route_active[route_id] if route["need_pump"] else 0
+        return sum(
+            model.route_uses_pump_option[route_id, slot, option_id]
+            for slot in model.PUMP_SLOTS
+            for option_id in payload["pump_option_ids"]
+        ) == required_options
+
+    model.route_pump_option_count = pyo.Constraint(model.ROUTES, rule=route_pump_option_count_rule)
+
+    def route_meter_option_count_rule(model: Any, route_id: str) -> Any:
+        return sum(
+            model.route_uses_meter_option[route_id, slot, option_id]
+            for slot in model.METER_SLOTS
+            for option_id in payload["meter_option_ids"]
+        ) == model.route_active[route_id]
+
+    model.route_meter_option_count = pyo.Constraint(
+        model.ROUTES, rule=route_meter_option_count_rule
+    )
+
+    def route_pump_slot_definition_rule(model: Any, route_id: str, slot: int) -> Any:
+        return model.route_uses_pump_slot[route_id, slot] == sum(
+            model.route_uses_pump_option[route_id, slot, option_id]
+            for option_id in payload["pump_option_ids"]
+        )
+
+    model.route_pump_slot_definition = pyo.Constraint(
+        model.ROUTE_PUMP_ASSIGNMENT_KEYS, rule=route_pump_slot_definition_rule
+    )
+
+    def route_meter_slot_definition_rule(model: Any, route_id: str, slot: int) -> Any:
+        return model.route_uses_meter_slot[route_id, slot] == sum(
+            model.route_uses_meter_option[route_id, slot, option_id]
+            for option_id in payload["meter_option_ids"]
+        )
+
+    model.route_meter_slot_definition = pyo.Constraint(
+        model.ROUTE_METER_ASSIGNMENT_KEYS, rule=route_meter_slot_definition_rule
+    )
+
+    def route_pump_option_activation_rule(model: Any, route_id: str, slot: int, option_id: str) -> Any:
+        return model.route_uses_pump_option[route_id, slot, option_id] <= model.pump_option_selected[
+            slot, option_id
+        ]
+
+    model.route_pump_option_activation = pyo.Constraint(
+        model.ROUTE_PUMP_OPTION_KEYS, rule=route_pump_option_activation_rule
+    )
+
+    def route_meter_option_activation_rule(model: Any, route_id: str, slot: int, option_id: str) -> Any:
+        return model.route_uses_meter_option[route_id, slot, option_id] <= model.meter_option_selected[
+            slot, option_id
+        ]
+
+    model.route_meter_option_activation = pyo.Constraint(
+        model.ROUTE_METER_OPTION_KEYS, rule=route_meter_option_activation_rule
+    )
+
     def route_pump_slot_activation_rule(model: Any, route_id: str, slot: int) -> Any:
         return model.route_uses_pump_slot[route_id, slot] <= sum(
             model.pump_option_selected[slot, option_id] for option_id in payload["pump_option_ids"]
@@ -224,21 +252,4 @@ def add_structure_constraints(model: Any) -> None:
 
     model.route_meter_slot_activation = pyo.Constraint(
         model.ROUTE_METER_ASSIGNMENT_KEYS, rule=route_meter_slot_activation_rule
-    )
-
-    def direct_metering_rule(model: Any, route_id: str, slot: int) -> Any:
-        route = payload["routes"][route_id]
-        if not route["measurement_required"]:
-            return pyo.Constraint.Skip
-        non_bypass_option_ids = [
-            option_id
-            for option_id in payload["meter_option_ids"]
-            if not payload["meter_options"][option_id].get("is_bypass", False)
-        ]
-        return model.route_uses_meter_slot[route_id, slot] <= sum(
-            model.meter_option_selected[slot, option_id] for option_id in non_bypass_option_ids
-        )
-
-    model.direct_metering_required = pyo.Constraint(
-        model.ROUTE_METER_ASSIGNMENT_KEYS, rule=direct_metering_rule
     )

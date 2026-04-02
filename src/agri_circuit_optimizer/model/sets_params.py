@@ -3,6 +3,8 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import Any, Dict
 
+from agri_circuit_optimizer.preprocess.feasibility import meter_compatibility
+
 
 def build_sets_and_parameters(data: Dict[str, Any], options: Dict[str, Any]) -> Dict[str, Any]:
     """Normalize scenario and option data into a model-friendly payload."""
@@ -83,6 +85,21 @@ def build_sets_and_parameters(data: Dict[str, Any], options: Dict[str, Any]) -> 
     payload["discharge_trunk_option_ids_by_class"] = _group_options_by_class(
         payload["discharge_trunk_options"]
     )
+    payload["route_meter_compatibility"] = {
+        route["route_id"]: {
+            option_id: meter_compatibility(route, option)
+            for option_id, option in payload["meter_options"].items()
+        }
+        for route in routes
+    }
+    payload["route_viable_meter_option_ids"] = {
+        route_id: sorted(
+            option_id
+            for option_id, compatibility in option_map.items()
+            if compatibility["compatible"]
+        )
+        for route_id, option_map in payload["route_meter_compatibility"].items()
+    }
 
     return {
         **payload,

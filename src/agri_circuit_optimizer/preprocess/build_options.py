@@ -14,33 +14,32 @@ from agri_circuit_optimizer.preprocess.pruning import prune_dominated_options
 
 
 def build_stage_options(data: Dict[str, Any]) -> Dict[str, Any]:
-    """Build viable V1 options for each superstructure stage."""
+    """Build viable V1/V2/V3 options for each superstructure stage."""
 
-    nodes = data["nodes"]
-    routes = data["routes"]
-    components = data["components"]
+    nodes = data["nodes"].to_dict("records")
+    routes = data["routes"].to_dict("records")
+    components = data["components"].to_dict("records")
     settings = data["settings"]
 
-    component_records = components.to_dict("records")
     source_options = _build_branch_options(
-        nodes=nodes.to_dict("records"),
+        nodes=nodes,
         templates=data["source_branch_templates"].to_dict("records"),
-        components=component_records,
+        components=components,
         stage_kind="source_branch",
         node_filter_key="is_source",
     )
     destination_options = _build_branch_options(
-        nodes=nodes.to_dict("records"),
+        nodes=nodes,
         templates=data["destination_branch_templates"].to_dict("records"),
-        components=component_records,
+        components=components,
         stage_kind="destination_branch",
         node_filter_key="is_sink",
     )
-
-    pump_slot_options = _build_single_component_options(component_records, category="pump")
-    meter_slot_options = _build_single_component_options(component_records, category="meter")
+    pump_slot_options = _build_single_component_options(components, category="pump")
+    meter_slot_options = _build_single_component_options(components, category="meter")
     trunk_options = _build_trunk_options(
-        templates=data["trunk_templates"].to_dict("records"), components=component_records
+        templates=data["trunk_templates"].to_dict("records"),
+        components=components,
     )
 
     suction_trunk_options = trunk_options["suction_trunk"]
@@ -49,14 +48,17 @@ def build_stage_options(data: Dict[str, Any]) -> Dict[str, Any]:
         {
             option["sys_diameter_class"]
             for option in (
-                pump_slot_options + meter_slot_options + suction_trunk_options + discharge_trunk_options
+                pump_slot_options
+                + meter_slot_options
+                + suction_trunk_options
+                + discharge_trunk_options
             )
             if option.get("sys_diameter_class") not in {"", "none", None}
         }
     )
 
     route_class_feasibility = _build_route_class_feasibility(
-        routes=routes.to_dict("records"),
+        routes=routes,
         source_options=source_options,
         destination_options=destination_options,
         pump_options=pump_slot_options,
@@ -68,12 +70,12 @@ def build_stage_options(data: Dict[str, Any]) -> Dict[str, Any]:
 
     mandatory_without_options = [
         route["route_id"]
-        for route in routes.to_dict("records")
+        for route in routes
         if route["mandatory"] and not route_class_feasibility[route["route_id"]]
     ]
     if mandatory_without_options:
         raise ValueError(
-            "Mandatory routes without any viable V1 option chain: "
+            "Mandatory routes without any viable option chain: "
             f"{mandatory_without_options}."
         )
 
@@ -102,6 +104,7 @@ def _build_branch_options(
     connectors = [component for component in components if component["category"] == "connector"]
     valves = [component for component in components if component["category"] == "valve"]
     checks = [component for component in components if component["category"] == "check_valve"]
+    adaptors = [component for component in components if component["category"] == "adaptor"]
 
     for node in nodes:
         if not bool(node[node_filter_key]):
@@ -115,60 +118,52 @@ def _build_branch_options(
             if allowed_nodes and node_id not in allowed_nodes:
                 continue
 
-            allowed_diameters = split_encoded_values(template["allowed_hose_diameters"])
-            hose_candidates = [component for component in hoses if component_matches_diameter(component, allowed_diameters)]
+            allowed_hose_diameters = split_encoded_values(template["allowed_hose_diameters"])
+            allowed_adaptor_pairs = set(split_encoded_values(template["allowed_adaptor_pairs"]))
+            hose_candidates = [
+                component
+                for component in hoses
+                if component_matches_diameter(component, allowed_hose_diameters)
+            ]
+            valve_candidates: Iterable[Dict[str, Any] | None] = valves if template["require_valve"] else [None]
+            check_candidates: Iterable[Dict[str, Any] | None] = checks if template["require_check"] else [None]
 
-            for hose in hose_candidates:
-                current_class = hose["sys_diameter_class"]
-                connector_candidates = [
-                    component
-                    for component in connectors
-                    if component["sys_diameter_class"] == current_class
-                ]
-                valve_candidates: Iterable[Dict[str, Any] | None] = (
-                    [
-                        component
-                        for component in valves
-                        if component["sys_diameter_class"] == current_class
-                    ]
-                    if template["require_valve"]
-                    else [None]
+            for hose, connector, valve, check in product(
+                hose_candidates,
+                connectors,
+                valve_candidates,
+                check_candidates,
+            ):
+                raw_components = [item for item in [hose, connector, valve, check] if item is not None]
+                adapted_components = _attach_branch_adaptors(
+                    system_class=hose["sys_diameter_class"],
+                    raw_components=raw_components,
+                    adaptors=adaptors,
+                    allowed_adaptor_pairs=allowed_adaptor_pairs,
                 )
-                check_candidates: Iterable[Dict[str, Any] | None] = (
-                    [
-                        component
-                        for component in checks
-                        if component["sys_diameter_class"] == current_class
-                    ]
-                    if template["require_check"]
-                    else [None]
-                )
+                if adapted_components is None:
+                    continue
 
-                for connector, valve, check in product(
-                    connector_candidates, valve_candidates, check_candidates
-                ):
-                    component_group = [item for item in [hose, connector, valve, check] if item is not None]
-                    if not component_group:
-                        continue
-                    node_options.append(
-                        _compose_option(
-                            stage_kind=stage_kind,
-                            option_suffix=(
-                                f"{node_id}_{template['template_id']}_"
-                                f"{'_'.join(item['component_id'] for item in component_group)}"
-                            ),
-                            sys_diameter_class=hose["sys_diameter_class"],
-                            components=component_group,
-                            applies_to=node_id,
-                            metadata={
-                                "template_id": template["template_id"],
-                                "node_id": node_id,
+                node_options.append(
+                    _compose_option(
+                        stage_kind=stage_kind,
+                        option_suffix=(
+                            f"{node_id}_{template['template_id']}_"
+                            f"{'_'.join(component['component_id'] for component in adapted_components)}"
+                        ),
+                        sys_diameter_class=hose["sys_diameter_class"],
+                        components=adapted_components,
+                        applies_to=node_id,
+                        metadata={
+                            "template_id": template["template_id"],
+                            "node_id": node_id,
                             "required_flags": {
                                 "require_valve": bool(template["require_valve"]),
                                 "require_check": bool(template["require_check"]),
                             },
-                            "allowed_adaptor_pairs": split_encoded_values(
-                                template["allowed_adaptor_pairs"]
+                            "allowed_adaptor_pairs": sorted(allowed_adaptor_pairs),
+                            "uses_adaptor": any(
+                                component["category"] == "adaptor" for component in adapted_components
                             ),
                         },
                         dominance_key=(
@@ -176,22 +171,63 @@ def _build_branch_options(
                             node_id,
                             template["template_id"],
                             hose["sys_diameter_class"],
-                            bool(template["require_valve"]),
-                            bool(template["require_check"]),
-                            tuple(sorted(Counter(item["category"] for item in component_group).items())),
+                            tuple(
+                                sorted(
+                                    Counter(component["category"] for component in adapted_components).items()
+                                )
+                            ),
                         ),
                     )
                 )
 
         options_by_node[node_id] = sorted(
-            prune_dominated_options(node_options), key=lambda option: option["option_id"]
+            prune_dominated_options(node_options),
+            key=lambda option: option["option_id"],
         )
 
     return dict(options_by_node)
 
 
+def _attach_branch_adaptors(
+    *,
+    system_class: str,
+    raw_components: List[Dict[str, Any]],
+    adaptors: List[Dict[str, Any]],
+    allowed_adaptor_pairs: set[str],
+) -> List[Dict[str, Any]] | None:
+    functional_components = [component for component in raw_components if component["category"] != "hose"]
+    foreign_classes = sorted(
+        {
+            component["sys_diameter_class"]
+            for component in functional_components
+            if component["sys_diameter_class"] != system_class
+        }
+    )
+    adaptor_components: List[Dict[str, Any]] = []
+
+    for foreign_class in foreign_classes:
+        adaptor_pair = f"{foreign_class}_to_{system_class}"
+        if adaptor_pair not in allowed_adaptor_pairs:
+            return None
+        adaptor = next(
+            (
+                component
+                for component in adaptors
+                if component["component_id"] == f"adaptor_{adaptor_pair}"
+            ),
+            None,
+        )
+        if adaptor is None:
+            return None
+        adaptor_components.append(adaptor)
+
+    return raw_components + adaptor_components
+
+
 def _build_single_component_options(
-    components: List[Dict[str, Any]], *, category: str
+    components: List[Dict[str, Any]],
+    *,
+    category: str,
 ) -> List[Dict[str, Any]]:
     options: List[Dict[str, Any]] = []
     for component in components:
@@ -203,21 +239,34 @@ def _build_single_component_options(
             sys_diameter_class=component["sys_diameter_class"],
             components=[component],
             applies_to=None,
-            metadata={"component_id": component["component_id"], "is_bypass": bool(component["is_bypass"])},
+            metadata={
+                "component_id": component["component_id"],
+                "is_bypass": bool(component["is_bypass"]),
+            },
             dominance_key=(
                 category,
                 component["sys_diameter_class"],
                 bool(component["is_bypass"]),
-                tuple(sorted(Counter(item["category"] for item in [component]).items())),
+                tuple(sorted(Counter([component["category"]]).items())),
             ),
         )
         option["is_bypass"] = bool(component["is_bypass"])
+        option["component_id"] = component["component_id"]
+        if category == "meter":
+            option["meter_error_pct"] = float(component.get("meter_error_pct") or 0.0)
+            option["meter_batch_min_l"] = float(component.get("meter_batch_min_l") or 0.0)
+            option["meter_dose_q_max_lpm"] = float(
+                component.get("meter_dose_q_max_lpm") or component.get("q_max_lpm") or 0.0
+            )
         options.append(option)
+
     return sorted(prune_dominated_options(options), key=lambda option: option["option_id"])
 
 
 def _build_trunk_options(
-    *, templates: List[Dict[str, Any]], components: List[Dict[str, Any]]
+    *,
+    templates: List[Dict[str, Any]],
+    components: List[Dict[str, Any]],
 ) -> Dict[str, List[Dict[str, Any]]]:
     hoses = [component for component in components if component["category"] == "hose"]
     connectors = [component for component in components if component["category"] == "connector"]
@@ -225,7 +274,11 @@ def _build_trunk_options(
 
     for template in templates:
         allowed_diameters = split_encoded_values(template["allowed_diameters"])
-        hose_candidates = [component for component in hoses if component_matches_diameter(component, allowed_diameters)]
+        hose_candidates = [
+            component
+            for component in hoses
+            if component_matches_diameter(component, allowed_diameters)
+        ]
         for hose in hose_candidates:
             connector_candidates = [
                 component
@@ -247,14 +300,15 @@ def _build_trunk_options(
                             template["stage_kind"],
                             template["template_id"],
                             hose["sys_diameter_class"],
-                            tuple(sorted(Counter(item["category"] for item in [hose, connector]).items())),
+                            tuple(sorted(Counter(["hose", "connector"]).items())),
                         ),
                     )
                 )
 
     return {
         stage_kind: sorted(
-            prune_dominated_options(stage_options), key=lambda option: option["option_id"]
+            prune_dominated_options(stage_options),
+            key=lambda option: option["option_id"],
         )
         for stage_kind, stage_options in options_by_stage.items()
     }
@@ -284,7 +338,9 @@ def _compose_option(
         "q_min_lpm": float(max(float(component["q_min_lpm"]) for component in components)),
         "q_max_lpm": float(min(float(component["q_max_lpm"]) for component in components)),
         "loss_lpm_equiv": float(sum(float(component["loss_lpm_equiv"]) for component in components)),
-        "internal_volume_l": float(sum(float(component["internal_volume_l"]) for component in components)),
+        "internal_volume_l": float(
+            sum(float(component["internal_volume_l"]) for component in components)
+        ),
         "category_profile": dict(category_profile),
         "metadata": metadata,
         "dominance_key": dominance_key,
@@ -303,9 +359,6 @@ def _build_route_class_feasibility(
     allowed_classes: List[str],
 ) -> Dict[str, List[str]]:
     feasible_classes: Dict[str, List[str]] = {}
-
-    source_classes = _index_classes(source_options)
-    destination_classes = _index_classes(destination_options)
     pump_classes = _index_classes({"pump": pump_options})
     meter_classes = _index_classes({"meter": meter_options})
     suction_classes = _index_classes({"suction_trunk": suction_trunk_options})
@@ -320,8 +373,8 @@ def _build_route_class_feasibility(
         required_flow = float(route["q_min_delivered_lpm"])
         route_feasible: List[str] = []
         for system_class in allowed_classes:
-            has_source = system_class in source_classes.get(route["source"], set())
-            has_destination = system_class in destination_classes.get(route["sink"], set())
+            has_source = bool(source_options.get(route["source"]))
+            has_destination = bool(destination_options.get(route["sink"]))
             has_suction = system_class in suction_classes.get("suction_trunk", set())
             has_discharge = system_class in discharge_classes.get("discharge_trunk", set())
             has_pump = any(

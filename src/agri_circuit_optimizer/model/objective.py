@@ -46,6 +46,7 @@ def add_objective(model: Any) -> None:
 
     optional_route_reward = float(settings["optional_route_reward"])
     cleaning_penalty = float(settings["cleaning_cost_liters_per_operation"])
+    robustness_weight = float(settings["robustness_weight"])
     reward_term = sum(
         optional_route_reward
         * float(payload["routes"][route_id]["weight"])
@@ -56,7 +57,9 @@ def add_objective(model: Any) -> None:
 
     model.total_cost_expression = pyo.Expression(expr=material_cost + cleaning_term)
     model.optional_reward_expression = pyo.Expression(expr=reward_term)
-    model.robustness_expression = pyo.Expression(expr=0.0)
+    model.robustness_expression = pyo.Expression(
+        expr=robustness_weight * sum(model.hydraulic_slack_lpm[route_id] for route_id in payload["route_ids"])
+    )
     model.total_objective = pyo.Objective(
         expr=model.total_cost_expression - model.optional_reward_expression - model.robustness_expression,
         sense=pyo.minimize,

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
-from itertools import combinations_with_replacement, product
+from itertools import combinations_with_replacement
 from pathlib import Path
 from typing import Any, Dict
 
@@ -14,6 +14,10 @@ from agri_circuit_optimizer.postprocess.reports import (
     build_route_report,
 )
 from agri_circuit_optimizer.preprocess.build_options import build_stage_options
+from agri_circuit_optimizer.preprocess.feasibility import (
+    compute_route_min_flow,
+    summarize_route_hydraulics,
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -30,7 +34,10 @@ def parse_args() -> argparse.Namespace:
 
 
 def solve_case(
-    scenario_dir: str | Path, *, solver_name: str | None = None, output_dir: str | Path | None = None
+    scenario_dir: str | Path,
+    *,
+    solver_name: str | None = None,
+    output_dir: str | Path | None = None,
 ) -> Dict[str, Any]:
     scenario_path = Path(scenario_dir)
     data = load_scenario(scenario_path)
@@ -102,11 +109,6 @@ def _extract_solution(model: Any, results: Any, solver_name: str) -> Dict[str, A
     import pyomo.environ as pyo
 
     payload = model._payload
-    system_class = next(
-        system_class
-        for system_class in payload["system_classes"]
-        if pyo.value(model.system_class_selected[system_class]) > 0.5
-    )
     selected_source_options = {
         node_id: next(
             option_id
@@ -132,7 +134,10 @@ def _extract_solution(model: Any, results: Any, solver_name: str) -> Dict[str, A
             if pyo.value(model.pump_option_selected[slot, option_id]) > 0.5
         )
         for slot in payload["pump_slots"]
-        if sum(pyo.value(model.pump_option_selected[slot, option_id]) for option_id in payload["pump_option_ids"])
+        if sum(
+            pyo.value(model.pump_option_selected[slot, option_id])
+            for option_id in payload["pump_option_ids"]
+        )
         > 0.5
     }
     selected_meter_slots = {
@@ -159,94 +164,101 @@ def _extract_solution(model: Any, results: Any, solver_name: str) -> Dict[str, A
         if pyo.value(model.discharge_trunk_selected[option_id]) > 0.5
     )
 
-    routes = []
-    hydraulics = []
-    active_route_ids = [
-        route_id for route_id in payload["route_ids"] if pyo.value(model.route_active[route_id]) > 0.5
-    ]
-    for route_id in active_route_ids:
+    assignment: Dict[str, Dict[str, Any]] = {}
+    for route_id in payload["route_ids"]:
+        if pyo.value(model.route_active[route_id]) <= 0.5:
+            continue
         route = payload["routes"][route_id]
-        source_option_id = selected_source_options[route["source"]]
-        destination_option_id = selected_destination_options[route["sink"]]
-        pump_slot = next(
-            slot
+        source_option = payload["source_options"][selected_source_options[route["source"]]]
+        destination_option = payload["destination_options"][
+            selected_destination_options[route["sink"]]
+        ]
+        pump_slot, pump_option_id = next(
+            (slot, option_id)
             for slot in payload["pump_slots"]
-            if pyo.value(model.route_uses_pump_slot[route_id, slot]) > 0.5
+            for option_id in payload["pump_option_ids"]
+            if pyo.value(model.route_uses_pump_option[route_id, slot, option_id]) > 0.5
         )
-        meter_slot = next(
-            slot
+        meter_slot, meter_option_id = next(
+            (slot, option_id)
             for slot in payload["meter_slots"]
-            if pyo.value(model.route_uses_meter_slot[route_id, slot]) > 0.5
+            for option_id in payload["meter_option_ids"]
+            if pyo.value(model.route_uses_meter_option[route_id, slot, option_id]) > 0.5
         )
-        pump_option_id = selected_pump_slots[pump_slot]
-        meter_option_id = selected_meter_slots[meter_slot]
-        flow = float(pyo.value(model.flow_delivered_lpm[route_id]))
-
-        source_option = payload["source_options"][source_option_id]
-        destination_option = payload["destination_options"][destination_option_id]
         pump_option = payload["pump_options"][pump_option_id]
         meter_option = payload["meter_options"][meter_option_id]
         suction_option = payload["suction_trunk_options"][selected_suction_trunk]
         discharge_option = payload["discharge_trunk_options"][selected_discharge_trunk]
-
-        route_loss = (
-            source_option["loss_lpm_equiv"]
-            + suction_option["loss_lpm_equiv"]
-            + pump_option["loss_lpm_equiv"]
-            + meter_option["loss_lpm_equiv"]
-            + discharge_option["loss_lpm_equiv"]
-            + destination_option["loss_lpm_equiv"]
+        flow = float(pyo.value(model.flow_delivered_lpm[route_id]))
+        meter_flags = payload["route_meter_compatibility"][route_id][meter_option_id]
+        hydraulics = summarize_route_hydraulics(
+            route=route,
+            source_option=source_option,
+            destination_option=destination_option,
+            pump_option=pump_option,
+            meter_option=meter_option,
+            suction_option=suction_option,
+            discharge_option=discharge_option,
+            flow_delivered_lpm=flow,
         )
-        hydraulic_slack = pump_option["q_max_lpm"] - flow
+        assignment[route_id] = {
+            "route": route,
+            "source_option": source_option,
+            "destination_option": destination_option,
+            "pump_slot": pump_slot,
+            "pump_option": pump_option,
+            "meter_slot": meter_slot,
+            "meter_option": meter_option,
+            "flow_delivered_lpm": flow,
+            "meter_flags": meter_flags,
+            "hydraulics": hydraulics,
+        }
 
-        routes.append(
-            {
-                "route_id": route_id,
-                "source": route["source"],
-                "sink": route["sink"],
-                "mandatory": bool(route["mandatory"]),
-                "measurement_required": bool(route["measurement_required"]),
-                "flow_delivered_lpm": flow,
-                "q_min_required_lpm": float(route["q_min_delivered_lpm"]),
-                "pump_slot": pump_slot,
-                "pump_option_id": pump_option_id,
-                "pump_component_id": pump_option["metadata"]["component_id"],
-                "meter_slot": meter_slot,
-                "meter_option_id": meter_option_id,
-                "meter_component_id": meter_option["metadata"]["component_id"],
-                "meter_is_bypass": bool(meter_option.get("is_bypass", False)),
-                "source_option_id": source_option_id,
-                "destination_option_id": destination_option_id,
-            }
-        )
-        hydraulics.append(
-            {
-                "route_id": route_id,
-                "system_class": system_class,
-                "suction_trunk_option_id": selected_suction_trunk,
-                "discharge_trunk_option_id": selected_discharge_trunk,
-                "flow_delivered_lpm": flow,
-                "q_min_required_lpm": float(route["q_min_delivered_lpm"]),
-                "loss_lpm_equiv": route_loss,
-                "hydraulic_slack_lpm": hydraulic_slack,
-            }
-        )
-
-    bom = _build_bom(payload, selected_source_options, selected_destination_options, selected_pump_slots, selected_meter_slots, selected_suction_trunk, selected_discharge_trunk)
+    bom = _build_bom(
+        payload,
+        selected_source_options,
+        selected_destination_options,
+        selected_pump_slots,
+        selected_meter_slots,
+        selected_suction_trunk,
+        selected_discharge_trunk,
+    )
+    routes_report, hydraulics_report = _build_reports_from_assignment(
+        assignment=assignment,
+        system_class=_summarize_system_class(
+            payload,
+            selected_source_options=selected_source_options,
+            selected_destination_options=selected_destination_options,
+            selected_pump_slots=selected_pump_slots,
+            selected_meter_slots=selected_meter_slots,
+            selected_suction_trunk=selected_suction_trunk,
+            selected_discharge_trunk=selected_discharge_trunk,
+        ),
+        suction_option_id=selected_suction_trunk,
+        discharge_option_id=selected_discharge_trunk,
+    )
 
     return {
         "summary": {
             "solver": solver_name,
             "solver_status": str(results.solver.status),
             "termination_condition": str(results.solver.termination_condition),
-            "system_class": system_class,
-            "routes_served": len(active_route_ids),
-            "mandatory_routes_served": sum(1 for route in routes if route["mandatory"]),
+            "system_class": _summarize_system_class(
+                payload,
+                selected_source_options=selected_source_options,
+                selected_destination_options=selected_destination_options,
+                selected_pump_slots=selected_pump_slots,
+                selected_meter_slots=selected_meter_slots,
+                selected_suction_trunk=selected_suction_trunk,
+                selected_discharge_trunk=selected_discharge_trunk,
+            ),
+            "routes_served": len(routes_report),
+            "mandatory_routes_served": sum(1 for route in routes_report if route["mandatory"]),
             "total_material_cost": round(sum(item["total_cost"] for item in bom), 3),
         },
         "bom": bom,
-        "routes": routes,
-        "hydraulics": hydraulics,
+        "routes": routes_report,
+        "hydraulics": hydraulics_report,
         "topology": {
             "source_options": selected_source_options,
             "destination_options": selected_destination_options,
@@ -261,12 +273,36 @@ def _extract_solution(model: Any, results: Any, solver_name: str) -> Dict[str, A
 def _solve_case_fallback(data: Dict[str, Any], options: Dict[str, Any], solver_name: str) -> Dict[str, Any]:
     settings = data["settings"]
     routes = data["routes"].to_dict("records")
+    components = data["components"].to_dict("records")
     mandatory_routes = [route for route in routes if route["mandatory"]]
     optional_routes = [route for route in routes if not route["mandatory"]]
+    fallback_payload = {
+        "source_options": {
+            option["option_id"]: option
+            for options_by_node in options["source_options"].values()
+            for option in options_by_node
+        },
+        "destination_options": {
+            option["option_id"]: option
+            for options_by_node in options["destination_options"].values()
+            for option in options_by_node
+        },
+        "pump_options": {
+            option["option_id"]: option for option in options["pump_slot_options"]
+        },
+        "meter_options": {
+            option["option_id"]: option for option in options["meter_slot_options"]
+        },
+        "suction_trunk_options": {
+            option["option_id"]: option for option in options["suction_trunk_options"]
+        },
+        "discharge_trunk_options": {
+            option["option_id"]: option for option in options["discharge_trunk_options"]
+        },
+    }
 
     best_solution: Dict[str, Any] | None = None
     best_objective: float | None = None
-
     optional_subsets = [[]]
     if optional_routes:
         optional_subsets = [
@@ -274,152 +310,295 @@ def _solve_case_fallback(data: Dict[str, Any], options: Dict[str, Any], solver_n
             for mask in range(1 << len(optional_routes))
         ]
 
-    for optional_subset in optional_subsets:
-        active_routes = mandatory_routes + optional_subset
-        if not active_routes:
-            continue
-
-        branch_topology = _select_branch_topology(
-            active_routes=active_routes,
-            source_options=options["source_options"],
-            destination_options=options["destination_options"],
-            suction_trunk_options=options["suction_trunk_options"],
-            discharge_trunk_options=options["discharge_trunk_options"],
-            components=data["components"].to_dict("records"),
-        )
-        if branch_topology is None:
-            continue
-
-        source_selection = branch_topology["source_selection"]
-        destination_selection = branch_topology["destination_selection"]
-        suction_option = branch_topology["suction_option"]
-        discharge_option = branch_topology["discharge_option"]
-
-        for selected_pumps in _enumerate_slot_combinations(
-            slot_options=options["pump_slot_options"],
-            max_slots=int(settings["u_max_slots"]),
-        ):
-            for selected_meters in _enumerate_slot_combinations(
-                slot_options=options["meter_slot_options"],
-                max_slots=int(settings["v_max_slots"]),
+    for system_class in options["system_classes"]:
+        for optional_subset in optional_subsets:
+            active_routes = mandatory_routes + optional_subset
+            if any(
+                system_class not in options["route_class_feasibility"][route["route_id"]]
+                for route in active_routes
             ):
-                    assignment = _assign_routes(
-                        active_routes=active_routes,
-                        source_selection=source_selection,
-                        destination_selection=destination_selection,
-                        selected_pumps=selected_pumps,
-                        selected_meters=selected_meters,
-                        suction_option=suction_option,
-                        discharge_option=discharge_option,
-                    )
-                    if assignment is None:
-                        continue
+                continue
 
-                    bom = _build_bom_from_fallback(
-                        components=data["components"].to_dict("records"),
-                        source_selection=source_selection,
-                        destination_selection=destination_selection,
-                        selected_pumps=selected_pumps,
-                        selected_meters=selected_meters,
-                        suction_option=suction_option,
-                        discharge_option=discharge_option,
-                    )
-                    if bom is None:
-                        continue
+            branch_topologies = _enumerate_branch_topologies(
+                active_routes=active_routes,
+                source_options=options["source_options"],
+                destination_options=options["destination_options"],
+                suction_trunk_options=options["suction_trunk_options"],
+                discharge_trunk_options=options["discharge_trunk_options"],
+                components=components,
+                system_class=system_class,
+            )
+            if not branch_topologies:
+                continue
 
-                    material_cost = sum(item["total_cost"] for item in bom)
-                    cleaning_penalty = float(settings["cleaning_cost_liters_per_operation"]) * len(active_routes)
-                    optional_reward = float(settings["optional_route_reward"]) * sum(
-                        float(route["weight"]) for route in optional_subset
-                    )
-                    objective_value = material_cost + cleaning_penalty - optional_reward
-
-                    if best_objective is None or objective_value < best_objective:
-                        routes_report, hydraulics_report = _build_route_and_hydraulic_reports_from_assignment(
-                            assignment=assignment,
-                            system_class=branch_topology["system_class"],
-                            suction_option=suction_option,
-                            discharge_option=discharge_option,
+            for branch_topology in branch_topologies:
+                for selected_pumps in _enumerate_slot_combinations(
+                    slot_options=options["pump_slot_options"],
+                    max_slots=int(settings["u_max_slots"]),
+                    system_class=system_class,
+                ):
+                    for selected_meters in _enumerate_slot_combinations(
+                        slot_options=options["meter_slot_options"],
+                        max_slots=int(settings["v_max_slots"]),
+                        system_class=system_class,
+                    ):
+                        assignment = _assign_routes(
+                            active_routes=active_routes,
+                            source_selection=branch_topology["source_selection"],
+                            destination_selection=branch_topology["destination_selection"],
+                            selected_pumps=selected_pumps,
+                            selected_meters=selected_meters,
+                            suction_option=branch_topology["suction_option"],
+                            discharge_option=branch_topology["discharge_option"],
                         )
-                        best_objective = objective_value
-                        best_solution = {
-                            "summary": {
-                                "solver": solver_name,
-                                "solver_status": "fallback",
-                                "termination_condition": "enumerated",
-                                "system_class": branch_topology["system_class"],
-                                "routes_served": len(active_routes),
-                                "mandatory_routes_served": len(mandatory_routes),
-                                "total_material_cost": round(material_cost, 3),
-                                "objective_value": round(objective_value, 3),
-                            },
-                            "bom": bom,
-                            "routes": routes_report,
-                            "hydraulics": hydraulics_report,
-                            "topology": {
-                                "source_options": {
-                                    node_id: option["option_id"] for node_id, option in source_selection.items()
+                        if assignment is None:
+                            continue
+
+                        bom = _build_bom_from_fallback(
+                            components=components,
+                            source_selection=branch_topology["source_selection"],
+                            destination_selection=branch_topology["destination_selection"],
+                            selected_pumps=selected_pumps,
+                            selected_meters=selected_meters,
+                            suction_option=branch_topology["suction_option"],
+                            discharge_option=branch_topology["discharge_option"],
+                        )
+                        if bom is None:
+                            continue
+
+                        hydraulic_bonus = float(settings["robustness_weight"]) * sum(
+                            item["hydraulics"]["hydraulic_slack_lpm"] for item in assignment.values()
+                        )
+                        material_cost = sum(item["total_cost"] for item in bom)
+                        cleaning_penalty = float(settings["cleaning_cost_liters_per_operation"]) * len(active_routes)
+                        optional_reward = float(settings["optional_route_reward"]) * sum(
+                            float(route["weight"]) for route in optional_subset
+                        )
+                        objective_value = material_cost + cleaning_penalty - optional_reward - hydraulic_bonus
+
+                        if best_objective is None or objective_value < best_objective:
+                            topology_source_options = {
+                                node_id: option["option_id"]
+                                for node_id, option in branch_topology["source_selection"].items()
+                            }
+                            topology_destination_options = {
+                                node_id: option["option_id"]
+                                for node_id, option in branch_topology["destination_selection"].items()
+                            }
+                            topology_pump_slots = {
+                                slot: option["option_id"] for slot, option in selected_pumps.items()
+                            }
+                            topology_meter_slots = {
+                                slot: option["option_id"] for slot, option in selected_meters.items()
+                            }
+                            topology_system_class = _summarize_system_class(
+                                fallback_payload,
+                                selected_source_options=topology_source_options,
+                                selected_destination_options=topology_destination_options,
+                                selected_pump_slots=topology_pump_slots,
+                                selected_meter_slots=topology_meter_slots,
+                                selected_suction_trunk=branch_topology["suction_option"]["option_id"],
+                                selected_discharge_trunk=branch_topology["discharge_option"]["option_id"],
+                            )
+                            routes_report, hydraulics_report = _build_reports_from_assignment(
+                                assignment=assignment,
+                                system_class=topology_system_class,
+                                suction_option_id=branch_topology["suction_option"]["option_id"],
+                                discharge_option_id=branch_topology["discharge_option"]["option_id"],
+                            )
+                            best_objective = objective_value
+                            best_solution = {
+                                "summary": {
+                                    "solver": solver_name,
+                                    "solver_status": "fallback",
+                                    "termination_condition": "enumerated",
+                                    "system_class": topology_system_class,
+                                    "routes_served": len(routes_report),
+                                    "mandatory_routes_served": len(mandatory_routes),
+                                    "total_material_cost": round(material_cost, 3),
+                                    "objective_value": round(objective_value, 3),
                                 },
-                                "destination_options": {
-                                    node_id: option["option_id"] for node_id, option in destination_selection.items()
+                                "bom": bom,
+                                "routes": routes_report,
+                                "hydraulics": hydraulics_report,
+                                "topology": {
+                                    "source_options": topology_source_options,
+                                    "destination_options": topology_destination_options,
+                                    "pump_slots": topology_pump_slots,
+                                    "meter_slots": topology_meter_slots,
+                                    "suction_trunk_option_id": branch_topology["suction_option"]["option_id"],
+                                    "discharge_trunk_option_id": branch_topology["discharge_option"]["option_id"],
                                 },
-                                "pump_slots": {
-                                    slot: option["option_id"] for slot, option in selected_pumps.items()
-                                },
-                                "meter_slots": {
-                                    slot: option["option_id"] for slot, option in selected_meters.items()
-                                },
-                                "suction_trunk_option_id": suction_option["option_id"],
-                                "discharge_trunk_option_id": discharge_option["option_id"],
-                            },
-                        }
+                            }
 
     if best_solution is None:
-        raise RuntimeError("Fallback enumeration could not find a feasible V1 solution.")
+        raise RuntimeError("Fallback enumeration could not find a feasible solution.")
     return best_solution
 
 
-def _select_cheapest_by_class(option_list: list[Dict[str, Any]], system_class: str) -> Dict[str, Any] | None:
-    candidates = [option for option in option_list if option["sys_diameter_class"] == system_class]
-    if not candidates:
-        return None
-    return min(candidates, key=lambda option: (option["cost"], option["loss_lpm_equiv"]))
-
-
-def _select_branch_options_for_routes(
+def _enumerate_branch_topologies(
     *,
-    routes: list[Dict[str, Any]],
-    options_by_node: Dict[str, list[Dict[str, Any]]],
-    system_class: str | None,
-    node_key: str,
-) -> Dict[str, Dict[str, Any]] | None:
-    selection: Dict[str, Dict[str, Any]] = {}
-    for route in routes:
-        node_id = route[node_key]
-        if node_id in selection:
-            continue
-        candidates = [
-            option
-            for option in options_by_node[node_id]
-            if system_class is None or option["sys_diameter_class"] == system_class
-        ]
-        if not candidates:
-            return None
-        selection[node_id] = min(candidates, key=lambda option: (option["cost"], option["loss_lpm_equiv"]))
-    return selection
+    active_routes: list[Dict[str, Any]],
+    source_options: Dict[str, list[Dict[str, Any]]],
+    destination_options: Dict[str, list[Dict[str, Any]]],
+    suction_trunk_options: list[Dict[str, Any]],
+    discharge_trunk_options: list[Dict[str, Any]],
+    components: list[Dict[str, Any]],
+    system_class: str,
+) -> list[Dict[str, Any]]:
+    component_availability = {
+        component["component_id"]: int(component["available_qty"]) for component in components
+    }
+    source_node_ids = sorted({route["source"] for route in active_routes})
+    sink_node_ids = sorted({route["sink"] for route in active_routes})
+    source_candidates = {
+        node_id: sorted(
+            list(source_options[node_id]),
+            key=lambda option: (option["cost"], option["loss_lpm_equiv"]),
+        )
+        for node_id in source_node_ids
+    }
+    destination_candidates = {
+        node_id: sorted(
+            list(destination_options[node_id]),
+            key=lambda option: (option["cost"], option["loss_lpm_equiv"]),
+        )
+        for node_id in sink_node_ids
+    }
+    if any(not options for options in source_candidates.values()) or any(
+        not options for options in destination_candidates.values()
+    ):
+        return None
+
+    suction_candidates = [
+        option for option in suction_trunk_options if option["sys_diameter_class"] == system_class
+    ]
+    discharge_candidates = [
+        option for option in discharge_trunk_options if option["sys_diameter_class"] == system_class
+    ]
+    topologies: list[Dict[str, Any]] = []
+
+    for suction_option in sorted(suction_candidates, key=lambda option: option["cost"]):
+        for discharge_option in sorted(discharge_candidates, key=lambda option: option["cost"]):
+            remaining = dict(component_availability)
+            if not _reserve_option(remaining, suction_option) or not _reserve_option(
+                remaining, discharge_option
+            ):
+                continue
+            branch_selections = _enumerate_branch_selections(
+                source_candidates=source_candidates,
+                destination_candidates=destination_candidates,
+                remaining_components=remaining,
+            )
+            if not branch_selections:
+                continue
+            for branch_selection in branch_selections:
+                topology_cost = (
+                    suction_option["cost"]
+                    + discharge_option["cost"]
+                    + branch_selection["total_cost"]
+                )
+                topologies.append(
+                    {
+                    "source_selection": branch_selection["source_selection"],
+                    "destination_selection": branch_selection["destination_selection"],
+                    "suction_option": suction_option,
+                    "discharge_option": discharge_option,
+                    "system_class": system_class,
+                    "topology_cost": topology_cost,
+                }
+                )
+
+    return sorted(
+        topologies,
+        key=lambda topology: (
+            topology["topology_cost"],
+            topology["suction_option"]["loss_lpm_equiv"] + topology["discharge_option"]["loss_lpm_equiv"],
+        ),
+    )
+
+
+def _enumerate_branch_selections(
+    *,
+    source_candidates: Dict[str, list[Dict[str, Any]]],
+    destination_candidates: Dict[str, list[Dict[str, Any]]],
+    remaining_components: Dict[str, int],
+) -> list[Dict[str, Any]]:
+    node_specs = [
+        ("source", node_id, source_candidates[node_id]) for node_id in sorted(source_candidates)
+    ] + [
+        ("destination", node_id, destination_candidates[node_id])
+        for node_id in sorted(destination_candidates)
+    ]
+    branch_selections: list[Dict[str, Any]] = []
+
+    def search(
+        index: int,
+        current_remaining: Dict[str, int],
+        current_cost: float,
+        current_source: Dict[str, Dict[str, Any]],
+        current_destination: Dict[str, Dict[str, Any]],
+    ) -> None:
+        if index == len(node_specs):
+            branch_selections.append(
+                {
+                "source_selection": dict(current_source),
+                "destination_selection": dict(current_destination),
+                "total_cost": current_cost,
+                }
+            )
+            return
+
+        kind, node_id, option_list = node_specs[index]
+        for option in option_list:
+            next_remaining = dict(current_remaining)
+            if not _reserve_option(next_remaining, option):
+                continue
+            if kind == "source":
+                current_source[node_id] = option
+                search(
+                    index + 1,
+                    next_remaining,
+                    current_cost + option["cost"],
+                    current_source,
+                    current_destination,
+                )
+                current_source.pop(node_id, None)
+            else:
+                current_destination[node_id] = option
+                search(
+                    index + 1,
+                    next_remaining,
+                    current_cost + option["cost"],
+                    current_source,
+                    current_destination,
+                )
+                current_destination.pop(node_id, None)
+
+    search(0, dict(remaining_components), 0.0, {}, {})
+    return sorted(
+        branch_selections,
+        key=lambda selection: (
+            selection["total_cost"],
+            sum(
+                option["loss_lpm_equiv"]
+                for option in selection["source_selection"].values()
+            )
+            + sum(
+                option["loss_lpm_equiv"]
+                for option in selection["destination_selection"].values()
+            ),
+        ),
+    )
 
 
 def _enumerate_slot_combinations(
     *,
     slot_options: list[Dict[str, Any]],
     max_slots: int,
-    system_class: str | None = None,
+    system_class: str,
 ) -> list[Dict[int, Dict[str, Any]]]:
-    candidates = [
-        option
-        for option in slot_options
-        if system_class is None or option["sys_diameter_class"] == system_class
-    ]
+    candidates = [option for option in slot_options if option["sys_diameter_class"] == system_class]
     combinations: list[Dict[int, Dict[str, Any]]] = []
     for slot_count in range(1, max_slots + 1):
         for combo in combinations_with_replacement(candidates, slot_count):
@@ -428,58 +607,6 @@ def _enumerate_slot_combinations(
         combinations,
         key=lambda combo: (sum(option["cost"] for option in combo.values()), len(combo)),
     )
-
-
-def _select_branch_topology(
-    *,
-    active_routes: list[Dict[str, Any]],
-    source_options: Dict[str, list[Dict[str, Any]]],
-    destination_options: Dict[str, list[Dict[str, Any]]],
-    suction_trunk_options: list[Dict[str, Any]],
-    discharge_trunk_options: list[Dict[str, Any]],
-    components: list[Dict[str, Any]],
-) -> Dict[str, Any] | None:
-    best_topology: Dict[str, Any] | None = None
-    best_cost: float | None = None
-
-    source_node_ids = sorted({route["source"] for route in active_routes})
-    sink_node_ids = sorted({route["sink"] for route in active_routes})
-    source_option_lists = [source_options[node_id] for node_id in source_node_ids]
-    destination_option_lists = [destination_options[node_id] for node_id in sink_node_ids]
-
-    for selected_source_options in product(*source_option_lists):
-        source_selection = dict(zip(source_node_ids, selected_source_options))
-        for selected_destination_options in product(*destination_option_lists):
-            destination_selection = dict(zip(sink_node_ids, selected_destination_options))
-            for suction_option in suction_trunk_options:
-                for discharge_option in discharge_trunk_options:
-                    bom = _build_bom_from_fallback(
-                        components=components,
-                        source_selection=source_selection,
-                        destination_selection=destination_selection,
-                        selected_pumps={},
-                        selected_meters={},
-                        suction_option=suction_option,
-                        discharge_option=discharge_option,
-                    )
-                    if bom is None:
-                        continue
-                    topology_cost = sum(item["total_cost"] for item in bom)
-                    if best_cost is None or topology_cost < best_cost:
-                        selected_classes = {
-                            option["sys_diameter_class"] for option in source_selection.values()
-                        } | {
-                            option["sys_diameter_class"] for option in destination_selection.values()
-                        } | {suction_option["sys_diameter_class"], discharge_option["sys_diameter_class"]}
-                        best_cost = topology_cost
-                        best_topology = {
-                            "source_selection": source_selection,
-                            "destination_selection": destination_selection,
-                            "suction_option": suction_option,
-                            "discharge_option": discharge_option,
-                            "system_class": selected_classes.pop() if len(selected_classes) == 1 else "mixed",
-                        }
-    return best_topology
 
 
 def _assign_routes(
@@ -495,28 +622,45 @@ def _assign_routes(
     assignment: Dict[str, Dict[str, Any]] = {}
     for route in active_routes:
         matched = None
+        source_option = source_selection[route["source"]]
+        destination_option = destination_selection[route["sink"]]
         for pump_slot, pump_option in selected_pumps.items():
             for meter_slot, meter_option in selected_meters.items():
-                flow = _compute_route_flow(
+                meter_flags = _build_meter_flags(route, meter_option)
+                if not meter_flags["compatible"]:
+                    continue
+                flow = compute_route_min_flow(
                     route=route,
-                    source_option=source_selection[route["source"]],
-                    destination_option=destination_selection[route["sink"]],
+                    source_option=source_option,
+                    destination_option=destination_option,
                     pump_option=pump_option,
                     meter_option=meter_option,
                     suction_option=suction_option,
                     discharge_option=discharge_option,
                 )
-                if flow is None:
+                hydraulics = summarize_route_hydraulics(
+                    route=route,
+                    source_option=source_option,
+                    destination_option=destination_option,
+                    pump_option=pump_option,
+                    meter_option=meter_option,
+                    suction_option=suction_option,
+                    discharge_option=discharge_option,
+                    flow_delivered_lpm=flow,
+                )
+                if not hydraulics["hydraulic_ok"]:
                     continue
                 matched = {
                     "route": route,
-                    "source_option": source_selection[route["source"]],
-                    "destination_option": destination_selection[route["sink"]],
+                    "source_option": source_option,
+                    "destination_option": destination_option,
                     "pump_slot": pump_slot,
                     "pump_option": pump_option,
                     "meter_slot": meter_slot,
                     "meter_option": meter_option,
                     "flow_delivered_lpm": flow,
+                    "meter_flags": meter_flags,
+                    "hydraulics": hydraulics,
                 }
                 break
             if matched is not None:
@@ -527,39 +671,10 @@ def _assign_routes(
     return assignment
 
 
-def _compute_route_flow(
-    *,
-    route: Dict[str, Any],
-    source_option: Dict[str, Any],
-    destination_option: Dict[str, Any],
-    pump_option: Dict[str, Any],
-    meter_option: Dict[str, Any],
-    suction_option: Dict[str, Any],
-    discharge_option: Dict[str, Any],
-) -> float | None:
-    if route["measurement_required"] and meter_option.get("is_bypass", False):
-        return None
+def _build_meter_flags(route: Dict[str, Any], meter_option: Dict[str, Any]) -> Dict[str, Any]:
+    from agri_circuit_optimizer.preprocess.feasibility import meter_compatibility
 
-    flow = max(
-        float(route["q_min_delivered_lpm"]),
-        float(source_option["q_min_lpm"]),
-        float(destination_option["q_min_lpm"]),
-        float(pump_option["q_min_lpm"]),
-        float(meter_option["q_min_lpm"]),
-        float(suction_option["q_min_lpm"]),
-        float(discharge_option["q_min_lpm"]),
-    )
-    max_flow = min(
-        float(source_option["q_max_lpm"]),
-        float(destination_option["q_max_lpm"]),
-        float(pump_option["q_max_lpm"]),
-        float(meter_option["q_max_lpm"]),
-        float(suction_option["q_max_lpm"]),
-        float(discharge_option["q_max_lpm"]),
-    )
-    if flow > max_flow:
-        return None
-    return flow
+    return meter_compatibility(route, meter_option)
 
 
 def _build_bom_from_fallback(
@@ -575,20 +690,15 @@ def _build_bom_from_fallback(
     component_index = {component["component_id"]: component for component in components}
     component_qty: Dict[str, int] = {}
 
-    def accumulate(option: Dict[str, Any]) -> None:
+    for option in (
+        list(source_selection.values())
+        + list(destination_selection.values())
+        + list(selected_pumps.values())
+        + list(selected_meters.values())
+        + [suction_option, discharge_option]
+    ):
         for component_id, qty in option["component_counts"].items():
             component_qty[component_id] = component_qty.get(component_id, 0) + int(qty)
-
-    for option in source_selection.values():
-        accumulate(option)
-    for option in destination_selection.values():
-        accumulate(option)
-    for option in selected_pumps.values():
-        accumulate(option)
-    for option in selected_meters.values():
-        accumulate(option)
-    accumulate(suction_option)
-    accumulate(discharge_option)
 
     for component_id, qty in component_qty.items():
         if qty > int(component_index[component_id]["available_qty"]):
@@ -608,12 +718,47 @@ def _build_bom_from_fallback(
     return bom
 
 
-def _build_route_and_hydraulic_reports_from_assignment(
+def _summarize_system_class(
+    payload: Dict[str, Any],
+    *,
+    selected_source_options: Dict[str, str],
+    selected_destination_options: Dict[str, str],
+    selected_pump_slots: Dict[int, str],
+    selected_meter_slots: Dict[int, str],
+    selected_suction_trunk: str,
+    selected_discharge_trunk: str,
+) -> str:
+    selected_classes = {
+        payload["source_options"][option_id]["sys_diameter_class"]
+        for option_id in selected_source_options.values()
+    }
+    selected_classes.update(
+        payload["destination_options"][option_id]["sys_diameter_class"]
+        for option_id in selected_destination_options.values()
+    )
+    selected_classes.update(
+        payload["pump_options"][option_id]["sys_diameter_class"]
+        for option_id in selected_pump_slots.values()
+    )
+    selected_classes.update(
+        payload["meter_options"][option_id]["sys_diameter_class"]
+        for option_id in selected_meter_slots.values()
+    )
+    selected_classes.add(payload["suction_trunk_options"][selected_suction_trunk]["sys_diameter_class"])
+    selected_classes.add(
+        payload["discharge_trunk_options"][selected_discharge_trunk]["sys_diameter_class"]
+    )
+    if len(selected_classes) == 1:
+        return next(iter(selected_classes))
+    return "mixed"
+
+
+def _build_reports_from_assignment(
     *,
     assignment: Dict[str, Dict[str, Any]],
     system_class: str,
-    suction_option: Dict[str, Any],
-    discharge_option: Dict[str, Any],
+    suction_option_id: str,
+    discharge_option_id: str,
 ) -> tuple[list[Dict[str, Any]], list[Dict[str, Any]]]:
     routes_report: list[Dict[str, Any]] = []
     hydraulics_report: list[Dict[str, Any]] = []
@@ -621,17 +766,11 @@ def _build_route_and_hydraulic_reports_from_assignment(
     for route_id in sorted(assignment):
         item = assignment[route_id]
         route = item["route"]
-        flow = float(item["flow_delivered_lpm"])
         pump_option = item["pump_option"]
         meter_option = item["meter_option"]
-        route_loss = (
-            item["source_option"]["loss_lpm_equiv"]
-            + suction_option["loss_lpm_equiv"]
-            + pump_option["loss_lpm_equiv"]
-            + meter_option["loss_lpm_equiv"]
-            + discharge_option["loss_lpm_equiv"]
-            + item["destination_option"]["loss_lpm_equiv"]
-        )
+        meter_flags = item["meter_flags"]
+        hydraulics = item["hydraulics"]
+        flow = float(item["flow_delivered_lpm"])
 
         routes_report.append(
             {
@@ -647,8 +786,12 @@ def _build_route_and_hydraulic_reports_from_assignment(
                 "pump_component_id": pump_option["metadata"]["component_id"],
                 "meter_slot": item["meter_slot"],
                 "meter_option_id": meter_option["option_id"],
+                "selected_meter_id": meter_option["metadata"]["component_id"],
                 "meter_component_id": meter_option["metadata"]["component_id"],
                 "meter_is_bypass": bool(meter_option.get("is_bypass", False)),
+                "meter_q_range_ok": bool(meter_flags["q_range_ok"]),
+                "meter_dose_ok": bool(meter_flags["dose_ok"]),
+                "meter_error_ok": bool(meter_flags["error_ok"]),
                 "source_option_id": item["source_option"]["option_id"],
                 "destination_option_id": item["destination_option"]["option_id"],
             }
@@ -657,16 +800,26 @@ def _build_route_and_hydraulic_reports_from_assignment(
             {
                 "route_id": route_id,
                 "system_class": system_class,
-                "suction_trunk_option_id": suction_option["option_id"],
-                "discharge_trunk_option_id": discharge_option["option_id"],
+                "suction_trunk_option_id": suction_option_id,
+                "discharge_trunk_option_id": discharge_option_id,
                 "flow_delivered_lpm": flow,
                 "q_min_required_lpm": float(route["q_min_delivered_lpm"]),
-                "loss_lpm_equiv": route_loss,
-                "hydraulic_slack_lpm": float(pump_option["q_max_lpm"]) - flow,
+                "total_loss_lpm_equiv": float(hydraulics["total_loss_lpm_equiv"]),
+                "hydraulic_slack_lpm": float(hydraulics["hydraulic_slack_lpm"]),
+                "gargalo_principal": hydraulics["bottleneck_label"],
             }
         )
 
     return routes_report, hydraulics_report
+
+
+def _reserve_option(remaining_components: Dict[str, int], option: Dict[str, Any]) -> bool:
+    for component_id, qty in option["component_counts"].items():
+        if remaining_components.get(component_id, 0) < qty:
+            return False
+    for component_id, qty in option["component_counts"].items():
+        remaining_components[component_id] -= qty
+    return True
 
 
 def _build_bom(

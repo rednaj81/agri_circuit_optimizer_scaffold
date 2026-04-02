@@ -59,59 +59,118 @@ Nós:
 - `src/agri_circuit_optimizer/` — pacote Python
 - `tests/` — testes automatizados
 
-## Como usar com Codex
-
-1. Extraia o `.zip`.
-2. Crie o ambiente virtual.
-3. Instale `requirements.txt`.
-4. Entregue ao Codex o arquivo `prompts/PROMPT_FOR_CODEX_IMPLEMENTATION.md`.
-5. Oriente o agente a seguir a ordem das tarefas em `guide/tasks/`.
-6. Peça implementação incremental em V1, depois V2 e por fim V3.
-
 ## Quick start
 
-```bash
+### Opção 1: sem instalação editável
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\activate
+$env:PYTHONPATH = 'src'
+pip install -r requirements.txt
+pytest -q tests --basetemp tests/_tmp/pytest-basetemp
+C:\Python312\python.exe -m agri_circuit_optimizer.solve.run_case --scenario data/scenario/example --dry-run
+C:\Python312\python.exe -m agri_circuit_optimizer.solve.run_case --scenario data/scenario/example --output-dir data/output/example_v3
+```
+
+### Opção 2: com instalação editável
+
+```powershell
 python -m venv .venv
 .\.venv\Scripts\activate
 pip install -r requirements.txt
 pip install -e .
+pytest -q tests --basetemp tests/_tmp/pytest-basetemp
 python -m agri_circuit_optimizer.solve.run_case --scenario data/scenario/example --dry-run
-python -m agri_circuit_optimizer.solve.run_case --scenario data/scenario/example --output-dir data/output/example_v1
-pytest -q
+python -m agri_circuit_optimizer.solve.run_case --scenario data/scenario/example --output-dir data/output/example_v3
 ```
 
-## Execução real do V1
+## Execução validada nesta máquina
 
-O fluxo V1 já cobre:
-- leitura e validação do cenário
+Os comandos abaixo foram executados com sucesso neste workspace:
+
+```powershell
+$env:PYTHONPATH = 'src'
+pytest -q tests --basetemp tests/_tmp/pytest-basetemp
+C:\Python312\python.exe -m agri_circuit_optimizer.solve.run_case --scenario data/scenario/example --dry-run
+C:\Python312\python.exe -m agri_circuit_optimizer.solve.run_case --scenario data/scenario/example --output-dir data/output/example_v3
+```
+
+Observações:
+- O ambiente atual não tem `pyomo` instalado, então o runner usa o fallback enumerativo.
+- Quando `pyomo` e HiGHS estiverem disponíveis, `solve_case` tenta o caminho Pyomo primeiro.
+- Os relatórios são gravados em `data/output/example_v3/`.
+
+## O que está implementado
+
+### V1
+- loaders e validação de cenário
 - geração de opções por estágio
 - poda conservadora de dominância
-- resolução end-to-end do cenário `example`
-- relatórios mínimos de BOM, rotas e hidráulica
+- modelo base com topologia, custo e vazão mínima
+- runner de cenário e relatórios mínimos
 
-Com o projeto instalado em modo editável:
+### V2
+- compatibilidade explícita `route -> meter_option`
+- medição direta obrigatória em rotas com `measurement_required`
+- adequação de medidor por vazão, dose mínima, erro máximo e faixa operacional de dosagem
+- mesma lógica no fallback enumerativo
+- relatórios com seleção e flags de medição
 
-```bash
-python -m agri_circuit_optimizer.solve.run_case --scenario data/scenario/example --dry-run
-python -m agri_circuit_optimizer.solve.run_case --scenario data/scenario/example --output-dir data/output/example_v1
-pytest -q tests --basetemp tests/_tmp/pytest-basetemp
-```
+### V3
+- compatibilidade de classe na linha central do sistema
+- suporte a ramais mistos quando a opção já embute adaptadores
+- perdas acumuladas por rota
+- capacidade efetiva da bomba após perdas
+- `hydraulic_slack_lpm` por rota
+- relatórios de hidráulica com perda total, folga e gargalo principal
 
-Arquivos gerados em `data/output/example_v1/`:
+## Relatórios gerados
+
+Em `data/output/example_v3/`:
 - `summary.json`
 - `bom.json`
 - `routes.json`
 - `hydraulics.json`
 
-Observação:
-- Quando `pyomo` e o solver HiGHS estiverem instalados no ambiente, o runner usa o caminho Pyomo.
-- Se essas dependências não estiverem disponíveis, o runner cai para um fallback enumerativo para manter a validação executável do V1.
+Os relatórios de rota incluem:
+- `selected_meter_id`
+- `meter_is_bypass`
+- `meter_q_range_ok`
+- `meter_dose_ok`
+- `meter_error_ok`
 
-## Roadmap de implementação
+Os relatórios hidráulicos incluem:
+- `total_loss_lpm_equiv`
+- `hydraulic_slack_lpm`
+- `gargalo_principal`
 
-- **V1:** topologia + custo + cobertura de rotas + vazão mínima
-- **V2:** medição direta + dosagem mínima + erro máximo
-- **V3:** classe de bitola + adaptadores + perdas hidráulicas + folga
+## Testes
+
+Cobertura mínima de aceite já incluída:
+- validação do contrato e das regras congeladas
+- geração de opções e poda
+- regressão end-to-end do `example`
+- medidor específico por dose/erro
+- inviabilidade por medidor incompatível
+- bypass permitido sem medição obrigatória
+- incompatibilidade de classe
+- inviabilidade por perdas excessivas
+- escolha de bomba maior quando a menor não vence as perdas
+
+## Roadmap
+
+Concluído:
+- T01 — contrato de dados e loaders
+- T02 — geração de opções e poda
+- T03 — modelo/runner V1
+- T04 — medição e dosagem
+- T05 — bitolas e hidráulica simplificada
+
+Próximos passos naturais:
+- consolidar execução Pyomo real no ambiente com `pyomo` + HiGHS
+- refinar a modelagem de compatibilidade geométrica se o projeto sair do escopo simplificado atual
+- ampliar relatórios operacionais e comparação entre solução Pyomo e fallback
 
 ## Arquivos-chave para começar
 
@@ -119,15 +178,5 @@ Observação:
 - `AGENTS.md`
 - `docs/04_model_formulation_v1_v2_v3.md`
 - `docs/05_data_contract.md`
-- `guide/tasks/T03_model_v1_topology_and_capacity.md`
-
-## Status atual
-
-Concluído nesta rodada:
-- T01 — contrato de dados e loaders
-- T02 — geração de opções e poda
-- T03 — modelo/runner V1 com validação do cenário `example`
-
-Ainda pendente:
-- V2 — dose mínima, erro máximo e adequação fina de medição
-- V3 — classe explícita de bitola, adaptadores, perdas e folga hidráulica
+- `guide/tasks/T01_data_contract_and_loaders.md`
+- `guide/tasks/T05_model_v3_diameters_and_hydraulics.md`

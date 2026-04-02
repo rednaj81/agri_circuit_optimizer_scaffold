@@ -78,57 +78,48 @@ def add_capacity_constraints(model: Any) -> None:
         model.ROUTES, rule=discharge_trunk_capacity_rule
     )
 
-    def pump_slot_upper_capacity_rule(model: Any, route_id: str, slot: int) -> Any:
-        slot_capacity = sum(
-            payload["pump_options"][option_id]["q_max_lpm"] * model.pump_option_selected[slot, option_id]
+    def pump_capacity_upper_rule(model: Any, route_id: str) -> Any:
+        return model.flow_delivered_lpm[route_id] <= sum(
+            payload["pump_options"][option_id]["q_max_lpm"]
+            * model.route_uses_pump_option[route_id, slot, option_id]
+            for slot in payload["pump_slots"]
+            for option_id in payload["pump_option_ids"]
+        ) + max_q * (1 - model.route_active[route_id])
+
+    model.pump_capacity_upper = pyo.Constraint(model.ROUTES, rule=pump_capacity_upper_rule)
+
+    def pump_capacity_lower_rule(model: Any, route_id: str) -> Any:
+        route = payload["routes"][route_id]
+        if not route["need_pump"]:
+            return pyo.Constraint.Skip
+        return model.flow_delivered_lpm[route_id] >= sum(
+            payload["pump_options"][option_id]["q_min_lpm"]
+            * model.route_uses_pump_option[route_id, slot, option_id]
+            for slot in payload["pump_slots"]
             for option_id in payload["pump_option_ids"]
         )
-        return model.flow_delivered_lpm[route_id] <= slot_capacity + max_q * (
-            1 - model.route_uses_pump_slot[route_id, slot]
-        )
 
-    model.pump_slot_upper_capacity = pyo.Constraint(
-        model.ROUTE_PUMP_ASSIGNMENT_KEYS, rule=pump_slot_upper_capacity_rule
-    )
+    model.pump_capacity_lower = pyo.Constraint(model.ROUTES, rule=pump_capacity_lower_rule)
 
-    def pump_slot_lower_capacity_rule(model: Any, route_id: str, slot: int) -> Any:
-        slot_qmin = sum(
-            payload["pump_options"][option_id]["q_min_lpm"] * model.pump_option_selected[slot, option_id]
-            for option_id in payload["pump_option_ids"]
-        )
-        return model.flow_delivered_lpm[route_id] >= slot_qmin - max_q * (
-            1 - model.route_uses_pump_slot[route_id, slot]
-        )
+    def meter_capacity_upper_rule(model: Any, route_id: str) -> Any:
+        return model.flow_delivered_lpm[route_id] <= sum(
+            payload["route_meter_compatibility"][route_id][option_id]["meter_q_max_lpm"]
+            * model.route_uses_meter_option[route_id, slot, option_id]
+            for slot in payload["meter_slots"]
+            for option_id in payload["meter_option_ids"]
+        ) + max_q * (1 - model.route_active[route_id])
 
-    model.pump_slot_lower_capacity = pyo.Constraint(
-        model.ROUTE_PUMP_ASSIGNMENT_KEYS, rule=pump_slot_lower_capacity_rule
-    )
+    model.meter_capacity_upper = pyo.Constraint(model.ROUTES, rule=meter_capacity_upper_rule)
 
-    def meter_slot_upper_capacity_rule(model: Any, route_id: str, slot: int) -> Any:
-        slot_capacity = sum(
-            payload["meter_options"][option_id]["q_max_lpm"] * model.meter_option_selected[slot, option_id]
+    def meter_capacity_lower_rule(model: Any, route_id: str) -> Any:
+        return model.flow_delivered_lpm[route_id] >= sum(
+            payload["meter_options"][option_id]["q_min_lpm"]
+            * model.route_uses_meter_option[route_id, slot, option_id]
+            for slot in payload["meter_slots"]
             for option_id in payload["meter_option_ids"]
         )
-        return model.flow_delivered_lpm[route_id] <= slot_capacity + max_q * (
-            1 - model.route_uses_meter_slot[route_id, slot]
-        )
 
-    model.meter_slot_upper_capacity = pyo.Constraint(
-        model.ROUTE_METER_ASSIGNMENT_KEYS, rule=meter_slot_upper_capacity_rule
-    )
-
-    def meter_slot_lower_capacity_rule(model: Any, route_id: str, slot: int) -> Any:
-        slot_qmin = sum(
-            payload["meter_options"][option_id]["q_min_lpm"] * model.meter_option_selected[slot, option_id]
-            for option_id in payload["meter_option_ids"]
-        )
-        return model.flow_delivered_lpm[route_id] >= slot_qmin - max_q * (
-            1 - model.route_uses_meter_slot[route_id, slot]
-        )
-
-    model.meter_slot_lower_capacity = pyo.Constraint(
-        model.ROUTE_METER_ASSIGNMENT_KEYS, rule=meter_slot_lower_capacity_rule
-    )
+    model.meter_capacity_lower = pyo.Constraint(model.ROUTES, rule=meter_capacity_lower_rule)
 
     def component_availability_rule(model: Any, component_id: str) -> Any:
         total_usage = 0

@@ -72,6 +72,26 @@ def declare_variables(model: Any) -> None:
         ],
         ordered=True,
     )
+    model.ROUTE_PUMP_OPTION_KEYS = pyo.Set(
+        dimen=3,
+        initialize=[
+            (route_id, slot, option_id)
+            for route_id in payload["route_ids"]
+            for slot in payload["pump_slots"]
+            for option_id in payload["pump_option_ids"]
+        ],
+        ordered=True,
+    )
+    model.ROUTE_METER_OPTION_KEYS = pyo.Set(
+        dimen=3,
+        initialize=[
+            (route_id, slot, option_id)
+            for route_id in payload["route_ids"]
+            for slot in payload["meter_slots"]
+            for option_id in payload["meter_option_ids"]
+        ],
+        ordered=True,
+    )
     model.SUCTION_TRUNK_OPTIONS = pyo.Set(
         initialize=payload["suction_trunk_option_ids"], ordered=True
     )
@@ -90,6 +110,10 @@ def declare_variables(model: Any) -> None:
     model.meter_option_selected = pyo.Var(model.METER_OPTION_KEYS, domain=pyo.Binary)
     model.route_uses_pump_slot = pyo.Var(model.ROUTE_PUMP_ASSIGNMENT_KEYS, domain=pyo.Binary)
     model.route_uses_meter_slot = pyo.Var(model.ROUTE_METER_ASSIGNMENT_KEYS, domain=pyo.Binary)
+    model.route_uses_pump_option = pyo.Var(model.ROUTE_PUMP_OPTION_KEYS, domain=pyo.Binary)
+    model.route_uses_meter_option = pyo.Var(model.ROUTE_METER_OPTION_KEYS, domain=pyo.Binary)
     model.suction_trunk_selected = pyo.Var(model.SUCTION_TRUNK_OPTIONS, domain=pyo.Binary)
     model.discharge_trunk_selected = pyo.Var(model.DISCHARGE_TRUNK_OPTIONS, domain=pyo.Binary)
     model.flow_delivered_lpm = pyo.Var(model.ROUTES, domain=pyo.NonNegativeReals)
+    model.total_loss_lpm_equiv = pyo.Var(model.ROUTES, domain=pyo.NonNegativeReals)
+    model.hydraulic_slack_lpm = pyo.Var(model.ROUTES, domain=pyo.NonNegativeReals)

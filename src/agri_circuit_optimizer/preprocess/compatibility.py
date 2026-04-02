@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, Iterable, List
 
+from agri_circuit_optimizer.preprocess.feasibility import meter_compatibility
+
 
 def check_system_diameter_compatibility(option: Dict[str, Any], system_class: str) -> bool:
     """Return True when an option is compatible with the chosen system diameter class."""
@@ -26,9 +28,7 @@ def option_supports_flow(option: Dict[str, Any], required_flow_lpm: float) -> bo
 
 
 def meter_option_allowed_for_route(route: Dict[str, Any], meter_option: Dict[str, Any]) -> bool:
-    if bool(route.get("measurement_required", False)) and bool(meter_option.get("is_bypass", False)):
-        return False
-    return option_supports_flow(meter_option, float(route.get("q_min_delivered_lpm", 0.0)))
+    return bool(meter_compatibility(route, meter_option)["compatible"])
 
 
 def route_respects_frozen_rules(source: str, sink: str) -> bool:

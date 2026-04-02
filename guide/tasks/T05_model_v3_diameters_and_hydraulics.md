@@ -18,4 +18,13 @@ modelo calcula perdas, aplica classe de bitola e filtra rotas inviáveis
 ## Status
 - [ ] não iniciado
 - [ ] em andamento
-- [ ] concluído
+- [x] concluído
+
+## Implementado
+- compatibilidade de classe na linha central do sistema
+- preservação de ramais mistos quando a própria opção incorpora adaptadores
+- perdas acumuladas por rota com `loss_lpm_equiv`
+- capacidade efetiva da bomba após perdas
+- `hydraulic_slack_lpm` por rota
+- relatórios com `total_loss_lpm_equiv`, `hydraulic_slack_lpm` e `gargalo_principal`
+- testes de incompatibilidade de classe, perda excessiva, escolha de bomba maior e regressão completa
