@@ -20,6 +20,11 @@ from agri_circuit_optimizer.preprocess.feasibility import (
     summarize_route_selectivity,
     summarize_route_hydraulics,
 )
+from agri_circuit_optimizer.solve.topology_engine import (
+    dry_run_fixed_topology,
+    is_fixed_topology_mode,
+    solve_fixed_topology_case,
+)
 
 EXTRA_USAGE_EPSILON = 1e-3
 
@@ -45,6 +50,15 @@ def solve_case(
 ) -> Dict[str, Any]:
     scenario_path = Path(scenario_dir)
     data = load_scenario(scenario_path)
+    if is_fixed_topology_mode(data):
+        solution = solve_fixed_topology_case(
+            data,
+            solver_name=solver_name or data["settings"]["default_solver"],
+        )
+        if output_dir is not None:
+            write_reports(solution, output_dir)
+        return solution
+
     options = build_stage_options(data)
 
     try:
@@ -75,6 +89,10 @@ def write_reports(solution: Dict[str, Any], output_dir: str | Path) -> None:
         "routes.json": build_route_report(solution),
         "hydraulics.json": build_hydraulic_report(solution),
     }
+    if "topology" in solution:
+        report_payloads["topology.json"] = solution["topology"]
+    if "comparison" in solution and solution["comparison"]:
+        report_payloads["comparison.json"] = solution["comparison"]
     for filename, payload in report_payloads.items():
         (out_dir / filename).write_text(
             json.dumps(payload, indent=2, ensure_ascii=False),
@@ -265,6 +283,7 @@ def _extract_solution(model: Any, results: Any, solver_name: str) -> Dict[str, A
             "solver": solver_name,
             "solver_status": str(results.solver.status),
             "termination_condition": str(results.solver.termination_condition),
+            "topology_family": "star_manifolds",
             "system_class": _summarize_system_class(
                 payload,
                 selected_source_options=selected_source_options,
@@ -456,6 +475,7 @@ def _solve_case_fallback(data: Dict[str, Any], options: Dict[str, Any], solver_n
                                     "solver": solver_name,
                                     "solver_status": "fallback",
                                     "termination_condition": "enumerated",
+                                    "topology_family": "star_manifolds",
                                     "system_class": topology_system_class,
                                     "routes_served": len(routes_report),
                                     "mandatory_routes_served": len(mandatory_routes),
@@ -1016,16 +1036,22 @@ def main() -> None:
     print(json.dumps(summary, indent=2, ensure_ascii=False))
 
     if args.dry_run:
-        options = build_stage_options(data)
-        dry_run_summary = {
-            **summary,
-            "system_classes": options["system_classes"],
-            "mandatory_routes_with_viable_classes": sum(
-                1
-                for route_id in data["routes"].loc[data["routes"]["mandatory"], "route_id"].tolist()
-                if options["route_class_feasibility"][route_id]
-            ),
-        }
+        if is_fixed_topology_mode(data):
+            dry_run_summary = {
+                **summary,
+                **dry_run_fixed_topology(data),
+            }
+        else:
+            options = build_stage_options(data)
+            dry_run_summary = {
+                **summary,
+                "system_classes": options["system_classes"],
+                "mandatory_routes_with_viable_classes": sum(
+                    1
+                    for route_id in data["routes"].loc[data["routes"]["mandatory"], "route_id"].tolist()
+                    if options["route_class_feasibility"][route_id]
+                ),
+            }
         print(json.dumps(dry_run_summary, indent=2, ensure_ascii=False))
         print("Dry-run completed: scenario loaded, validated and preprocessed.")
         return

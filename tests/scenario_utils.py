@@ -10,6 +10,7 @@ import yaml
 
 EXAMPLE_SCENARIO = Path("data/scenario/example")
 MAQUETE_SCENARIO = Path("data/scenario/maquete_core")
+MAQUETE_BUS_SCENARIO = Path("data/scenario/maquete_bus_manual")
 
 
 def copy_example_scenario() -> Path:
@@ -18,6 +19,10 @@ def copy_example_scenario() -> Path:
 
 def copy_maquete_scenario() -> Path:
     return _copy_scenario(MAQUETE_SCENARIO, "maquete-test")
+
+
+def copy_maquete_bus_scenario() -> Path:
+    return _copy_scenario(MAQUETE_BUS_SCENARIO, "maquete-bus-test")
 
 
 def _copy_scenario(source: Path, prefix: str) -> Path:

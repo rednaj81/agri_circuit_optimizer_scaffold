@@ -15,6 +15,8 @@ class ScenarioPaths:
     destination_branch_templates_csv: Path
     trunk_templates_csv: Path
     settings_yaml: Path
+    edges_csv: Path
+    topology_rules_yaml: Path
 
 
 @dataclass(frozen=True)
@@ -30,6 +32,9 @@ class NodeRecord:
     footprint_w_m: Optional[float] = None
     footprint_d_m: Optional[float] = None
     mount_height_m: Optional[float] = None
+    node_role: Optional[str] = None
+    preferred_topology_family: Optional[str] = None
+    allow_service_loop: bool = False
 
 
 @dataclass(frozen=True)
@@ -44,6 +49,11 @@ class RouteRecord:
     dose_error_max_pct: float
     weight: float
     need_pump: bool
+    route_group: str = "core"
+    allow_multi_stage_path: bool = False
+    max_active_pumps: Optional[int] = None
+    max_reading_meters: Optional[int] = None
+    route_notes: str = ""
 
 
 @dataclass(frozen=True)
@@ -102,6 +112,8 @@ SCENARIO_TABLE_SCHEMAS = {
         boolean_columns=("is_source", "is_sink", "is_pure_source", "is_final_sink"),
         string_columns=("node_id", "node_type"),
         optional_float_columns=("x_m", "y_m", "footprint_w_m", "footprint_d_m", "mount_height_m"),
+        optional_string_columns=("node_role", "preferred_topology_family"),
+        optional_boolean_columns=("allow_service_loop",),
     ),
     "routes": ScenarioTableSchema(
         required_columns=(
@@ -119,6 +131,9 @@ SCENARIO_TABLE_SCHEMAS = {
         boolean_columns=("mandatory", "measurement_required", "need_pump"),
         float_columns=("q_min_delivered_lpm", "dose_min_l", "dose_error_max_pct", "weight"),
         string_columns=("route_id", "source", "sink"),
+        optional_string_columns=("route_group", "route_notes"),
+        optional_boolean_columns=("allow_multi_stage_path",),
+        optional_integer_columns=("max_active_pumps", "max_reading_meters"),
     ),
     "components": ScenarioTableSchema(
         required_columns=(
@@ -205,6 +220,35 @@ SCENARIO_TABLE_SCHEMAS = {
         required_columns=("template_id", "stage_kind", "allowed_diameters", "notes"),
         string_columns=("template_id", "stage_kind", "allowed_diameters", "notes"),
         optional_boolean_columns=("consume_connector",),
+    ),
+    "edges": ScenarioTableSchema(
+        required_columns=(
+            "edge_id",
+            "from_node",
+            "to_node",
+            "edge_kind",
+            "direction_mode",
+            "can_be_active",
+            "must_be_closed_if_unused",
+            "default_installed",
+            "component_ids",
+        ),
+        boolean_columns=("can_be_active", "must_be_closed_if_unused", "default_installed"),
+        string_columns=(
+            "edge_id",
+            "from_node",
+            "to_node",
+            "edge_kind",
+            "direction_mode",
+            "component_ids",
+        ),
+        optional_float_columns=("length_m",),
+        optional_boolean_columns=(
+            "counts_towards_hose_total",
+            "counts_towards_connector_total",
+        ),
+        optional_string_columns=("topology_family", "group_id", "notes", "branch_role"),
+        allow_blank_string_columns=("topology_family", "group_id", "notes", "branch_role"),
     ),
 }
 

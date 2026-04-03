@@ -1,0 +1,11 @@
+topology_family: bus_with_pump_islands
+max_active_pumps_per_route: 1
+max_reading_meters_per_route: 1
+allow_idle_pumps_on_path: true
+allow_idle_meters_on_path: true
+allow_passive_bypass_on_path: true
+enforce_simple_path: true
+allow_cycle_if_inactive: true
+treat_extra_open_branch_as_invalid: true
+core_routes_group: core
+service_routes_group: service

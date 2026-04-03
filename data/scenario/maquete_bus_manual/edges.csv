@@ -1,0 +1,18 @@
+edge_id,from_node,to_node,topology_family,edge_kind,length_m,direction_mode,group_id,can_be_active,counts_towards_hose_total,counts_towards_connector_total,must_be_closed_if_unused,default_installed,component_ids,branch_role,notes
+E_TAP_W,W,B0,bus_with_pump_islands,tap_suction,1.0,forward_only,,1,1,1,1,1,hose_g1_1m|solenoid_base_g1|check_base_g1|tee_base_g1,suction,water source tap
+E_TAP_I,I,B1,bus_with_pump_islands,tap_bidirectional,1.0,bidirectional,,1,1,1,1,1,hose_g1_1m|solenoid_base_g1|tee_base_g1,,incorporator tap
+E_TAP_IR,B2,IR,bus_with_pump_islands,tap_discharge,1.0,forward_only,,1,1,1,1,1,hose_g1_1m|solenoid_base_g1|tee_base_g1,discharge,service return tap
+E_TAP_P1,P1,B3,bus_with_pump_islands,tap_bidirectional,1.0,bidirectional,,1,1,1,1,1,hose_g1_1m|solenoid_base_g1|tee_base_g1,,p1 tap
+E_TAP_P2,P2,B4,bus_with_pump_islands,tap_bidirectional,1.0,bidirectional,,1,1,1,1,1,hose_g1_1m|solenoid_base_g1|tee_base_g1,,p2 tap
+E_TAP_P3,P3,B5,bus_with_pump_islands,tap_bidirectional,1.0,bidirectional,,1,1,1,1,1,hose_g1_1m|solenoid_base_g1|tee_base_g1,,p3 tap
+E_TAP_P4,P4,B6,bus_with_pump_islands,tap_bidirectional,1.0,bidirectional,,1,1,1,1,1,hose_g1_1m|solenoid_base_g1|tee_base_g1,,p4 tap
+E_TAP_M,M,B7,bus_with_pump_islands,tap_bidirectional,1.0,bidirectional,,1,1,1,1,1,hose_g1_1m|solenoid_base_g1|tee_base_g1,,mixer tap
+E_TAP_S,B8,S,bus_with_pump_islands,tap_discharge,1.0,forward_only,,1,1,0,1,1,hose_g1_1m|valve_extra_g1,discharge,external outlet tap
+E_BUS_01,B0,B1,bus_with_pump_islands,pump_island,1.0,forward_only,,1,1,0,0,1,hose_g1_1m|pump_suction_base_g1|meter_high_g1,,upstream island
+E_BUS_12,B1,B2,bus_with_pump_islands,pump_island,1.0,forward_only,,1,1,0,0,1,hose_g1_1m|pump_suction_base_g1|meter_small_g1,,service island
+E_BUS_23,B2,B3,bus_with_pump_islands,bus_segment,1.0,forward_only,,1,1,0,0,1,hose_g1_1m,,main bus
+E_BUS_34,B3,B4,bus_with_pump_islands,bus_segment,1.0,forward_only,,1,1,0,0,1,hose_g1_1m,,main bus
+E_BUS_45,B4,B5,bus_with_pump_islands,bus_segment,1.0,forward_only,,1,1,0,0,1,hose_g1_1m,,main bus
+E_BUS_56,B5,B6,bus_with_pump_islands,bus_segment,1.0,forward_only,,1,1,0,0,1,hose_g1_1m,,main bus
+E_BUS_67,B6,B7,bus_with_pump_islands,pump_island,1.0,forward_only,,1,1,0,0,1,hose_g1_1m|pump_suction_base_g1|meter_mid_g1,,downstream island
+E_BUS_78,B7,B8,bus_with_pump_islands,bus_segment,1.0,forward_only,,1,1,0,0,1,hose_g1_1m,,main bus

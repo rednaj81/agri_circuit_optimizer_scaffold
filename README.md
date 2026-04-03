@@ -2,6 +2,7 @@
 
 Implementação incremental de um solucionador para síntese de circuito hidráulico agrícola com:
 - topologia em camadas (superestrutura)
+- modo multitopologia com validação de topologia fixa
 - seleção de componentes a partir de biblioteca de materiais
 - medição com fluxômetros
 - restrições de vazão mínima na saída
@@ -18,6 +19,7 @@ Encontrar a menor rede hidráulica instrumentada que:
 - permite limpeza entre operações
 - garante medição direta nas rotas de dosagem
 - garante seletividade operacional em arquitetura estrela com manifolds
+- compara famílias topológicas quando o cenário fornece topologia fixa por arestas
 - respeita compatibilidade física de bitolas
 - é hidraulicamente viável no modelo simplificado
 - atende vazões mínimas exigidas
@@ -94,6 +96,8 @@ python -m agri_circuit_optimizer.solve.run_case --scenario data/scenario/example
 .\.venv\Scripts\activate
 python -m agri_circuit_optimizer.solve.run_case --scenario data/scenario/maquete_core --dry-run
 python -m agri_circuit_optimizer.solve.run_case --scenario data/scenario/maquete_core --output-dir data/output/maquete_core
+python -m agri_circuit_optimizer.solve.run_case --scenario data/scenario/maquete_bus_manual --dry-run
+python -m agri_circuit_optimizer.solve.run_case --scenario data/scenario/maquete_bus_manual --output-dir data/output/maquete_bus_manual
 ```
 
 ## Execução validada nesta máquina
@@ -110,7 +114,8 @@ Os comandos abaixo foram executados com sucesso neste workspace:
 Observações:
 - A `.venv` deste workspace consegue importar `pyomo` e `highspy`.
 - `solve_case` tenta Pyomo primeiro e cai para o fallback enumerativo quando necessário.
-- Os relatórios são gravados em `data/output/example_v3/` e `data/output/maquete_core/`.
+- Cenários com `edges.csv` + `topology_rules.yaml` entram no engine de topologia fixa.
+- Os relatórios são gravados em `data/output/example_v3/`, `data/output/maquete_core/` e `data/output/maquete_bus_manual/`.
 
 ## O que está implementado
 
@@ -153,6 +158,15 @@ Observações:
 - ramo extra aberto invalida a rota como operação seletiva
 - nós bidirecionais exigem isolamento independente nos dois lados usando o mesmo SKU físico de solenoide
 
+### Multitopologia
+- `settings.yaml` aceita `topology_family`
+- `star_manifolds` continua usando o pipeline V1/V2/V3 já existente
+- `bus_with_pump_islands` usa `edges.csv` + `topology_rules.yaml`
+- a topologia instalada é separada da operação por rota
+- cada rota passa a ser validada por caminho ativo dirigido
+- bombas e medidores instalados podem permanecer no caminho como elementos ociosos quando a família permitir
+- `route_group=service` permite separar rotas como `I -> IR` do atendimento core
+
 ## Relatórios gerados
 
 Em `data/output/example_v3/`:
@@ -167,6 +181,14 @@ Em `data/output/maquete_core/`:
 - `routes.json`
 - `hydraulics.json`
 
+Em `data/output/maquete_bus_manual/`:
+- `summary.json`
+- `bom.json`
+- `routes.json`
+- `hydraulics.json`
+- `topology.json`
+- `comparison.json`
+
 Os relatórios de rota incluem:
 - `selected_meter_id`
 - `meter_is_bypass`
@@ -179,6 +201,12 @@ Os relatórios de rota incluem:
 - `extra_open_branch_conflict`
 - `open_suction_branch_count`
 - `open_discharge_branch_count`
+- `topology_family`
+- `served`
+- `failure_reason`
+- `active_path_edge_ids`
+- `active_path_arc_ids`
+- `active_path_nodes`
 
 Os relatórios hidráulicos incluem:
 - `total_loss_lpm_equiv`
@@ -195,6 +223,14 @@ O resumo da maquete também inclui:
 - `solenoid_suction_total`
 - `solenoid_discharge_total`
 - `solenoid_total`
+
+No modo multitopologia, o resumo também inclui:
+- `topology_family`
+- `core_routes_served`
+- `service_routes_served`
+- `core_mandatory_routes_served`
+- `service_mandatory_routes_served`
+- `mandatory_core_routes_unserved`
 
 ## Testes
 
@@ -227,6 +263,10 @@ Concluído:
 - T11 — modo `bottleneck_plus_length`
 - T12 — testes e relatórios da maquete
 - refinamento de seletividade operacional em arquitetura estrela
+- engine de topologia fixa multitopologia
+- suporte à família `bus_with_pump_islands`
+- cenário `data/scenario/maquete_bus_manual/`
+- comparação básica entre famílias por BOM e cobertura
 
 Próximos passos naturais:
 - consolidar execução Pyomo real no ambiente com `pyomo` + HiGHS
