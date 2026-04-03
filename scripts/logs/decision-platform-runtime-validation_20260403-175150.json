@@ -1,0 +1,123 @@
+{
+  "started_at": "2026-04-03T17:51:50.6656666-03:00",
+  "repo_root": "C:\\d\\dev\\agri_circuit_optimizer_scaffold",
+  "branch": "codex/new-architecture-platform",
+  "scenario_dir": "data/decision_platform/maquete_v2",
+  "output_dir": "data/output/decision_platform/maquete_v2",
+  "dry_run": false,
+  "steps": [
+    {
+      "name": "1. Branch e ambiente",
+      "started_at": "2026-04-03T17:51:50.6734621-03:00",
+      "status": "passed",
+      "details": {
+        "active_branch": "codex/new-architecture-platform",
+        "julia_depot_path": "C:\\d\\dev\\agri_circuit_optimizer_scaffold\\julia_depot_runtime",
+        "pythonpath": "src",
+        "python_version": "Python 3.12.6"
+      },
+      "finished_at": "2026-04-03T17:51:50.9245472-03:00",
+      "duration_seconds": 0.25,
+      "duration_display": "00:00:00.249"
+    },
+    {
+      "name": "2. Validar Julia",
+      "started_at": "2026-04-03T17:51:50.9348148-03:00",
+      "status": "passed",
+      "details": {
+        "julia_command": "C:\\Users\\jande\\AppData\\Local\\Microsoft\\WindowsApps\\julia.exe",
+        "depot_path": "C:\\d\\dev\\agri_circuit_optimizer_scaffold\\julia_depot_runtime",
+        "julia_version": "julia version 1.12.5",
+        "depot_visible": true
+      },
+      "finished_at": "2026-04-03T17:51:52.6681692-03:00",
+      "duration_seconds": 1.733,
+      "duration_display": "00:00:01.733"
+    },
+    {
+      "name": "3. Suíte rápida",
+      "started_at": "2026-04-03T17:51:52.6722272-03:00",
+      "status": "passed",
+      "details": {
+        "marker": "not slow and not requires_julia",
+        "basetemp": "tests/_tmp/pytest-basetemp-fast"
+      },
+      "finished_at": "2026-04-03T17:56:19.1349669-03:00",
+      "duration_seconds": 266.459,
+      "duration_display": "00:04:26.458"
+    },
+    {
+      "name": "4. Suíte com Julia real",
+      "started_at": "2026-04-03T17:56:19.1367756-03:00",
+      "status": "passed",
+      "details": {
+        "basetemp": "tests/_tmp/pytest-basetemp-julia",
+        "marker": "requires_julia",
+        "expected_engine": "watermodels_jl",
+        "expected_mode": "real_julia"
+      },
+      "finished_at": "2026-04-03T17:59:25.9385893-03:00",
+      "duration_seconds": 186.799,
+      "duration_display": "00:03:06.799"
+    },
+    {
+      "name": "5. Pipeline maquete_v2",
+      "started_at": "2026-04-03T17:59:25.9476846-03:00",
+      "status": "passed",
+      "details": {
+        "engine_mode": "real_julia",
+        "engine_used": "watermodels_jl",
+        "engine_requested": "watermodels_jl",
+        "output_dir": "C:\\d\\dev\\agri_circuit_optimizer_scaffold\\data\\output\\decision_platform\\maquete_v2",
+        "selected_candidate_id": "loop_ring__g5m2_2"
+      },
+      "finished_at": "2026-04-03T18:02:39.1117743-03:00",
+      "duration_seconds": 193.161,
+      "duration_display": "00:03:13.161"
+    },
+    {
+      "name": "6. Conferir artefatos de saída",
+      "started_at": "2026-04-03T18:02:39.1127764-03:00",
+      "status": "passed",
+      "details": {
+        "output_dir": "C:\\d\\dev\\agri_circuit_optimizer_scaffold\\data\\output\\decision_platform\\maquete_v2",
+        "artifact_count_checked": 11
+      },
+      "finished_at": "2026-04-03T18:02:39.1294016-03:00",
+      "duration_seconds": 0.017,
+      "duration_display": "00:00:00.016"
+    },
+    {
+      "name": "7. Checklist de consistência",
+      "started_at": "2026-04-03T18:02:39.1306639-03:00",
+      "status": "passed",
+      "details": {
+        "score_final": 0.9110553820006229,
+        "default_profile_id": "balanced",
+        "install_cost": 435.0,
+        "resilience_score": 75.0,
+        "selected_candidate_id": "loop_ring__g5m2_2",
+        "topology_family": "loop_ring",
+        "fallback_cost": 300.0,
+        "cleaning_score": 89.69999999999999,
+        "quality_score_raw": 87.333
+      },
+      "finished_at": "2026-04-03T18:02:39.2179842-03:00",
+      "duration_seconds": 0.087,
+      "duration_display": "00:00:00.087"
+    },
+    {
+      "name": "8. UI local",
+      "started_at": "2026-04-03T18:02:39.2212807-03:00",
+      "finished_at": "2026-04-03T18:02:39.2213241-03:00",
+      "status": "skipped",
+      "duration_seconds": 0.0,
+      "duration_display": "00:00:00.000",
+      "details": {
+        "reason": "Execução da UI foi desabilitada via -SkipUi."
+      }
+    }
+  ],
+  "finished_at": "2026-04-03T18:02:39.2216949-03:00",
+  "success": true
+}

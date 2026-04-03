@@ -1,0 +1,48 @@
+{
+  "started_at": "2026-04-03T17:41:33.3493987-03:00",
+  "repo_root": "C:\\d\\dev\\agri_circuit_optimizer_scaffold",
+  "branch": "codex/new-architecture-platform",
+  "scenario_dir": "data/decision_platform/maquete_v2",
+  "output_dir": "data/output/decision_platform/maquete_v2",
+  "dry_run": true,
+  "steps": [
+    {
+      "name": "1. Branch e ambiente",
+      "started_at": "2026-04-03T17:41:33.3704963-03:00",
+      "status": "passed",
+      "details": [
+        {
+          "Command": "git checkout codex/new-architecture-platform",
+          "ExitCode": 0,
+          "Output": []
+        },
+        {
+          "Command": "git pull",
+          "ExitCode": 0,
+          "Output": []
+        },
+        {
+          "julia_depot_path": "C:\\d\\dev\\agri_circuit_optimizer_scaffold\\julia_depot_runtime",
+          "python_version": "python --version",
+          "git_pull_skipped": false,
+          "pythonpath": "src",
+          "active_branch": "codex/new-architecture-platform"
+        }
+      ],
+      "finished_at": "2026-04-03T17:41:33.4295077-03:00",
+      "duration_seconds": 0.058,
+      "duration_display": "00:00:00.057"
+    },
+    {
+      "name": "2. Validar Julia",
+      "started_at": "2026-04-03T17:41:33.4471151-03:00",
+      "status": "failed",
+      "error": "The variable '$script:JuliaCommand' cannot be retrieved because it has not been set.",
+      "finished_at": "2026-04-03T17:41:33.4880729-03:00",
+      "duration_seconds": 0.041,
+      "duration_display": "00:00:00.040"
+    }
+  ],
+  "finished_at": "2026-04-03T17:41:33.4983139-03:00",
+  "success": false
+}
