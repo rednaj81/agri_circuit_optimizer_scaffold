@@ -164,8 +164,20 @@ Os testes da `decision_platform` foram atualizados para refletir o novo estado:
 
 Observação:
 
-- a suíte completa `tests/decision_platform` foi iniciada mais de uma vez e ficou lenta por concorrência com Julia real
-- o rerun correto ainda deve ser feito de forma visível, sem `-q`, para auditoria final desta rodada
+- uma tentativa anterior ficou lenta por duas execuções concorrentes de `pytest`; isso foi encerrado
+- a passada final correta foi rerodada em execução única, com saída visível e depot Julia explícito
+
+Execução final validada:
+
+```powershell
+$env:PYTHONPATH='src'
+$env:JULIA_DEPOT_PATH=(Resolve-Path 'julia_depot_runtime')
+.\.venv\Scripts\python.exe -m pytest tests\decision_platform -p no:tmpdir --basetemp tests/_tmp/pytest-basetemp-real -vv -s
+```
+
+Resultado final:
+
+- `16 passed in 1643.60s (0:27:23)`
 
 ## Comandos recomendados para validação local
 
@@ -205,7 +217,6 @@ $env:JULIA_DEPOT_PATH=(Resolve-Path 'julia_depot_runtime')
 
 - o runtime Julia real foi ativado no host atual, mas o setup depende do depot local `julia_depot_runtime`
 - a instalação Julia no host ainda não está “limpa” o suficiente para dispensar esse depot local
-- a suíte completa ainda precisa de uma passada final única e sem concorrência para carimbar auditoria
 - a engine Julia continua simplificada no conteúdo do `DecisionEngine.jl`; o runtime real está ativo, mas a lógica hidráulica ali ainda não é uma modelagem completa de WaterModels
 
 ## Estado objetivo no fim desta rodada
@@ -215,4 +226,3 @@ $env:JULIA_DEPOT_PATH=(Resolve-Path 'julia_depot_runtime')
 - Dash real ativo: sim
 - `maquete_v2` rodou com `engine_used=watermodels_jl`: sim
 - fail-closed preservado: sim
-

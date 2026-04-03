@@ -23,7 +23,7 @@ def test_bridge_fails_closed_when_fallback_is_none(monkeypatch) -> None:
         assert "fallback 'none'" in str(exc)
 
 
-def test_bridge_falls_back_when_python_emulation_is_allowed() -> None:
+def test_bridge_falls_back_when_python_emulation_is_allowed(monkeypatch) -> None:
     scenario_dir = prepare_scenario_copy(
         "data/decision_platform/maquete_v2",
         "maquete_v2_bridge_fallback",
@@ -33,6 +33,8 @@ def test_bridge_falls_back_when_python_emulation_is_allowed() -> None:
         bundle = load_scenario_bundle(scenario_dir)
         candidate = generate_candidate_topologies(bundle)[0]
         payload = build_candidate_payload(normalize_candidate(candidate, bundle), bundle)
+        monkeypatch.setattr(bridge, "julia_available", lambda: False)
+        monkeypatch.setattr(bridge, "watermodels_available", lambda project_dir=None: False)
         metrics = evaluate_candidate_via_bridge(payload, bundle)
         assert metrics["engine_requested"] == "watermodels_jl"
         assert metrics["engine_used"] == "python_emulated_julia"

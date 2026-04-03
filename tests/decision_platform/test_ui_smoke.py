@@ -11,7 +11,8 @@ def test_dash_app_builds_layout_and_callbacks_even_when_fail_closed() -> None:
 
     assert hasattr(app, "layout")
     assert app.layout is not None
-    assert len(getattr(app, "callbacks", [])) >= 4
+    callback_count = len(getattr(app, "callbacks", [])) or len(getattr(app, "callback_map", {}))
+    assert callback_count >= 4
 
 
 def test_real_dash_stack_is_available() -> None:
@@ -50,12 +51,12 @@ def test_catalog_filters_include_quality_resilience_and_fallback() -> None:
             max_cost=1000,
             min_quality=50,
             min_resilience=10,
-            fallback_filter="NO_FALLBACK",
+            fallback_filter="WITH_FALLBACK",
         )
         assert filtered
         assert all(record["feasible"] for record in filtered)
         assert all(float(record["quality_score_raw"]) >= 50 for record in filtered)
         assert all(float(record["resilience_score"]) >= 10 for record in filtered)
-        assert all(int(record["fallback_component_count"]) == 0 for record in filtered)
+        assert all(int(record["fallback_component_count"]) > 0 for record in filtered)
     finally:
         cleanup_scenario_copy(scenario_dir)

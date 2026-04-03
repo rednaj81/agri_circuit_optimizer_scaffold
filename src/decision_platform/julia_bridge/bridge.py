@@ -125,6 +125,11 @@ def evaluate_candidates_via_bridge(
         ]
 
     if prefer_real_julia and julia_ok and watermodels_ok:
+        real_result = _call_real_julia(payloads)
+        if isinstance(real_result, dict):
+            real_metrics_list = [real_result]
+        else:
+            real_metrics_list = list(real_result)
         return [
             _decorate_engine_metadata(
                 metrics,
@@ -135,7 +140,7 @@ def evaluate_candidates_via_bridge(
                 watermodels_ok=watermodels_ok,
                 warning=None,
             )
-            for metrics in _call_real_julia(payloads)
+            for metrics in real_metrics_list
         ]
 
     if fallback_engine == "python_emulated_julia":
