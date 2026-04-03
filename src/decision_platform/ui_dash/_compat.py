@@ -57,6 +57,10 @@ except Exception:  # pragma: no cover
         Tab=_factory("Tab"),
         Graph=_factory("Graph"),
         Store=_factory("Store"),
+        Dropdown=_factory("Dropdown"),
+        Checklist=_factory("Checklist"),
+        Input=_factory("Input"),
+        Slider=_factory("Slider"),
     )
     dag = SimpleNamespace(AgGrid=_factory("AgGrid"))
     cyto = SimpleNamespace(Cytoscape=_factory("Cytoscape"))

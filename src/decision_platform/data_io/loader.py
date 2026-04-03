@@ -251,6 +251,13 @@ def _validate_bundle(
     ].sum(axis=1)
     if (weight_sum <= 0).any():
         raise ValueError("weight_profiles.csv must define positive aggregate weights.")
+    hydraulic_engine = scenario_settings.get("hydraulic_engine", {})
+    primary_engine = str(hydraulic_engine.get("primary", "")).strip()
+    fallback_engine = str(hydraulic_engine.get("fallback", "")).strip()
+    if primary_engine not in {"watermodels_jl", "python_emulated_julia"}:
+        raise ValueError("scenario_settings.yaml hydraulic_engine.primary must be 'watermodels_jl' or 'python_emulated_julia'.")
+    if fallback_engine not in {"none", "python_emulated_julia"}:
+        raise ValueError("scenario_settings.yaml hydraulic_engine.fallback must be 'none' or 'python_emulated_julia'.")
 
 
 def _parse_bool(value: Any) -> bool:

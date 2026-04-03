@@ -14,4 +14,5 @@ def test_generator_creates_multiple_families_and_mutations() -> None:
     assert {"star_manifolds", "bus_with_pump_islands", "loop_ring", "hybrid_free"} <= families
     assert "mutation" in generation_sources
     assert "crossover" in generation_sources
-    assert len(candidates) <= 20
+    assert len(candidates) > 20
+    assert len(candidates) <= int(bundle.scenario_settings["candidate_generation"]["population_size"])

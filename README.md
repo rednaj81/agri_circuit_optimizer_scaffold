@@ -123,6 +123,8 @@ Dependências:
 - base: `pip install -r requirements.txt`
 - UI completa: `pip install -e .[ui]`
 - bridge Julia real: instalar Julia no sistema e preparar o ambiente de `julia/Project.toml`
+- se o alias da Store não funcionar no terminal/sandbox, defina `JULIA_EXE` apontando para o binário real do `juliaup`, por exemplo:
+  `C:\Users\<usuario>\.julia\juliaup\julia-1.12.5+0.x64.w64.mingw32\bin\julia.exe`
 
 ## Execução validada nesta máquina
 
@@ -133,7 +135,7 @@ Os comandos abaixo foram executados com sucesso neste workspace:
 .\.venv\Scripts\python.exe -m agri_circuit_optimizer.solve.run_case --scenario data/scenario/example --dry-run
 .\.venv\Scripts\python.exe -m agri_circuit_optimizer.solve.run_case --scenario data/scenario/maquete_core --dry-run
 .\.venv\Scripts\python.exe -m agri_circuit_optimizer.solve.run_case --scenario data/scenario/maquete_core --output-dir data/output/maquete_core
-.\.venv\Scripts\python.exe -m decision_platform.api.run_pipeline --scenario data/decision_platform/maquete_v2 --output-dir data/output/decision_platform/maquete_v2
+.\.venv\Scripts\python.exe -m pytest tests\decision_platform -p no:tmpdir -q
 ```
 
 Observações:
@@ -141,8 +143,10 @@ Observações:
 - `solve_case` tenta Pyomo primeiro e cai para o fallback enumerativo quando necessário.
 - Cenários com `edges.csv` + `topology_rules.yaml` entram no engine de topologia fixa.
 - Os relatórios são gravados em `data/output/example_v3/`, `data/output/maquete_core/` e `data/output/maquete_bus_manual/`.
-- Julia não está instalada nesta máquina, então o bridge novo roda em `python_emulated_julia`.
+- Julia está instalada nesta máquina, mas `WaterModels/JuMP/HiGHS` ainda não foram ativados localmente por bloqueio de rede/TLS/permissão do ambiente Julia.
+- `data/decision_platform/maquete_v2/scenario_settings.yaml` agora é `fail closed`: se `WaterModels` não estiver disponível e `fallback: none`, o pipeline falha com mensagem clara.
 - O layout da UI Dash é construído e testado, mas o servidor interativo depende da instalação do stack Dash real.
+- A instalação local de `dash`, `dash-ag-grid` e `dash-cytoscape` falhou neste workspace por ACL/permissão do `pip` em diretórios temporários.
 
 ## O que está implementado
 
@@ -199,11 +203,15 @@ Observações:
 - geração de candidatos por família topológica
 - normalização/reparo conservador de topologia
 - instalação de componentes por link com fallback controlado
-- bridge Python -> Julia com fallback executável local
+- bridge Python -> Julia com `fail closed` respeitando o contrato do cenário
+- fallback explícito e rastreável quando o cenário permitir `python_emulated_julia`
 - catálogo com soluções viáveis e inviáveis
 - ranking multicritério por `weight_profiles.csv`
 - renderização 2D e comparação por radar
 - UI Dash com abas de dados, execução, catálogo, comparação, circuito e escolha final
+- `quality_rules.csv` aplicado de verdade no score com breakdown, flags e regras disparadas
+- logs de seleção de componentes por candidato
+- métricas de geração por família, viabilidade por família e motivos de inviabilidade
 
 ## Relatórios gerados
 
@@ -231,6 +239,7 @@ Em `data/output/decision_platform/maquete_v2/`:
 - `catalog.csv`
 - `catalog_detailed.json`
 - `ranking_profiles.json`
+- `catalog_summary.json`
 - um diretório por candidato com `solution.json` e `bom.csv`
 
 Os relatórios de rota incluem:
@@ -295,9 +304,11 @@ Cobertura mínima de aceite já incluída:
 - validacão de isolamento independente para nós bidirecionais
 - loader completo do contrato da nova plataforma
 - geração de famílias, mutações e crossovers para `maquete_v2`
-- bridge Python/Julia com fallback estruturado
+- bridge Python/Julia com `fail closed` e metadados de engine
 - catálogo, ranking e UI smoke test da nova arquitetura
 - export completo do cenário `maquete_v2`
+- quality rules dirigindo o score por tabela
+- seleção de componentes com log explícito por candidato
 
 ## Roadmap
 

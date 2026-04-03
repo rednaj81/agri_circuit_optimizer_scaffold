@@ -6,6 +6,7 @@ from typing import Any
 
 import pandas as pd
 
+from decision_platform.catalog.quality_rules import apply_quality_rules
 from decision_platform.data_io.loader import ScenarioBundle
 from decision_platform.graph_generation.generator import generate_candidate_topologies
 from decision_platform.graph_repair.repair import normalize_candidate
@@ -20,7 +21,7 @@ def build_solution_catalog(bundle: ScenarioBundle) -> dict[str, Any]:
     evaluated = []
     for candidate in candidates:
         payload = build_candidate_payload(candidate, bundle)
-        metrics = evaluate_candidate_via_bridge(payload, bundle)
+        metrics = apply_quality_rules(evaluate_candidate_via_bridge(payload, bundle), bundle)
         render = build_render_payload(candidate, bundle, metrics)
         evaluated.append(
             {
@@ -49,6 +50,8 @@ def build_solution_catalog(bundle: ScenarioBundle) -> dict[str, Any]:
                 "operability_score": float(item["metrics"]["operability_score"]),
                 "maintenance_score": float(item["metrics"]["maintenance_score"]),
                 "fallback_component_count": int(item["metrics"]["fallback_component_count"]),
+                "engine_used": item["metrics"]["engine_used"],
+                "engine_mode": item["metrics"]["engine_mode"],
             }
             for item in evaluated
         ]
@@ -57,11 +60,13 @@ def build_solution_catalog(bundle: ScenarioBundle) -> dict[str, Any]:
         profile_id: apply_weight_profile(catalog_frame, bundle.weight_profiles, profile_id)
         for profile_id in bundle.weight_profiles["profile_id"].tolist()
     }
+    summary = _build_catalog_summary(candidates, evaluated)
     return {
         "scenario_id": bundle.scenario_settings.get("scenario_id", bundle.base_dir.name),
         "catalog": evaluated,
         "catalog_frame": catalog_frame,
         "ranked_profiles": ranked_profiles,
+        "summary": summary,
     }
 
 
@@ -90,6 +95,10 @@ def export_catalog(result: dict[str, Any], output_dir: str | Path) -> dict[str, 
     detailed_json.write_text(json.dumps(_json_ready_catalog(result["catalog"]), indent=2, ensure_ascii=False), encoding="utf-8")
     exported["catalog_detailed"] = detailed_json
 
+    summary_json = out_dir / "catalog_summary.json"
+    summary_json.write_text(json.dumps(result.get("summary", {}), indent=2, ensure_ascii=False), encoding="utf-8")
+    exported["catalog_summary"] = summary_json
+
     for item in result["catalog"]:
         candidate_dir = out_dir / item["candidate_id"]
         candidate_dir.mkdir(parents=True, exist_ok=True)
@@ -113,3 +122,30 @@ def _json_ready_catalog(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
         }
         for item in items
     ]
+
+
+def _build_catalog_summary(candidates: list[dict[str, Any]], evaluated: list[dict[str, Any]]) -> dict[str, Any]:
+    family_counts: dict[str, int] = {}
+    feasible_by_family: dict[str, int] = {}
+    repaired_count = 0
+    infeasible_by_reason: dict[str, int] = {}
+    for candidate in candidates:
+        family = candidate["topology_family"]
+        family_counts[family] = family_counts.get(family, 0) + 1
+        repaired_count += int(bool(candidate.get("metadata", {}).get("repaired", False)))
+    for item in evaluated:
+        family = item["topology_family"]
+        if bool(item["metrics"]["feasible"]):
+            feasible_by_family[family] = feasible_by_family.get(family, 0) + 1
+        for route in item["metrics"]["route_metrics"]:
+            if route.get("feasible", True):
+                continue
+            reason = str(route.get("reason", "unknown"))
+            infeasible_by_reason[reason] = infeasible_by_reason.get(reason, 0) + 1
+    return {
+        "candidate_count": len(candidates),
+        "candidates_by_family": family_counts,
+        "feasible_by_family": feasible_by_family,
+        "repair_rate": round(repaired_count / max(len(candidates), 1), 4),
+        "infeasible_rate_by_reason": infeasible_by_reason,
+    }

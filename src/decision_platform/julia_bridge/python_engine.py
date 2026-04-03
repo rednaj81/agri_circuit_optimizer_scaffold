@@ -49,7 +49,7 @@ def emulate_watermodels_cli(payload: dict, bundle: ScenarioBundle) -> dict:
         if served_routes
         else 0.0
     )
-    quality_score = sum(metric["quality_score"] for metric in route_metrics) / route_count
+    quality_score = sum(metric["quality_score_base"] for metric in route_metrics) / route_count
     flow_out_score = sum(metric["flow_score"] for metric in route_metrics) / route_count
     resilience_score = min(100.0, float(alternate_path_count_critical * 10 + len(served_routes) * 3))
     cleaning_score = max(0.0, 100.0 - cleaning_avg * 10)
@@ -137,12 +137,6 @@ def _evaluate_route(graph: nx.DiGraph, payload: dict, route: dict) -> dict:
             <= float(selected_meter["confidence_max_lpm"])
         )
         route_quality = sum(float(component["quality_base_score"]) for component in path_components)
-        route_quality += 20 if within_confidence else (-10 if selected_meter is not None else 0)
-        route_quality -= passive_reverse_pump_count * 25
-        route_quality -= max(0, len(pumps) - 1) * 8
-        route_quality -= sum(int(component["is_fallback"]) for component in path_components) * 15
-        route_quality -= 15 if used_fallback_pump else 0
-        route_quality -= 15 if used_fallback_meter else 0
         switch_count = sum(1 for component in path_components if component["category"] in {"valve", "pump", "meter"})
         operability_score = max(0.0, 100.0 - switch_count * 6 - max(0, len(pumps) - 1) * 8)
         flow_score = min(100.0, delivered_flow / max(float(route["q_min_delivered_lpm"]), 1.0) * 100.0)
@@ -166,11 +160,15 @@ def _evaluate_route(graph: nx.DiGraph, payload: dict, route: dict) -> dict:
             "fallback_component_count": sum(int(component["is_fallback"]) for component in path_components)
             + int(used_fallback_pump)
             + int(used_fallback_meter),
+            "used_fallback_pump": used_fallback_pump,
+            "used_fallback_meter": used_fallback_meter,
             "delivered_flow_lpm": round(delivered_flow, 3),
             "required_flow_lpm": float(route["q_min_delivered_lpm"]),
+            "quality_score_base": round(route_quality, 3),
             "quality_score": round(route_quality, 3),
             "operability_score": round(operability_score, 3),
             "flow_score": round(flow_score, 3),
+            "component_ids_on_path": [component["component_id"] for component in path_components],
         }
     return _route_failure(route, "hydraulic_or_meter_infeasible")
 
@@ -220,11 +218,15 @@ def _route_failure(route: dict, reason: str) -> dict:
         "cleaning_volume_l": 0.0,
         "component_switch_count": 0,
         "fallback_component_count": 0,
+        "used_fallback_pump": False,
+        "used_fallback_meter": False,
         "delivered_flow_lpm": 0.0,
         "required_flow_lpm": float(route["q_min_delivered_lpm"]),
+        "quality_score_base": 0.0,
         "quality_score": 0.0,
         "operability_score": 0.0,
         "flow_score": 0.0,
+        "component_ids_on_path": [],
     }
 
 
