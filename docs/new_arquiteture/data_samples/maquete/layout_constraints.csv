@@ -1,0 +1,11 @@
+rule_id,scope,key,value,unit,description
+L01,global,base_width_m,1.0,m,Largura da base
+L02,global,base_height_m,0.5,m,Altura da base
+L03,global,max_total_hose_m,20.0,m,Mangueira total disponível
+L04,global,hose_module_m,1.0,m,Módulo discreto de mangueira
+L05,global,bend_factor,1.25,ratio,Fator de curva
+L06,global,connection_margin_m,0.2,m,Margem de conexão
+L07,global,max_active_pumps_per_route,1,count,Padrão preferido por rota
+L08,global,max_reading_meters_per_route,1,count,Só um medidor de leitura por rota
+L09,global,allow_idle_pumps_on_path,1,bool,Bombas ociosas no caminho podem existir
+L10,global,allow_idle_meters_on_path,1,bool,Medidores ociosos no caminho podem existir

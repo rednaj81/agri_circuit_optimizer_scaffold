@@ -1,0 +1,13 @@
+rule_id,archetype,allowed_categories,required_categories,optional_categories,max_series_pumps,max_reading_meters,notes
+R01,tank_tap,valve|hose|connector,valve|hose,check_valve|connector,0,0,Tap valvulado
+R02,supply_tap,valve|hose|check_valve|connector,valve|hose,check_valve|connector,0,0,Fonte
+R03,outlet_tap,valve|hose|connector,valve|hose,connector,0,0,Saída
+R04,service_tap,valve|hose|connector,valve|hose,connector,0,0,Serviço
+R05,bus_segment,hose|connector|valve,hose,connector|valve,0,0,Segmento simples
+R06,pump_island_segment,hose|pump|meter|connector|valve,hose,pump|meter|connector|valve,2,1,Ilha de bombeamento
+R07,upper_bypass_segment,hose|valve|connector,hose,valve|connector,0,0,Bypass superior
+R08,vertical_link,hose|valve|connector,hose,valve|connector,0,0,Link vertical
+R09,star_tap,valve|hose|connector,valve|hose,connector,0,0,Tap estrela
+R10,star_trunk,hose|pump|meter|connector,hose,pump|meter|connector,2,1,Tronco estrela
+R11,loop_lower_chord,hose|pump|meter|connector|valve,hose,pump|meter|connector|valve,2,1,Loop inferior
+R12,loop_upper_chord,hose|valve|connector,hose,valve|connector,0,0,Loop superior

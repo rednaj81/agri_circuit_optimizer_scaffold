@@ -1,0 +1,41 @@
+scenario_id: maquete_v2
+project_mode: decision_platform
+
+enabled_families:
+  - star_manifolds
+  - bus_with_pump_islands
+  - loop_ring
+  - hybrid_free
+
+candidate_generation:
+  population_size: 120
+  generations: 40
+  keep_top_n_per_family: 25
+  random_seed: 42
+  enable_mutations: true
+  enable_crossover: true
+  allow_family_hopping: true
+
+hydraulic_engine:
+  primary: watermodels_jl
+  fallback: none
+  route_evaluation_mode: per_route_active_path
+  export_debug_payloads: true
+
+ranking:
+  default_profile: balanced
+  keep_only_feasible: true
+  expose_dynamic_weights: true
+  store_pareto_front: true
+
+ui:
+  enable_table_editing: true
+  enable_graph_comparison: true
+  enable_route_highlight: true
+  default_layout_mode: preset_coordinates
+
+exports:
+  write_catalog_csv: true
+  write_catalog_parquet: true
+  write_solution_json: true
+  write_bom_csv: true

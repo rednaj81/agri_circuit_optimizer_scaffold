@@ -1,0 +1,47 @@
+families:
+  star_manifolds:
+    enabled: true
+    allow_cycles: false
+    allow_parallel_bypass: false
+    allow_idle_pumps_on_path: false
+    allow_idle_meters_on_path: false
+    max_active_pumps_per_route: 1
+    max_reading_meters_per_route: 1
+    notes: "Família estrela tradicional"
+
+  bus_with_pump_islands:
+    enabled: true
+    allow_cycles: true
+    allow_parallel_bypass: true
+    allow_idle_pumps_on_path: true
+    allow_idle_meters_on_path: true
+    max_active_pumps_per_route: 1
+    max_reading_meters_per_route: 1
+    notes: "Barramento com ilhas de bombeamento"
+
+  loop_ring:
+    enabled: true
+    allow_cycles: true
+    allow_parallel_bypass: true
+    allow_idle_pumps_on_path: true
+    allow_idle_meters_on_path: true
+    max_active_pumps_per_route: 1
+    max_reading_meters_per_route: 1
+    notes: "Loop fechado com taps"
+
+  hybrid_free:
+    enabled: true
+    allow_cycles: true
+    allow_parallel_bypass: true
+    allow_idle_pumps_on_path: true
+    allow_idle_meters_on_path: true
+    max_active_pumps_per_route: 2
+    max_reading_meters_per_route: 1
+    notes: "Família híbrida e mutável"
+
+global_preferences:
+  treat_passive_reverse_pump_flow_as_viable: true
+  default_pump_reverse_loss_pct_when_off: 60
+  default_pump_forward_loss_pct_when_on: 5
+  score_bonus_within_meter_confidence: true
+  compute_cleaning_from_path_volume: true

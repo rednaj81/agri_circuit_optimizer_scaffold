@@ -1,0 +1,19 @@
+route_id,source,sink,mandatory,route_group,q_min_delivered_lpm,measurement_required,dose_min_l,dose_error_max_pct,cleaning_required,allow_series_pumps,weight,notes
+R001,W,M,1,core,40,1,0,0,1,1,10,Água para misturador
+R002,W,I,1,core,20,1,0,0,1,1,8,Água para incorporador
+R003,W,S,1,core,30,1,0,0,1,1,7,Água para saída
+R004,P1,M,1,core,8,1,1,2,1,1,9,Produto 1 para misturador
+R005,P2,M,1,core,8,1,1,2,1,1,9,Produto 2 para misturador
+R006,P3,M,1,core,8,1,1,2,1,1,9,Produto 3 para misturador
+R007,P4,M,1,core,8,1,1,2,1,1,9,Produto 4 para misturador
+R008,I,M,1,core,8,1,1,2,1,1,9,Incorporador para misturador
+R009,M,S,1,core,50,1,0,0,1,1,10,Misturador para saída
+R010,I,P1,0,optional,8,1,1,2,1,1,5,Premix para P1
+R011,I,P2,0,optional,8,1,1,2,1,1,5,Premix para P2
+R012,I,P3,0,optional,8,1,1,2,1,1,5,Premix para P3
+R013,I,P4,0,optional,8,1,1,2,1,1,5,Premix para P4
+R014,P1,S,0,optional,8,1,1,2,1,1,3,Produto 1 para saída
+R015,P2,S,0,optional,8,1,1,2,1,1,3,Produto 2 para saída
+R016,P3,S,0,optional,8,1,1,2,1,1,3,Produto 3 para saída
+R017,P4,S,0,optional,8,1,1,2,1,1,3,Produto 4 para saída
+R018,I,IR,0,service,10,0,0,0,1,1,2,Recirculação/serviço

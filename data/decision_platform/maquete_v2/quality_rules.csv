@@ -1,0 +1,9 @@
+rule_id,metric_scope,metric_name,operator,threshold,score_delta_if_true,score_delta_if_false,hard_filter,description
+Q01,route,active_pump_count,<=,1,15,0,0,Bônus para bomba ativa única
+Q02,route,passive_reverse_pump_count,<=,0,0,-25,0,Penalidade para fluxo reverso por bomba desligada
+Q03,route,flow_within_meter_confidence,==,1,20,-10,0,Bônus se medição cai na faixa de confiabilidade
+Q04,route,cleaning_volume_l,<=,2.0,10,0,0,Bônus para pequena limpeza por rota
+Q05,solution,alternate_path_count_critical,>=,2,12,0,0,Bônus para caminhos alternativos
+Q06,solution,fallback_component_count,<=,0,0,-30,0,Penalidade para uso de fallback
+Q07,route,component_switch_count,<=,3,8,-4,0,Operação simples
+Q08,route,series_pump_count,<=,1,0,-8,0,Penalidade para série de bombas

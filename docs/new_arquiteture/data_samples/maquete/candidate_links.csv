@@ -1,0 +1,39 @@
+link_id,from_node,to_node,archetype,length_m,bidirectional,family_hint,install_cost_override,group_id,notes
+L001,P1,J1,tank_tap,0.25,1,"bus,hybrid",0,tap_P1,Tap P1
+L002,P2,J2,tank_tap,0.25,1,"bus,hybrid",0,tap_P2,Tap P2
+L003,P3,J2,tank_tap,0.3,1,"bus,hybrid",0,tap_P3a,Tap P3 via J2
+L004,P3,J3,tank_tap,0.25,1,"bus,hybrid",0,tap_P3b,Tap P3 via J3
+L005,P4,J3,tank_tap,0.25,1,"bus,hybrid",0,tap_P4,Tap P4
+L006,M,J4,tank_tap,0.25,1,"bus,hybrid",0,tap_M,Tap M
+L007,I,J4,tank_tap,0.2,1,"bus,hybrid",0,tap_I,Tap I
+L008,IR,J4,service_tap,0.1,1,"bus,hybrid,loop",0,tap_IR,Tap IR
+L009,W,J1,supply_tap,0.3,1,"bus,hybrid",0,tap_W_lower,Água para barramento inferior
+L010,W,U1,supply_tap,0.15,1,"bus,loop,hybrid",0,tap_W_upper,Água para bypass superior
+L011,S,J4,outlet_tap,0.2,1,"bus,hybrid",0,tap_S_lower,Saída via barramento inferior
+L012,S,U3,outlet_tap,0.18,1,"bus,loop,hybrid",0,tap_S_upper,Saída via barramento superior
+L013,J1,J2,bus_segment,0.2,1,"bus,hybrid",0,bus_1,Barramento inferior 1
+L014,J2,J3,pump_island_segment,0.2,1,"bus,hybrid",0,bus_2,Barramento com ilha bomba
+L015,J3,J4,pump_island_segment,0.2,1,"bus,hybrid",0,bus_3,Barramento com ilha bomba
+L016,U1,U2,upper_bypass_segment,0.3,1,"bus,loop,hybrid",0,upper_1,Bypass superior
+L017,U2,U3,upper_bypass_segment,0.3,1,"bus,loop,hybrid",0,upper_2,Bypass superior
+L018,J1,U1,vertical_link,0.17,1,"bus,loop,hybrid",0,vert_1,Conexão vertical
+L019,J3,U2,vertical_link,0.17,1,"bus,loop,hybrid",0,vert_2,Conexão vertical
+L020,J4,U3,vertical_link,0.17,1,"bus,loop,hybrid",0,vert_3,Conexão vertical
+L021,W,HS,star_tap,0.35,1,star,0,star_W,Água para hub sucção
+L022,P1,HS,star_tap,0.3,1,star,0,star_P1S,P1 para hub sucção
+L023,P2,HS,star_tap,0.25,1,star,0,star_P2S,P2 para hub sucção
+L024,P3,HS,star_tap,0.22,1,star,0,star_P3S,P3 para hub sucção
+L025,P4,HS,star_tap,0.22,1,star,0,star_P4S,P4 para hub sucção
+L026,M,HS,star_tap,0.35,1,star,0,star_MS,M para hub sucção
+L027,I,HS,star_tap,0.55,1,star,0,star_IS,I para hub sucção
+L028,HS,HD,star_trunk,0.3,1,star,0,star_trunk,Tronco estrela
+L029,HD,P1,star_tap,0.35,1,star,0,star_P1D,Hub descarga para P1
+L030,HD,P2,star_tap,0.28,1,star,0,star_P2D,Hub descarga para P2
+L031,HD,P3,star_tap,0.22,1,star,0,star_P3D,Hub descarga para P3
+L032,HD,P4,star_tap,0.18,1,star,0,star_P4D,Hub descarga para P4
+L033,HD,M,star_tap,0.24,1,star,0,star_MD,Hub descarga para M
+L034,HD,I,star_tap,0.3,1,star,0,star_ID,Hub descarga para I
+L035,HD,IR,star_tap,0.18,1,star,0,star_IRD,Hub descarga para IR
+L036,HD,S,star_tap,0.25,1,star,0,star_SD,Hub descarga para S
+L037,J1,J4,loop_lower_chord,0.6,1,"loop,hybrid",0,loop_chord,Cordão inferior de loop
+L038,U1,U3,loop_upper_chord,0.6,1,"loop,hybrid",0,loop_upper,Cordão superior de loop

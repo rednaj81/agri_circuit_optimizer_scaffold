@@ -8,6 +8,31 @@ version = "0.1.0"
 description = "Scaffold for agricultural hydraulic circuit synthesis and optimization."
 readme = "README.md"
 requires-python = ">=3.11"
+dependencies = [
+  "pyomo>=6.8",
+  "pandas>=2.2",
+  "numpy>=1.26",
+  "pyyaml>=6.0",
+  "pydantic>=2.7",
+  "highspy>=1.7",
+  "rich>=13.7",
+  "networkx>=3.3",
+  "matplotlib>=3.8",
+  "plotly>=5.24",
+]
+
+[project.optional-dependencies]
+ui = [
+  "dash>=2.18",
+  "dash-ag-grid>=31.3",
+  "dash-cytoscape>=1.0",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

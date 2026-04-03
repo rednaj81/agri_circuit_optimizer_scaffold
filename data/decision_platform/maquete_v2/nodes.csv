@@ -1,0 +1,19 @@
+node_id,node_type,label,x_m,y_m,allow_inbound,allow_outbound,requires_mixing_service,zone,is_candidate_hub,notes
+W,water_tank,Tanque de água,0.05,0.42,0,1,0,supply,0,Fonte principal
+P1,product_tank,Produto 1,0.15,0.08,1,1,0,process,0,Tanque de produto
+P2,product_tank,Produto 2,0.3,0.08,1,1,0,process,0,Tanque de produto
+P3,product_tank,Produto 3,0.45,0.08,1,1,0,process,0,Tanque de produto
+P4,product_tank,Produto 4,0.6,0.08,1,1,0,process,0,Tanque de produto
+M,mixer_tank,Misturador,0.75,0.08,1,1,0,process,0,Tanque misturador
+I,incorporator_tank,Incorporador,0.9,0.08,1,1,1,service,0,Tanque incorporador
+S,external_outlet,Saída externa,0.95,0.42,1,0,0,outlet,0,Abastecimento externo
+IR,service_return,Retorno incorporador,0.9,0.18,1,0,1,service,0,Retorno/serviço opcional
+J1,junction,Junção 1,0.18,0.25,1,1,0,internal,0,Junção inferior esquerda
+J2,junction,Junção 2,0.38,0.25,1,1,0,internal,0,Junção inferior centro-esquerda
+J3,junction,Junção 3,0.58,0.25,1,1,0,internal,0,Junção inferior centro-direita
+J4,junction,Junção 4,0.78,0.25,1,1,0,internal,0,Junção inferior direita
+U1,junction,Bypass superior 1,0.18,0.42,1,1,0,internal,0,Junção superior esquerda
+U2,junction,Bypass superior 2,0.48,0.42,1,1,0,internal,0,Junção superior centro
+U3,junction,Bypass superior 3,0.78,0.42,1,1,0,internal,0,Junção superior direita
+HS,junction,Hub estrela sucção,0.35,0.3,1,1,0,hub,1,Hub estrela sucção
+HD,junction,Hub estrela descarga,0.65,0.3,1,1,0,hub,1,Hub estrela descarga

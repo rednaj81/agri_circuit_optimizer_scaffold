@@ -3,6 +3,7 @@
 Implementação incremental de um solucionador para síntese de circuito hidráulico agrícola com:
 - topologia em camadas (superestrutura)
 - modo multitopologia com validação de topologia fixa
+- plataforma paralela de catálogo multitopologia orientada a decisão
 - seleção de componentes a partir de biblioteca de materiais
 - medição com fluxômetros
 - restrições de vazão mínima na saída
@@ -100,6 +101,29 @@ python -m agri_circuit_optimizer.solve.run_case --scenario data/scenario/maquete
 python -m agri_circuit_optimizer.solve.run_case --scenario data/scenario/maquete_bus_manual --output-dir data/output/maquete_bus_manual
 ```
 
+### Nova plataforma de decisão
+
+Pipeline do cenário `maquete_v2`:
+
+```powershell
+.\.venv\Scripts\activate
+$env:PYTHONPATH = 'src'
+python -m decision_platform.api.run_pipeline --scenario data/decision_platform/maquete_v2 --output-dir data/output/decision_platform/maquete_v2
+```
+
+UI Dash:
+
+```powershell
+.\.venv\Scripts\activate
+$env:PYTHONPATH = 'src'
+python -m decision_platform.ui_dash.app
+```
+
+Dependências:
+- base: `pip install -r requirements.txt`
+- UI completa: `pip install -e .[ui]`
+- bridge Julia real: instalar Julia no sistema e preparar o ambiente de `julia/Project.toml`
+
 ## Execução validada nesta máquina
 
 Os comandos abaixo foram executados com sucesso neste workspace:
@@ -109,6 +133,7 @@ Os comandos abaixo foram executados com sucesso neste workspace:
 .\.venv\Scripts\python.exe -m agri_circuit_optimizer.solve.run_case --scenario data/scenario/example --dry-run
 .\.venv\Scripts\python.exe -m agri_circuit_optimizer.solve.run_case --scenario data/scenario/maquete_core --dry-run
 .\.venv\Scripts\python.exe -m agri_circuit_optimizer.solve.run_case --scenario data/scenario/maquete_core --output-dir data/output/maquete_core
+.\.venv\Scripts\python.exe -m decision_platform.api.run_pipeline --scenario data/decision_platform/maquete_v2 --output-dir data/output/decision_platform/maquete_v2
 ```
 
 Observações:
@@ -116,6 +141,8 @@ Observações:
 - `solve_case` tenta Pyomo primeiro e cai para o fallback enumerativo quando necessário.
 - Cenários com `edges.csv` + `topology_rules.yaml` entram no engine de topologia fixa.
 - Os relatórios são gravados em `data/output/example_v3/`, `data/output/maquete_core/` e `data/output/maquete_bus_manual/`.
+- Julia não está instalada nesta máquina, então o bridge novo roda em `python_emulated_julia`.
+- O layout da UI Dash é construído e testado, mas o servidor interativo depende da instalação do stack Dash real.
 
 ## O que está implementado
 
@@ -167,6 +194,17 @@ Observações:
 - bombas e medidores instalados podem permanecer no caminho como elementos ociosos quando a família permitir
 - `route_group=service` permite separar rotas como `I -> IR` do atendimento core
 
+### Plataforma de decisão `maquete_v2`
+- dados em `data/decision_platform/maquete_v2/`
+- geração de candidatos por família topológica
+- normalização/reparo conservador de topologia
+- instalação de componentes por link com fallback controlado
+- bridge Python -> Julia com fallback executável local
+- catálogo com soluções viáveis e inviáveis
+- ranking multicritério por `weight_profiles.csv`
+- renderização 2D e comparação por radar
+- UI Dash com abas de dados, execução, catálogo, comparação, circuito e escolha final
+
 ## Relatórios gerados
 
 Em `data/output/example_v3/`:
@@ -188,6 +226,12 @@ Em `data/output/maquete_bus_manual/`:
 - `hydraulics.json`
 - `topology.json`
 - `comparison.json`
+
+Em `data/output/decision_platform/maquete_v2/`:
+- `catalog.csv`
+- `catalog_detailed.json`
+- `ranking_profiles.json`
+- um diretório por candidato com `solution.json` e `bom.csv`
 
 Os relatórios de rota incluem:
 - `selected_meter_id`
@@ -249,6 +293,11 @@ Cobertura mínima de aceite já incluída:
 - gargalo por T e sensibilidade a comprimento na maquete
 - inviabilidade por quebra de seletividade em estrela
 - validacão de isolamento independente para nós bidirecionais
+- loader completo do contrato da nova plataforma
+- geração de famílias, mutações e crossovers para `maquete_v2`
+- bridge Python/Julia com fallback estruturado
+- catálogo, ranking e UI smoke test da nova arquitetura
+- export completo do cenário `maquete_v2`
 
 ## Roadmap
 
@@ -267,11 +316,18 @@ Concluído:
 - suporte à família `bus_with_pump_islands`
 - cenário `data/scenario/maquete_bus_manual/`
 - comparação básica entre famílias por BOM e cobertura
+- nova plataforma `src/decision_platform/`
+- cenário `data/decision_platform/maquete_v2/`
+- bridge Julia scaffold + fallback Python executável
+- catálogo multitopologia com ranking e renderização 2D
+- UI Dash para exploração do catálogo
 
 Próximos passos naturais:
 - consolidar execução Pyomo real no ambiente com `pyomo` + HiGHS
 - refinar a modelagem de compatibilidade geométrica se o projeto sair do escopo simplificado atual
 - ampliar relatórios operacionais e comparação entre solução Pyomo e fallback
+- instalar Julia/WaterModels.jl no ambiente alvo e validar o bridge real
+- instalar o stack Dash completo para uso interativo da UI
 
 ## Arquivos-chave para começar
 
