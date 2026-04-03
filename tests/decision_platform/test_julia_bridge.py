@@ -9,10 +9,12 @@ from decision_platform.scenario_engine.installer import build_candidate_payload
 from tests.decision_platform.scenario_utils import cleanup_scenario_copy, prepare_scenario_copy
 
 
-def test_bridge_fails_closed_when_fallback_is_none() -> None:
+def test_bridge_fails_closed_when_fallback_is_none(monkeypatch) -> None:
     bundle = load_scenario_bundle("data/decision_platform/maquete_v2")
     candidate = generate_candidate_topologies(bundle)[0]
     payload = build_candidate_payload(normalize_candidate(candidate, bundle), bundle)
+    monkeypatch.setattr(bridge, "julia_available", lambda: False)
+    monkeypatch.setattr(bridge, "watermodels_available", lambda project_dir=None: False)
 
     try:
         evaluate_candidate_via_bridge(payload, bundle)
@@ -79,3 +81,9 @@ def test_bridge_uses_real_julia_when_available(monkeypatch) -> None:
         assert metrics["watermodels_available"] is True
     finally:
         cleanup_scenario_copy(scenario_dir)
+
+
+def test_bridge_detects_real_julia_runtime_when_available() -> None:
+    assert bridge.find_julia_executable()
+    assert bridge.julia_available() is True
+    assert bridge.watermodels_available() is True

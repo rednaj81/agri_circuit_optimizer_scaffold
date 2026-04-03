@@ -78,8 +78,21 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
                         value=["feasible_only"] if bundle.scenario_settings["ranking"].get("keep_only_feasible", True) else [],
                     ),
                     dcc.Input(id="max-cost-input", type="number", value=None),
+                    dcc.Input(id="min-quality-input", type="number", value=None),
+                    dcc.Input(id="min-resilience-input", type="number", value=None),
+                    dcc.Dropdown(
+                        id="fallback-filter-dropdown",
+                        options=[
+                            {"label": "Todos", "value": "ALL"},
+                            {"label": "Sem fallback", "value": "NO_FALLBACK"},
+                            {"label": "Com fallback", "value": "WITH_FALLBACK"},
+                        ],
+                        value="ALL",
+                    ),
                     _weight_inputs(bundle),
                     _table("catalog-grid", pd.DataFrame(ranked)),
+                    html.Button("Exportar catálogo ranqueado", id="export-catalog-button"),
+                    dcc.Download(id="catalog-download"),
                 ],
             ),
                     dcc.Tab(
@@ -106,6 +119,8 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
                         options=[{"label": record["candidate_id"], "value": record["candidate_id"]} for record in ranked],
                         value=selected_candidate,
                     ),
+                    html.Button("Exportar candidato selecionado", id="export-selected-button"),
+                    dcc.Download(id="selected-candidate-download"),
                     cyto.Cytoscape(
                         id="circuit-cytoscape",
                         elements=candidate_details.get("cytoscape_elements", []),
@@ -151,6 +166,9 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
         Input("family-dropdown", "value"),
         Input("feasible-only-checklist", "value"),
         Input("max-cost-input", "value"),
+        Input("min-quality-input", "value"),
+        Input("min-resilience-input", "value"),
+        Input("fallback-filter-dropdown", "value"),
         Input("weight-cost", "value"),
         Input("weight-quality", "value"),
         Input("weight-flow", "value"),
@@ -163,6 +181,9 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
         family: str,
         feasible_only: list[str],
         max_cost: Any,
+        min_quality: Any,
+        min_resilience: Any,
+        fallback_filter: str,
         cost_weight: Any,
         quality_weight: Any,
         flow_weight: Any,
@@ -186,6 +207,9 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
             family=family,
             feasible_only="feasible_only" in (feasible_only or []),
             max_cost=max_cost,
+            min_quality=min_quality,
+            min_resilience=min_resilience,
+            fallback_filter=fallback_filter,
         )
 
     @app.callback(
@@ -210,6 +234,88 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
             candidate_ids = [candidate_ids]
         return build_solution_comparison_figure(_lookup_candidates(result, candidate_ids or []))
 
+    @app.callback(
+        Output("catalog-download", "data"),
+        Input("export-catalog-button", "n_clicks"),
+        State("profile-dropdown", "value"),
+        State("family-dropdown", "value"),
+        State("feasible-only-checklist", "value"),
+        State("max-cost-input", "value"),
+        State("min-quality-input", "value"),
+        State("min-resilience-input", "value"),
+        State("fallback-filter-dropdown", "value"),
+        State("weight-cost", "value"),
+        State("weight-quality", "value"),
+        State("weight-flow", "value"),
+        State("weight-resilience", "value"),
+        State("weight-cleaning", "value"),
+        State("weight-operability", "value"),
+        prevent_initial_call=True,
+    )
+    def _export_catalog(
+        n_clicks: Any,
+        profile: str,
+        family: str,
+        feasible_only: list[str],
+        max_cost: Any,
+        min_quality: Any,
+        min_resilience: Any,
+        fallback_filter: str,
+        cost_weight: Any,
+        quality_weight: Any,
+        flow_weight: Any,
+        resilience_weight: Any,
+        cleaning_weight: Any,
+        operability_weight: Any,
+    ) -> Any:
+        if not n_clicks or not result:
+            return None
+        weights = {
+            "cost_weight": cost_weight,
+            "quality_weight": quality_weight,
+            "flow_weight": flow_weight,
+            "resilience_weight": resilience_weight,
+            "cleaning_weight": cleaning_weight,
+            "operability_weight": operability_weight,
+        }
+        ranked_records = rerank_catalog(result, profile, weights)
+        filtered_records = filter_catalog_records(
+            ranked_records,
+            family=family,
+            feasible_only="feasible_only" in (feasible_only or []),
+            max_cost=max_cost,
+            min_quality=min_quality,
+            min_resilience=min_resilience,
+            fallback_filter=fallback_filter,
+        )
+        return _send_text_download(
+            json.dumps(filtered_records, indent=2, ensure_ascii=False),
+            "ranked_catalog.json",
+        )
+
+    @app.callback(
+        Output("selected-candidate-download", "data"),
+        Input("export-selected-button", "n_clicks"),
+        State("selected-candidate-dropdown", "value"),
+        prevent_initial_call=True,
+    )
+    def _export_selected_candidate(n_clicks: Any, candidate_id: str) -> Any:
+        if not n_clicks or not result or not candidate_id:
+            return None
+        detail = build_candidate_detail(result, candidate_id)
+        candidate = next(item for item in result["catalog"] if item["candidate_id"] == candidate_id)
+        payload = {
+            "candidate_id": candidate_id,
+            "topology_family": candidate["topology_family"],
+            "metrics": candidate["metrics"],
+            "render": candidate["render"],
+            "breakdown": detail["breakdown"],
+        }
+        return _send_text_download(
+            json.dumps(payload, indent=2, ensure_ascii=False),
+            f"{candidate_id}.json",
+        )
+
     return app
 
 
@@ -228,6 +334,9 @@ def filter_catalog_records(
     family: str | None = None,
     feasible_only: bool = False,
     max_cost: Any = None,
+    min_quality: Any = None,
+    min_resilience: Any = None,
+    fallback_filter: str | None = None,
 ) -> list[dict[str, Any]]:
     filtered = list(records)
     if family and family != "ALL":
@@ -236,6 +345,14 @@ def filter_catalog_records(
         filtered = [record for record in filtered if bool(record["feasible"])]
     if max_cost not in (None, ""):
         filtered = [record for record in filtered if float(record["install_cost"]) <= float(max_cost)]
+    if min_quality not in (None, ""):
+        filtered = [record for record in filtered if float(record["quality_score_raw"]) >= float(min_quality)]
+    if min_resilience not in (None, ""):
+        filtered = [record for record in filtered if float(record["resilience_score"]) >= float(min_resilience)]
+    if fallback_filter == "NO_FALLBACK":
+        filtered = [record for record in filtered if int(record["fallback_component_count"]) == 0]
+    if fallback_filter == "WITH_FALLBACK":
+        filtered = [record for record in filtered if int(record["fallback_component_count"]) > 0]
     return filtered
 
 
@@ -310,6 +427,13 @@ def _weight_inputs(bundle: Any) -> Any:
             dcc.Input(id="weight-operability", type="number", value=float(profile["operability_weight"])),
         ],
     )
+
+
+def _send_text_download(content: str, filename: str) -> Any:
+    sender = getattr(dcc, "send_string", None)
+    if callable(sender):  # pragma: no branch
+        return sender(content, filename)
+    return {"content": content, "filename": filename}
 
 
 def main() -> None:

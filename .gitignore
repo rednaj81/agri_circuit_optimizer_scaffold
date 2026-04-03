@@ -16,3 +16,9 @@ pytest-cache-files-*/
 data/output/*
 !data/output/.gitkeep
 pytest-cache-files/
+.julia_depot/
+julia_depot_runtime/
+.runtime_tmp/
+runtime_artifacts_manual/
+runtime_artifacts_test/
+julia/smoke_runtime.jl

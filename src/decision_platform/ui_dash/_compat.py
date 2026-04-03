@@ -57,6 +57,7 @@ except Exception:  # pragma: no cover
         Tab=_factory("Tab"),
         Graph=_factory("Graph"),
         Store=_factory("Store"),
+        Download=_factory("Download"),
         Dropdown=_factory("Dropdown"),
         Checklist=_factory("Checklist"),
         Input=_factory("Input"),

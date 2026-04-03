@@ -4,13 +4,14 @@ import json
 from pathlib import Path
 from typing import Any
 
+import matplotlib.pyplot as plt
 import pandas as pd
 
 from decision_platform.catalog.quality_rules import apply_quality_rules
 from decision_platform.data_io.loader import ScenarioBundle
 from decision_platform.graph_generation.generator import generate_candidate_topologies
 from decision_platform.graph_repair.repair import normalize_candidate
-from decision_platform.julia_bridge.bridge import evaluate_candidate_via_bridge
+from decision_platform.julia_bridge.bridge import evaluate_candidates_via_bridge
 from decision_platform.ranking.scoring import apply_weight_profile
 from decision_platform.rendering.circuit import build_render_payload
 from decision_platform.scenario_engine.installer import build_candidate_payload
@@ -18,10 +19,13 @@ from decision_platform.scenario_engine.installer import build_candidate_payload
 
 def build_solution_catalog(bundle: ScenarioBundle) -> dict[str, Any]:
     candidates = [normalize_candidate(candidate, bundle) for candidate in generate_candidate_topologies(bundle)]
+    payloads = [build_candidate_payload(candidate, bundle) for candidate in candidates]
+    metrics_list = [
+        apply_quality_rules(metrics, bundle)
+        for metrics in evaluate_candidates_via_bridge(payloads, bundle)
+    ]
     evaluated = []
-    for candidate in candidates:
-        payload = build_candidate_payload(candidate, bundle)
-        metrics = apply_quality_rules(evaluate_candidate_via_bridge(payload, bundle), bundle)
+    for candidate, payload, metrics in zip(candidates, payloads, metrics_list):
         render = build_render_payload(candidate, bundle, metrics)
         evaluated.append(
             {
@@ -75,6 +79,7 @@ def export_catalog(result: dict[str, Any], output_dir: str | Path) -> dict[str, 
     out_dir.mkdir(parents=True, exist_ok=True)
     exported: dict[str, Path] = {}
     catalog_frame = result["catalog_frame"].copy()
+    selected_profile_id, selected_candidate = _select_default_candidate(result)
 
     catalog_csv = out_dir / "catalog.csv"
     catalog_frame.to_csv(catalog_csv, index=False)
@@ -87,17 +92,30 @@ def export_catalog(result: dict[str, Any], output_dir: str | Path) -> dict[str, 
     except Exception:
         pass
 
+    ranked_profiles_json = out_dir / "ranked_profiles.json"
+    ranked_profiles_json.write_text(json.dumps(result["ranked_profiles"], indent=2, ensure_ascii=False), encoding="utf-8")
+    exported["ranked_profiles"] = ranked_profiles_json
+
     ranking_json = out_dir / "ranking_profiles.json"
     ranking_json.write_text(json.dumps(result["ranked_profiles"], indent=2, ensure_ascii=False), encoding="utf-8")
-    exported["ranking_profiles"] = ranking_json
+    exported["ranking_profiles_legacy"] = ranking_json
 
     detailed_json = out_dir / "catalog_detailed.json"
     detailed_json.write_text(json.dumps(_json_ready_catalog(result["catalog"]), indent=2, ensure_ascii=False), encoding="utf-8")
     exported["catalog_detailed"] = detailed_json
 
+    catalog_json = out_dir / "catalog.json"
+    catalog_json.write_text(json.dumps(_json_ready_catalog(result["catalog"]), indent=2, ensure_ascii=False), encoding="utf-8")
+    exported["catalog_json"] = catalog_json
+
     summary_json = out_dir / "catalog_summary.json"
     summary_json.write_text(json.dumps(result.get("summary", {}), indent=2, ensure_ascii=False), encoding="utf-8")
     exported["catalog_summary"] = summary_json
+
+    decision_summary = _build_decision_summary(result, selected_profile_id, selected_candidate)
+    final_summary_json = out_dir / "summary.json"
+    final_summary_json.write_text(json.dumps(decision_summary, indent=2, ensure_ascii=False), encoding="utf-8")
+    exported["summary_json"] = final_summary_json
 
     for item in result["catalog"]:
         candidate_dir = out_dir / item["candidate_id"]
@@ -107,6 +125,61 @@ def export_catalog(result: dict[str, Any], output_dir: str | Path) -> dict[str, 
             encoding="utf-8",
         )
         pd.DataFrame(item["metrics"]["bom_summary"]["components"]).to_csv(candidate_dir / "bom.csv", index=False)
+
+    if selected_candidate is not None:
+        selected_candidate_json = out_dir / "selected_candidate.json"
+        selected_candidate_json.write_text(
+            json.dumps(_json_ready_catalog([selected_candidate])[0], indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        exported["selected_candidate_json"] = selected_candidate_json
+
+        selected_candidate_routes_json = out_dir / "selected_candidate_routes.json"
+        selected_candidate_routes_json.write_text(
+            json.dumps(selected_candidate["metrics"]["route_metrics"], indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        exported["selected_candidate_routes_json"] = selected_candidate_routes_json
+
+        selected_candidate_score_json = out_dir / "selected_candidate_score_breakdown.json"
+        selected_candidate_score_json.write_text(
+            json.dumps(
+                {
+                    "profile_id": selected_profile_id,
+                    "candidate_id": selected_candidate["candidate_id"],
+                    "quality_score_breakdown": selected_candidate["metrics"].get("quality_score_breakdown", []),
+                    "quality_flags": selected_candidate["metrics"].get("quality_flags", []),
+                    "rules_triggered": selected_candidate["metrics"].get("rules_triggered", []),
+                    "selection_log": selected_candidate["payload"].get("selection_log", []),
+                },
+                indent=2,
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
+        exported["selected_candidate_score_breakdown_json"] = selected_candidate_score_json
+
+        selected_candidate_render_json = out_dir / "selected_candidate_render.json"
+        selected_candidate_render_json.write_text(
+            json.dumps(selected_candidate["render"], indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        exported["selected_candidate_render_json"] = selected_candidate_render_json
+
+        selected_candidate_bom_csv = out_dir / "selected_candidate_bom.csv"
+        pd.DataFrame(selected_candidate["metrics"]["bom_summary"]["components"]).to_csv(selected_candidate_bom_csv, index=False)
+        exported["selected_candidate_bom_csv"] = selected_candidate_bom_csv
+
+        selected_candidate_svg = out_dir / "selected_candidate.svg"
+        selected_candidate_svg.write_text(_build_svg(selected_candidate["render"]), encoding="utf-8")
+        exported["selected_candidate_svg"] = selected_candidate_svg
+
+        try:
+            selected_candidate_png = out_dir / "selected_candidate.png"
+            _build_png(selected_candidate["render"], selected_candidate_png)
+            exported["selected_candidate_png"] = selected_candidate_png
+        except Exception:
+            pass
     return exported
 
 
@@ -149,3 +222,137 @@ def _build_catalog_summary(candidates: list[dict[str, Any]], evaluated: list[dic
         "repair_rate": round(repaired_count / max(len(candidates), 1), 4),
         "infeasible_rate_by_reason": infeasible_by_reason,
     }
+
+
+def _select_default_candidate(result: dict[str, Any]) -> tuple[str | None, dict[str, Any] | None]:
+    ranked_profiles = result.get("ranked_profiles", {})
+    if not ranked_profiles:
+        return None, None
+    selected_profile_id = next(iter(ranked_profiles))
+    ranked_records = ranked_profiles.get(selected_profile_id, [])
+    if not ranked_records:
+        return selected_profile_id, None
+    selected_candidate_id = ranked_records[0]["candidate_id"]
+    selected_candidate = next(
+        (candidate for candidate in result["catalog"] if candidate["candidate_id"] == selected_candidate_id),
+        None,
+    )
+    return selected_profile_id, selected_candidate
+
+
+def _build_decision_summary(
+    result: dict[str, Any],
+    selected_profile_id: str | None,
+    selected_candidate: dict[str, Any] | None,
+) -> dict[str, Any]:
+    summary = dict(result.get("summary", {}))
+    summary["scenario_id"] = result.get("scenario_id")
+    summary["best_profile"] = selected_profile_id
+    if selected_candidate is None:
+        summary["selected_candidate_id"] = None
+        return summary
+    metrics = selected_candidate["metrics"]
+    summary.update(
+        {
+            "selected_candidate_id": selected_candidate["candidate_id"],
+            "selected_topology_family": selected_candidate["topology_family"],
+            "engine_requested": metrics.get("engine_requested"),
+            "engine_used": metrics.get("engine_used"),
+            "engine_mode": metrics.get("engine_mode"),
+            "julia_available": metrics.get("julia_available"),
+            "watermodels_available": metrics.get("watermodels_available"),
+            "feasible": bool(metrics.get("feasible")),
+            "total_cost": float(metrics.get("install_cost", 0.0)) + float(metrics.get("fallback_cost", 0.0)),
+            "install_cost": float(metrics.get("install_cost", 0.0)),
+            "fallback_cost": float(metrics.get("fallback_cost", 0.0)),
+            "quality_total": float(metrics.get("quality_score_raw", 0.0)),
+            "flow_total": float(metrics.get("flow_out_score", 0.0)),
+            "resilience_total": float(metrics.get("resilience_score", 0.0)),
+            "operability_total": float(metrics.get("operability_score", 0.0)),
+            "cleaning_total": float(metrics.get("cleaning_score", 0.0)),
+            "maintenance_total": float(metrics.get("maintenance_score", 0.0)),
+            "fallback_component_count": int(metrics.get("fallback_component_count", 0)),
+            "route_count": len(metrics.get("route_metrics", [])),
+            "bom_component_count": int(metrics.get("bom_summary", {}).get("total_components", 0)),
+        }
+    )
+    return summary
+
+
+def _build_svg(render_payload: dict[str, Any]) -> str:
+    node_elements = []
+    edge_elements = []
+    for element in render_payload.get("cytoscape_elements", []):
+        data = element.get("data", {})
+        position = element.get("position")
+        if position:
+            node_id = str(data.get("id", ""))
+            x = float(position.get("x", 0.0))
+            y = float(position.get("y", 0.0))
+            node_elements.append(
+                f'<g class="node"><circle cx="{x:.1f}" cy="{y:.1f}" r="18" fill="#1f77b4" opacity="0.9" />'
+                f'<text x="{x:.1f}" y="{y + 5:.1f}" text-anchor="middle" font-size="12" fill="#ffffff">{node_id}</text></g>'
+            )
+        elif "source" in data and "target" in data:
+            edge_elements.append((str(data["source"]), str(data["target"]), str(data.get("label", ""))))
+    node_positions = {
+        str(element.get("data", {}).get("id", "")): element.get("position", {})
+        for element in render_payload.get("cytoscape_elements", [])
+        if element.get("position")
+    }
+    svg_edges = []
+    for source, target, label in edge_elements:
+        src = node_positions.get(source, {})
+        dst = node_positions.get(target, {})
+        if not src or not dst:
+            continue
+        x1 = float(src.get("x", 0.0))
+        y1 = float(src.get("y", 0.0))
+        x2 = float(dst.get("x", 0.0))
+        y2 = float(dst.get("y", 0.0))
+        mx = (x1 + x2) / 2.0
+        my = (y1 + y2) / 2.0
+        svg_edges.append(
+            f'<g class="edge"><line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}" stroke="#555555" stroke-width="3" />'
+            f'<text x="{mx:.1f}" y="{my - 6:.1f}" text-anchor="middle" font-size="10" fill="#333333">{label}</text></g>'
+        )
+    return (
+        '<svg xmlns="http://www.w3.org/2000/svg" width="960" height="560" viewBox="0 0 960 560">'
+        '<rect width="100%" height="100%" fill="#f9fbfd" />'
+        + "".join(svg_edges)
+        + "".join(node_elements)
+        + "</svg>"
+    )
+
+
+def _build_png(render_payload: dict[str, Any], output_path: Path) -> None:
+    node_positions = {
+        str(element.get("data", {}).get("id", "")): element.get("position", {})
+        for element in render_payload.get("cytoscape_elements", [])
+        if element.get("position")
+    }
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.set_facecolor("#f9fbfd")
+    fig.patch.set_facecolor("#f9fbfd")
+    for element in render_payload.get("cytoscape_elements", []):
+        data = element.get("data", {})
+        if "source" not in data or "target" not in data:
+            continue
+        src = node_positions.get(str(data["source"]), {})
+        dst = node_positions.get(str(data["target"]), {})
+        if not src or not dst:
+            continue
+        x1, y1 = float(src.get("x", 0.0)), float(src.get("y", 0.0))
+        x2, y2 = float(dst.get("x", 0.0)), float(dst.get("y", 0.0))
+        ax.plot([x1, x2], [y1, y2], color="#555555", linewidth=2.5, zorder=1)
+        ax.text((x1 + x2) / 2.0, (y1 + y2) / 2.0 - 8, str(data.get("label", "")), fontsize=8, ha="center", color="#333333")
+    for node_id, position in node_positions.items():
+        x, y = float(position.get("x", 0.0)), float(position.get("y", 0.0))
+        ax.scatter([x], [y], s=500, color="#1f77b4", zorder=2)
+        ax.text(x, y, node_id, fontsize=9, ha="center", va="center", color="white", zorder=3)
+    ax.set_xlim(0, 960)
+    ax.set_ylim(560, 0)
+    ax.axis("off")
+    fig.tight_layout()
+    fig.savefig(output_path, dpi=140, bbox_inches="tight")
+    plt.close(fig)

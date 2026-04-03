@@ -4,7 +4,7 @@ using JuMP
 using HiGHS
 using WaterModels
 
-export build_result
+export build_result, build_results
 
 function build_result(payload)
     model = Model(HiGHS.Optimizer)
@@ -120,6 +120,10 @@ function build_result(payload)
         ),
         "route_metrics" => route_metrics,
     )
+end
+
+function build_results(payloads)
+    return [build_result(payload) for payload in payloads]
 end
 
 end
