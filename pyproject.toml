@@ -40,6 +40,8 @@ pythonpath = ["src"]
 norecursedirs = ["tests/_tmp"]
 markers = [
   "requires_julia: integration tests that require the real Julia + WaterModels runtime",
+  "requires_dash: tests that require the real Dash stack",
+  "slow: slower tests that exercise end-to-end runtime flows",
 ]
 
 [tool.ruff]

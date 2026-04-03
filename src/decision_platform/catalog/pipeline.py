@@ -64,12 +64,20 @@ def build_solution_catalog(bundle: ScenarioBundle) -> dict[str, Any]:
         profile_id: apply_weight_profile(catalog_frame, bundle.weight_profiles, profile_id)
         for profile_id in bundle.weight_profiles["profile_id"].tolist()
     }
+    default_profile_id = _get_default_profile_id(bundle)
+    selected_candidate_id, selected_candidate = _resolve_selected_candidate(
+        evaluated,
+        ranked_profiles.get(default_profile_id, []),
+    )
     summary = _build_catalog_summary(candidates, evaluated)
     return {
         "scenario_id": bundle.scenario_settings.get("scenario_id", bundle.base_dir.name),
         "catalog": evaluated,
         "catalog_frame": catalog_frame,
         "ranked_profiles": ranked_profiles,
+        "default_profile_id": default_profile_id,
+        "selected_candidate_id": selected_candidate_id,
+        "selected_candidate": selected_candidate,
         "summary": summary,
     }
 
@@ -79,7 +87,8 @@ def export_catalog(result: dict[str, Any], output_dir: str | Path) -> dict[str, 
     out_dir.mkdir(parents=True, exist_ok=True)
     exported: dict[str, Path] = {}
     catalog_frame = result["catalog_frame"].copy()
-    selected_profile_id, selected_candidate = _select_default_candidate(result)
+    selected_profile_id = result.get("default_profile_id")
+    selected_candidate = result.get("selected_candidate")
 
     catalog_csv = out_dir / "catalog.csv"
     catalog_frame.to_csv(catalog_csv, index=False)
@@ -136,7 +145,15 @@ def export_catalog(result: dict[str, Any], output_dir: str | Path) -> dict[str, 
 
         selected_candidate_routes_json = out_dir / "selected_candidate_routes.json"
         selected_candidate_routes_json.write_text(
-            json.dumps(selected_candidate["metrics"]["route_metrics"], indent=2, ensure_ascii=False),
+            json.dumps(
+                {
+                    "candidate_id": selected_candidate["candidate_id"],
+                    "topology_family": selected_candidate["topology_family"],
+                    "routes": selected_candidate["metrics"]["route_metrics"],
+                },
+                indent=2,
+                ensure_ascii=False,
+            ),
             encoding="utf-8",
         )
         exported["selected_candidate_routes_json"] = selected_candidate_routes_json
@@ -161,13 +178,26 @@ def export_catalog(result: dict[str, Any], output_dir: str | Path) -> dict[str, 
 
         selected_candidate_render_json = out_dir / "selected_candidate_render.json"
         selected_candidate_render_json.write_text(
-            json.dumps(selected_candidate["render"], indent=2, ensure_ascii=False),
+            json.dumps(
+                {
+                    "candidate_id": selected_candidate["candidate_id"],
+                    "topology_family": selected_candidate["topology_family"],
+                    "render": selected_candidate["render"],
+                },
+                indent=2,
+                ensure_ascii=False,
+            ),
             encoding="utf-8",
         )
         exported["selected_candidate_render_json"] = selected_candidate_render_json
 
         selected_candidate_bom_csv = out_dir / "selected_candidate_bom.csv"
-        pd.DataFrame(selected_candidate["metrics"]["bom_summary"]["components"]).to_csv(selected_candidate_bom_csv, index=False)
+        bom_frame = pd.DataFrame(selected_candidate["metrics"]["bom_summary"]["components"]).copy()
+        if not bom_frame.empty:
+            bom_frame.insert(0, "candidate_id", selected_candidate["candidate_id"])
+        else:
+            bom_frame = pd.DataFrame([{"candidate_id": selected_candidate["candidate_id"]}])
+        bom_frame.to_csv(selected_candidate_bom_csv, index=False)
         exported["selected_candidate_bom_csv"] = selected_candidate_bom_csv
 
         selected_candidate_svg = out_dir / "selected_candidate.svg"
@@ -224,22 +254,6 @@ def _build_catalog_summary(candidates: list[dict[str, Any]], evaluated: list[dic
     }
 
 
-def _select_default_candidate(result: dict[str, Any]) -> tuple[str | None, dict[str, Any] | None]:
-    ranked_profiles = result.get("ranked_profiles", {})
-    if not ranked_profiles:
-        return None, None
-    selected_profile_id = next(iter(ranked_profiles))
-    ranked_records = ranked_profiles.get(selected_profile_id, [])
-    if not ranked_records:
-        return selected_profile_id, None
-    selected_candidate_id = ranked_records[0]["candidate_id"]
-    selected_candidate = next(
-        (candidate for candidate in result["catalog"] if candidate["candidate_id"] == selected_candidate_id),
-        None,
-    )
-    return selected_profile_id, selected_candidate
-
-
 def _build_decision_summary(
     result: dict[str, Any],
     selected_profile_id: str | None,
@@ -247,6 +261,7 @@ def _build_decision_summary(
 ) -> dict[str, Any]:
     summary = dict(result.get("summary", {}))
     summary["scenario_id"] = result.get("scenario_id")
+    summary["default_profile_id"] = selected_profile_id
     summary["best_profile"] = selected_profile_id
     if selected_candidate is None:
         summary["selected_candidate_id"] = None
@@ -277,6 +292,38 @@ def _build_decision_summary(
         }
     )
     return summary
+
+
+def _get_default_profile_id(bundle: ScenarioBundle) -> str:
+    configured = str(bundle.scenario_settings.get("ranking", {}).get("default_profile", "")).strip()
+    if configured:
+        return configured
+    return str(bundle.weight_profiles["profile_id"].iloc[0])
+
+
+def resolve_selected_candidate(
+    result: dict[str, Any],
+    profile_id: str | None = None,
+    ranked_records: list[dict[str, Any]] | None = None,
+) -> tuple[str | None, dict[str, Any] | None]:
+    resolved_profile_id = profile_id or result.get("default_profile_id")
+    if ranked_records is None:
+        ranked_records = result.get("ranked_profiles", {}).get(resolved_profile_id or "", [])
+    return _resolve_selected_candidate(result.get("catalog", []), ranked_records)
+
+
+def _resolve_selected_candidate(
+    catalog: list[dict[str, Any]],
+    ranked_records: list[dict[str, Any]],
+) -> tuple[str | None, dict[str, Any] | None]:
+    if not ranked_records:
+        return None, None
+    selected_candidate_id = str(ranked_records[0]["candidate_id"])
+    selected_candidate = next(
+        (candidate for candidate in catalog if candidate["candidate_id"] == selected_candidate_id),
+        None,
+    )
+    return selected_candidate_id, selected_candidate
 
 
 def _build_svg(render_payload: dict[str, Any]) -> str:

@@ -7,6 +7,7 @@ from typing import Any
 import pandas as pd
 
 from decision_platform.api.run_pipeline import run_decision_pipeline
+from decision_platform.catalog.pipeline import resolve_selected_candidate
 from decision_platform.data_io.loader import load_scenario_bundle
 from decision_platform.ranking.scoring import apply_dynamic_weights
 from decision_platform.rendering.circuit import build_solution_comparison_figure
@@ -17,125 +18,134 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
     bundle = load_scenario_bundle(scenario_dir)
     result, pipeline_error = _safe_run_pipeline(scenario_dir)
     profile_id = bundle.scenario_settings["ranking"]["default_profile"]
-    ranked = _get_ranked_records(result, profile_id) if result else []
-    selected_candidate = ranked[0]["candidate_id"] if ranked else None
-    candidate_details = build_candidate_detail(result, selected_candidate) if result and selected_candidate else {}
-    comparison_ids = [record["candidate_id"] for record in ranked[:4]]
+    initial_state = build_catalog_view_state(
+        result,
+        profile_id=profile_id,
+        current_selected_id=result.get("selected_candidate_id") if result else None,
+    )
+    candidate_details = build_candidate_detail(result, initial_state["selected_candidate_id"]) if result else {}
 
     app = Dash(__name__)
     app.layout = html.Div(
         children=[
             html.H1("Decision Platform - Circuitos Hidráulicos"),
             dcc.Store(id="scenario-dir", data=str(Path(scenario_dir))),
-            dcc.Store(id="selected-profile", data=profile_id),
             dcc.Tabs(
                 children=[
                     dcc.Tab(
-                label="Dados",
-                children=[
-                    html.H2("Tabelas"),
-                    _table("nodes-grid", bundle.nodes),
-                    _table("components-grid", bundle.components),
-                    _table("routes-grid", bundle.route_requirements),
-                ],
-            ),
-                    dcc.Tab(
-                label="Execução",
-                children=[
-                    html.H2("Execução"),
-                    html.Button("Reexecutar pipeline", id="run-button"),
-                    html.Pre(
-                        json.dumps(
-                            {
-                                "candidate_count": len(result["catalog"]) if result else 0,
-                                "feasible_count": sum(1 for item in result["catalog"] if item["metrics"]["feasible"]) if result else 0,
-                                "error": pipeline_error,
-                            },
-                            indent=2,
-                            ensure_ascii=False,
-                        ),
-                        id="execution-summary",
-                    ),
-                ],
-            ),
-                    dcc.Tab(
-                label="Catálogo",
-                children=[
-                    html.H2("Soluções"),
-                    dcc.Dropdown(
-                        id="profile-dropdown",
-                        options=[{"label": profile, "value": profile} for profile in bundle.weight_profiles["profile_id"].tolist()],
-                        value=profile_id,
-                    ),
-                    dcc.Dropdown(
-                        id="family-dropdown",
-                        options=[{"label": family, "value": family} for family in sorted(bundle.scenario_settings["enabled_families"])],
-                        value="ALL",
-                    ),
-                    dcc.Checklist(
-                        id="feasible-only-checklist",
-                        options=[{"label": "Apenas viáveis", "value": "feasible_only"}],
-                        value=["feasible_only"] if bundle.scenario_settings["ranking"].get("keep_only_feasible", True) else [],
-                    ),
-                    dcc.Input(id="max-cost-input", type="number", value=None),
-                    dcc.Input(id="min-quality-input", type="number", value=None),
-                    dcc.Input(id="min-resilience-input", type="number", value=None),
-                    dcc.Dropdown(
-                        id="fallback-filter-dropdown",
-                        options=[
-                            {"label": "Todos", "value": "ALL"},
-                            {"label": "Sem fallback", "value": "NO_FALLBACK"},
-                            {"label": "Com fallback", "value": "WITH_FALLBACK"},
+                        label="Dados",
+                        children=[
+                            html.H2("Tabelas"),
+                            _table("nodes-grid", bundle.nodes),
+                            _table("components-grid", bundle.components),
+                            _table("routes-grid", bundle.route_requirements),
                         ],
-                        value="ALL",
                     ),
-                    _weight_inputs(bundle),
-                    _table("catalog-grid", pd.DataFrame(ranked)),
-                    html.Button("Exportar catálogo ranqueado", id="export-catalog-button"),
-                    dcc.Download(id="catalog-download"),
-                ],
-            ),
                     dcc.Tab(
-                label="Comparação",
-                children=[
-                    html.H2("Comparação"),
-                    dcc.Dropdown(
-                        id="compare-candidates-dropdown",
-                        options=[{"label": record["candidate_id"], "value": record["candidate_id"]} for record in ranked[:8]],
-                        value=comparison_ids,
+                        label="Execução",
+                        children=[
+                            html.H2("Execução"),
+                            html.Button("Reexecutar pipeline", id="run-button"),
+                            html.Pre(
+                                json.dumps(
+                                    {
+                                        "candidate_count": len(result["catalog"]) if result else 0,
+                                        "feasible_count": sum(1 for item in result["catalog"] if item["metrics"]["feasible"]) if result else 0,
+                                        "default_profile_id": result.get("default_profile_id") if result else None,
+                                        "selected_candidate_id": result.get("selected_candidate_id") if result else None,
+                                        "error": pipeline_error,
+                                    },
+                                    indent=2,
+                                    ensure_ascii=False,
+                                ),
+                                id="execution-summary",
+                            ),
+                        ],
                     ),
-                    dcc.Graph(
-                        id="comparison-figure",
-                        figure=build_solution_comparison_figure(_lookup_candidates(result, comparison_ids)) if result else build_solution_comparison_figure([]),
-                    ),
-                ],
-            ),
                     dcc.Tab(
-                label="Circuito",
-                children=[
-                    html.H2("Renderização 2D"),
-                    dcc.Dropdown(
-                        id="selected-candidate-dropdown",
-                        options=[{"label": record["candidate_id"], "value": record["candidate_id"]} for record in ranked],
-                        value=selected_candidate,
+                        label="Catálogo",
+                        children=[
+                            html.H2("Soluções"),
+                            dcc.Dropdown(
+                                id="profile-dropdown",
+                                options=[{"label": profile, "value": profile} for profile in bundle.weight_profiles["profile_id"].tolist()],
+                                value=profile_id,
+                            ),
+                            dcc.Dropdown(
+                                id="family-dropdown",
+                                options=[{"label": family, "value": family} for family in sorted(bundle.scenario_settings["enabled_families"])],
+                                value="ALL",
+                            ),
+                            dcc.Checklist(
+                                id="feasible-only-checklist",
+                                options=[{"label": "Apenas viáveis", "value": "feasible_only"}],
+                                value=["feasible_only"] if bundle.scenario_settings["ranking"].get("keep_only_feasible", True) else [],
+                            ),
+                            dcc.Input(id="max-cost-input", type="number", value=None),
+                            dcc.Input(id="min-quality-input", type="number", value=None),
+                            dcc.Input(id="min-resilience-input", type="number", value=None),
+                            dcc.Dropdown(
+                                id="fallback-filter-dropdown",
+                                options=[
+                                    {"label": "Todos", "value": "ALL"},
+                                    {"label": "Sem fallback", "value": "NO_FALLBACK"},
+                                    {"label": "Com fallback", "value": "WITH_FALLBACK"},
+                                ],
+                                value="ALL",
+                            ),
+                            _weight_inputs(bundle),
+                            _table("catalog-grid", pd.DataFrame(initial_state["ranked_records"])),
+                            html.Button("Exportar catálogo ranqueado", id="export-catalog-button"),
+                            dcc.Download(id="catalog-download"),
+                        ],
                     ),
-                    html.Button("Exportar candidato selecionado", id="export-selected-button"),
-                    dcc.Download(id="selected-candidate-download"),
-                    cyto.Cytoscape(
-                        id="circuit-cytoscape",
-                        elements=candidate_details.get("cytoscape_elements", []),
-                        layout={"name": "preset"},
-                        style={"width": "100%", "height": "520px"},
-                    ),
-                ],
-            ),
                     dcc.Tab(
-                label="Escolha final",
-                children=[
-                    html.H2("Justificativa"),
-                    html.Pre(json.dumps(candidate_details.get("breakdown", {}), indent=2, ensure_ascii=False), id="candidate-breakdown"),
-                ],
-            ),
+                        label="Comparação",
+                        children=[
+                            html.H2("Comparação"),
+                            dcc.Dropdown(
+                                id="compare-candidates-dropdown",
+                                options=initial_state["comparison_options"],
+                                value=initial_state["comparison_ids"],
+                                multi=True,
+                            ),
+                            dcc.Graph(
+                                id="comparison-figure",
+                                figure=build_solution_comparison_figure(_lookup_candidates(result, initial_state["comparison_ids"]))
+                                if result
+                                else build_solution_comparison_figure([]),
+                            ),
+                        ],
+                    ),
+                    dcc.Tab(
+                        label="Circuito",
+                        children=[
+                            html.H2("Renderização 2D"),
+                            dcc.Dropdown(
+                                id="selected-candidate-dropdown",
+                                options=initial_state["selected_options"],
+                                value=initial_state["selected_candidate_id"],
+                            ),
+                            html.Button("Exportar candidato selecionado", id="export-selected-button"),
+                            dcc.Download(id="selected-candidate-download"),
+                            cyto.Cytoscape(
+                                id="circuit-cytoscape",
+                                elements=candidate_details.get("cytoscape_elements", []),
+                                layout={"name": "preset"},
+                                style={"width": "100%", "height": "520px"},
+                            ),
+                        ],
+                    ),
+                    dcc.Tab(
+                        label="Escolha final",
+                        children=[
+                            html.H2("Justificativa"),
+                            html.Pre(
+                                json.dumps(candidate_details.get("breakdown", {}), indent=2, ensure_ascii=False),
+                                id="candidate-breakdown",
+                            ),
+                        ],
+                    ),
                 ],
             ),
         ],
@@ -154,6 +164,8 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
             {
                 "candidate_count": len(rerun["catalog"]) if rerun else 0,
                 "feasible_count": sum(1 for item in rerun["catalog"] if item["metrics"]["feasible"]) if rerun else 0,
+                "default_profile_id": rerun.get("default_profile_id") if rerun else None,
+                "selected_candidate_id": rerun.get("selected_candidate_id") if rerun else None,
                 "error": rerun_error,
             },
             indent=2,
@@ -162,6 +174,10 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
 
     @app.callback(
         Output("catalog-grid", "rowData"),
+        Output("selected-candidate-dropdown", "options"),
+        Output("selected-candidate-dropdown", "value"),
+        Output("compare-candidates-dropdown", "options"),
+        Output("compare-candidates-dropdown", "value"),
         Input("profile-dropdown", "value"),
         Input("family-dropdown", "value"),
         Input("feasible-only-checklist", "value"),
@@ -175,6 +191,8 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
         Input("weight-resilience", "value"),
         Input("weight-cleaning", "value"),
         Input("weight-operability", "value"),
+        State("selected-candidate-dropdown", "value"),
+        State("compare-candidates-dropdown", "value"),
     )
     def _rerank_catalog(
         profile: str,
@@ -190,9 +208,11 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
         resilience_weight: Any,
         cleaning_weight: Any,
         operability_weight: Any,
-    ) -> list[dict[str, Any]]:
+        current_selected_id: str | None,
+        current_compare_ids: Any,
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], str | None, list[dict[str, Any]], list[str]]:
         if not result:
-            return []
+            return [], [], None, [], []
         weights = {
             "cost_weight": cost_weight,
             "quality_weight": quality_weight,
@@ -201,15 +221,25 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
             "cleaning_weight": cleaning_weight,
             "operability_weight": operability_weight,
         }
-        ranked_records = rerank_catalog(result, profile, weights)
-        return filter_catalog_records(
-            ranked_records,
+        view_state = build_catalog_view_state(
+            result,
+            profile_id=profile,
+            weight_overrides=weights,
             family=family,
             feasible_only="feasible_only" in (feasible_only or []),
             max_cost=max_cost,
             min_quality=min_quality,
             min_resilience=min_resilience,
             fallback_filter=fallback_filter,
+            current_selected_id=current_selected_id,
+            current_compare_ids=current_compare_ids,
+        )
+        return (
+            view_state["ranked_records"],
+            view_state["selected_options"],
+            view_state["selected_candidate_id"],
+            view_state["comparison_options"],
+            view_state["comparison_ids"],
         )
 
     @app.callback(
@@ -230,9 +260,7 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
     def _update_comparison(candidate_ids: Any) -> Any:
         if not result:
             return build_solution_comparison_figure([])
-        if isinstance(candidate_ids, str):
-            candidate_ids = [candidate_ids]
-        return build_solution_comparison_figure(_lookup_candidates(result, candidate_ids or []))
+        return build_solution_comparison_figure(_lookup_candidates(result, _normalize_compare_ids(candidate_ids)))
 
     @app.callback(
         Output("catalog-download", "data"),
@@ -278,9 +306,10 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
             "cleaning_weight": cleaning_weight,
             "operability_weight": operability_weight,
         }
-        ranked_records = rerank_catalog(result, profile, weights)
-        filtered_records = filter_catalog_records(
-            ranked_records,
+        view_state = build_catalog_view_state(
+            result,
+            profile_id=profile,
+            weight_overrides=weights,
             family=family,
             feasible_only="feasible_only" in (feasible_only or []),
             max_cost=max_cost,
@@ -289,7 +318,7 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
             fallback_filter=fallback_filter,
         )
         return _send_text_download(
-            json.dumps(filtered_records, indent=2, ensure_ascii=False),
+            json.dumps(view_state["ranked_records"], indent=2, ensure_ascii=False),
             "ranked_catalog.json",
         )
 
@@ -322,10 +351,76 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
 def rerank_catalog(result: dict[str, Any], profile_id: str, weight_overrides: dict[str, Any] | None = None) -> list[dict[str, Any]]:
     if not result:
         return []
-    if weight_overrides and any(value not in (None, "") for value in weight_overrides.values()):
-        weights = {key: float(value) if value not in (None, "") else 0.0 for key, value in weight_overrides.items()}
+    if _weight_overrides_active(weight_overrides):
+        weights = {key: float(value) if value not in (None, "") else 0.0 for key, value in (weight_overrides or {}).items()}
         return apply_dynamic_weights(result["catalog_frame"], weights)
     return result["ranked_profiles"].get(profile_id, [])
+
+
+def build_catalog_view_state(
+    result: dict[str, Any] | None,
+    *,
+    profile_id: str,
+    weight_overrides: dict[str, Any] | None = None,
+    family: str | None = None,
+    feasible_only: bool = False,
+    max_cost: Any = None,
+    min_quality: Any = None,
+    min_resilience: Any = None,
+    fallback_filter: str | None = None,
+    current_selected_id: str | None = None,
+    current_compare_ids: list[str] | str | None = None,
+) -> dict[str, Any]:
+    if not result:
+        return {
+            "ranked_records": [],
+            "selected_candidate_id": None,
+            "selected_options": [],
+            "comparison_ids": [],
+            "comparison_options": [],
+        }
+    ranked_records = rerank_catalog(result, profile_id, weight_overrides)
+    filtered_records = filter_catalog_records(
+        ranked_records,
+        family=family,
+        feasible_only=feasible_only,
+        max_cost=max_cost,
+        min_quality=min_quality,
+        min_resilience=min_resilience,
+        fallback_filter=fallback_filter,
+    )
+    selected_candidate_id = select_visible_candidate_id(
+        result,
+        profile_id=profile_id,
+        filtered_records=filtered_records,
+        current_selected_id=current_selected_id,
+        weight_overrides=weight_overrides,
+        filters_active=_filters_active(
+            family=family,
+            feasible_only=feasible_only,
+            max_cost=max_cost,
+            min_quality=min_quality,
+            min_resilience=min_resilience,
+            fallback_filter=fallback_filter,
+        ),
+    )
+    selected_options = [
+        {"label": record["candidate_id"], "value": record["candidate_id"]}
+        for record in filtered_records
+    ]
+    normalized_compare_ids = _normalize_compare_ids(current_compare_ids)
+    visible_ids = {record["candidate_id"] for record in filtered_records}
+    comparison_ids = [candidate_id for candidate_id in normalized_compare_ids if candidate_id in visible_ids]
+    if not comparison_ids:
+        comparison_ids = [record["candidate_id"] for record in filtered_records[:4]]
+    comparison_options = selected_options[:8]
+    return {
+        "ranked_records": filtered_records,
+        "selected_candidate_id": selected_candidate_id,
+        "selected_options": selected_options,
+        "comparison_ids": comparison_ids,
+        "comparison_options": comparison_options,
+    }
 
 
 def filter_catalog_records(
@@ -383,6 +478,35 @@ def build_candidate_detail(result: dict[str, Any] | None, candidate_id: str | No
     }
 
 
+def select_visible_candidate_id(
+    result: dict[str, Any] | None,
+    *,
+    profile_id: str,
+    filtered_records: list[dict[str, Any]],
+    current_selected_id: str | None,
+    weight_overrides: dict[str, Any] | None,
+    filters_active: bool,
+) -> str | None:
+    if not result or not filtered_records:
+        return None
+    visible_ids = {record["candidate_id"] for record in filtered_records}
+    if current_selected_id in visible_ids:
+        return current_selected_id
+    default_selected_id = result.get("selected_candidate_id")
+    use_official_selected = (
+        profile_id == result.get("default_profile_id")
+        and not filters_active
+        and not _weight_overrides_active(weight_overrides)
+        and default_selected_id in visible_ids
+    )
+    if use_official_selected:
+        return default_selected_id
+    profile_selected_id, _ = resolve_selected_candidate(result, profile_id=profile_id, ranked_records=filtered_records)
+    if profile_selected_id in visible_ids:
+        return profile_selected_id
+    return filtered_records[0]["candidate_id"]
+
+
 def _lookup_candidates(result: dict[str, Any] | None, candidate_ids: list[str]) -> list[dict[str, Any]]:
     if not result:
         return []
@@ -390,16 +514,10 @@ def _lookup_candidates(result: dict[str, Any] | None, candidate_ids: list[str]) 
     return [item for item in result["catalog"] if item["candidate_id"] in wanted]
 
 
-def _get_ranked_records(result: dict[str, Any] | None, profile_id: str) -> list[dict[str, Any]]:
-    if not result:
-        return []
-    return result["ranked_profiles"].get(profile_id, [])
-
-
 def _safe_run_pipeline(scenario_dir: str | Path) -> tuple[dict[str, Any] | None, str | None]:
     try:
         return run_decision_pipeline(scenario_dir), None
-    except Exception as exc:  # pragma: no cover - exercised in non-Dash runtime paths
+    except Exception as exc:  # pragma: no cover
         return None, str(exc)
 
 
@@ -434,6 +552,39 @@ def _send_text_download(content: str, filename: str) -> Any:
     if callable(sender):  # pragma: no branch
         return sender(content, filename)
     return {"content": content, "filename": filename}
+
+
+def _weight_overrides_active(weight_overrides: dict[str, Any] | None) -> bool:
+    return bool(weight_overrides) and any(value not in (None, "") for value in weight_overrides.values())
+
+
+def _filters_active(
+    *,
+    family: str | None,
+    feasible_only: bool,
+    max_cost: Any,
+    min_quality: Any,
+    min_resilience: Any,
+    fallback_filter: str | None,
+) -> bool:
+    return any(
+        [
+            family not in (None, "", "ALL"),
+            feasible_only,
+            max_cost not in (None, ""),
+            min_quality not in (None, ""),
+            min_resilience not in (None, ""),
+            fallback_filter not in (None, "", "ALL"),
+        ]
+    )
+
+
+def _normalize_compare_ids(current_compare_ids: list[str] | str | None) -> list[str]:
+    if current_compare_ids is None:
+        return []
+    if isinstance(current_compare_ids, str):
+        return [current_compare_ids]
+    return list(current_compare_ids)
 
 
 def main() -> None:

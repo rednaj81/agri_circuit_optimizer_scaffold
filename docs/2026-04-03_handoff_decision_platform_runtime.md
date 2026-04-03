@@ -16,6 +16,25 @@ Fechar o runtime real da `decision_platform` sem reabrir escopo:
 
 ## O que foi implementado de fato
 
+### 0. Candidato selecionado oficial
+
+O pipeline agora formaliza explicitamente:
+
+- `default_profile_id`
+- `selected_candidate_id`
+- `selected_candidate`
+
+Esse candidato oficial é compartilhado por:
+
+- CLI
+- UI
+- `summary.json`
+- `selected_candidate.json`
+- `selected_candidate_routes.json`
+- `selected_candidate_bom.csv`
+- `selected_candidate_score_breakdown.json`
+- `selected_candidate_render.json`
+
 ### 1. Bridge Julia real consolidado
 
 Arquivos principais:
@@ -97,6 +116,13 @@ A exportação agora gera:
 - `selected_candidate.svg`
 - `selected_candidate.png` quando o ambiente permite render com `matplotlib`
 
+Os exports finais agora carregam coerência explícita com o candidato selecionado:
+
+- `summary.json` contém `default_profile_id` e `selected_candidate_id`
+- `selected_candidate_routes.json` contém `candidate_id`
+- `selected_candidate_render.json` contém `candidate_id`
+- `selected_candidate_bom.csv` contém coluna `candidate_id`
+
 ### 5. UI mais fechada para decisão real
 
 Arquivo principal:
@@ -116,6 +142,8 @@ A UI agora suporta:
 - seleção explícita do candidato
 - export do catálogo filtrado
 - export do candidato selecionado
+- seleção inicial alinhada ao `selected_candidate_id` oficial
+- troca explícita do selecionado quando perfil/filtros/pesos mudam
 
 ## Validação executada
 
@@ -175,9 +203,9 @@ $env:JULIA_DEPOT_PATH=(Resolve-Path 'julia_depot_runtime')
 .\.venv\Scripts\python.exe -m pytest tests\decision_platform -p no:tmpdir --basetemp tests/_tmp/pytest-basetemp-real -vv -s
 ```
 
-Resultado final:
+Resultado final mais recente:
 
-- `16 passed in 1643.60s (0:27:23)`
+- `20 passed in 1677.22s (0:27:57)`
 
 ## Comandos recomendados para validação local
 
@@ -211,6 +239,13 @@ $env:JULIA_DEPOT_PATH=(Resolve-Path 'julia_depot_runtime')
 $env:PYTHONPATH='src'
 $env:JULIA_DEPOT_PATH=(Resolve-Path 'julia_depot_runtime')
 .\.venv\Scripts\python.exe -m pytest tests\decision_platform\test_julia_bridge.py tests\decision_platform\test_maquete_v2_acceptance.py tests\decision_platform\test_ui_smoke.py -p no:tmpdir -vv -s
+```
+
+### Suíte rápida
+
+```powershell
+$env:PYTHONPATH='src'
+.\.venv\Scripts\python.exe -m pytest tests\decision_platform -p no:tmpdir --basetemp tests/_tmp/pytest-basetemp-fast -m "not slow and not requires_julia" -q
 ```
 
 ## Limitações remanescentes

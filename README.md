@@ -108,6 +108,7 @@ Pipeline do cenário `maquete_v2`:
 ```powershell
 .\.venv\Scripts\activate
 $env:PYTHONPATH = 'src'
+$env:JULIA_DEPOT_PATH = (Resolve-Path 'julia_depot_runtime')
 python -m decision_platform.api.run_pipeline --scenario data/decision_platform/maquete_v2 --output-dir data/output/decision_platform/maquete_v2
 ```
 
@@ -116,6 +117,7 @@ UI Dash:
 ```powershell
 .\.venv\Scripts\activate
 $env:PYTHONPATH = 'src'
+$env:JULIA_DEPOT_PATH = (Resolve-Path 'julia_depot_runtime')
 python -m decision_platform.ui_dash.app
 ```
 
@@ -135,7 +137,7 @@ Os comandos abaixo foram executados com sucesso neste workspace:
 .\.venv\Scripts\python.exe -m agri_circuit_optimizer.solve.run_case --scenario data/scenario/example --dry-run
 .\.venv\Scripts\python.exe -m agri_circuit_optimizer.solve.run_case --scenario data/scenario/maquete_core --dry-run
 .\.venv\Scripts\python.exe -m agri_circuit_optimizer.solve.run_case --scenario data/scenario/maquete_core --output-dir data/output/maquete_core
-.\.venv\Scripts\python.exe -m pytest tests\decision_platform -p no:tmpdir -q
+.\.venv\Scripts\python.exe -m pytest tests\decision_platform -p no:tmpdir --basetemp tests/_tmp/pytest-basetemp-full -vv -s
 ```
 
 Observações:
@@ -143,10 +145,30 @@ Observações:
 - `solve_case` tenta Pyomo primeiro e cai para o fallback enumerativo quando necessário.
 - Cenários com `edges.csv` + `topology_rules.yaml` entram no engine de topologia fixa.
 - Os relatórios são gravados em `data/output/example_v3/`, `data/output/maquete_core/` e `data/output/maquete_bus_manual/`.
-- Julia está instalada nesta máquina, mas `WaterModels/JuMP/HiGHS` ainda não foram ativados localmente por bloqueio de rede/TLS/permissão do ambiente Julia.
+- Julia, `WaterModels`, `JuMP` e `HiGHS` estão ativos nesta máquina via `julia_depot_runtime/`.
 - `data/decision_platform/maquete_v2/scenario_settings.yaml` agora é `fail closed`: se `WaterModels` não estiver disponível e `fallback: none`, o pipeline falha com mensagem clara.
-- O layout da UI Dash é construído e testado, mas o servidor interativo depende da instalação do stack Dash real.
-- A instalação local de `dash`, `dash-ag-grid` e `dash-cytoscape` falhou neste workspace por ACL/permissão do `pip` em diretórios temporários.
+- O stack real do Dash está ativo na `.venv` e a UI é testada com o runtime real.
+
+## Candidato selecionado oficial
+
+Na `decision_platform`, o candidato selecionado não é mais implícito nem derivado da ordem de um `dict`.
+
+Regras:
+- o cenário define `ranking.default_profile`
+- o pipeline retorna explicitamente:
+  - `default_profile_id`
+  - `selected_candidate_id`
+  - `selected_candidate`
+- o candidato selecionado oficial é o primeiro do ranking do perfil padrão já ordenado pelo pipeline
+- o CLI usa esse `selected_candidate_id`
+- a UI abre usando esse `selected_candidate_id`
+- os exports finais usam esse mesmo candidato
+
+Na UI:
+- trocar o perfil recalcula o ranking visível
+- filtros e pesos alteram o catálogo visível
+- se o candidato selecionado sair do conjunto filtrado, a UI escolhe explicitamente outro candidato visível
+- o painel `Circuito` e o painel `Escolha final` sempre refletem o mesmo candidato atual
 
 ## O que está implementado
 
@@ -236,10 +258,20 @@ Em `data/output/maquete_bus_manual/`:
 - `comparison.json`
 
 Em `data/output/decision_platform/maquete_v2/`:
+- `summary.json`
 - `catalog.csv`
+- `catalog.json`
 - `catalog_detailed.json`
+- `ranked_profiles.json`
 - `ranking_profiles.json`
 - `catalog_summary.json`
+- `selected_candidate.json`
+- `selected_candidate_routes.json`
+- `selected_candidate_bom.csv`
+- `selected_candidate_score_breakdown.json`
+- `selected_candidate_render.json`
+- `selected_candidate.svg`
+- `selected_candidate.png`
 - um diretório por candidato com `solution.json` e `bom.csv`
 
 Os relatórios de rota incluem:
@@ -309,6 +341,8 @@ Cobertura mínima de aceite já incluída:
 - export completo do cenário `maquete_v2`
 - quality rules dirigindo o score por tabela
 - seleção de componentes com log explícito por candidato
+- candidato selecionado oficial compartilhado entre pipeline, CLI, UI e exports
+- separação entre suíte rápida, suíte com Julia real e suíte completa
 
 ## Roadmap
 
@@ -332,6 +366,39 @@ Concluído:
 - bridge Julia scaffold + fallback Python executável
 - catálogo multitopologia com ranking e renderização 2D
 - UI Dash para exploração do catálogo
+
+## Testes da decision platform
+
+Suíte rápida:
+
+```powershell
+$env:PYTHONPATH = 'src'
+.\.venv\Scripts\python.exe -m pytest tests\decision_platform -p no:tmpdir --basetemp tests/_tmp/pytest-basetemp-fast -m "not slow and not requires_julia" -q
+```
+
+Suíte com Julia real:
+
+```powershell
+$env:PYTHONPATH = 'src'
+$env:JULIA_DEPOT_PATH = (Resolve-Path 'julia_depot_runtime')
+.\.venv\Scripts\python.exe -m pytest tests\decision_platform -p no:tmpdir --basetemp tests/_tmp/pytest-basetemp-julia -m "requires_julia" -vv -s
+```
+
+Suíte completa:
+
+```powershell
+$env:PYTHONPATH = 'src'
+$env:JULIA_DEPOT_PATH = (Resolve-Path 'julia_depot_runtime')
+.\.venv\Scripts\python.exe -m pytest tests\decision_platform -p no:tmpdir --basetemp tests/_tmp/pytest-basetemp-full -vv -s
+```
+
+UI local:
+
+```powershell
+$env:PYTHONPATH = 'src'
+$env:JULIA_DEPOT_PATH = (Resolve-Path 'julia_depot_runtime')
+.\.venv\Scripts\python.exe -m decision_platform.ui_dash.app
+```
 
 Próximos passos naturais:
 - consolidar execução Pyomo real no ambiente com `pyomo` + HiGHS

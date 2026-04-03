@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from decision_platform.data_io.loader import load_scenario_bundle
 from decision_platform.graph_generation.generator import generate_candidate_topologies
 from decision_platform.graph_repair.repair import normalize_candidate
@@ -85,6 +87,8 @@ def test_bridge_uses_real_julia_when_available(monkeypatch) -> None:
         cleanup_scenario_copy(scenario_dir)
 
 
+@pytest.mark.requires_julia
+@pytest.mark.slow
 def test_bridge_detects_real_julia_runtime_when_available() -> None:
     assert bridge.find_julia_executable()
     assert bridge.julia_available() is True

@@ -31,8 +31,10 @@ def main() -> None:
         "scenario_id": result["scenario_id"],
         "candidate_count": len(result["catalog"]),
         "feasible_count": sum(1 for item in result["catalog"] if bool(item["metrics"]["feasible"])),
-        "best_profile": next(iter(result["ranked_profiles"])),
-        "top_candidate": result["ranked_profiles"][next(iter(result["ranked_profiles"]))][0]["candidate_id"],
+        "default_profile_id": result.get("default_profile_id"),
+        "best_profile": result.get("default_profile_id"),
+        "selected_candidate_id": result.get("selected_candidate_id"),
+        "top_candidate": result.get("selected_candidate_id"),
     }
     print(json.dumps(summary, indent=2, ensure_ascii=False))
 

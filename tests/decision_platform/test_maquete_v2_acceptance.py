@@ -3,6 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 import shutil
 
+import json
+import pandas as pd
 import pytest
 
 from decision_platform.api.run_pipeline import run_decision_pipeline
@@ -10,6 +12,7 @@ from decision_platform.julia_bridge.bridge import watermodels_available
 from tests.decision_platform.scenario_utils import cleanup_scenario_copy, prepare_scenario_copy
 
 
+@pytest.mark.slow
 def test_maquete_v2_pipeline_exports_and_route_metrics() -> None:
     scenario_dir = prepare_scenario_copy(
         "data/decision_platform/maquete_v2",
@@ -23,6 +26,8 @@ def test_maquete_v2_pipeline_exports_and_route_metrics() -> None:
         result = run_decision_pipeline(scenario_dir, output_dir)
 
         assert result["scenario_id"] == "maquete_v2"
+        assert result["default_profile_id"] == "balanced"
+        assert result["selected_candidate_id"] == result["selected_candidate"]["candidate_id"]
         feasible = [item for item in result["catalog"] if item["metrics"]["feasible"]]
         infeasible = [item for item in result["catalog"] if not item["metrics"]["feasible"]]
 
@@ -33,10 +38,33 @@ def test_maquete_v2_pipeline_exports_and_route_metrics() -> None:
         assert any(item["metrics"]["quality_score_breakdown"] for item in feasible)
         assert any(item["payload"]["selection_log"] for item in feasible)
 
+        summary = json.loads((output_dir / "summary.json").read_text(encoding="utf-8"))
+        selected_candidate = json.loads((output_dir / "selected_candidate.json").read_text(encoding="utf-8"))
+        selected_routes = json.loads((output_dir / "selected_candidate_routes.json").read_text(encoding="utf-8"))
+        selected_render = json.loads((output_dir / "selected_candidate_render.json").read_text(encoding="utf-8"))
+        selected_breakdown = json.loads((output_dir / "selected_candidate_score_breakdown.json").read_text(encoding="utf-8"))
+        selected_bom = pd.read_csv(output_dir / "selected_candidate_bom.csv")
+
         assert (output_dir / "catalog.csv").exists()
+        assert (output_dir / "catalog.json").exists()
         assert (output_dir / "catalog_detailed.json").exists()
+        assert (output_dir / "ranked_profiles.json").exists()
         assert (output_dir / "ranking_profiles.json").exists()
         assert (output_dir / "catalog_summary.json").exists()
+        assert (output_dir / "selected_candidate.svg").exists()
+
+        assert summary["default_profile_id"] == result["default_profile_id"]
+        assert summary["selected_candidate_id"] == result["selected_candidate_id"]
+        assert selected_candidate["candidate_id"] == result["selected_candidate_id"]
+        assert selected_routes["candidate_id"] == result["selected_candidate_id"]
+        assert selected_render["candidate_id"] == result["selected_candidate_id"]
+        assert selected_breakdown["candidate_id"] == result["selected_candidate_id"]
+        assert selected_breakdown["profile_id"] == result["default_profile_id"]
+        assert all(selected_bom["candidate_id"] == result["selected_candidate_id"])
+        assert selected_routes["topology_family"] == selected_candidate["topology_family"]
+        assert selected_render["topology_family"] == selected_candidate["topology_family"]
+        assert selected_render["render"] == selected_candidate["render"]
+        assert selected_routes["routes"] == selected_candidate["metrics"]["route_metrics"]
     finally:
         if output_dir.exists():
             shutil.rmtree(output_dir)
@@ -44,6 +72,7 @@ def test_maquete_v2_pipeline_exports_and_route_metrics() -> None:
 
 
 @pytest.mark.requires_julia
+@pytest.mark.slow
 def test_maquete_v2_pipeline_runs_with_real_julia_and_exports_final_artifacts() -> None:
     if not watermodels_available():
         pytest.skip("Real Julia/WaterModels runtime is not available.")
@@ -53,8 +82,7 @@ def test_maquete_v2_pipeline_runs_with_real_julia_and_exports_final_artifacts() 
     try:
         result = run_decision_pipeline("data/decision_platform/maquete_v2", output_dir)
         assert result["scenario_id"] == "maquete_v2"
-        selected = result["ranked_profiles"]["min_cost"][0]["candidate_id"]
-        selected_item = next(item for item in result["catalog"] if item["candidate_id"] == selected)
+        selected_item = result["selected_candidate"]
         assert selected_item["metrics"]["engine_requested"] == "watermodels_jl"
         assert selected_item["metrics"]["engine_used"] == "watermodels_jl"
         assert selected_item["metrics"]["engine_mode"] == "real_julia"
@@ -70,6 +98,9 @@ def test_maquete_v2_pipeline_runs_with_real_julia_and_exports_final_artifacts() 
         assert (output_dir / "selected_candidate_score_breakdown.json").exists()
         assert (output_dir / "selected_candidate_render.json").exists()
         assert (output_dir / "selected_candidate.svg").exists()
+        summary = json.loads((output_dir / "summary.json").read_text(encoding="utf-8"))
+        assert summary["selected_candidate_id"] == result["selected_candidate_id"]
+        assert summary["default_profile_id"] == result["default_profile_id"]
     finally:
         if output_dir.exists():
             shutil.rmtree(output_dir)
