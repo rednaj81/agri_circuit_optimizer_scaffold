@@ -56,7 +56,7 @@ def desired_run_path(repo_root: Path) -> Path:
 def read_json(path: Path) -> Any:
     if not path.exists():
         return None
-    return json.loads(path.read_text(encoding="utf-8"))
+    return json.loads(path.read_text(encoding="utf-8-sig"))
 
 
 def write_json(path: Path, payload: Any) -> None:
