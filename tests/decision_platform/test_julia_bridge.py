@@ -23,7 +23,7 @@ def test_bridge_fails_closed_when_fallback_is_none(monkeypatch) -> None:
         evaluate_candidate_via_bridge(payload, bundle)
         raise AssertionError("Expected fail-closed JuliaBridgeError.")
     except JuliaBridgeError as exc:
-        assert "fallback 'none'" in str(exc)
+        assert "Official runtime requires" in str(exc)
 
 
 @pytest.mark.fast
@@ -43,6 +43,29 @@ def test_bridge_falls_back_when_python_emulation_is_allowed(monkeypatch) -> None
         assert metrics["engine_requested"] == "watermodels_jl"
         assert metrics["engine_used"] == "python_emulated_julia"
         assert metrics["engine_mode"] == "fallback_emulated"
+        assert "Diagnostic-only fallback" in str(metrics["engine_warning"])
+    finally:
+        cleanup_scenario_copy(scenario_dir)
+
+
+@pytest.mark.fast
+def test_bridge_allows_explicit_python_primary_for_diagnostic_paths(monkeypatch) -> None:
+    scenario_dir = prepare_scenario_copy(
+        "data/decision_platform/maquete_v2",
+        "maquete_v2_bridge_python_primary",
+        scenario_overrides={"hydraulic_engine": {"primary": "python_emulated_julia", "fallback": "none"}},
+    )
+    try:
+        bundle = load_scenario_bundle(scenario_dir)
+        candidate = generate_candidate_topologies(bundle)[0]
+        payload = build_candidate_payload(normalize_candidate(candidate, bundle), bundle)
+        monkeypatch.setattr(bridge, "julia_available", lambda: False)
+        monkeypatch.setattr(bridge, "watermodels_available", lambda project_dir=None: False)
+        metrics = evaluate_candidate_via_bridge(payload, bundle)
+        assert metrics["engine_requested"] == "python_emulated_julia"
+        assert metrics["engine_used"] == "python_emulated_julia"
+        assert metrics["engine_mode"] == "python_fallback_primary"
+        assert metrics["engine_warning"] is None
     finally:
         cleanup_scenario_copy(scenario_dir)
 

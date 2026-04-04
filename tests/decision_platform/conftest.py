@@ -14,7 +14,10 @@ def maquete_v2_fallback_runtime() -> dict[str, object]:
         scenario_overrides={"hydraulic_engine": {"fallback": "python_emulated_julia"}},
     )
     try:
-        result = run_decision_pipeline(scenario_dir)
+        result = run_decision_pipeline(
+            scenario_dir,
+            allow_diagnostic_python_emulation=True,
+        )
         yield {
             "scenario_dir": scenario_dir,
             "result": result,

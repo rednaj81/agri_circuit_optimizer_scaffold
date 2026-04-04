@@ -23,7 +23,12 @@ def test_maquete_v2_pipeline_exports_and_route_metrics() -> None:
     if output_dir.exists():
         shutil.rmtree(output_dir)
     try:
-        result = run_decision_pipeline(scenario_dir, output_dir)
+        result = run_decision_pipeline(
+            scenario_dir,
+            output_dir,
+            include_engine_comparison=True,
+            allow_diagnostic_python_emulation=True,
+        )
 
         assert result["scenario_id"] == "maquete_v2"
         assert result["default_profile_id"] == "balanced"
@@ -134,7 +139,7 @@ def test_maquete_v2_pipeline_runs_with_real_julia_and_exports_final_artifacts() 
         assert (output_dir / "catalog.csv").exists()
         assert (output_dir / "catalog.json").exists()
         assert (output_dir / "ranked_profiles.json").exists()
-        assert (output_dir / "engine_comparison.json").exists()
+        assert not (output_dir / "engine_comparison.json").exists()
         assert (output_dir / "selected_candidate.json").exists()
         assert (output_dir / "selected_candidate_routes.json").exists()
         assert (output_dir / "selected_candidate_bom.csv").exists()

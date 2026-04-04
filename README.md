@@ -80,13 +80,14 @@ Observações:
 ### Runtime principal atual
 
 - `src/decision_platform/` é a frente principal para decisão humana assistida no cenário `data/decision_platform/maquete_v2/`.
-- o pipeline já exporta catálogo, ranking, candidato oficial, comparação Julia vs Python, explicação do vencedor e agregados de viabilidade.
+- o pipeline oficial exporta catálogo, ranking, candidato oficial, explicação do vencedor e agregados de viabilidade.
+- a comparação Julia vs Python existe apenas como trilha diagnóstica explícita.
 - a UI Dash já cobre catálogo, comparação, circuito, candidato oficial e filtros de decisão com persistência simples em sessão.
 
 ### O que já está validado
 
 - bridge real Julia ativo com `engine_used=watermodels_jl`
-- comparação Python vs Julia exportada em `engine_comparison.json`
+- comparação Python vs Julia exportada quando a trilha diagnóstica é habilitada explicitamente
 - candidato oficial coerente entre pipeline, UI e artefatos
 - motivos de inviabilidade e falhas de restrição exportados no catálogo e no resumo
 - explicação auditável do vencedor em `selected_candidate_explanation.json` e `.md`
@@ -103,6 +104,7 @@ Observações:
 - `pytest tests/decision_platform -m "not requires_julia" -q`
 - `pytest tests/decision_platform -m requires_julia -q`
 - `python -m decision_platform.api.run_pipeline --scenario data/decision_platform/maquete_v2 --output-dir data/output/decision_platform/maquete_v2`
+- `python -m decision_platform.api.run_pipeline --scenario data/decision_platform/maquete_v2 --output-dir data/output/decision_platform/maquete_v2 --include-engine-comparison`
 - `python -m decision_platform.ui_dash.app`
 
 ## Quick start
@@ -150,6 +152,15 @@ Pipeline do cenário `maquete_v2`:
 $env:PYTHONPATH = 'src'
 $env:JULIA_DEPOT_PATH = (Resolve-Path 'julia_depot_runtime')
 python -m decision_platform.api.run_pipeline --scenario data/decision_platform/maquete_v2 --output-dir data/output/decision_platform/maquete_v2
+```
+
+Comparação diagnóstica Julia vs Python, fora do caminho oficial:
+
+```powershell
+.\.venv\Scripts\activate
+$env:PYTHONPATH = 'src'
+$env:JULIA_DEPOT_PATH = (Resolve-Path 'julia_depot_runtime')
+python -m decision_platform.api.run_pipeline --scenario data/decision_platform/maquete_v2 --output-dir data/output/decision_platform/maquete_v2_diag --include-engine-comparison --allow-diagnostic-python-emulation
 ```
 
 UI Dash:
@@ -220,7 +231,9 @@ Observações:
 - Cenários com `edges.csv` + `topology_rules.yaml` entram no engine de topologia fixa.
 - Os relatórios são gravados em `data/output/example_v3/`, `data/output/maquete_core/` e `data/output/maquete_bus_manual/`.
 - Julia, `WaterModels`, `JuMP` e `HiGHS` estão ativos nesta máquina via `julia_depot_runtime/`.
-- `data/decision_platform/maquete_v2/scenario_settings.yaml` agora é `fail closed`: se `WaterModels` não estiver disponível e `fallback: none`, o pipeline falha com mensagem clara.
+- `data/decision_platform/maquete_v2/scenario_settings.yaml` é `fail closed`: se `WaterModels` não estiver disponível e `fallback: none`, o pipeline oficial falha com mensagem clara.
+- o pipeline oficial não habilita `python_emulated_julia` nem exporta `engine_comparison.json` por padrão.
+- a comparação Julia vs Python e qualquer uso de `python_emulated_julia` ficaram restritos a trilhas diagnósticas explícitas com `--include-engine-comparison` e/ou `--allow-diagnostic-python-emulation`.
 - O stack real do Dash está ativo na `.venv` e a UI é testada com o runtime real.
 - A suíte atual da `decision_platform` coleta `24` testes.
 - Os slices validados nesta rodada foram:
@@ -228,7 +241,8 @@ Observações:
   - `8 passed` em `tests/decision_platform/test_ui_smoke.py -m "not requires_julia"`
   - `1 passed` no aceite exportador de `maquete_v2`
   - `2 passed` em `-m requires_julia`
-- O pipeline exporta `engine_comparison.json`, `engine_comparison_candidates.csv`, `selected_candidate_explanation.json`, `selected_candidate_explanation.md`, `family_summary.csv`, `infeasibility_summary.json`, motivos de inviabilidade por candidato e métricas agregadas de viabilidade/custo por família.
+- O pipeline oficial exporta `selected_candidate_explanation.json`, `selected_candidate_explanation.md`, `family_summary.csv`, `infeasibility_summary.json`, motivos de inviabilidade por candidato e métricas agregadas de viabilidade/custo por família.
+- `engine_comparison.json` e `engine_comparison_candidates.csv` só são exportados na trilha diagnóstica explícita.
 
 ## Candidato selecionado oficial
 
@@ -308,11 +322,11 @@ Na UI:
 - normalização/reparo conservador de topologia
 - instalação de componentes por link com fallback controlado
 - bridge Python -> Julia com `fail closed` respeitando o contrato do cenário
-- fallback explícito e rastreável quando o cenário permitir `python_emulated_julia`
+- `python_emulated_julia` preservado apenas para auditoria, comparação e testes explicitamente opt-in
 - catálogo com soluções viáveis e inviáveis
 - auditoria explícita do engine Julia real versus `python_emulated_julia`
-- `engine_comparison.json` com diff de decisão, ranking e métricas por rota
-- `engine_comparison_candidates.csv` com ranking exportável por engine/perfil/cenário
+- `engine_comparison.json` com diff de decisão, ranking e métricas por rota quando a comparação diagnóstica é solicitada explicitamente
+- `engine_comparison_candidates.csv` com ranking exportável por engine/perfil/cenário quando a comparação diagnóstica é solicitada explicitamente
 - ranking multicritério por `weight_profiles.csv`
 - renderização 2D e comparação por radar
 - UI Dash com abas de dados, execução, catálogo, comparação, circuito e escolha final
@@ -353,8 +367,6 @@ Em `data/output/decision_platform/maquete_v2/`:
 - `ranked_profiles.json`
 - `ranking_profiles.json`
 - `catalog_summary.json`
-- `engine_comparison.json`
-- `engine_comparison_candidates.csv`
 - `family_summary.csv`
 - `infeasibility_summary.json`
 - `selected_candidate.json`
@@ -369,6 +381,10 @@ Em `data/output/decision_platform/maquete_v2/`:
 - `ui_validation/README.md`
 - `ui_validation/*.png`
 - um diretório por candidato com `solution.json` e `bom.csv`
+
+Somente na trilha diagnóstica explícita:
+- `engine_comparison.json`
+- `engine_comparison_candidates.csv`
 
 Os relatórios de rota incluem:
 - `selected_meter_id`

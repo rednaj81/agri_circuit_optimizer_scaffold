@@ -145,7 +145,7 @@ def evaluate_candidates_via_bridge(
 
     if fallback_engine == "python_emulated_julia":
         warning = (
-            "Falling back to python_emulated_julia because Julia/WaterModels is unavailable."
+            "Diagnostic-only fallback to python_emulated_julia because Julia/WaterModels is unavailable."
         )
         return [
             _decorate_engine_metadata(
@@ -161,7 +161,7 @@ def evaluate_candidates_via_bridge(
         ]
 
     raise JuliaBridgeError(
-        "Scenario requires primary engine 'watermodels_jl' with fallback 'none', "
+        "Official runtime requires primary engine 'watermodels_jl' with fallback 'none', "
         "but Julia/WaterModels is unavailable. Install Julia, JuMP, HiGHS and WaterModels "
         "and configure JULIA_EXE if needed."
     )

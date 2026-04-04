@@ -74,6 +74,7 @@ def audit_julia_engine_implementation() -> dict[str, Any]:
             "O runtime Julia sobe um processo real com ambiente `julia/Project.toml` e valida disponibilidade de WaterModels/JuMP/HiGHS antes da avaliação.",
             "O arquivo `DecisionEngine.jl` importa `WaterModels`, mas não chama APIs de formulação ou solve da biblioteca para calcular a rede hidráulica.",
             "A decisão por rota hoje é calculada por lógica própria em Julia: enumeração de caminhos, seleção de bomba/medidor, perdas lineares equivalentes e gargalo por capacidade mínima.",
+            "A trilha `python_emulated_julia` permanece apenas para auditoria/comparação explícita e não faz parte do runtime oficial.",
         ],
         "simplifications_still_present": [
             "Não há modelo de rede hidráulica WaterModels resolvendo balanço/acoplamento global.",
@@ -121,6 +122,10 @@ def build_engine_comparison_suite(bundle: ScenarioBundle, *, julia_result: dict[
         ),
     }
     return {
+        "comparison_policy": {
+            "official_runtime": "julia_only_fail_closed",
+            "python_emulation": "diagnostic_only_explicit_opt_in",
+        },
         "implementation_audit": audit_julia_engine_implementation(),
         "scenario_comparisons": scenario_comparisons,
         "candidate_rows": _build_candidate_rows_for_suite(
