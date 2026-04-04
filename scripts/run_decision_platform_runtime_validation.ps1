@@ -14,9 +14,12 @@ Set-StrictMode -Version 3.0
 $ErrorActionPreference = "Stop"
 
 $script:RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+$script:ProfilesPath = Join-Path $PSScriptRoot "decision_platform_runtime_validation_profiles.json"
+$script:ProfilesConfig = Get-Content -LiteralPath $script:ProfilesPath -Raw | ConvertFrom-Json -AsHashtable
+$script:SharedProfile = $script:ProfilesConfig["shared"]
+$script:ProbeOverrideEnv = [string]$script:ProfilesConfig["probe_override_env"]
 $script:PythonExe = Join-Path $script:RepoRoot ".venv\Scripts\python.exe"
 $script:JuliaDepotDir = Join-Path $script:RepoRoot "julia_depot_runtime"
-$script:ProbeOverrideEnv = "DECISION_PLATFORM_DISABLE_REAL_JULIA_PROBE"
 $script:ReportTimestamp = Get-Date
 $script:ValidationProfile = if ($Mode -eq "official") {
     "official"
@@ -27,30 +30,31 @@ elseif ($IncludeEngineComparison) {
 else {
     "diagnostic"
 }
+$script:ProfileConfig = $script:ProfilesConfig["profiles"][$script:ValidationProfile]
 $script:RuntimeScenarioDir = $null
 $script:TemporaryScenarioDir = $null
+
+if (-not $script:ProfileConfig) {
+    throw ("Perfil de validação não encontrado em {0}: {1}" -f $script:ProfilesPath, $script:ValidationProfile)
+}
+
+if ([string]::IsNullOrWhiteSpace($OutputDir)) {
+    $OutputDir = [string]$script:ProfileConfig["default_output_dir"]
+}
+
 $script:Report = [ordered]@{
     started_at = $script:ReportTimestamp.ToString("o")
     mode = $Mode
     validation_profile = $script:ValidationProfile
+    profile_description = [string]$script:ProfileConfig["description"]
     scenario_dir = $ScenarioDir
+    output_dir = $OutputDir
     include_engine_comparison = [bool]$IncludeEngineComparison
     disable_real_julia_probe = [bool]$DisableRealJuliaProbe
     dry_run = [bool]$DryRun
     repo_root = $script:RepoRoot
+    profile_config_path = $script:ProfilesPath
     steps = @()
-}
-
-if ([string]::IsNullOrWhiteSpace($OutputDir)) {
-    $OutputDir = if ($script:ValidationProfile -eq "official") {
-        "data/output/decision_platform/runtime_validation_official"
-    }
-    elseif ($script:ValidationProfile -eq "diagnostic_comparison") {
-        "data/output/decision_platform/runtime_validation_diagnostic_comparison"
-    }
-    else {
-        "data/output/decision_platform/runtime_validation_diagnostic"
-    }
 }
 
 function Format-Duration {
@@ -89,6 +93,24 @@ function Read-JsonFile {
     )
 
     return Get-Content -LiteralPath $PathValue -Raw | ConvertFrom-Json -AsHashtable
+}
+
+function Get-NestedValue {
+    param(
+        [Parameter(Mandatory = $true)]
+        [hashtable]$Data,
+        [Parameter(Mandatory = $true)]
+        [string]$FieldPath
+    )
+
+    $current = $Data
+    foreach ($segment in $FieldPath.Split(".")) {
+        if ($current -isnot [hashtable] -or -not $current.ContainsKey($segment)) {
+            throw ("Campo obrigatório ausente em {0}" -f $FieldPath)
+        }
+        $current = $current[$segment]
+    }
+    return $current
 }
 
 function Write-StepBanner {
@@ -294,22 +316,12 @@ function Get-ValidationEnvironment {
         PYTHONPATH = "src"
     }
 
-    if ($Mode -eq "official") {
-        $environment[$script:ProbeOverrideEnv] = $null
-        $environment["JULIA_DEPOT_PATH"] = Resolve-WorkspacePath -PathValue $script:JuliaDepotDir
-        return $environment
-    }
-
-    if ($DisableRealJuliaProbe) {
-        $environment[$script:ProbeOverrideEnv] = "1"
-    }
-    else {
-        $environment[$script:ProbeOverrideEnv] = $null
-    }
-
-    if (-not $DisableRealJuliaProbe -and (Test-Path -LiteralPath $script:JuliaDepotDir)) {
+    if ($script:ProfileConfig["use_julia_depot"]) {
         $environment["JULIA_DEPOT_PATH"] = Resolve-WorkspacePath -PathValue $script:JuliaDepotDir
     }
+
+    $probeOverrideValue = $script:ProfileConfig["set_probe_override_env"]
+    $environment[$script:ProbeOverrideEnv] = if ($null -eq $probeOverrideValue) { $null } else { [string]$probeOverrideValue }
 
     return $environment
 }
@@ -321,10 +333,10 @@ function Get-PipelineArguments {
         "--output-dir", $OutputDir
     )
 
-    if ($Mode -eq "diagnostic") {
+    if ($script:ProfileConfig["allow_diagnostic_python_emulation"]) {
         $args += "--allow-diagnostic-python-emulation"
     }
-    if ($IncludeEngineComparison) {
+    if ($script:ProfileConfig["include_engine_comparison"]) {
         $args += "--include-engine-comparison"
     }
 
@@ -333,7 +345,8 @@ function Get-PipelineArguments {
 
 function Prepare-ScenarioForMode {
     $resolvedScenarioDir = Resolve-WorkspacePath -PathValue $ScenarioDir
-    if ($Mode -eq "official") {
+    $fallbackOverride = $script:ProfileConfig["scenario_fallback_override"]
+    if ($null -eq $fallbackOverride) {
         $script:RuntimeScenarioDir = $resolvedScenarioDir
         return $resolvedScenarioDir
     }
@@ -352,7 +365,7 @@ function Prepare-ScenarioForMode {
         $updatedContent = [regex]::Replace(
             $settingsContent,
             "(?m)^(\s*fallback:\s*).+$",
-            '${1}python_emulated_julia',
+            ('${1}{0}' -f [string]$fallbackOverride),
             1
         )
         Set-Content -LiteralPath $settingsPath -Value $updatedContent -Encoding utf8
@@ -371,12 +384,46 @@ function Assert-TelemetryFields {
         [string]$Context
     )
 
-    foreach ($field in @("started_at", "finished_at", "duration_s", "execution_mode", "official_gate_valid", "policy_mode", "policy_message")) {
-        Assert-FieldPresent -Data $Runtime -FieldName $field -Context $Context
+    foreach ($field in @($script:SharedProfile["runtime_required_fields"])) {
+        Assert-FieldPresent -Data $Runtime -FieldName ([string]$field) -Context $Context
     }
 
     if ([double]$Runtime["duration_s"] -lt 0) {
         throw ("Campo duration_s em {0} precisa ser não negativo." -f $Context)
+    }
+}
+
+function Assert-ExpectedFields {
+    param(
+        [Parameter(Mandatory = $true)]
+        [hashtable]$Summary,
+        [Parameter(Mandatory = $true)]
+        [hashtable]$Runtime,
+        [Parameter(Mandatory = $true)]
+        [hashtable]$Expectations
+    )
+
+    foreach ($pair in $Expectations["string_fields"].GetEnumerator()) {
+        Assert-FieldEquals -Data $Summary -FieldName ([string]$pair.Key) -ExpectedValue ([string]$pair.Value) -Context "summary.json"
+    }
+    foreach ($pair in $Expectations["boolean_fields"].GetEnumerator()) {
+        Assert-BooleanValue -Data $Summary -FieldName ([string]$pair.Key) -ExpectedValue ([bool]$pair.Value) -Context "summary.json"
+    }
+    foreach ($pair in $Expectations["runtime_string_fields"].GetEnumerator()) {
+        Assert-FieldEquals -Data $Runtime -FieldName ([string]$pair.Key) -ExpectedValue ([string]$pair.Value) -Context "summary.json.runtime"
+    }
+    foreach ($pair in $Expectations["runtime_boolean_fields"].GetEnumerator()) {
+        Assert-BooleanValue -Data $Runtime -FieldName ([string]$pair.Key) -ExpectedValue ([bool]$pair.Value) -Context "summary.json.runtime"
+    }
+    foreach ($containsRule in @($Expectations["contains"])) {
+        $fieldPath = [string]$containsRule["field"]
+        $value = if ($fieldPath.StartsWith("runtime.")) {
+            [string](Get-NestedValue -Data $Summary -FieldPath $fieldPath)
+        }
+        else {
+            [string](Get-NestedValue -Data $Summary -FieldPath $fieldPath)
+        }
+        Assert-ContainsText -Value $value -ExpectedFragment ([string]$containsRule["text"]) -Context ("summary.json.{0}" -f $fieldPath)
     }
 }
 
@@ -386,8 +433,8 @@ function Assert-SummaryPolicy {
         [hashtable]$Summary
     )
 
-    foreach ($field in @("candidate_count", "selected_candidate_id", "engine_requested", "engine_used", "engine_mode", "runtime")) {
-        Assert-FieldPresent -Data $Summary -FieldName $field -Context "summary.json"
+    foreach ($field in @($script:SharedProfile["summary_required_fields"])) {
+        Assert-FieldPresent -Data $Summary -FieldName ([string]$field) -Context "summary.json"
     }
 
     if (-not ($Summary["runtime"] -is [hashtable])) {
@@ -396,36 +443,7 @@ function Assert-SummaryPolicy {
 
     $runtime = $Summary["runtime"]
     Assert-TelemetryFields -Runtime $runtime -Context "summary.json.runtime"
-
-    if ($Mode -eq "official") {
-        Assert-FieldEquals -Data $Summary -FieldName "execution_mode" -ExpectedValue "official" -Context "summary.json"
-        Assert-BooleanValue -Data $Summary -FieldName "official_gate_valid" -ExpectedValue $true -Context "summary.json"
-        Assert-BooleanValue -Data $Summary -FieldName "real_julia_probe_disabled" -ExpectedValue $false -Context "summary.json"
-        Assert-FieldEquals -Data $Summary -FieldName "runtime_policy_mode" -ExpectedValue "official_julia_only" -Context "summary.json"
-        Assert-FieldEquals -Data $runtime -FieldName "execution_mode" -ExpectedValue "official" -Context "summary.json.runtime"
-        Assert-BooleanValue -Data $runtime -FieldName "official_gate_valid" -ExpectedValue $true -Context "summary.json.runtime"
-        Assert-BooleanValue -Data $runtime -FieldName "real_julia_probe_disabled" -ExpectedValue $false -Context "summary.json.runtime"
-        Assert-FieldEquals -Data $runtime -FieldName "policy_mode" -ExpectedValue "official_julia_only" -Context "summary.json.runtime"
-    }
-    else {
-        Assert-FieldEquals -Data $Summary -FieldName "execution_mode" -ExpectedValue "diagnostic" -Context "summary.json"
-        Assert-BooleanValue -Data $Summary -FieldName "official_gate_valid" -ExpectedValue $false -Context "summary.json"
-        Assert-FieldEquals -Data $runtime -FieldName "execution_mode" -ExpectedValue "diagnostic" -Context "summary.json.runtime"
-        Assert-BooleanValue -Data $runtime -FieldName "official_gate_valid" -ExpectedValue $false -Context "summary.json.runtime"
-
-        if ($DisableRealJuliaProbe) {
-            Assert-BooleanValue -Data $Summary -FieldName "real_julia_probe_disabled" -ExpectedValue $true -Context "summary.json"
-            Assert-FieldEquals -Data $Summary -FieldName "runtime_policy_mode" -ExpectedValue "diagnostic_override_probe_disabled" -Context "summary.json"
-            Assert-BooleanValue -Data $runtime -FieldName "real_julia_probe_disabled" -ExpectedValue $true -Context "summary.json.runtime"
-            Assert-FieldEquals -Data $runtime -FieldName "policy_mode" -ExpectedValue "diagnostic_override_probe_disabled" -Context "summary.json.runtime"
-            Assert-ContainsText -Value ([string]$Summary["runtime_policy_message"]) -ExpectedFragment $script:ProbeOverrideEnv -Context "summary.json.runtime_policy_message"
-            Assert-ContainsText -Value ([string]$runtime["policy_message"]) -ExpectedFragment $script:ProbeOverrideEnv -Context "summary.json.runtime.policy_message"
-        }
-        else {
-            Assert-FieldEquals -Data $Summary -FieldName "runtime_policy_mode" -ExpectedValue "diagnostic_opt_in" -Context "summary.json"
-            Assert-FieldEquals -Data $runtime -FieldName "policy_mode" -ExpectedValue "diagnostic_opt_in" -Context "summary.json.runtime"
-        }
-    }
+    Assert-ExpectedFields -Summary $Summary -Runtime $runtime -Expectations $script:ProfileConfig["summary_expectations"]
 
     if ([int]$Summary["candidate_count"] -le 0) {
         throw "summary.json precisa expor candidate_count maior que zero."
@@ -440,19 +458,8 @@ function Assert-CoreArtifacts {
         [hashtable]$Summary
     )
 
-    $requiredArtifacts = @(
-        "selected_candidate.json",
-        "selected_candidate_routes.json",
-        "selected_candidate_score_breakdown.json",
-        "selected_candidate_bom.csv",
-        "selected_candidate_render.json",
-        "selected_candidate_explanation.json",
-        "selected_candidate_explanation.md",
-        "family_summary.csv",
-        "infeasibility_summary.json"
-    )
-    foreach ($artifact in $requiredArtifacts) {
-        $artifactPath = Join-Path $ResolvedOutputDir $artifact
+    foreach ($artifact in @($script:SharedProfile["core_artifacts"])) {
+        $artifactPath = Join-Path $ResolvedOutputDir ([string]$artifact)
         if (-not (Test-ArtifactExists -PathValue $artifactPath)) {
             throw ("Artefato obrigatório ausente: {0}" -f $artifactPath)
         }
@@ -464,8 +471,8 @@ function Assert-CoreArtifacts {
     $selectedRender = Read-JsonFile -PathValue (Join-Path $ResolvedOutputDir "selected_candidate_render.json")
     $selectedExplanation = Read-JsonFile -PathValue (Join-Path $ResolvedOutputDir "selected_candidate_explanation.json")
     $infeasibilitySummary = Read-JsonFile -PathValue (Join-Path $ResolvedOutputDir "infeasibility_summary.json")
-    $familySummary = Import-Csv -LiteralPath (Join-Path $ResolvedOutputDir "family_summary.csv")
-    $selectedBom = Import-Csv -LiteralPath (Join-Path $ResolvedOutputDir "selected_candidate_bom.csv")
+    $familySummary = @(Import-Csv -LiteralPath (Join-Path $ResolvedOutputDir "family_summary.csv"))
+    $selectedBom = @(Import-Csv -LiteralPath (Join-Path $ResolvedOutputDir "selected_candidate_bom.csv"))
     $selectedCandidateId = [string]$Summary["selected_candidate_id"]
 
     Assert-FieldEquals -Data $selectedCandidate -FieldName "candidate_id" -ExpectedValue $selectedCandidateId -Context "selected_candidate.json"
@@ -479,9 +486,10 @@ function Assert-CoreArtifacts {
         throw "selected_candidate.json.metrics não está no formato esperado."
     }
     $metrics = $selectedCandidate["metrics"]
-    Assert-FieldEquals -Data $metrics -FieldName "engine_requested" -ExpectedValue ([string]$Summary["engine_requested"]) -Context "selected_candidate.json.metrics"
-    Assert-FieldEquals -Data $metrics -FieldName "engine_used" -ExpectedValue ([string]$Summary["engine_used"]) -Context "selected_candidate.json.metrics"
-    Assert-FieldEquals -Data $metrics -FieldName "engine_mode" -ExpectedValue ([string]$Summary["engine_mode"]) -Context "selected_candidate.json.metrics"
+    foreach ($metricField in @($script:SharedProfile["selected_candidate_metric_fields"])) {
+        $fieldName = [string]$metricField
+        Assert-FieldEquals -Data $metrics -FieldName $fieldName -ExpectedValue ([string]$Summary[$fieldName]) -Context "selected_candidate.json.metrics"
+    }
 
     if ($selectedExplanation.ContainsKey("winner")) {
         if (-not ($selectedExplanation["winner"] -is [hashtable])) {
@@ -507,43 +515,40 @@ function Assert-CoreArtifacts {
     Assert-FieldPresent -Data $infeasibilitySummary -FieldName "total_infeasible_candidates" -Context "infeasibility_summary.json"
 }
 
-function Assert-EngineComparisonPolicy {
+function Assert-EngineComparisonArtifacts {
     param(
-        [Parameter(Mandatory = $true)]
-        [hashtable]$EngineComparison,
         [Parameter(Mandatory = $true)]
         [string]$ResolvedOutputDir
     )
 
-    foreach ($field in @("execution_policy", "runtime")) {
-        Assert-FieldPresent -Data $EngineComparison -FieldName $field -Context "engine_comparison.json"
+    $engineComparisonPath = Join-Path $ResolvedOutputDir "engine_comparison.json"
+    $engineComparison = Read-JsonFile -PathValue $engineComparisonPath
+
+    foreach ($field in @($script:SharedProfile["engine_comparison_required_fields"])) {
+        Assert-FieldPresent -Data $engineComparison -FieldName ([string]$field) -Context "engine_comparison.json"
     }
-    if (-not ($EngineComparison["execution_policy"] -is [hashtable])) {
+    if (-not ($engineComparison["execution_policy"] -is [hashtable])) {
         throw "engine_comparison.json.execution_policy não está no formato esperado."
     }
-    if (-not ($EngineComparison["runtime"] -is [hashtable])) {
+    if (-not ($engineComparison["runtime"] -is [hashtable])) {
         throw "engine_comparison.json.runtime não está no formato esperado."
     }
 
-    $executionPolicy = $EngineComparison["execution_policy"]
-    $runtime = $EngineComparison["runtime"]
+    $executionPolicy = $engineComparison["execution_policy"]
+    $runtime = $engineComparison["runtime"]
+    $expectedRuntime = $script:ProfileConfig["summary_expectations"]
+    foreach ($pair in $expectedRuntime["runtime_string_fields"].GetEnumerator()) {
+        Assert-FieldEquals -Data $executionPolicy -FieldName ([string]$pair.Key) -ExpectedValue ([string]$pair.Value) -Context "engine_comparison.json.execution_policy"
+        Assert-FieldEquals -Data $runtime -FieldName ([string]$pair.Key) -ExpectedValue ([string]$pair.Value) -Context "engine_comparison.json.runtime"
+    }
+    foreach ($pair in $expectedRuntime["runtime_boolean_fields"].GetEnumerator()) {
+        Assert-BooleanValue -Data $executionPolicy -FieldName ([string]$pair.Key) -ExpectedValue ([bool]$pair.Value) -Context "engine_comparison.json.execution_policy"
+        Assert-BooleanValue -Data $runtime -FieldName ([string]$pair.Key) -ExpectedValue ([bool]$pair.Value) -Context "engine_comparison.json.runtime"
+    }
     Assert-TelemetryFields -Runtime $runtime -Context "engine_comparison.json.runtime"
 
-    Assert-BooleanValue -Data $executionPolicy -FieldName "official_gate_valid" -ExpectedValue $false -Context "engine_comparison.json.execution_policy"
-    Assert-FieldEquals -Data $executionPolicy -FieldName "execution_mode" -ExpectedValue "diagnostic" -Context "engine_comparison.json.execution_policy"
-    Assert-BooleanValue -Data $runtime -FieldName "official_gate_valid" -ExpectedValue $false -Context "engine_comparison.json.runtime"
-    Assert-FieldEquals -Data $runtime -FieldName "execution_mode" -ExpectedValue "diagnostic" -Context "engine_comparison.json.runtime"
-
-    if ($DisableRealJuliaProbe) {
-        Assert-BooleanValue -Data $executionPolicy -FieldName "real_julia_probe_disabled" -ExpectedValue $true -Context "engine_comparison.json.execution_policy"
-        Assert-BooleanValue -Data $runtime -FieldName "real_julia_probe_disabled" -ExpectedValue $true -Context "engine_comparison.json.runtime"
-    }
-
     $engineComparisonCandidatesPath = Join-Path $ResolvedOutputDir "engine_comparison_candidates.csv"
-    if (-not (Test-ArtifactExists -PathValue $engineComparisonCandidatesPath)) {
-        throw ("Artefato obrigatório ausente: {0}" -f $engineComparisonCandidatesPath)
-    }
-    $engineComparisonCandidates = Import-Csv -LiteralPath $engineComparisonCandidatesPath
+    $engineComparisonCandidates = @(Import-Csv -LiteralPath $engineComparisonCandidatesPath)
     if ($engineComparisonCandidates.Count -le 0) {
         throw "engine_comparison_candidates.csv precisa conter ao menos uma linha."
     }
@@ -551,10 +556,34 @@ function Assert-EngineComparisonPolicy {
         throw "engine_comparison_candidates.csv precisa conter a coluna engine."
     }
     $engineNames = @($engineComparisonCandidates | ForEach-Object { [string]$_.engine } | Sort-Object -Unique)
-    foreach ($expectedEngine in @("julia", "python")) {
-        if ($engineNames -notcontains $expectedEngine) {
-            throw ("engine_comparison_candidates.csv precisa conter o engine '{0}'." -f $expectedEngine)
+    foreach ($expectedEngine in @($script:SharedProfile["engine_comparison_candidate_engines"])) {
+        if ($engineNames -notcontains [string]$expectedEngine) {
+            throw ("engine_comparison_candidates.csv precisa conter o engine '{0}'." -f [string]$expectedEngine)
         }
+    }
+}
+
+function Assert-ProfileArtifacts {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ResolvedOutputDir
+    )
+
+    foreach ($artifact in @($script:ProfileConfig["artifacts"]["required"])) {
+        $artifactPath = Join-Path $ResolvedOutputDir ([string]$artifact)
+        if (-not (Test-ArtifactExists -PathValue $artifactPath)) {
+            throw ("Artefato obrigatório ausente: {0}" -f $artifactPath)
+        }
+    }
+    foreach ($artifact in @($script:ProfileConfig["artifacts"]["forbidden"])) {
+        $artifactPath = Join-Path $ResolvedOutputDir ([string]$artifact)
+        if (Test-ArtifactExists -PathValue $artifactPath) {
+            throw ("Artefato proibido encontrado para o perfil {0}: {1}" -f $script:ValidationProfile, $artifactPath)
+        }
+    }
+
+    if (@($script:ProfileConfig["artifacts"]["required"]).Count -gt 0) {
+        Assert-EngineComparisonArtifacts -ResolvedOutputDir $ResolvedOutputDir
     }
 }
 
@@ -577,21 +606,20 @@ try {
         if (-not (Test-Path -LiteralPath $script:PythonExe) -and -not $DryRun) {
             throw ("Python da virtualenv não encontrado: {0}" -f $script:PythonExe)
         }
-        if ($Mode -eq "official" -and $IncludeEngineComparison) {
-            throw "O modo official não aceita --include-engine-comparison."
+
+        if ([bool]$script:ProfileConfig["reject_disable_real_julia_probe_flag"] -and $DisableRealJuliaProbe) {
+            throw ("O perfil {0} não aceita -DisableRealJuliaProbe." -f $script:ValidationProfile)
         }
-        if ($Mode -eq "official" -and $DisableRealJuliaProbe) {
-            throw "O modo official não aceita override diagnóstico da sonda Julia."
+        if ([bool]$script:ProfileConfig["require_disable_real_julia_probe_flag"] -and -not $DisableRealJuliaProbe) {
+            throw ("O perfil {0} exige -DisableRealJuliaProbe." -f $script:ValidationProfile)
         }
-        if ($Mode -eq "diagnostic" -and -not $DisableRealJuliaProbe) {
-            throw "O gate canônico de diagnostic da fase 0 exige -DisableRealJuliaProbe para marcar explicitamente que a execução não compõe o caminho oficial."
+        if ([bool]$script:ProfileConfig["reject_process_probe_override"] -and [Environment]::GetEnvironmentVariable($script:ProbeOverrideEnv, "Process")) {
+            throw ("{0} está ativo no processo atual. O perfil {1} exige Julia-only sem override diagnóstico." -f $script:ProbeOverrideEnv, $script:ValidationProfile)
         }
-        if ($Mode -eq "official" -and [Environment]::GetEnvironmentVariable($script:ProbeOverrideEnv, "Process")) {
-            throw ("{0} está ativo no processo atual. O modo official exige Julia-only sem override diagnóstico." -f $script:ProbeOverrideEnv)
-        }
-        if ($Mode -eq "official" -and -not (Test-Path -LiteralPath $script:JuliaDepotDir) -and -not $DryRun) {
+        if ([bool]$script:ProfileConfig["use_julia_depot"] -and -not (Test-Path -LiteralPath $script:JuliaDepotDir) -and -not $DryRun) {
             throw ("Diretório do depot Julia não encontrado: {0}" -f $script:JuliaDepotDir)
         }
+
         $preparedScenarioDir = Prepare-ScenarioForMode
 
         if ((Test-Path -LiteralPath $resolvedOutputDir) -and -not $DryRun) {
@@ -604,8 +632,8 @@ try {
         return @{
             output_dir = $resolvedOutputDir
             scenario_dir = $preparedScenarioDir
-            mode = $Mode
-            validation_profile = $script:ValidationProfile
+            profile = $script:ValidationProfile
+            profile_description = $script:ProfileConfig["description"]
         }
     }
 
@@ -648,7 +676,6 @@ try {
     }
 
     Invoke-Step -Name "4. Validar artefatos principais" -Action {
-        $summaryPath = Join-Path $resolvedOutputDir "summary.json"
         if ($DryRun) {
             return @{
                 output_dir = $resolvedOutputDir
@@ -656,7 +683,7 @@ try {
             }
         }
 
-        $summary = Read-JsonFile -PathValue $summaryPath
+        $summary = Read-JsonFile -PathValue (Join-Path $resolvedOutputDir "summary.json")
         Assert-CoreArtifacts -ResolvedOutputDir $resolvedOutputDir -Summary $summary
         return @{
             output_dir = $resolvedOutputDir
@@ -665,60 +692,19 @@ try {
         }
     }
 
-    Invoke-Step -Name "5. Validar artefatos diagnósticos" -Action {
-        $engineComparisonPath = Join-Path $resolvedOutputDir "engine_comparison.json"
-        $engineComparisonCandidatesPath = Join-Path $resolvedOutputDir "engine_comparison_candidates.csv"
-        $engineComparisonExists = Test-ArtifactExists -PathValue $engineComparisonPath
-        $engineComparisonCandidatesExists = Test-ArtifactExists -PathValue $engineComparisonCandidatesPath
-
-        if ($Mode -eq "official") {
-            if ($engineComparisonExists) {
-                throw ("engine_comparison.json não pode existir no modo official: {0}" -f $engineComparisonPath)
-            }
-            if ($engineComparisonCandidatesExists) {
-                throw ("engine_comparison_candidates.csv não pode existir no modo official: {0}" -f $engineComparisonCandidatesPath)
-            }
+    Invoke-Step -Name "5. Validar artefatos do perfil" -Action {
+        if ($DryRun) {
             return @{
-                engine_comparison_expected = $false
-                engine_comparison_found = $engineComparisonExists
-                engine_comparison_candidates_found = $engineComparisonCandidatesExists
+                profile = $script:ValidationProfile
+                simulated = $true
             }
         }
 
-        if ($IncludeEngineComparison) {
-            if (-not $engineComparisonExists -and -not $DryRun) {
-                throw ("engine_comparison.json era obrigatório no modo diagnostic com comparação explícita: {0}" -f $engineComparisonPath)
-            }
-            if ($DryRun) {
-                return @{
-                    engine_comparison_expected = $true
-                    engine_comparison_found = $true
-                    simulated = $true
-                }
-            }
-
-            $engineComparison = Read-JsonFile -PathValue $engineComparisonPath
-            Assert-EngineComparisonPolicy -EngineComparison $engineComparison -ResolvedOutputDir $resolvedOutputDir
-            return @{
-                engine_comparison_expected = $true
-                engine_comparison_found = $true
-                engine_comparison_candidates_found = $true
-                execution_mode = $engineComparison["runtime"]["execution_mode"]
-                official_gate_valid = $engineComparison["runtime"]["official_gate_valid"]
-            }
-        }
-
-        if ($engineComparisonExists) {
-            throw ("engine_comparison.json não pode existir sem comparação explícita no modo diagnostic: {0}" -f $engineComparisonPath)
-        }
-        if ($engineComparisonCandidatesExists) {
-            throw ("engine_comparison_candidates.csv não pode existir sem comparação explícita no modo diagnostic: {0}" -f $engineComparisonCandidatesPath)
-        }
-
+        Assert-ProfileArtifacts -ResolvedOutputDir $resolvedOutputDir
         return @{
-            engine_comparison_expected = $false
-            engine_comparison_found = $false
-            engine_comparison_candidates_found = $false
+            profile = $script:ValidationProfile
+            required = @($script:ProfileConfig["artifacts"]["required"])
+            forbidden = @($script:ProfileConfig["artifacts"]["forbidden"])
         }
     }
 }

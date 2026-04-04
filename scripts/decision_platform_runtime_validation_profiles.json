@@ -1,0 +1,189 @@
+{
+  "probe_override_env": "DECISION_PLATFORM_DISABLE_REAL_JULIA_PROBE",
+  "shared": {
+    "summary_required_fields": [
+      "candidate_count",
+      "selected_candidate_id",
+      "engine_requested",
+      "engine_used",
+      "engine_mode",
+      "execution_mode",
+      "official_gate_valid",
+      "real_julia_probe_disabled",
+      "runtime_policy_mode",
+      "runtime_policy_message",
+      "runtime"
+    ],
+    "runtime_required_fields": [
+      "started_at",
+      "finished_at",
+      "duration_s",
+      "execution_mode",
+      "official_gate_valid",
+      "real_julia_probe_disabled",
+      "policy_mode",
+      "policy_message"
+    ],
+    "core_artifacts": [
+      "selected_candidate.json",
+      "selected_candidate_routes.json",
+      "selected_candidate_score_breakdown.json",
+      "selected_candidate_bom.csv",
+      "selected_candidate_render.json",
+      "selected_candidate_explanation.json",
+      "selected_candidate_explanation.md",
+      "family_summary.csv",
+      "infeasibility_summary.json"
+    ],
+    "selected_candidate_metric_fields": [
+      "engine_requested",
+      "engine_used",
+      "engine_mode"
+    ],
+    "engine_comparison_required_fields": [
+      "execution_policy",
+      "runtime"
+    ],
+    "engine_comparison_candidate_engines": [
+      "julia",
+      "python"
+    ]
+  },
+  "profiles": {
+    "official": {
+      "description": "Official Julia-only gate",
+      "mode": "official",
+      "default_output_dir": "data/output/decision_platform/runtime_validation_official",
+      "allow_diagnostic_python_emulation": false,
+      "include_engine_comparison": false,
+      "require_disable_real_julia_probe_flag": false,
+      "reject_disable_real_julia_probe_flag": true,
+      "reject_process_probe_override": true,
+      "use_julia_depot": true,
+      "set_probe_override_env": null,
+      "scenario_fallback_override": null,
+      "summary_expectations": {
+        "string_fields": {
+          "execution_mode": "official",
+          "runtime_policy_mode": "official_julia_only"
+        },
+        "boolean_fields": {
+          "official_gate_valid": true,
+          "real_julia_probe_disabled": false
+        },
+        "runtime_string_fields": {
+          "execution_mode": "official",
+          "policy_mode": "official_julia_only"
+        },
+        "runtime_boolean_fields": {
+          "official_gate_valid": true,
+          "real_julia_probe_disabled": false
+        },
+        "contains": []
+      },
+      "artifacts": {
+        "required": [],
+        "forbidden": [
+          "engine_comparison.json",
+          "engine_comparison_candidates.csv"
+        ]
+      }
+    },
+    "diagnostic": {
+      "description": "Diagnostic lean profile with explicit probe override",
+      "mode": "diagnostic",
+      "default_output_dir": "data/output/decision_platform/runtime_validation_diagnostic",
+      "allow_diagnostic_python_emulation": true,
+      "include_engine_comparison": false,
+      "require_disable_real_julia_probe_flag": true,
+      "reject_disable_real_julia_probe_flag": false,
+      "reject_process_probe_override": false,
+      "use_julia_depot": false,
+      "set_probe_override_env": "1",
+      "scenario_fallback_override": "python_emulated_julia",
+      "summary_expectations": {
+        "string_fields": {
+          "execution_mode": "diagnostic",
+          "runtime_policy_mode": "diagnostic_override_probe_disabled"
+        },
+        "boolean_fields": {
+          "official_gate_valid": false,
+          "real_julia_probe_disabled": true
+        },
+        "runtime_string_fields": {
+          "execution_mode": "diagnostic",
+          "policy_mode": "diagnostic_override_probe_disabled"
+        },
+        "runtime_boolean_fields": {
+          "official_gate_valid": false,
+          "real_julia_probe_disabled": true
+        },
+        "contains": [
+          {
+            "field": "runtime_policy_message",
+            "text": "DECISION_PLATFORM_DISABLE_REAL_JULIA_PROBE"
+          },
+          {
+            "field": "runtime.policy_message",
+            "text": "DECISION_PLATFORM_DISABLE_REAL_JULIA_PROBE"
+          }
+        ]
+      },
+      "artifacts": {
+        "required": [],
+        "forbidden": [
+          "engine_comparison.json",
+          "engine_comparison_candidates.csv"
+        ]
+      }
+    },
+    "diagnostic_comparison": {
+      "description": "Diagnostic comparison profile with explicit probe override",
+      "mode": "diagnostic",
+      "default_output_dir": "data/output/decision_platform/runtime_validation_diagnostic_comparison",
+      "allow_diagnostic_python_emulation": true,
+      "include_engine_comparison": true,
+      "require_disable_real_julia_probe_flag": true,
+      "reject_disable_real_julia_probe_flag": false,
+      "reject_process_probe_override": false,
+      "use_julia_depot": false,
+      "set_probe_override_env": "1",
+      "scenario_fallback_override": "python_emulated_julia",
+      "summary_expectations": {
+        "string_fields": {
+          "execution_mode": "diagnostic",
+          "runtime_policy_mode": "diagnostic_override_probe_disabled"
+        },
+        "boolean_fields": {
+          "official_gate_valid": false,
+          "real_julia_probe_disabled": true
+        },
+        "runtime_string_fields": {
+          "execution_mode": "diagnostic",
+          "policy_mode": "diagnostic_override_probe_disabled"
+        },
+        "runtime_boolean_fields": {
+          "official_gate_valid": false,
+          "real_julia_probe_disabled": true
+        },
+        "contains": [
+          {
+            "field": "runtime_policy_message",
+            "text": "DECISION_PLATFORM_DISABLE_REAL_JULIA_PROBE"
+          },
+          {
+            "field": "runtime.policy_message",
+            "text": "DECISION_PLATFORM_DISABLE_REAL_JULIA_PROBE"
+          }
+        ]
+      },
+      "artifacts": {
+        "required": [
+          "engine_comparison.json",
+          "engine_comparison_candidates.csv"
+        ],
+        "forbidden": []
+      }
+    }
+  }
+}

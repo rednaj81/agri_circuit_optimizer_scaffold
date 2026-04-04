@@ -100,6 +100,7 @@ Observações:
 
 ### Critério prático de aceite
 
+- `scripts/decision_platform_runtime_validation_profiles.json`
 - `pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode official`
 - `pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode diagnostic -DisableRealJuliaProbe`
 - `pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode diagnostic -DisableRealJuliaProbe -IncludeEngineComparison`
@@ -151,12 +152,17 @@ python -m agri_circuit_optimizer.solve.run_case --scenario data/scenario/maquete
 Fluxo canônico de validação da fase 0:
 
 ```powershell
+# profile: official
 pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode official
+# profile: diagnostic
 pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode diagnostic -DisableRealJuliaProbe
+# profile: diagnostic_comparison
 pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode diagnostic -DisableRealJuliaProbe -IncludeEngineComparison
 ```
 
-O script acima é a referência canônica da fase 0. Quando `make` estiver disponível no host, os alvos `decision-platform-validate-*` apenas encapsulam esse mesmo comando. Ele usa `summary.json` como fonte de verdade, cruza o candidato oficial com os artefatos principais exportados e só aceita `engine_comparison.json` e `engine_comparison_candidates.csv` na trilha diagnóstica com comparação explícita. Use os comandos manuais abaixo apenas como apoio.
+O script acima é a referência canônica da fase 0 e lê a matriz declarativa em `scripts/decision_platform_runtime_validation_profiles.json`. Quando `make` estiver disponível no host, os alvos `decision-platform-validate-*` apenas encapsulam esse mesmo comando. Ele usa `summary.json` como fonte de verdade, cruza o candidato oficial com os artefatos principais exportados e só aceita `engine_comparison.json` e `engine_comparison_candidates.csv` no perfil `diagnostic_comparison`. Use os comandos manuais abaixo apenas como apoio.
+
+A comparação Julia vs Python permanece diagnóstica e exige os dois opt-ins explícitos: `--allow-diagnostic-python-emulation` e `--include-engine-comparison`.
 
 Pipeline oficial Julia-only do cenário `maquete_v2`:
 
@@ -557,12 +563,15 @@ Concluído:
 Fluxo operacional recomendado:
 
 ```powershell
+# profile: official
 pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode official
+# profile: diagnostic
 pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode diagnostic -DisableRealJuliaProbe
+# profile: diagnostic_comparison
 pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode diagnostic -DisableRealJuliaProbe -IncludeEngineComparison
 ```
 
-O script consolidado valida `summary.json` sempre, cruza `selected_candidate.json`, `selected_candidate_routes.json`, `selected_candidate_explanation.json`, `selected_candidate_bom.csv`, `family_summary.csv` e `infeasibility_summary.json` contra o resumo oficial, bloqueia `engine_comparison.json` e `engine_comparison_candidates.csv` no modo oficial e só aceita comparação quando ela foi solicitada explicitamente no modo diagnóstico. O `Makefile` oferece aliases equivalentes quando o executável `make` existir no host.
+O script consolidado valida `summary.json` sempre, aplica o contrato declarativo em `scripts/decision_platform_runtime_validation_profiles.json`, cruza `selected_candidate.json`, `selected_candidate_routes.json`, `selected_candidate_explanation.json`, `selected_candidate_bom.csv`, `family_summary.csv` e `infeasibility_summary.json` contra o resumo oficial, bloqueia `engine_comparison.json` e `engine_comparison_candidates.csv` no perfil `official` e só aceita comparação quando ela foi solicitada explicitamente no perfil `diagnostic_comparison`. O `Makefile` oferece aliases equivalentes quando o executável `make` existir no host.
 
 Suíte rápida:
 

@@ -12,20 +12,23 @@
 ## Matriz de validação da fase 0
 
 Fluxo canônico:
+- contrato declarativo: `scripts/decision_platform_runtime_validation_profiles.json`
 - script-base: `pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1`
-- oficial: `pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode official`
-- diagnóstico lean: `pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode diagnostic -DisableRealJuliaProbe`
-- diagnóstico com comparação: `pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode diagnostic -DisableRealJuliaProbe -IncludeEngineComparison`
+- profile `official`: `pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode official`
+- profile `diagnostic`: `pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode diagnostic -DisableRealJuliaProbe`
+- profile `diagnostic_comparison`: `pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode diagnostic -DisableRealJuliaProbe -IncludeEngineComparison`
 - aliases opcionais quando `make` existir no host: `decision-platform-validate-official`, `decision-platform-validate-diagnostic`, `decision-platform-validate-diagnostic-comparison`
 - fonte de verdade: `summary.json` sempre, `engine_comparison.json` apenas quando a comparação diagnóstica for solicitada
 - o validador remove o diretório de saída antes da run para evitar artefato stale
 - o validador cruza `summary.json` com os artefatos principais do candidato oficial antes de declarar sucesso
-- o validador falha se o modo pedido não bater com a política exportada pelo pipeline
+- o validador falha se o modo pedido não bater com o perfil declarativo e com a política exportada pelo pipeline
 
 ### 1. Gate oficial Julia-only
 - objetivo: provar que o caminho oficial continua fail-closed e exporta o candidato oficial sem fallback implícito
 - comando canônico:
   `pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode official`
+- profile declarativo:
+  `official`
 - alias opcional:
   `make decision-platform-validate-official`
 - comando de teste:
@@ -40,6 +43,8 @@ Fluxo canônico:
 - objetivo: validar exports centrais, coerência do candidato oficial e métricas de rota sem depender do runtime Julia real
 - comando canônico:
   `pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode diagnostic -DisableRealJuliaProbe`
+- profile declarativo:
+  `diagnostic`
 - alias opcional:
   `make decision-platform-validate-diagnostic`
 - comando de teste:
@@ -57,6 +62,8 @@ Fluxo canônico:
 - objetivo: provar que a comparação Julia vs Python continua disponível apenas por opt-in explícito
 - comando canônico:
   `pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode diagnostic -DisableRealJuliaProbe -IncludeEngineComparison`
+- profile declarativo:
+  `diagnostic_comparison`
 - alias opcional:
   `make decision-platform-validate-diagnostic-comparison`
 - comando de teste:
