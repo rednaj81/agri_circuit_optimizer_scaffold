@@ -167,12 +167,12 @@ O script acima é a referência canônica da fase 0 e lê a matriz declarativa e
 
 A comparação Julia vs Python permanece diagnóstica e exige os dois opt-ins explícitos: `--allow-diagnostic-python-emulation` e `--include-engine-comparison`.
 
-Execução reproduzida nesta máquina em 2026-04-04 com o validador canônico:
+Execução reproduzida nesta máquina em 2026-04-04 com a matriz canônica completa:
 
-- `scripts/logs/decision-platform-runtime-validation_official_preflight_20260404-173803-414.json`: `validation_profile=official_preflight`, `validation_flow=preflight`, `validation_sufficiency=triage_only`, `julia_available=true`, `watermodels_available=true`, `official_gate_valid=true`
-- `scripts/logs/decision-platform-runtime-validation_official_20260404-171759-547.json`: `execution_mode=official`, `official_gate_valid=true`, `engine_used=watermodels_jl`, `selected_candidate_id=bus_with_pump_islands__g18m1_1`, sem `engine_comparison.json`
-- `scripts/logs/decision-platform-runtime-validation_diagnostic_20260404-171626-776.json`: `execution_mode=diagnostic`, `official_gate_valid=false`, `engine_used=python_emulated_julia`, `real_julia_probe_disabled=true`
-- `scripts/logs/decision-platform-runtime-validation_diagnostic_comparison_20260404-171626-120.json`: `execution_mode=diagnostic`, `official_gate_valid=false`, `real_julia_probe_disabled=true`, com `engine_comparison.json`
+- `scripts/logs/decision-platform-runtime-validation_official_preflight_20260404-174138-977.json`: `validation_profile=official_preflight`, `validation_flow=preflight`, `validation_sufficiency=triage_only`, `julia_available=true`, `watermodels_available=true`, `official_gate_valid=true`
+- `scripts/logs/decision-platform-runtime-validation_official_20260404-174150-905.json`: `execution_mode=official`, `official_gate_valid=true`, `engine_used=watermodels_jl`, `selected_candidate_id=bus_with_pump_islands__g18m1_1`, sem `engine_comparison.json`
+- `scripts/logs/decision-platform-runtime-validation_diagnostic_20260404-174654-628.json`: `execution_mode=diagnostic`, `official_gate_valid=false`, `engine_used=python_emulated_julia`, `real_julia_probe_disabled=true`, sem `engine_comparison.json`
+- `scripts/logs/decision-platform-runtime-validation_diagnostic_comparison_20260404-174654-321.json`: `execution_mode=diagnostic`, `official_gate_valid=false`, `real_julia_probe_disabled=true`, com `engine_comparison.json`
 
 O artefato `engine_comparison.json` continua sendo apenas diagnóstico. Nesta rodada ele confirmou `comparison_policy.official_runtime=julia_only_fail_closed` e `comparison_policy.python_emulation=diagnostic_only_explicit_opt_in`; ele não deve ser lido como prova do vencedor do perfil `official`.
 

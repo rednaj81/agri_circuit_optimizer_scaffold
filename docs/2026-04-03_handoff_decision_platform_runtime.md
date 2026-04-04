@@ -32,11 +32,10 @@ pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode
 pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode diagnostic -DisableRealJuliaProbe -IncludeEngineComparison
 ```
 
-Suporte automatizado reproduzido no mesmo codebase:
+Suporte automatizado reproduzido nesta wave:
 
 ```powershell
-.\.venv\Scripts\python.exe -m pytest tests\decision_platform\test_run_pipeline_cli.py tests\decision_platform\test_runtime_validation_script.py -q --basetemp tests/_tmp/pytest-basetemp-wave3-target
-.\.venv\Scripts\python.exe -m pytest tests\scripts\test_decision_platform_runtime_validation.py -q --basetemp tests/_tmp/pytest-basetemp-wave4-script-suite
+.\.venv\Scripts\python.exe -m pytest tests\scripts\test_decision_platform_runtime_validation.py -q --basetemp tests/_tmp/pytest-basetemp-wave5-script-suite
 ```
 
 ## Evidencia persistida
@@ -45,7 +44,7 @@ Suporte automatizado reproduzido no mesmo codebase:
 
 Relatorio salvo:
 
-- `scripts/logs/decision-platform-runtime-validation_official_preflight_20260404-173803-414.json`
+- `scripts/logs/decision-platform-runtime-validation_official_preflight_20260404-174138-977.json`
 
 Campos observados no relatorio:
 
@@ -72,7 +71,7 @@ Contrato de perfil observado:
 
 Relatorio salvo:
 
-- `scripts/logs/decision-platform-runtime-validation_official_20260404-171759-547.json`
+- `scripts/logs/decision-platform-runtime-validation_official_20260404-174150-905.json`
 
 Artefatos validados:
 
@@ -106,7 +105,7 @@ Contrato de perfil observado:
 
 Relatorio salvo:
 
-- `scripts/logs/decision-platform-runtime-validation_diagnostic_20260404-171626-776.json`
+- `scripts/logs/decision-platform-runtime-validation_diagnostic_20260404-174654-628.json`
 
 Artefatos validados:
 
@@ -135,7 +134,7 @@ Contrato de perfil observado:
 
 Relatorio salvo:
 
-- `scripts/logs/decision-platform-runtime-validation_diagnostic_comparison_20260404-171626-120.json`
+- `scripts/logs/decision-platform-runtime-validation_diagnostic_comparison_20260404-174654-321.json`
 
 Artefatos validados:
 
