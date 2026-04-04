@@ -23,7 +23,9 @@ phase_0:
     transition_note: "A phase_1 pode iniciar sobre esta base congelada sem reabrir a semantica do gate Julia-only."
 phase_1:
   target: "Normalizar domínio, persistência e cenários"
-  status: "exit_ready"
+  status: "closed"
+  closure_mode: "frozen_after_wave_7"
+  next_phase_id: "phase_2"
   exit_criteria:
     - "cenários versionáveis"
     - "catálogo de componentes persistido"
@@ -35,9 +37,9 @@ phase_1:
     - "Os entrypoints oficiais (`run_decision_pipeline` e `save_and_reopen_local_bundle`) devem continuar falhando fechado para layout legado sem manifesto."
     - "As suítes de contrato já endurecidas (`test_loaders.py`, `test_scenario_contract_validation.py`, `test_component_catalog_contract.py`, `test_scenario_settings_contract.py`) permanecem como sustentação da saída, não como tema reaberto."
   closure_handoff:
-    summary_doc: "docs/2026-04-04_phase1_exit.md"
+    summary_doc: "docs/2026-04-04_phase1_to_phase2_handoff.md"
     freeze_rule: "Phase_2 deve consumir o bundle canônico como baseline congelado; não reabrir persistência, catálogo, rotas, settings, topologia ou layout sem novo handoff objetivo."
-    transition_note: "A phase_1 fica pronta para encerramento formal quando este checklist e a suíte canônica de aceite estiverem verdes no codebase local."
+    transition_note: "A phase_1 está encerrada; a continuidade do programa deve migrar para a phase_2 usando o handoff único desta transição."
 phase_2:
   target: "Entregar studio de nós e arestas"
   exit_criteria:
