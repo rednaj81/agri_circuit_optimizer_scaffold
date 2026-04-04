@@ -63,7 +63,12 @@ Nós:
 - `guide/tasks/` — tarefas numeradas para execução incremental
 - `data/scenario/example/` — cenário-exemplo e contrato de dados
 - `src/agri_circuit_optimizer/` — pacote Python
+- `src/decision_platform/` — plataforma multitopologia orientada a catálogo e decisão
 - `tests/` — testes automatizados
+
+Observações:
+- `src/agri_circuit_optimizer/` continua mantido como baseline legado validado por testes e referência histórica do V1/V2/V3.
+- `src/decision_platform/` é o runtime ativo do cenário `data/decision_platform/maquete_v2/`.
 
 ## Quick start
 
@@ -163,6 +168,7 @@ Regras:
 - o CLI usa esse `selected_candidate_id`
 - a UI abre usando esse `selected_candidate_id`
 - os exports finais usam esse mesmo candidato
+- os exports carregam também metadados de geração/origem do candidato quando disponíveis
 
 Na UI:
 - trocar o perfil recalcula o ranking visível
@@ -292,6 +298,12 @@ Os relatórios de rota incluem:
 - `active_path_edge_ids`
 - `active_path_arc_ids`
 - `active_path_nodes`
+- `total_loss_lpm_equiv`
+- `route_effective_q_max_lpm`
+- `hydraulic_slack_lpm`
+- `bottleneck_component_id`
+- `critical_consequence`
+- `hydraulic_trace`
 
 Os relatórios hidráulicos incluem:
 - `total_loss_lpm_equiv`
@@ -398,6 +410,12 @@ UI local:
 $env:PYTHONPATH = 'src'
 $env:JULIA_DEPOT_PATH = (Resolve-Path 'julia_depot_runtime')
 .\.venv\Scripts\python.exe -m decision_platform.ui_dash.app
+```
+
+Validação visual da UI:
+
+```powershell
+data/output/decision_platform/ui_validation/
 ```
 
 Próximos passos naturais:

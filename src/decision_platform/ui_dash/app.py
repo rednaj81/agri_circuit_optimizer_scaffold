@@ -24,6 +24,12 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
         current_selected_id=result.get("selected_candidate_id") if result else None,
     )
     candidate_details = build_candidate_detail(result, initial_state["selected_candidate_id"]) if result else {}
+    initial_catalog_summary = _build_catalog_state_summary(
+        profile_id=profile_id,
+        selected_candidate_id=initial_state["selected_candidate_id"],
+        ranked_records=initial_state["ranked_records"],
+        filters={},
+    )
 
     app = Dash(__name__)
     app.layout = html.Div(
@@ -94,7 +100,8 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
                                 value="ALL",
                             ),
                             _weight_inputs(bundle),
-                            _table("catalog-grid", pd.DataFrame(initial_state["ranked_records"])),
+                            html.Pre(initial_catalog_summary, id="catalog-state-summary"),
+                            _catalog_grid(initial_state["ranked_records"]),
                             html.Button("Exportar catálogo ranqueado", id="export-catalog-button"),
                             dcc.Download(id="catalog-download"),
                         ],
@@ -126,6 +133,10 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
                                 options=initial_state["selected_options"],
                                 value=initial_state["selected_candidate_id"],
                             ),
+                            html.Pre(
+                                json.dumps(candidate_details.get("summary", {}), indent=2, ensure_ascii=False),
+                                id="selected-candidate-summary",
+                            ),
                             html.Button("Exportar candidato selecionado", id="export-selected-button"),
                             dcc.Download(id="selected-candidate-download"),
                             cyto.Cytoscape(
@@ -134,6 +145,7 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
                                 layout={"name": "preset"},
                                 style={"width": "100%", "height": "520px"},
                             ),
+                            _route_grid(candidate_details.get("route_rows", [])),
                         ],
                     ),
                     dcc.Tab(
@@ -178,6 +190,7 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
         Output("selected-candidate-dropdown", "value"),
         Output("compare-candidates-dropdown", "options"),
         Output("compare-candidates-dropdown", "value"),
+        Output("catalog-state-summary", "children"),
         Input("profile-dropdown", "value"),
         Input("family-dropdown", "value"),
         Input("feasible-only-checklist", "value"),
@@ -210,9 +223,9 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
         operability_weight: Any,
         current_selected_id: str | None,
         current_compare_ids: Any,
-    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], str | None, list[dict[str, Any]], list[str]]:
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], str | None, list[dict[str, Any]], list[str], str]:
         if not result:
-            return [], [], None, [], []
+            return [], [], None, [], [], json.dumps({}, ensure_ascii=False)
         weights = {
             "cost_weight": cost_weight,
             "quality_weight": quality_weight,
@@ -234,24 +247,46 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
             current_selected_id=current_selected_id,
             current_compare_ids=current_compare_ids,
         )
+        filters = {
+            "family": family,
+            "feasible_only": "feasible_only" in (feasible_only or []),
+            "max_cost": max_cost,
+            "min_quality": min_quality,
+            "min_resilience": min_resilience,
+            "fallback_filter": fallback_filter,
+            "weight_overrides": weights,
+        }
         return (
             view_state["ranked_records"],
             view_state["selected_options"],
             view_state["selected_candidate_id"],
             view_state["comparison_options"],
             view_state["comparison_ids"],
+            _build_catalog_state_summary(
+                profile_id=profile,
+                selected_candidate_id=view_state["selected_candidate_id"],
+                ranked_records=view_state["ranked_records"],
+                filters=filters,
+            ),
         )
 
     @app.callback(
         Output("circuit-cytoscape", "elements"),
+        Output("route-metrics-grid", "rowData"),
+        Output("selected-candidate-summary", "children"),
         Output("candidate-breakdown", "children"),
         Input("selected-candidate-dropdown", "value"),
     )
-    def _update_selected_candidate(candidate_id: str) -> tuple[list[dict[str, Any]], str]:
+    def _update_selected_candidate(candidate_id: str) -> tuple[list[dict[str, Any]], list[dict[str, Any]], str, str]:
         if not result or not candidate_id:
-            return [], json.dumps({}, ensure_ascii=False)
+            return [], [], json.dumps({}, ensure_ascii=False), json.dumps({}, ensure_ascii=False)
         detail = build_candidate_detail(result, candidate_id)
-        return detail["cytoscape_elements"], json.dumps(detail["breakdown"], indent=2, ensure_ascii=False)
+        return (
+            detail["cytoscape_elements"],
+            detail["route_rows"],
+            json.dumps(detail["summary"], indent=2, ensure_ascii=False),
+            json.dumps(detail["breakdown"], indent=2, ensure_ascii=False),
+        )
 
     @app.callback(
         Output("comparison-figure", "figure"),
@@ -336,6 +371,8 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
         payload = {
             "candidate_id": candidate_id,
             "topology_family": candidate["topology_family"],
+            "generation_source": candidate.get("generation_source"),
+            "generation_metadata": candidate.get("generation_metadata", {}),
             "metrics": candidate["metrics"],
             "render": candidate["render"],
             "breakdown": detail["breakdown"],
@@ -453,14 +490,42 @@ def filter_catalog_records(
 
 def build_candidate_detail(result: dict[str, Any] | None, candidate_id: str | None) -> dict[str, Any]:
     if not result or not candidate_id:
-        return {"cytoscape_elements": [], "breakdown": {}}
+        return {"cytoscape_elements": [], "breakdown": {}, "summary": {}, "route_rows": []}
     candidate = next(item for item in result["catalog"] if item["candidate_id"] == candidate_id)
     metrics = candidate["metrics"]
+    route_rows = [
+        {
+            "route_id": route["route_id"],
+            "feasible": route["feasible"],
+            "reason": route["reason"],
+            "required_flow_lpm": route["required_flow_lpm"],
+            "delivered_flow_lpm": route["delivered_flow_lpm"],
+            "route_effective_q_max_lpm": route.get("route_effective_q_max_lpm"),
+            "hydraulic_slack_lpm": route.get("hydraulic_slack_lpm"),
+            "total_loss_lpm_equiv": route.get("total_loss_lpm_equiv"),
+            "bottleneck_component_id": route.get("bottleneck_component_id"),
+            "critical_consequence": route.get("critical_consequence"),
+        }
+        for route in metrics.get("route_metrics", [])
+    ]
     return {
         "cytoscape_elements": candidate["render"]["cytoscape_elements"],
+        "summary": {
+            "candidate_id": candidate_id,
+            "topology_family": candidate["topology_family"],
+            "generation_source": candidate.get("generation_source"),
+            "lineage_label": candidate.get("generation_metadata", {}).get("lineage_label"),
+            "engine_used": metrics.get("engine_used"),
+            "engine_mode": metrics.get("engine_mode"),
+            "install_cost": metrics["install_cost"],
+            "score_final": _lookup_score(result, candidate_id),
+        },
+        "route_rows": route_rows,
         "breakdown": {
             "candidate_id": candidate_id,
             "topology_family": candidate["topology_family"],
+            "generation_source": candidate.get("generation_source"),
+            "generation_metadata": candidate.get("generation_metadata", {}),
             "engine_requested": metrics.get("engine_requested"),
             "engine_used": metrics.get("engine_used"),
             "engine_mode": metrics.get("engine_mode"),
@@ -474,6 +539,7 @@ def build_candidate_detail(result: dict[str, Any] | None, candidate_id: str | No
             "quality_flags": metrics.get("quality_flags", []),
             "rules_triggered": metrics.get("rules_triggered", []),
             "selection_log": candidate["payload"].get("selection_log", []),
+            "route_hydraulic_summary": route_rows,
         },
     }
 
@@ -530,6 +596,51 @@ def _table(component_id: str, frame: pd.DataFrame) -> Any:
     )
 
 
+def _catalog_grid(records: list[dict[str, Any]]) -> Any:
+    columns = [
+        {"field": "candidate_id"},
+        {"field": "topology_family"},
+        {"field": "generation_source"},
+        {"field": "lineage_label"},
+        {"field": "origin_family"},
+        {"field": "generation_index"},
+        {"field": "was_repaired"},
+        {"field": "feasible"},
+        {"field": "score_final"},
+        {"field": "install_cost"},
+        {"field": "quality_score_raw"},
+        {"field": "resilience_score"},
+        {"field": "fallback_component_count"},
+    ]
+    return dag.AgGrid(
+        id="catalog-grid",
+        columnDefs=columns,
+        rowData=records,
+        dashGridOptions={"pagination": True, "animateRows": True},
+    )
+
+
+def _route_grid(records: list[dict[str, Any]]) -> Any:
+    columns = [
+        {"field": "route_id"},
+        {"field": "feasible"},
+        {"field": "reason"},
+        {"field": "required_flow_lpm"},
+        {"field": "delivered_flow_lpm"},
+        {"field": "route_effective_q_max_lpm"},
+        {"field": "hydraulic_slack_lpm"},
+        {"field": "total_loss_lpm_equiv"},
+        {"field": "bottleneck_component_id"},
+        {"field": "critical_consequence"},
+    ]
+    return dag.AgGrid(
+        id="route-metrics-grid",
+        columnDefs=columns,
+        rowData=records,
+        dashGridOptions={"pagination": True, "animateRows": True},
+    )
+
+
 def _weight_inputs(bundle: Any) -> Any:
     profile = bundle.weight_profiles.loc[
         bundle.weight_profiles["profile_id"] == bundle.scenario_settings["ranking"]["default_profile"]
@@ -552,6 +663,31 @@ def _send_text_download(content: str, filename: str) -> Any:
     if callable(sender):  # pragma: no branch
         return sender(content, filename)
     return {"content": content, "filename": filename}
+
+
+def _build_catalog_state_summary(
+    *,
+    profile_id: str,
+    selected_candidate_id: str | None,
+    ranked_records: list[dict[str, Any]],
+    filters: dict[str, Any],
+) -> str:
+    summary = {
+        "profile_id": profile_id,
+        "selected_candidate_id": selected_candidate_id,
+        "visible_candidate_count": len(ranked_records),
+        "top_visible_candidate_id": ranked_records[0]["candidate_id"] if ranked_records else None,
+        "filters": filters,
+    }
+    return json.dumps(summary, indent=2, ensure_ascii=False)
+
+
+def _lookup_score(result: dict[str, Any], candidate_id: str) -> float | None:
+    ranked = result.get("ranked_profiles", {}).get(result.get("default_profile_id"), [])
+    for record in ranked:
+        if record["candidate_id"] == candidate_id:
+            return float(record.get("score_final", 0.0))
+    return None
 
 
 def _weight_overrides_active(weight_overrides: dict[str, Any] | None) -> bool:

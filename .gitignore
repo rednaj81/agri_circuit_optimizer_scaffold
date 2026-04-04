@@ -22,3 +22,8 @@ julia_depot_runtime/
 runtime_artifacts_manual/
 runtime_artifacts_test/
 julia/smoke_runtime.jl
+scripts/logs/*.json
+data/output/decision_platform/ui_validation/
+artifacts/
+chrome/
+chromedriver/

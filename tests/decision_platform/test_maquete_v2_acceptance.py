@@ -35,6 +35,8 @@ def test_maquete_v2_pipeline_exports_and_route_metrics() -> None:
         assert infeasible
         assert any(route["cleaning_volume_l"] >= 0 for item in feasible for route in item["metrics"]["route_metrics"])
         assert any(route["selected_meter_id"] for item in feasible for route in item["metrics"]["route_metrics"] if route["feasible"])
+        assert any("total_loss_lpm_equiv" in route for item in feasible for route in item["metrics"]["route_metrics"])
+        assert any("bottleneck_component_id" in route for item in feasible for route in item["metrics"]["route_metrics"])
         assert any(item["metrics"]["quality_score_breakdown"] for item in feasible)
         assert any(item["payload"]["selection_log"] for item in feasible)
 
@@ -55,7 +57,9 @@ def test_maquete_v2_pipeline_exports_and_route_metrics() -> None:
 
         assert summary["default_profile_id"] == result["default_profile_id"]
         assert summary["selected_candidate_id"] == result["selected_candidate_id"]
+        assert summary["selected_generation_source"] == result["selected_candidate"]["generation_source"]
         assert selected_candidate["candidate_id"] == result["selected_candidate_id"]
+        assert "generation_metadata" in selected_candidate
         assert selected_routes["candidate_id"] == result["selected_candidate_id"]
         assert selected_render["candidate_id"] == result["selected_candidate_id"]
         assert selected_breakdown["candidate_id"] == result["selected_candidate_id"]
@@ -65,6 +69,8 @@ def test_maquete_v2_pipeline_exports_and_route_metrics() -> None:
         assert selected_render["topology_family"] == selected_candidate["topology_family"]
         assert selected_render["render"] == selected_candidate["render"]
         assert selected_routes["routes"] == selected_candidate["metrics"]["route_metrics"]
+        assert all("route_effective_q_max_lpm" in route for route in selected_routes["routes"])
+        assert all("critical_consequence" in route for route in selected_routes["routes"])
     finally:
         if output_dir.exists():
             shutil.rmtree(output_dir)

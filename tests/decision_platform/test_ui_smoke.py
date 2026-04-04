@@ -40,8 +40,11 @@ def test_dash_app_uses_pipeline_result_when_fallback_is_allowed() -> None:
         app = build_app(scenario_dir)
         assert hasattr(app, "layout")
         assert app.layout is not None
-        detail = build_candidate_detail(run_decision_pipeline(scenario_dir), None)
+        result = run_decision_pipeline(scenario_dir)
+        detail = build_candidate_detail(result, result["selected_candidate_id"])
         assert "breakdown" in detail
+        assert detail["summary"]["candidate_id"] == result["selected_candidate_id"]
+        assert detail["route_rows"]
     finally:
         cleanup_scenario_copy(scenario_dir)
 
@@ -64,6 +67,7 @@ def test_ui_view_state_uses_official_selected_candidate_instead_of_catalog_first
         assert view_state["selected_candidate_id"] == result["selected_candidate_id"]
         assert view_state["selected_candidate_id"] != manipulated["catalog"][0]["candidate_id"]
         assert detail["cytoscape_elements"] == result["selected_candidate"]["render"]["cytoscape_elements"]
+        assert detail["summary"]["generation_source"] == result["selected_candidate"]["generation_source"]
     finally:
         cleanup_scenario_copy(scenario_dir)
 

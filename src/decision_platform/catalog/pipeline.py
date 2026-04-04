@@ -9,7 +9,7 @@ import pandas as pd
 
 from decision_platform.catalog.quality_rules import apply_quality_rules
 from decision_platform.data_io.loader import ScenarioBundle
-from decision_platform.graph_generation.generator import generate_candidate_topologies
+from decision_platform.graph_generation.generator import generate_candidate_topology_bundle
 from decision_platform.graph_repair.repair import normalize_candidate
 from decision_platform.julia_bridge.bridge import evaluate_candidates_via_bridge
 from decision_platform.ranking.scoring import apply_weight_profile
@@ -18,7 +18,9 @@ from decision_platform.scenario_engine.installer import build_candidate_payload
 
 
 def build_solution_catalog(bundle: ScenarioBundle) -> dict[str, Any]:
-    candidates = [normalize_candidate(candidate, bundle) for candidate in generate_candidate_topologies(bundle)]
+    generation_bundle = generate_candidate_topology_bundle(bundle)
+    generation_report = generation_bundle["report"]
+    candidates = [normalize_candidate(candidate, bundle) for candidate in generation_bundle["candidates"]]
     payloads = [build_candidate_payload(candidate, bundle) for candidate in candidates]
     metrics_list = [
         apply_quality_rules(metrics, bundle)
@@ -32,6 +34,7 @@ def build_solution_catalog(bundle: ScenarioBundle) -> dict[str, Any]:
                 "candidate_id": candidate["candidate_id"],
                 "topology_family": candidate["topology_family"],
                 "generation_source": candidate["generation_source"],
+                "generation_metadata": candidate.get("metadata", {}),
                 "installed_link_ids": candidate["installed_link_ids"],
                 "payload": payload,
                 "metrics": metrics,
@@ -44,6 +47,10 @@ def build_solution_catalog(bundle: ScenarioBundle) -> dict[str, Any]:
                 "candidate_id": item["candidate_id"],
                 "topology_family": item["topology_family"],
                 "generation_source": item["generation_source"],
+                "lineage_label": str(item["generation_metadata"].get("lineage_label", item["generation_source"])),
+                "origin_family": str(item["generation_metadata"].get("origin_family", item["topology_family"])),
+                "generation_index": int(item["generation_metadata"].get("generation", 0)),
+                "was_repaired": bool(item["generation_metadata"].get("repaired", False)),
                 "feasible": bool(item["metrics"]["feasible"]),
                 "install_cost": float(item["metrics"]["install_cost"]),
                 "fallback_cost": float(item["metrics"]["fallback_cost"]),
@@ -69,7 +76,7 @@ def build_solution_catalog(bundle: ScenarioBundle) -> dict[str, Any]:
         evaluated,
         ranked_profiles.get(default_profile_id, []),
     )
-    summary = _build_catalog_summary(candidates, evaluated)
+    summary = _build_catalog_summary(candidates, evaluated, generation_report)
     return {
         "scenario_id": bundle.scenario_settings.get("scenario_id", bundle.base_dir.name),
         "catalog": evaluated,
@@ -79,6 +86,7 @@ def build_solution_catalog(bundle: ScenarioBundle) -> dict[str, Any]:
         "selected_candidate_id": selected_candidate_id,
         "selected_candidate": selected_candidate,
         "summary": summary,
+        "generation_report": generation_report,
     }
 
 
@@ -149,6 +157,8 @@ def export_catalog(result: dict[str, Any], output_dir: str | Path) -> dict[str, 
                 {
                     "candidate_id": selected_candidate["candidate_id"],
                     "topology_family": selected_candidate["topology_family"],
+                    "generation_source": selected_candidate.get("generation_source"),
+                    "generation_metadata": selected_candidate.get("generation_metadata", {}),
                     "routes": selected_candidate["metrics"]["route_metrics"],
                 },
                 indent=2,
@@ -168,6 +178,19 @@ def export_catalog(result: dict[str, Any], output_dir: str | Path) -> dict[str, 
                     "quality_flags": selected_candidate["metrics"].get("quality_flags", []),
                     "rules_triggered": selected_candidate["metrics"].get("rules_triggered", []),
                     "selection_log": selected_candidate["payload"].get("selection_log", []),
+                    "route_hydraulic_summary": [
+                        {
+                            "route_id": route.get("route_id"),
+                            "feasible": route.get("feasible"),
+                            "reason": route.get("reason"),
+                            "route_effective_q_max_lpm": route.get("route_effective_q_max_lpm"),
+                            "hydraulic_slack_lpm": route.get("hydraulic_slack_lpm"),
+                            "total_loss_lpm_equiv": route.get("total_loss_lpm_equiv"),
+                            "bottleneck_component_id": route.get("bottleneck_component_id"),
+                            "critical_consequence": route.get("critical_consequence"),
+                        }
+                        for route in selected_candidate["metrics"].get("route_metrics", [])
+                    ],
                 },
                 indent=2,
                 ensure_ascii=False,
@@ -219,6 +242,7 @@ def _json_ready_catalog(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
             "candidate_id": item["candidate_id"],
             "topology_family": item["topology_family"],
             "generation_source": item["generation_source"],
+            "generation_metadata": item.get("generation_metadata", {}),
             "installed_link_ids": item["installed_link_ids"],
             "metrics": item["metrics"],
             "render": item["render"],
@@ -227,11 +251,16 @@ def _json_ready_catalog(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
     ]
 
 
-def _build_catalog_summary(candidates: list[dict[str, Any]], evaluated: list[dict[str, Any]]) -> dict[str, Any]:
+def _build_catalog_summary(
+    candidates: list[dict[str, Any]],
+    evaluated: list[dict[str, Any]],
+    generation_report: dict[str, Any],
+) -> dict[str, Any]:
     family_counts: dict[str, int] = {}
     feasible_by_family: dict[str, int] = {}
     repaired_count = 0
     infeasible_by_reason: dict[str, int] = {}
+    infeasible_routes_by_family: dict[str, int] = {}
     for candidate in candidates:
         family = candidate["topology_family"]
         family_counts[family] = family_counts.get(family, 0) + 1
@@ -245,12 +274,15 @@ def _build_catalog_summary(candidates: list[dict[str, Any]], evaluated: list[dic
                 continue
             reason = str(route.get("reason", "unknown"))
             infeasible_by_reason[reason] = infeasible_by_reason.get(reason, 0) + 1
+            infeasible_routes_by_family[family] = infeasible_routes_by_family.get(family, 0) + 1
     return {
         "candidate_count": len(candidates),
         "candidates_by_family": family_counts,
         "feasible_by_family": feasible_by_family,
+        "infeasible_routes_by_family": infeasible_routes_by_family,
         "repair_rate": round(repaired_count / max(len(candidates), 1), 4),
         "infeasible_rate_by_reason": infeasible_by_reason,
+        "generation_report": generation_report,
     }
 
 
@@ -271,6 +303,8 @@ def _build_decision_summary(
         {
             "selected_candidate_id": selected_candidate["candidate_id"],
             "selected_topology_family": selected_candidate["topology_family"],
+            "selected_generation_source": selected_candidate.get("generation_source"),
+            "selected_lineage_label": selected_candidate.get("generation_metadata", {}).get("lineage_label"),
             "engine_requested": metrics.get("engine_requested"),
             "engine_used": metrics.get("engine_used"),
             "engine_mode": metrics.get("engine_mode"),
