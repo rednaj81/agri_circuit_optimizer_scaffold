@@ -1,0 +1,50 @@
+phase_0:
+  target: "Garantir Julia-only no caminho oficial e documentação honesta"
+  exit_criteria:
+    - "engine oficial falha fechado sem Julia"
+    - "README e docs coerentes"
+  canonical_validation_profiles:
+    - "official_preflight"
+    - "official"
+    - "diagnostic"
+    - "diagnostic_comparison"
+  phase_exit_checklist:
+    - "`official_preflight` deve permanecer `validation_flow=preflight`, `validation_sufficiency=triage_only` e `official_gate_complete=false`."
+    - "`official` deve permanecer o unico gate completo Julia-only com `validation_flow=full`, `validation_sufficiency=official_evidence`, `official_gate_complete=true`, `execution_mode=official`, `official_gate_valid=true` e `engine_used=watermodels_jl`."
+    - "`diagnostic` deve permanecer nao oficial com `validation_flow=full`, `validation_sufficiency=diagnostic_evidence`, `official_gate_complete=false`, `execution_mode=diagnostic`, `official_gate_valid=false` e sem `engine_comparison.json`."
+    - "`diagnostic_comparison` deve permanecer nao oficial com `validation_flow=full`, `validation_sufficiency=diagnostic_evidence`, `official_gate_complete=false`, `execution_mode=diagnostic`, `official_gate_valid=false` e `engine_comparison.json` obrigatorio."
+    - "README e `docs/2026-04-03_handoff_decision_platform_runtime.md` devem apontar para este checklist como fonte unica de saida da phase_0."
+phase_1:
+  target: "Normalizar domínio, persistência e cenários"
+  exit_criteria:
+    - "cenários versionáveis"
+    - "catálogo de componentes persistido"
+phase_2:
+  target: "Entregar studio de nós e arestas"
+  exit_criteria:
+    - "nós editáveis"
+    - "arestas editáveis"
+    - "salvar/reabrir cenário"
+phase_3:
+  target: "Fila e background runs"
+  exit_criteria:
+    - "jobs isolados"
+    - "status por run"
+    - "logs e artefatos"
+phase_4:
+  target: "Profundidade do engine Julia"
+  exit_criteria:
+    - "métricas de rota fortes"
+    - "viabilidade robusta"
+phase_5:
+  target: "UI de decisão humana"
+  exit_criteria:
+    - "comparação lado a lado"
+    - "explicabilidade do vencedor"
+    - "render 2D útil"
+phase_6:
+  target: "Polimento e estabilização"
+  exit_criteria:
+    - "bugs críticos resolvidos"
+    - "testes/execução documentados"
+    - "harden final"

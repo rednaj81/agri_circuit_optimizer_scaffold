@@ -14,10 +14,41 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 PROFILES_PATH = REPO_ROOT / "scripts" / "decision_platform_runtime_validation_profiles.json"
 SCRIPT_PATH = REPO_ROOT / "scripts" / "run_decision_platform_runtime_validation.ps1"
 TEST_LOG_ROOT = REPO_ROOT / "tests" / "_tmp" / "runtime_validation_pytests"
+PHASE_PLAN_PATH = REPO_ROOT / "docs" / "codex_dual_agent_hydraulic_autonomy_bundle" / "automation" / "phase_plan.yaml"
 
 
 def _load_profiles() -> dict:
     return json.loads(PROFILES_PATH.read_text(encoding="utf-8"))
+
+
+EXPECTED_PROFILE_SEMANTICS = {
+    "official_preflight": {
+        "validation_flow": "preflight",
+        "validation_sufficiency": "triage_only",
+        "official_gate_complete": False,
+    },
+    "official": {
+        "validation_flow": "full",
+        "validation_sufficiency": "official_evidence",
+        "official_gate_complete": True,
+        "execution_mode": "official",
+        "official_gate_valid": True,
+    },
+    "diagnostic": {
+        "validation_flow": "full",
+        "validation_sufficiency": "diagnostic_evidence",
+        "official_gate_complete": False,
+        "execution_mode": "diagnostic",
+        "official_gate_valid": False,
+    },
+    "diagnostic_comparison": {
+        "validation_flow": "full",
+        "validation_sufficiency": "diagnostic_evidence",
+        "official_gate_complete": False,
+        "execution_mode": "diagnostic",
+        "official_gate_valid": False,
+    },
+}
 
 
 def _profile_to_args(profile_name: str, profile: dict) -> list[str]:
@@ -72,9 +103,11 @@ def test_runtime_validation_profiles_define_expected_matrix() -> None:
     profiles = _load_profiles()
 
     assert profiles["probe_override_env"] == "DECISION_PLATFORM_DISABLE_REAL_JULIA_PROBE"
-    assert set(profiles["profiles"]) == {"official_preflight", "official", "diagnostic", "diagnostic_comparison"}
-    assert profiles["profiles"]["official_preflight"]["validation_flow"] == "preflight"
-    assert profiles["profiles"]["official_preflight"]["validation_sufficiency"] == "triage_only"
+    assert set(profiles["profiles"]) == set(EXPECTED_PROFILE_SEMANTICS)
+    for profile_name, semantics in EXPECTED_PROFILE_SEMANTICS.items():
+        profile = profiles["profiles"][profile_name]
+        assert profile["validation_flow"] == semantics["validation_flow"]
+        assert profile["validation_sufficiency"] == semantics["validation_sufficiency"]
     assert profiles["profiles"]["official"]["mode"] == "official"
     assert profiles["profiles"]["diagnostic"]["mode"] == "diagnostic"
     assert profiles["profiles"]["diagnostic_comparison"]["include_engine_comparison"] is True
@@ -83,10 +116,47 @@ def test_runtime_validation_profiles_define_expected_matrix() -> None:
 
 
 @pytest.mark.fast
+def test_runtime_validation_profile_semantics_cover_phase0_exit_invariants() -> None:
+    profiles = _load_profiles()["profiles"]
+
+    preflight = profiles["official_preflight"]
+    assert preflight["validation_flow"] == "preflight"
+    assert preflight["validation_sufficiency"] == "triage_only"
+    assert preflight["preflight_expectations"]["boolean_fields"]["official_gate_valid"] is True
+
+    official = profiles["official"]
+    assert official["validation_flow"] == "full"
+    assert official["validation_sufficiency"] == "official_evidence"
+    assert official["summary_expectations"]["string_fields"]["execution_mode"] == "official"
+    assert official["summary_expectations"]["boolean_fields"]["official_gate_valid"] is True
+
+    for profile_name in ("diagnostic", "diagnostic_comparison"):
+        profile = profiles[profile_name]
+        assert profile["validation_flow"] == "full"
+        assert profile["validation_sufficiency"] == "diagnostic_evidence"
+        assert profile["summary_expectations"]["string_fields"]["execution_mode"] == "diagnostic"
+        assert profile["summary_expectations"]["boolean_fields"]["official_gate_valid"] is False
+
+
+@pytest.mark.fast
+def test_phase0_exit_checklist_references_the_same_semantics() -> None:
+    checklist_text = PHASE_PLAN_PATH.read_text(encoding="utf-8")
+
+    assert "phase_exit_checklist" in checklist_text
+    assert "official_preflight" in checklist_text
+    assert "triage_only" in checklist_text
+    assert "official_gate_complete=false" in checklist_text
+    assert "official_gate_complete=true" in checklist_text
+    assert "execution_mode=official" in checklist_text
+    assert "execution_mode=diagnostic" in checklist_text
+
+
+@pytest.mark.fast
 @pytest.mark.parametrize("profile_name", ["official_preflight", "official", "diagnostic", "diagnostic_comparison"])
 def test_runtime_validation_script_uses_declarative_profile_matrix(profile_name: str) -> None:
     profiles = _load_profiles()
     profile = profiles["profiles"][profile_name]
+    semantics = EXPECTED_PROFILE_SEMANTICS[profile_name]
     logs_dir = _make_logs_dir(profile_name)
     try:
         result = _run_validation_script(*_profile_to_args(profile_name, profile), logs_dir=logs_dir)
@@ -96,7 +166,9 @@ def test_runtime_validation_script_uses_declarative_profile_matrix(profile_name:
         report = _read_single_report(logs_dir)
         assert report["success"] is True
         assert report["validation_profile"] == profile_name
+        assert report["validation_flow"] == semantics["validation_flow"]
         assert report["validation_sufficiency"] == profile["validation_sufficiency"]
+        assert report["official_gate_complete"] is semantics["official_gate_complete"]
         assert report["profile_config_path"].endswith("decision_platform_runtime_validation_profiles.json")
         assert report["steps"][-1]["status"] == "passed"
         if profile["validation_flow"] == "preflight":
@@ -147,6 +219,7 @@ def test_runtime_validation_script_blocks_probe_override_for_official_preflight(
         report = _read_single_report(logs_dir)
         assert report["success"] is False
         assert report["validation_profile"] == "official_preflight"
+        assert report["official_gate_complete"] is False
         assert report["steps"][0]["status"] == "failed"
         assert profiles["probe_override_env"] in report["steps"][0]["error"]
     finally:

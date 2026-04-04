@@ -16,10 +16,16 @@ Escopo deste documento:
 
 Este documento nao reabre arquitetura funcional de V1/V2/V3.
 
+Checklist unico de saida da phase_0:
+
+- `docs/codex_dual_agent_hydraulic_autonomy_bundle/automation/phase_plan.yaml`, chave `phase_0.phase_exit_checklist`
+
+Este handoff operacional deve permanecer coerente com esse checklist. Em caso de divergencia, trate o checklist como fonte de verdade para a saida de fase.
+
 ## Matriz canonica suportada
 
 - `official_preflight`: triagem rapida de ambiente e politica; nao executa o pipeline completo e nao produz evidencia oficial suficiente
-- `official`: gate oficial Julia-only com validacao completa de `summary.json` e artefatos principais
+- `official`: gate oficial Julia-only com validacao completa de `summary.json` e artefatos principais; e o unico perfil que pode aparecer como `official_gate_complete=true`
 - `diagnostic`: trilha diagnostica lean com override explicito de probe Julia real
 - `diagnostic_comparison`: trilha diagnostica com comparacao explicita entre Julia e Python
 
@@ -51,6 +57,7 @@ Campos observados no relatorio:
 - `validation_profile = official_preflight`
 - `validation_flow = preflight`
 - `validation_sufficiency = triage_only`
+- `official_gate_complete = false` no contrato automatizado desta fase
 - `scenario_primary_engine = watermodels_jl`
 - `scenario_fallback_engine = none`
 - `julia_available = true`
@@ -87,6 +94,7 @@ Campos observados em `summary.json`:
 
 - `execution_mode = official`
 - `official_gate_valid = true`
+- `official_gate_complete = true` no contrato automatizado desta fase
 - `engine_requested = watermodels_jl`
 - `engine_used = watermodels_jl`
 - `engine_mode = real_julia`
@@ -116,6 +124,7 @@ Campos observados em `summary.json`:
 
 - `execution_mode = diagnostic`
 - `official_gate_valid = false`
+- `official_gate_complete = false` no contrato automatizado desta fase
 - `engine_requested = watermodels_jl`
 - `engine_used = python_emulated_julia`
 - `engine_mode = fallback_emulated`
@@ -146,6 +155,7 @@ Campos observados em `summary.json`:
 
 - `execution_mode = diagnostic`
 - `official_gate_valid = false`
+- `official_gate_complete = false` no contrato automatizado desta fase
 - `engine_used = python_emulated_julia`
 - `real_julia_probe_disabled = true`
 - `runtime_policy_mode = diagnostic_override_probe_disabled`
@@ -173,6 +183,7 @@ Leitura correta do artefato de comparacao:
 
 - a matriz declarativa suportada pelo validador canônico tem quatro perfis explicitos: `official_preflight`, `official`, `diagnostic` e `diagnostic_comparison`
 - `official_preflight` permanece suportado apenas como triagem rapida e explicitamente insuficiente para evidencia oficial
+- `official_gate_complete=true` e reservado ao perfil `official` no contrato automatizado desta fase
 - o script canonico usa `summary.json` como fonte de verdade e valida os artefatos principais a partir dele
 - o caminho oficial falha fechado se o override diagnostico estiver ativo no processo atual
 - o caminho oficial nao exporta comparacao entre engines

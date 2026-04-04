@@ -54,6 +54,7 @@ $script:Report = [ordered]@{
     profile_description = [string]$script:ProfileConfig["description"]
     validation_flow = [string]$script:ProfileConfig["validation_flow"]
     validation_sufficiency = [string]$script:ProfileConfig["validation_sufficiency"]
+    official_gate_complete = ([string]$script:ProfileConfig["validation_sufficiency"] -eq "official_evidence")
     scenario_dir = $ScenarioDir
     output_dir = $OutputDir
     include_engine_comparison = [bool]$IncludeEngineComparison
