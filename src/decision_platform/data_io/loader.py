@@ -178,6 +178,8 @@ NUMERIC_COLUMNS = {
     "layout_constraints.csv": ("value",),
 }
 
+ALLOWED_ROUTE_GROUPS = {"core", "optional", "service"}
+
 
 def load_scenario_bundle(base_dir: str | Path) -> ScenarioBundle:
     base = Path(base_dir)
@@ -317,6 +319,7 @@ def _validate_bundle(
     routes = tables["route_requirements.csv"]
     components = tables["components.csv"]
     profiles = tables["weight_profiles.csv"]
+    node_directions = nodes.set_index("node_id")[["allow_inbound", "allow_outbound"]]
 
     node_ids = set(nodes["node_id"].tolist())
     link_endpoints = set(links["from_node"].tolist()) | set(links["to_node"].tolist())
@@ -325,6 +328,52 @@ def _validate_bundle(
         raise ValueError(f"candidate_links.csv references unknown nodes: {sorted(link_endpoints - node_ids)}")
     if sorted(route_endpoints - node_ids):
         raise ValueError(f"route_requirements.csv references unknown nodes: {sorted(route_endpoints - node_ids)}")
+    invalid_route_ids = sorted({route_id for route_id in routes["route_id"].tolist() if not str(route_id).strip()})
+    if invalid_route_ids:
+        raise ValueError("route_requirements.csv contains blank route_id values.")
+    duplicate_route_ids = sorted(routes.loc[routes["route_id"].duplicated(keep=False), "route_id"].unique().tolist())
+    if duplicate_route_ids:
+        raise ValueError(f"route_requirements.csv contains duplicated route_id values: {duplicate_route_ids}")
+    invalid_route_groups = sorted(
+        {
+            str(route_group).strip()
+            for route_group in routes["route_group"].tolist()
+            if str(route_group).strip() not in ALLOWED_ROUTE_GROUPS
+        }
+    )
+    if invalid_route_groups:
+        raise ValueError(f"route_requirements.csv contains invalid route_group values: {invalid_route_groups}")
+    sink_direction_violations = routes.loc[
+        routes["sink"].map(lambda node_id: not bool(node_directions.at[node_id, "allow_inbound"])),
+        ["route_id", "sink"],
+    ]
+    if not sink_direction_violations.empty:
+        violations = sink_direction_violations.to_dict("records")
+        raise ValueError(
+            "route_requirements.csv contains routes entering nodes with allow_inbound=false: "
+            f"{violations}"
+        )
+    source_direction_violations = routes.loc[
+        routes["source"].map(lambda node_id: not bool(node_directions.at[node_id, "allow_outbound"])),
+        ["route_id", "source"],
+    ]
+    if not source_direction_violations.empty:
+        violations = source_direction_violations.to_dict("records")
+        raise ValueError(
+            "route_requirements.csv contains routes leaving nodes with allow_outbound=false: "
+            f"{violations}"
+        )
+    dosing_without_measurement = routes.loc[
+        (~routes["measurement_required"])
+        & ((routes["dose_min_l"] > 0) | (routes["dose_error_max_pct"] > 0)),
+        ["route_id", "dose_min_l", "dose_error_max_pct"],
+    ]
+    if not dosing_without_measurement.empty:
+        violations = dosing_without_measurement.to_dict("records")
+        raise ValueError(
+            "route_requirements.csv contains dosing routes without direct measurement: "
+            f"{violations}"
+        )
     if not (
         components.loc[components["category"] == "pump", "is_fallback"].any()
         and components.loc[components["category"] == "meter", "is_fallback"].any()

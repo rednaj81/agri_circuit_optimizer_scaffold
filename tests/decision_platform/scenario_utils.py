@@ -4,8 +4,9 @@ from contextlib import contextmanager
 from copy import deepcopy
 import shutil
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
+import pandas as pd
 import yaml
 
 from decision_platform.julia_bridge.bridge import disable_real_julia_probe
@@ -58,6 +59,20 @@ def cleanup_scenario_copy(target: str | Path) -> None:
     target_path = Path(target)
     if target_path.exists():
         shutil.rmtree(target_path)
+
+
+def update_scenario_table(
+    scenario_dir: str | Path,
+    filename: str,
+    updater: Callable[[pd.DataFrame], pd.DataFrame],
+) -> Path:
+    table_path = Path(scenario_dir) / filename
+    frame = pd.read_csv(table_path)
+    updated = updater(frame.copy())
+    if updated is None:
+        raise ValueError(f"Scenario table updater for '{filename}' must return a DataFrame.")
+    updated.to_csv(table_path, index=False, lineterminator="\n")
+    return table_path
 
 
 @contextmanager
