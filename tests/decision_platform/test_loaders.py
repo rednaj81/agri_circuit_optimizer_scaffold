@@ -12,6 +12,9 @@ def test_maquete_v2_loader_reads_full_contract() -> None:
     bundle = load_scenario_bundle("data/decision_platform/maquete_v2")
 
     assert bundle.scenario_settings["scenario_id"] == "maquete_v2"
+    assert bundle.bundle_version == "decision_platform_scenario_bundle/v1"
+    assert bundle.bundle_manifest_path is not None
+    assert bundle.resolved_files["components.csv"].name == "component_catalog.csv"
     assert set(bundle.topology_rules["families"]) >= {
         "star_manifolds",
         "bus_with_pump_islands",

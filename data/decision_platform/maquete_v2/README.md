@@ -13,4 +13,6 @@ Este cenário é uma base para a nova arquitetura.
 ## Observações
 - os dados são exemplo inicial e podem ser refinados;
 - o objetivo aqui é dar ao Codex uma base concreta de implementação;
-- o cenário precisa ser promovido depois para `data/decision_platform/maquete_v2/`.
+- o cenário já está alinhado ao bundle persistido e deve permanecer versionável por diff;
+- `scenario_bundle.yaml` é o manifesto canônico do bundle persistido;
+- `component_catalog.csv` é o catálogo de componentes canônico e `components.csv` fica como alias legado.

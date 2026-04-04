@@ -1,0 +1,12 @@
+component_id,category,subtype,nominal_diameter_mm,cost,available_qty,is_fallback,quality_base_score,hard_min_lpm,hard_max_lpm,confidence_min_lpm,confidence_max_lpm,forward_loss_pct_when_on,reverse_loss_pct_when_off,cleaning_hold_up_l,can_be_in_series,active_for_reading,notes
+valve_solenoid_g1,valve,solenoid,8,9,9,0,5,0,99999,0,99999,2,100,0.01,1,0,Válvula base
+valve_solenoid_fallback,valve,solenoid_fallback,8,50,999,1,0,0,99999,0,99999,2,100,0.01,1,0,Fallback de válvula
+pump_main_300,pump,suction_main,8,9,3,0,12,0,300,40,280,5,60,0.08,1,0,Bomba principal 300 LPM
+pump_fallback_universal,pump,universal_fallback,8,200,999,1,0,0,99999,0,99999,10,65,0.12,1,0,Bomba fallback ampla
+meter_small_g1,meter,electromagnetic_small,8,9,1,0,12,1,25,3,15,1,100,0.02,1,1,Fluxômetro pequeno
+meter_mid_g1,meter,electromagnetic_mid,8,9,1,0,10,10,80,15,50,1,100,0.02,1,1,Fluxômetro médio
+meter_high_g1,meter,electromagnetic_high,8,9,1,0,8,50,400,80,250,1,100,0.03,1,1,Fluxômetro alto
+meter_fallback_universal,meter,fallback_universal,8,500,999,1,0,0,99999,0,99999,2,100,0.05,1,1,Fluxômetro fallback
+hose_1m_g1,hose,flex_1m,8,0,40,0,0,0,99999,0,99999,1,1,0.03,1,0,Mangueira 1m
+tee_g1,connector,tee,8,0,30,0,0,0,99999,0,99999,3,3,0.01,1,0,Conector T
+check_valve_g1,check_valve,inline,8,0,20,0,4,0,99999,0,99999,2,100,0.01,1,0,Antirretorno

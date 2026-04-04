@@ -11,6 +11,9 @@ import yaml
 @dataclass(frozen=True)
 class ScenarioBundle:
     base_dir: Path
+    bundle_version: str
+    bundle_manifest_path: Path | None
+    resolved_files: dict[str, Path]
     nodes: pd.DataFrame
     components: pd.DataFrame
     candidate_links: pd.DataFrame
@@ -21,6 +24,39 @@ class ScenarioBundle:
     layout_constraints: pd.DataFrame
     topology_rules: dict[str, Any]
     scenario_settings: dict[str, Any]
+
+
+BUNDLE_MANIFEST_FILENAME = "scenario_bundle.yaml"
+SCENARIO_BUNDLE_VERSION = "decision_platform_scenario_bundle/v1"
+
+MANIFEST_TABLE_KEYS = {
+    "nodes": "nodes.csv",
+    "components": "components.csv",
+    "candidate_links": "candidate_links.csv",
+    "edge_component_rules": "edge_component_rules.csv",
+    "route_requirements": "route_requirements.csv",
+    "quality_rules": "quality_rules.csv",
+    "weight_profiles": "weight_profiles.csv",
+    "layout_constraints": "layout_constraints.csv",
+}
+
+MANIFEST_DOCUMENT_KEYS = {
+    "topology_rules": "topology_rules.yaml",
+    "scenario_settings": "scenario_settings.yaml",
+}
+
+DEFAULT_SCENARIO_FILE_ALIASES = {
+    "nodes.csv": ("nodes.csv",),
+    "components.csv": ("component_catalog.csv", "components.csv"),
+    "candidate_links.csv": ("candidate_links.csv",),
+    "edge_component_rules.csv": ("edge_component_rules.csv",),
+    "route_requirements.csv": ("route_requirements.csv",),
+    "quality_rules.csv": ("quality_rules.csv",),
+    "weight_profiles.csv": ("weight_profiles.csv",),
+    "layout_constraints.csv": ("layout_constraints.csv",),
+    "topology_rules.yaml": ("topology_rules.yaml",),
+    "scenario_settings.yaml": ("scenario_settings.yaml",),
+}
 
 
 REQUIRED_TABLES = {
@@ -142,40 +178,28 @@ NUMERIC_COLUMNS = {
     "layout_constraints.csv": ("value",),
 }
 
-DEFAULT_SCENARIO_FILES = (
-    "nodes.csv",
-    "components.csv",
-    "candidate_links.csv",
-    "edge_component_rules.csv",
-    "route_requirements.csv",
-    "quality_rules.csv",
-    "weight_profiles.csv",
-    "layout_constraints.csv",
-    "topology_rules.yaml",
-    "scenario_settings.yaml",
-)
-
 
 def load_scenario_bundle(base_dir: str | Path) -> ScenarioBundle:
     base = Path(base_dir)
-    missing = [name for name in DEFAULT_SCENARIO_FILES if not (base / name).exists()]
-    if missing:
-        raise FileNotFoundError(f"Missing decision platform scenario files: {missing}")
+    bundle_version, manifest_path, resolved_files = _resolve_scenario_files(base)
 
     tables = {
-        filename: _read_table(base / filename, filename)
+        filename: _read_table(resolved_files[filename], filename)
         for filename in REQUIRED_TABLES
     }
 
-    with open(base / "topology_rules.yaml", "r", encoding="utf-8") as fh:
+    with open(resolved_files["topology_rules.yaml"], "r", encoding="utf-8") as fh:
         topology_rules = yaml.safe_load(fh) or {}
-    with open(base / "scenario_settings.yaml", "r", encoding="utf-8") as fh:
+    with open(resolved_files["scenario_settings.yaml"], "r", encoding="utf-8") as fh:
         scenario_settings = yaml.safe_load(fh) or {}
 
     _validate_bundle(tables, topology_rules, scenario_settings)
 
     return ScenarioBundle(
         base_dir=base,
+        bundle_version=bundle_version,
+        bundle_manifest_path=manifest_path,
+        resolved_files=resolved_files,
         nodes=tables["nodes.csv"],
         components=tables["components.csv"],
         candidate_links=tables["candidate_links.csv"],
@@ -187,6 +211,84 @@ def load_scenario_bundle(base_dir: str | Path) -> ScenarioBundle:
         topology_rules=topology_rules,
         scenario_settings=scenario_settings,
     )
+
+
+def _resolve_scenario_files(base_dir: Path) -> tuple[str, Path | None, dict[str, Path]]:
+    manifest_path = base_dir / BUNDLE_MANIFEST_FILENAME
+    if manifest_path.exists():
+        manifest = _load_bundle_manifest(manifest_path)
+        resolved = _resolve_manifest_files(base_dir, manifest)
+        return SCENARIO_BUNDLE_VERSION, manifest_path, resolved
+    return "legacy_directory_layout", None, _resolve_legacy_files(base_dir)
+
+
+def _load_bundle_manifest(path: Path) -> dict[str, Any]:
+    with open(path, "r", encoding="utf-8") as fh:
+        manifest = yaml.safe_load(fh) or {}
+    if not isinstance(manifest, dict):
+        raise ValueError(f"Scenario bundle manifest '{path.name}' must be a mapping.")
+    bundle_version = str(manifest.get("bundle_version", "")).strip()
+    if bundle_version != SCENARIO_BUNDLE_VERSION:
+        raise ValueError(
+            f"Scenario bundle manifest '{path.name}' uses unsupported bundle_version "
+            f"'{bundle_version or '<missing>'}'. Expected '{SCENARIO_BUNDLE_VERSION}'."
+        )
+    return manifest
+
+
+def _resolve_manifest_files(base_dir: Path, manifest: dict[str, Any]) -> dict[str, Path]:
+    tables = manifest.get("tables")
+    documents = manifest.get("documents")
+    if not isinstance(tables, dict):
+        raise ValueError(f"Scenario bundle manifest '{BUNDLE_MANIFEST_FILENAME}' must define a 'tables' mapping.")
+    if not isinstance(documents, dict):
+        raise ValueError(f"Scenario bundle manifest '{BUNDLE_MANIFEST_FILENAME}' must define a 'documents' mapping.")
+    resolved: dict[str, Path] = {}
+    missing_entries: list[str] = []
+    missing_files: list[str] = []
+    for key, filename in MANIFEST_TABLE_KEYS.items():
+        relative_path = str(tables.get(key, "")).strip()
+        if not relative_path:
+            missing_entries.append(f"tables.{key}")
+            continue
+        path = base_dir / relative_path
+        if not path.exists():
+            missing_files.append(relative_path)
+        resolved[filename] = path
+    for key, filename in MANIFEST_DOCUMENT_KEYS.items():
+        relative_path = str(documents.get(key, "")).strip()
+        if not relative_path:
+            missing_entries.append(f"documents.{key}")
+            continue
+        path = base_dir / relative_path
+        if not path.exists():
+            missing_files.append(relative_path)
+        resolved[filename] = path
+    if missing_entries:
+        raise ValueError(
+            f"Scenario bundle manifest '{BUNDLE_MANIFEST_FILENAME}' is missing required entries: {missing_entries}"
+        )
+    if missing_files:
+        raise FileNotFoundError(
+            f"Scenario bundle manifest '{BUNDLE_MANIFEST_FILENAME}' references missing files: {missing_files}"
+        )
+    return resolved
+
+
+def _resolve_legacy_files(base_dir: Path) -> dict[str, Path]:
+    resolved: dict[str, Path] = {}
+    missing: list[str] = []
+    for filename, aliases in DEFAULT_SCENARIO_FILE_ALIASES.items():
+        for candidate_name in aliases:
+            candidate_path = base_dir / candidate_name
+            if candidate_path.exists():
+                resolved[filename] = candidate_path
+                break
+        else:
+            missing.append(filename)
+    if missing:
+        raise FileNotFoundError(f"Missing decision platform scenario files: {missing}")
+    return resolved
 
 
 def _read_table(path: Path, filename: str) -> pd.DataFrame:

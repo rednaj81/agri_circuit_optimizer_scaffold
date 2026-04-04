@@ -1,0 +1,13 @@
+bundle_version: decision_platform_scenario_bundle/v1
+tables:
+  nodes: nodes.csv
+  components: component_catalog.csv
+  candidate_links: candidate_links.csv
+  edge_component_rules: edge_component_rules.csv
+  route_requirements: route_requirements.csv
+  quality_rules: quality_rules.csv
+  weight_profiles: weight_profiles.csv
+  layout_constraints: layout_constraints.csv
+documents:
+  topology_rules: topology_rules.yaml
+  scenario_settings: scenario_settings.yaml
