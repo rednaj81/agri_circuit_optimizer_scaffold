@@ -92,7 +92,7 @@ def test_runtime_validation_script_uses_declarative_profile_matrix(profile_name:
         report = _read_single_report(logs_dir)
         assert report["success"] is True
         assert report["validation_profile"] == profile_name
-        assert report["profiles_path"].endswith("decision_platform_runtime_validation_profiles.json")
+        assert report["profile_config_path"].endswith("decision_platform_runtime_validation_profiles.json")
         assert report["steps"][-1]["status"] == "passed"
     finally:
         shutil.rmtree(logs_dir, ignore_errors=True)
