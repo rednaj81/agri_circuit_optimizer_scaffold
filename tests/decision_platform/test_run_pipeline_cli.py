@@ -35,6 +35,16 @@ def test_cli_rejects_disabled_probe_without_explicit_diagnostic_opt_in(monkeypat
 
 
 @pytest.mark.fast
+def test_cli_rejects_engine_comparison_without_explicit_diagnostic_opt_in() -> None:
+    with pytest.raises(OfficialRuntimeConfigError) as exc:
+        run_decision_pipeline(
+            "data/decision_platform/maquete_v2",
+            include_engine_comparison=True,
+        )
+    assert "--allow-diagnostic-python-emulation" in str(exc.value)
+
+
+@pytest.mark.fast
 def test_run_decision_pipeline_skips_engine_comparison_by_default(monkeypatch) -> None:
     monkeypatch.delenv("DECISION_PLATFORM_DISABLE_REAL_JULIA_PROBE", raising=False)
     bundle = SimpleNamespace(

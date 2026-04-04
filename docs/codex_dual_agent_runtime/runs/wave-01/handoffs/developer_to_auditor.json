@@ -1,0 +1,36 @@
+{
+  "wave_index": 1,
+  "phase_id": "phase_0",
+  "developer_handoff": {
+    "status": "completed",
+    "objective": "Endurecer o gate Julia-only oficial, exigir opt-in diagnostico explicito para qualquer trilha com python_emulated_julia e recolocar o validador canonico em estado coerente com a documentacao.",
+    "changes": [
+      "src/decision_platform/api/run_pipeline.py agora rejeita --include-engine-comparison sem --allow-diagnostic-python-emulation, fechando a brecha onde a comparacao Julia vs Python podia ser acionada sem o opt-in diagnostico explicito.",
+      "scripts/run_decision_platform_runtime_validation.ps1 foi restaurado e alinhado a scripts/decision_platform_runtime_validation_profiles.json; o script usa a matriz declarativa para resolver perfil, ambiente, override de fallback e regras de validacao de artefatos.",
+      "tests/decision_platform/test_run_pipeline_cli.py ganhou regressao para a nova exigencia de opt-in diagnostico explicito.",
+      "tests/decision_platform/test_runtime_validation_script.py cobre o comportamento do validador em DryRun para os perfis official, diagnostic e diagnostic_comparison, alem da rejeicao do perfil diagnostico sem -DisableRealJuliaProbe.",
+      "README.md e docs/2026-04-03_handoff_decision_platform_runtime.md foram ajustados para deixar explicito que a comparacao Julia vs Python exige os dois opt-ins: --allow-diagnostic-python-emulation e --include-engine-comparison."
+    ],
+    "validations": [
+      ".\\.venv\\Scripts\\python.exe -m pytest tests\\decision_platform\\test_run_pipeline_cli.py tests\\decision_platform\\test_runtime_validation_script.py -q --basetemp tests/_tmp/pytest-basetemp-wave1-script-cli -> 9 passed",
+      ".\\.venv\\Scripts\\python.exe -m pytest tests\\decision_platform\\test_run_pipeline_cli.py tests\\decision_platform\\test_julia_bridge.py tests\\decision_platform\\test_runtime_validation_script.py -m \"not requires_julia\" -q --basetemp tests/_tmp/pytest-basetemp-wave1-no-julia -> 16 passed, 1 deselected",
+      ".\\.venv\\Scripts\\python.exe -m pytest tests\\decision_platform\\test_julia_bridge.py::test_bridge_detects_real_julia_runtime_when_available -q --basetemp tests/_tmp/pytest-basetemp-wave1-real-julia -> 1 passed",
+      "pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode official -> passed",
+      "pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode diagnostic -DisableRealJuliaProbe -> passed",
+      "pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode diagnostic -DisableRealJuliaProbe -IncludeEngineComparison -> passed"
+    ],
+    "generated_artifacts": [
+      "data/output/decision_platform/runtime_validation_official/",
+      "data/output/decision_platform/runtime_validation_diagnostic/",
+      "data/output/decision_platform/runtime_validation_diagnostic_comparison/",
+      "scripts/logs/decision-platform-runtime-validation_official_20260404-164449-519.json",
+      "scripts/logs/decision-platform-runtime-validation_diagnostic_20260404-165143-695.json",
+      "scripts/logs/decision-platform-runtime-validation_diagnostic_comparison_20260404-165227-552.json"
+    ],
+    "limitations": [
+      "A validacao official continua depender de Julia real, WaterModels, JuMP e HiGHS operacionais no host.",
+      "O workspace continua com muitos arquivos nao versionados fora do escopo desta onda; o commit deve isolar apenas os arquivos tocados por esta entrega."
+    ],
+    "next_role": "Auditor"
+  }
+}

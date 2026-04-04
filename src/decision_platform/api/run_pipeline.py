@@ -25,11 +25,12 @@ def run_decision_pipeline(
 ) -> dict[str, Any]:
     started_at = datetime.now(UTC)
     bundle = load_scenario_bundle(scenario_dir)
+    should_build_engine_comparison = False if include_engine_comparison is None else include_engine_comparison
     _validate_runtime_policy(
         bundle,
         allow_diagnostic_python_emulation=allow_diagnostic_python_emulation,
+        include_engine_comparison=should_build_engine_comparison,
     )
-    should_build_engine_comparison = False if include_engine_comparison is None else include_engine_comparison
     runtime_policy = _build_runtime_policy(
         allow_diagnostic_python_emulation=allow_diagnostic_python_emulation,
         include_engine_comparison=should_build_engine_comparison,
@@ -96,8 +97,14 @@ def _validate_runtime_policy(
     bundle: ScenarioBundle,
     *,
     allow_diagnostic_python_emulation: bool,
+    include_engine_comparison: bool,
 ) -> None:
     probe_disabled = real_julia_probe_disabled()
+    if include_engine_comparison and not allow_diagnostic_python_emulation:
+        raise OfficialRuntimeConfigError(
+            "Diagnostic engine comparison uses python_emulated_julia and requires explicit "
+            "--allow-diagnostic-python-emulation opt-in."
+        )
     if probe_disabled and not allow_diagnostic_python_emulation:
         raise OfficialRuntimeConfigError(
             f"{DISABLE_REAL_JULIA_PROBE_ENV}=1 disabled the real Julia probe. "

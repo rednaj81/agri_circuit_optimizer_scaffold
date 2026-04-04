@@ -365,7 +365,7 @@ function Prepare-ScenarioForMode {
         $updatedContent = [regex]::Replace(
             $settingsContent,
             "(?m)^(\s*fallback:\s*).+$",
-            ('${1}{0}' -f [string]$fallbackOverride),
+            ('${1}' + [string]$fallbackOverride),
             1
         )
         Set-Content -LiteralPath $settingsPath -Value $updatedContent -Encoding utf8

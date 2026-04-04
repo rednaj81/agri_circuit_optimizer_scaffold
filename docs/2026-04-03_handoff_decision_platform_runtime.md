@@ -245,6 +245,16 @@ $env:JULIA_DEPOT_PATH=(Resolve-Path 'julia_depot_runtime')
 .\.venv\Scripts\python.exe -m decision_platform.api.run_pipeline --scenario data/decision_platform/maquete_v2 --output-dir data/output/decision_platform/maquete_v2
 ```
 
+Comparação diagnóstica explícita:
+
+```powershell
+$env:PYTHONPATH='src'
+$env:DECISION_PLATFORM_DISABLE_REAL_JULIA_PROBE='1'
+.\.venv\Scripts\python.exe -m decision_platform.api.run_pipeline --scenario data/decision_platform/maquete_v2 --output-dir data/output/decision_platform/maquete_v2_diag --allow-diagnostic-python-emulation --include-engine-comparison
+```
+
+Observação: `--include-engine-comparison` não habilita sozinho a trilha diagnóstica; a comparação exige opt-in explícito com `--allow-diagnostic-python-emulation`.
+
 UI local:
 
 ```powershell
