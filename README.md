@@ -182,6 +182,7 @@ Persistência local introduzida na phase 1:
 - `save_authored_scenario_bundle(...)` persiste as tabelas de autoria (`nodes`, `components`, `candidate_links`, `edge_component_rules`, `route_requirements`, `layout_constraints`) e os documentos `topology_rules.yaml` e `scenario_settings.yaml` no mesmo bundle canônico
 - a aba `Dados` da UI local expõe um fluxo único de `Salvar e reabrir bundle` para gravar e reabrir esse bundle sem depender só do estado de sessão
 - o loader falha fechado para `candidate_links.csv` com `link_id` vazio/duplicado, self-loop, `archetype` sem regra correspondente e `family_hint` fora das famílias conhecidas/habilitadas
+- `docs/2026-04-04_phase1_exit.md` e `phase_1.phase_exit_checklist` em `docs/codex_dual_agent_hydraulic_autonomy_bundle/automation/phase_plan.yaml` são a fonte única de saída da phase 1
 
 Execução reproduzida nesta máquina em 2026-04-04 e consolidada pelo manifesto `docs/codex_dual_agent_runtime/phase_0_validation_manifest.json`. O artefato `engine_comparison.json` continua sendo apenas diagnóstico e nunca substitui a validação oficial do profile `official`.
 
