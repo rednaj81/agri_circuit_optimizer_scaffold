@@ -75,6 +75,23 @@ def update_scenario_table(
     return table_path
 
 
+def update_scenario_yaml(
+    scenario_dir: str | Path,
+    filename: str,
+    updater: Callable[[dict[str, Any]], dict[str, Any]],
+) -> Path:
+    yaml_path = Path(scenario_dir) / filename
+    payload = yaml.safe_load(yaml_path.read_text(encoding="utf-8")) or {}
+    updated = updater(deepcopy(payload))
+    if updated is None:
+        raise ValueError(f"Scenario YAML updater for '{filename}' must return a mapping.")
+    yaml_path.write_text(
+        yaml.safe_dump(updated, sort_keys=False, allow_unicode=True),
+        encoding="utf-8",
+    )
+    return yaml_path
+
+
 @contextmanager
 def diagnostic_runtime_test_mode():
     with disable_real_julia_probe():

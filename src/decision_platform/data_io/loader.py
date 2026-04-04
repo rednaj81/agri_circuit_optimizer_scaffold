@@ -179,6 +179,7 @@ NUMERIC_COLUMNS = {
 }
 
 ALLOWED_ROUTE_GROUPS = {"core", "optional", "service"}
+ALLOWED_PROJECT_MODES = {"decision_platform"}
 SUPPORTED_COMPONENT_CATEGORIES = {
     "check_valve",
     "connector",
@@ -188,6 +189,23 @@ SUPPORTED_COMPONENT_CATEGORIES = {
     "valve",
 }
 ALLOWED_FALLBACK_COMPONENT_CATEGORIES = {"meter", "pump", "valve"}
+TOPOLOGY_BOOLEAN_FIELDS = {
+    "enabled",
+    "allow_cycles",
+    "allow_parallel_bypass",
+    "allow_idle_pumps_on_path",
+    "allow_idle_meters_on_path",
+}
+TOPOLOGY_POSITIVE_INTEGER_FIELDS = {
+    "max_active_pumps_per_route",
+    "max_reading_meters_per_route",
+}
+REQUIRED_LAYOUT_GLOBAL_KEYS = {
+    "hose_module_m",
+    "max_total_hose_m",
+    "max_active_pumps_per_route",
+    "max_reading_meters_per_route",
+}
 
 
 def load_scenario_bundle(base_dir: str | Path) -> ScenarioBundle:
@@ -386,6 +404,9 @@ def _validate_bundle(
         )
     _validate_component_catalog(components)
     _validate_edge_component_rules(edge_rules, components)
+    _validate_scenario_settings(scenario_settings, topology_rules, profiles)
+    _validate_topology_rules(topology_rules, scenario_settings)
+    _validate_layout_constraints(tables["layout_constraints.csv"], topology_rules, scenario_settings)
     if not (
         components.loc[components["category"] == "pump", "is_fallback"].any()
         and components.loc[components["category"] == "meter", "is_fallback"].any()
@@ -395,13 +416,6 @@ def _validate_bundle(
         raise ValueError("components.csv contains hard range with max < min.")
     if any(components["confidence_max_lpm"] < components["confidence_min_lpm"]):
         raise ValueError("components.csv contains confidence range with max < min.")
-    enabled_families = scenario_settings.get("enabled_families", [])
-    known_families = set((topology_rules.get("families") or {}).keys())
-    if not enabled_families:
-        raise ValueError("scenario_settings.yaml must list enabled_families.")
-    unknown_families = sorted(set(enabled_families) - known_families)
-    if unknown_families:
-        raise ValueError(f"enabled_families not declared in topology_rules.yaml: {unknown_families}")
     weight_sum = profiles[
         [
             "cost_weight",
@@ -503,6 +517,67 @@ def _validate_component_catalog(components: pd.DataFrame) -> None:
         )
 
 
+def _validate_scenario_settings(
+    scenario_settings: dict[str, Any],
+    topology_rules: dict[str, Any],
+    profiles: pd.DataFrame,
+) -> None:
+    scenario_id = str(scenario_settings.get("scenario_id", "")).strip()
+    if not scenario_id:
+        raise ValueError("scenario_settings.yaml must define a non-empty scenario_id.")
+    project_mode = str(scenario_settings.get("project_mode", "")).strip()
+    if project_mode not in ALLOWED_PROJECT_MODES:
+        raise ValueError(
+            f"scenario_settings.yaml project_mode must be one of {sorted(ALLOWED_PROJECT_MODES)}."
+        )
+    enabled_families = scenario_settings.get("enabled_families")
+    if not isinstance(enabled_families, list) or not enabled_families:
+        raise ValueError("scenario_settings.yaml must list enabled_families.")
+    normalized_enabled_families = [str(family).strip() for family in enabled_families]
+    if any(not family for family in normalized_enabled_families):
+        raise ValueError("scenario_settings.yaml enabled_families cannot contain blank values.")
+    duplicate_families = sorted(
+        {
+            family
+            for family in normalized_enabled_families
+            if normalized_enabled_families.count(family) > 1
+        }
+    )
+    if duplicate_families:
+        raise ValueError(
+            f"scenario_settings.yaml enabled_families contains duplicate values: {duplicate_families}"
+        )
+    known_families = set((topology_rules.get("families") or {}).keys())
+    unknown_families = sorted(set(normalized_enabled_families) - known_families)
+    if unknown_families:
+        raise ValueError(f"enabled_families not declared in topology_rules.yaml: {unknown_families}")
+    ranking = scenario_settings.get("ranking")
+    if not isinstance(ranking, dict):
+        raise ValueError("scenario_settings.yaml must define a ranking mapping.")
+    default_profile = str(ranking.get("default_profile", "")).strip()
+    if not default_profile:
+        raise ValueError("scenario_settings.yaml ranking.default_profile must be non-empty.")
+    known_profiles = set(profiles["profile_id"].tolist())
+    if default_profile not in known_profiles:
+        raise ValueError(
+            "scenario_settings.yaml ranking.default_profile must reference an existing weight_profiles.csv profile_id."
+        )
+    storage = scenario_settings.get("storage")
+    if storage is not None:
+        if not isinstance(storage, dict):
+            raise ValueError("scenario_settings.yaml storage must be a mapping when present.")
+        bundle_manifest = str(storage.get("bundle_manifest", "")).strip()
+        component_catalog = str(storage.get("component_catalog", "")).strip()
+        if bundle_manifest != BUNDLE_MANIFEST_FILENAME:
+            raise ValueError(
+                "scenario_settings.yaml storage.bundle_manifest must match the canonical bundle manifest filename."
+            )
+        if component_catalog != "component_catalog.csv":
+            raise ValueError(
+                "scenario_settings.yaml storage.component_catalog must match the canonical component catalog filename."
+            )
+
+
 def _validate_edge_component_rules(edge_rules: pd.DataFrame, components: pd.DataFrame) -> None:
     known_catalog_categories = set(components["category"].tolist())
     duplicate_rule_ids = sorted(
@@ -554,6 +629,73 @@ def _validate_edge_component_rules(edge_rules: pd.DataFrame, components: pd.Data
                 "edge_component_rules.csv has categories marked as both required and optional: "
                 f"rule_id={rule['rule_id']} categories={overlapping}"
             )
+
+
+def _validate_topology_rules(topology_rules: dict[str, Any], scenario_settings: dict[str, Any]) -> None:
+    families = topology_rules.get("families")
+    if not isinstance(families, dict) or not families:
+        raise ValueError("topology_rules.yaml must define a non-empty families mapping.")
+    enabled_families = [str(family).strip() for family in scenario_settings.get("enabled_families", [])]
+    for family_name in enabled_families:
+        family_rules = families.get(family_name)
+        if not isinstance(family_rules, dict):
+            raise ValueError(
+                f"topology_rules.yaml must declare a mapping for enabled family '{family_name}'."
+            )
+        for field_name in TOPOLOGY_BOOLEAN_FIELDS:
+            field_value = family_rules.get(field_name)
+            if not isinstance(field_value, bool):
+                raise ValueError(
+                    f"topology_rules.yaml family '{family_name}' field '{field_name}' must be boolean."
+                )
+        if not bool(family_rules.get("enabled")):
+            raise ValueError(
+                f"topology_rules.yaml family '{family_name}' must have enabled=true when listed in enabled_families."
+            )
+        for field_name in TOPOLOGY_POSITIVE_INTEGER_FIELDS:
+            field_value = family_rules.get(field_name)
+            if not isinstance(field_value, int) or isinstance(field_value, bool) or field_value <= 0:
+                raise ValueError(
+                    f"topology_rules.yaml family '{family_name}' field '{field_name}' must be a positive integer."
+                )
+
+
+def _validate_layout_constraints(
+    layout_constraints: pd.DataFrame,
+    topology_rules: dict[str, Any],
+    scenario_settings: dict[str, Any],
+) -> None:
+    duplicate_rule_ids = sorted(
+        layout_constraints.loc[layout_constraints["rule_id"].duplicated(keep=False), "rule_id"].unique().tolist()
+    )
+    if duplicate_rule_ids:
+        raise ValueError(f"layout_constraints.csv contains duplicated rule_id values: {duplicate_rule_ids}")
+    global_constraints = layout_constraints.loc[layout_constraints["scope"] == "global"].copy()
+    global_keys = set(global_constraints["key"].tolist())
+    missing_global_keys = sorted(REQUIRED_LAYOUT_GLOBAL_KEYS - global_keys)
+    if missing_global_keys:
+        raise ValueError(
+            f"layout_constraints.csv is missing required global keys: {missing_global_keys}"
+        )
+    global_values = global_constraints.set_index("key")["value"]
+    hose_module_m = float(global_values["hose_module_m"])
+    max_total_hose_m = float(global_values["max_total_hose_m"])
+    max_active_pumps = float(global_values["max_active_pumps_per_route"])
+    max_reading_meters = float(global_values["max_reading_meters_per_route"])
+    if hose_module_m <= 0:
+        raise ValueError("layout_constraints.csv key 'hose_module_m' must be positive.")
+    if max_total_hose_m <= 0 or max_total_hose_m < hose_module_m:
+        raise ValueError(
+            "layout_constraints.csv key 'max_total_hose_m' must be positive and at least hose_module_m."
+        )
+    if not float(max_active_pumps).is_integer() or max_active_pumps <= 0:
+        raise ValueError(
+            "layout_constraints.csv key 'max_active_pumps_per_route' must be a positive integer."
+        )
+    if not float(max_reading_meters).is_integer() or max_reading_meters <= 0:
+        raise ValueError(
+            "layout_constraints.csv key 'max_reading_meters_per_route' must be a positive integer."
+        )
 
 
 def _split_pipe(value: Any) -> list[str]:

@@ -18,3 +18,4 @@ Este cenário é uma base para a nova arquitetura.
 - `component_catalog.csv` é o catálogo de componentes canônico e `components.csv` fica como alias legado.
 - o contrato de rotas é fail-closed: não entram rotas em nós com `allow_inbound=0`, não saem rotas de nós com `allow_outbound=0` e dosagem exige `measurement_required=1`.
 - o contrato do catálogo/regras também é fail-closed: categorias do catálogo e de `edge_component_rules.csv` precisam permanecer canônicas, componentes de medição precisam ser legíveis e regras não podem declarar categorias fora do domínio ou fora de `allowed_categories`.
+- settings, topologia e layout também são validados de forma fail-closed: `scenario_settings.yaml`, `topology_rules.yaml` e `layout_constraints.csv` precisam manter ids, famílias, perfis e limites estruturais explícitos e coerentes.
