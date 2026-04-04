@@ -179,6 +179,15 @@ NUMERIC_COLUMNS = {
 }
 
 ALLOWED_ROUTE_GROUPS = {"core", "optional", "service"}
+SUPPORTED_COMPONENT_CATEGORIES = {
+    "check_valve",
+    "connector",
+    "hose",
+    "meter",
+    "pump",
+    "valve",
+}
+ALLOWED_FALLBACK_COMPONENT_CATEGORIES = {"meter", "pump", "valve"}
 
 
 def load_scenario_bundle(base_dir: str | Path) -> ScenarioBundle:
@@ -318,6 +327,7 @@ def _validate_bundle(
     links = tables["candidate_links.csv"]
     routes = tables["route_requirements.csv"]
     components = tables["components.csv"]
+    edge_rules = tables["edge_component_rules.csv"]
     profiles = tables["weight_profiles.csv"]
     node_directions = nodes.set_index("node_id")[["allow_inbound", "allow_outbound"]]
 
@@ -374,6 +384,8 @@ def _validate_bundle(
             "route_requirements.csv contains dosing routes without direct measurement: "
             f"{violations}"
         )
+    _validate_component_catalog(components)
+    _validate_edge_component_rules(edge_rules, components)
     if not (
         components.loc[components["category"] == "pump", "is_fallback"].any()
         and components.loc[components["category"] == "meter", "is_fallback"].any()
@@ -409,6 +421,143 @@ def _validate_bundle(
         raise ValueError("scenario_settings.yaml hydraulic_engine.primary must be 'watermodels_jl' or 'python_emulated_julia'.")
     if fallback_engine not in {"none", "python_emulated_julia"}:
         raise ValueError("scenario_settings.yaml hydraulic_engine.fallback must be 'none' or 'python_emulated_julia'.")
+
+
+def _validate_component_catalog(components: pd.DataFrame) -> None:
+    duplicate_component_ids = sorted(
+        components.loc[components["component_id"].duplicated(keep=False), "component_id"].unique().tolist()
+    )
+    if duplicate_component_ids:
+        raise ValueError(f"components.csv contains duplicated component_id values: {duplicate_component_ids}")
+    invalid_component_ids = sorted(
+        {component_id for component_id in components["component_id"].tolist() if not str(component_id).strip()}
+    )
+    if invalid_component_ids:
+        raise ValueError("components.csv contains blank component_id values.")
+    unknown_categories = sorted(set(components["category"].tolist()) - SUPPORTED_COMPONENT_CATEGORIES)
+    if unknown_categories:
+        raise ValueError(f"components.csv contains unsupported categories: {unknown_categories}")
+    invalid_cost_components = components.loc[components["cost"] < 0, ["component_id", "cost"]]
+    if not invalid_cost_components.empty:
+        raise ValueError(
+            "components.csv contains negative cost values: "
+            f"{invalid_cost_components.to_dict('records')}"
+        )
+    invalid_qty_components = components.loc[
+        (components["available_qty"] <= 0)
+        | (~components["available_qty"].map(lambda value: float(value).is_integer())),
+        ["component_id", "available_qty"],
+    ]
+    if not invalid_qty_components.empty:
+        raise ValueError(
+            "components.csv contains invalid available_qty values: "
+            f"{invalid_qty_components.to_dict('records')}"
+        )
+    invalid_fallback_categories = components.loc[
+        components["is_fallback"] & ~components["category"].isin(ALLOWED_FALLBACK_COMPONENT_CATEGORIES),
+        ["component_id", "category"],
+    ]
+    if not invalid_fallback_categories.empty:
+        raise ValueError(
+            "components.csv contains fallback components with unsupported categories: "
+            f"{invalid_fallback_categories.to_dict('records')}"
+        )
+    invalid_reading_components = components.loc[
+        components["active_for_reading"] & (components["category"] != "meter"),
+        ["component_id", "category"],
+    ]
+    if not invalid_reading_components.empty:
+        raise ValueError(
+            "components.csv contains non-meter components flagged for active reading: "
+            f"{invalid_reading_components.to_dict('records')}"
+        )
+    unreadable_meters = components.loc[
+        (components["category"] == "meter") & (~components["active_for_reading"]),
+        ["component_id"],
+    ]
+    if not unreadable_meters.empty:
+        raise ValueError(
+            "components.csv contains meter components with active_for_reading=false: "
+            f"{unreadable_meters.to_dict('records')}"
+        )
+    meter_range_violations = components.loc[
+        (components["category"] == "meter")
+        & (
+            (components["hard_max_lpm"] <= 0)
+            | (components["confidence_max_lpm"] <= 0)
+            | (components["confidence_min_lpm"] < components["hard_min_lpm"])
+            | (components["confidence_max_lpm"] > components["hard_max_lpm"])
+        ),
+        [
+            "component_id",
+            "hard_min_lpm",
+            "hard_max_lpm",
+            "confidence_min_lpm",
+            "confidence_max_lpm",
+        ],
+    ]
+    if not meter_range_violations.empty:
+        raise ValueError(
+            "components.csv contains meter components with incoherent reading ranges: "
+            f"{meter_range_violations.to_dict('records')}"
+        )
+
+
+def _validate_edge_component_rules(edge_rules: pd.DataFrame, components: pd.DataFrame) -> None:
+    known_catalog_categories = set(components["category"].tolist())
+    duplicate_rule_ids = sorted(
+        edge_rules.loc[edge_rules["rule_id"].duplicated(keep=False), "rule_id"].unique().tolist()
+    )
+    if duplicate_rule_ids:
+        raise ValueError(f"edge_component_rules.csv contains duplicated rule_id values: {duplicate_rule_ids}")
+    for rule in edge_rules.to_dict("records"):
+        allowed = set(_split_pipe(rule["allowed_categories"]))
+        required = set(_split_pipe(rule["required_categories"]))
+        optional = set(_split_pipe(rule["optional_categories"]))
+        if not allowed:
+            raise ValueError(
+                "edge_component_rules.csv contains rules with empty allowed_categories: "
+                f"{rule['rule_id']}"
+            )
+        if not required:
+            raise ValueError(
+                "edge_component_rules.csv contains rules with empty required_categories: "
+                f"{rule['rule_id']}"
+            )
+        unsupported = sorted((allowed | required | optional) - SUPPORTED_COMPONENT_CATEGORIES)
+        if unsupported:
+            raise ValueError(
+                "edge_component_rules.csv contains unsupported categories: "
+                f"rule_id={rule['rule_id']} categories={unsupported}"
+            )
+        missing_from_catalog = sorted((allowed | required | optional) - known_catalog_categories)
+        if missing_from_catalog:
+            raise ValueError(
+                "edge_component_rules.csv references categories absent from component catalog: "
+                f"rule_id={rule['rule_id']} categories={missing_from_catalog}"
+            )
+        missing_required = sorted(required - allowed)
+        if missing_required:
+            raise ValueError(
+                "edge_component_rules.csv has required_categories outside allowed_categories: "
+                f"rule_id={rule['rule_id']} categories={missing_required}"
+            )
+        missing_optional = sorted(optional - allowed)
+        if missing_optional:
+            raise ValueError(
+                "edge_component_rules.csv has optional_categories outside allowed_categories: "
+                f"rule_id={rule['rule_id']} categories={missing_optional}"
+            )
+        overlapping = sorted(required & optional)
+        if overlapping:
+            raise ValueError(
+                "edge_component_rules.csv has categories marked as both required and optional: "
+                f"rule_id={rule['rule_id']} categories={overlapping}"
+            )
+
+
+def _split_pipe(value: Any) -> list[str]:
+    return [item.strip() for item in str(value).split("|") if item.strip()]
 
 
 def _parse_bool(value: Any) -> bool:

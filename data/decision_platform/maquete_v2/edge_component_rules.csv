@@ -1,5 +1,5 @@
 rule_id,archetype,allowed_categories,required_categories,optional_categories,max_series_pumps,max_reading_meters,notes
-R01,tank_tap,valve|hose|connector,valve|hose,check_valve|connector,0,0,Tap valvulado
+R01,tank_tap,valve|hose|connector|check_valve,valve|hose,check_valve|connector,0,0,Tap valvulado
 R02,supply_tap,valve|hose|check_valve|connector,valve|hose,check_valve|connector,0,0,Fonte
 R03,outlet_tap,valve|hose|connector,valve|hose,connector,0,0,Saída
 R04,service_tap,valve|hose|connector,valve|hose,connector,0,0,Serviço
