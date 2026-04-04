@@ -206,6 +206,12 @@ REQUIRED_LAYOUT_GLOBAL_KEYS = {
     "max_active_pumps_per_route",
     "max_reading_meters_per_route",
 }
+FAMILY_HINT_ALIASES = {
+    "star": "star_manifolds",
+    "bus": "bus_with_pump_islands",
+    "loop": "loop_ring",
+    "hybrid": "hybrid_free",
+}
 
 
 def load_scenario_bundle(base_dir: str | Path) -> ScenarioBundle:
@@ -240,7 +246,6 @@ def load_scenario_bundle(base_dir: str | Path) -> ScenarioBundle:
         topology_rules=topology_rules,
         scenario_settings=scenario_settings,
     )
-
 
 def _resolve_scenario_files(base_dir: Path) -> tuple[str, Path | None, dict[str, Path]]:
     manifest_path = base_dir / BUNDLE_MANIFEST_FILENAME
@@ -405,6 +410,7 @@ def _validate_bundle(
     _validate_component_catalog(components)
     _validate_edge_component_rules(edge_rules, components)
     _validate_scenario_settings(scenario_settings, topology_rules, profiles)
+    _validate_candidate_links(links, edge_rules, topology_rules, scenario_settings)
     _validate_topology_rules(topology_rules, scenario_settings)
     _validate_layout_constraints(tables["layout_constraints.csv"], topology_rules, scenario_settings)
     if not (
@@ -631,6 +637,69 @@ def _validate_edge_component_rules(edge_rules: pd.DataFrame, components: pd.Data
             )
 
 
+def _validate_candidate_links(
+    links: pd.DataFrame,
+    edge_rules: pd.DataFrame,
+    topology_rules: dict[str, Any],
+    scenario_settings: dict[str, Any],
+) -> None:
+    blank_link_ids = sorted({link_id for link_id in links["link_id"].tolist() if not str(link_id).strip()})
+    if blank_link_ids:
+        raise ValueError("candidate_links.csv contains blank link_id values.")
+    duplicate_link_ids = sorted(links.loc[links["link_id"].duplicated(keep=False), "link_id"].unique().tolist())
+    if duplicate_link_ids:
+        raise ValueError(f"candidate_links.csv contains duplicated link_id values: {duplicate_link_ids}")
+    self_loops = links.loc[links["from_node"] == links["to_node"], ["link_id", "from_node", "to_node"]]
+    if not self_loops.empty:
+        raise ValueError(
+            "candidate_links.csv contains self-loop edges with from_node == to_node: "
+            f"{self_loops.to_dict('records')}"
+        )
+    known_archetypes = set(edge_rules["archetype"].tolist())
+    missing_archetype_rules = links.loc[~links["archetype"].isin(known_archetypes), ["link_id", "archetype"]]
+    if not missing_archetype_rules.empty:
+        raise ValueError(
+            "candidate_links.csv references archetype without matching edge_component_rules.csv rule: "
+            f"{missing_archetype_rules.to_dict('records')}"
+        )
+    known_families = set((topology_rules.get("families") or {}).keys())
+    enabled_families = {str(family).strip() for family in scenario_settings.get("enabled_families", []) if str(family).strip()}
+    family_hint_violations: list[dict[str, Any]] = []
+    for link in links.to_dict("records"):
+        raw_hints = _split_family_hint(link.get("family_hint", ""))
+        if not raw_hints:
+            family_hint_violations.append(
+                {"link_id": link["link_id"], "family_hint": link.get("family_hint", ""), "reason": "blank"}
+            )
+            continue
+        unknown_hints = sorted(raw_hints - known_families)
+        if unknown_hints:
+            family_hint_violations.append(
+                {
+                    "link_id": link["link_id"],
+                    "family_hint": link.get("family_hint", ""),
+                    "reason": "unknown_family",
+                    "families": unknown_hints,
+                }
+            )
+            continue
+        disabled_hints = sorted(raw_hints - enabled_families)
+        if disabled_hints:
+            family_hint_violations.append(
+                {
+                    "link_id": link["link_id"],
+                    "family_hint": link.get("family_hint", ""),
+                    "reason": "disabled_family",
+                    "families": disabled_hints,
+                }
+            )
+    if family_hint_violations:
+        raise ValueError(
+            "candidate_links.csv contains family_hint values outside topology_rules.yaml/scenario_settings.yaml: "
+            f"{family_hint_violations}"
+        )
+
+
 def _validate_topology_rules(topology_rules: dict[str, Any], scenario_settings: dict[str, Any]) -> None:
     families = topology_rules.get("families")
     if not isinstance(families, dict) or not families:
@@ -700,6 +769,11 @@ def _validate_layout_constraints(
 
 def _split_pipe(value: Any) -> list[str]:
     return [item.strip() for item in str(value).split("|") if item.strip()]
+
+
+def _split_family_hint(value: Any) -> set[str]:
+    raw = {item.strip() for item in str(value).replace('"', "").split(",") if item.strip()}
+    return {FAMILY_HINT_ALIASES.get(item, item) for item in raw}
 
 
 def _parse_bool(value: Any) -> bool:

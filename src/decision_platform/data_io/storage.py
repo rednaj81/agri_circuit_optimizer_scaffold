@@ -110,9 +110,19 @@ def update_bundle_from_authoring_payload(
     *,
     nodes_rows: list[dict[str, Any]] | None = None,
     components_rows: list[dict[str, Any]] | None = None,
+    candidate_links_rows: list[dict[str, Any]] | None = None,
+    edge_component_rules_rows: list[dict[str, Any]] | None = None,
     route_rows: list[dict[str, Any]] | None = None,
+    layout_constraints_rows: list[dict[str, Any]] | None = None,
+    topology_rules_text: str | None = None,
     scenario_settings_text: str | None = None,
 ) -> ScenarioBundle:
+    topology_rules = bundle.topology_rules
+    if topology_rules_text is not None:
+        parsed = yaml.safe_load(topology_rules_text) if topology_rules_text.strip() else {}
+        if not isinstance(parsed, dict):
+            raise ValueError("topology_rules editor content must deserialize to a mapping.")
+        topology_rules = parsed
     scenario_settings = bundle.scenario_settings
     if scenario_settings_text is not None:
         parsed = yaml.safe_load(scenario_settings_text) if scenario_settings_text.strip() else {}
@@ -123,7 +133,11 @@ def update_bundle_from_authoring_payload(
         bundle,
         nodes=_rows_to_frame(nodes_rows, bundle.nodes),
         components=_rows_to_frame(components_rows, bundle.components),
+        candidate_links=_rows_to_frame(candidate_links_rows, bundle.candidate_links),
+        edge_component_rules=_rows_to_frame(edge_component_rules_rows, bundle.edge_component_rules),
         route_requirements=_rows_to_frame(route_rows, bundle.route_requirements),
+        layout_constraints=_rows_to_frame(layout_constraints_rows, bundle.layout_constraints),
+        topology_rules=topology_rules,
         scenario_settings=scenario_settings,
     )
 
@@ -134,7 +148,11 @@ def save_authored_scenario_bundle(
     *,
     nodes_rows: list[dict[str, Any]] | None = None,
     components_rows: list[dict[str, Any]] | None = None,
+    candidate_links_rows: list[dict[str, Any]] | None = None,
+    edge_component_rules_rows: list[dict[str, Any]] | None = None,
     route_rows: list[dict[str, Any]] | None = None,
+    layout_constraints_rows: list[dict[str, Any]] | None = None,
+    topology_rules_text: str | None = None,
     scenario_settings_text: str | None = None,
     include_legacy_components_alias: bool = False,
 ) -> tuple[ScenarioBundle, dict[str, Path]]:
@@ -143,7 +161,11 @@ def save_authored_scenario_bundle(
         source_bundle,
         nodes_rows=nodes_rows,
         components_rows=components_rows,
+        candidate_links_rows=candidate_links_rows,
+        edge_component_rules_rows=edge_component_rules_rows,
         route_rows=route_rows,
+        layout_constraints_rows=layout_constraints_rows,
+        topology_rules_text=topology_rules_text,
         scenario_settings_text=scenario_settings_text,
     )
     exported = save_scenario_bundle(
@@ -159,7 +181,11 @@ def bundle_authoring_payload(bundle: ScenarioBundle) -> dict[str, Any]:
     return {
         "nodes_rows": bundle.nodes.to_dict("records"),
         "components_rows": bundle.components.to_dict("records"),
+        "candidate_links_rows": bundle.candidate_links.to_dict("records"),
+        "edge_component_rules_rows": bundle.edge_component_rules.to_dict("records"),
         "route_rows": bundle.route_requirements.to_dict("records"),
+        "layout_constraints_rows": bundle.layout_constraints.to_dict("records"),
+        "topology_rules_text": yaml.safe_dump(bundle.topology_rules, sort_keys=False, allow_unicode=True),
         "scenario_settings_text": yaml.safe_dump(bundle.scenario_settings, sort_keys=False, allow_unicode=True),
     }
 

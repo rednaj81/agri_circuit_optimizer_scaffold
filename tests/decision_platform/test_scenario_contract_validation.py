@@ -7,6 +7,7 @@ from tests.decision_platform.scenario_utils import (
     cleanup_scenario_copy,
     prepare_scenario_copy,
     update_scenario_table,
+    update_scenario_yaml,
 )
 
 
@@ -109,6 +110,118 @@ def test_loader_rejects_invalid_route_group() -> None:
         )
 
         with pytest.raises(ValueError, match="invalid route_group"):
+            load_scenario_bundle(scenario_dir)
+    finally:
+        cleanup_scenario_copy(scenario_dir)
+
+
+def test_loader_rejects_blank_link_id() -> None:
+    scenario_dir = prepare_scenario_copy(
+        "data/decision_platform/maquete_v2",
+        "maquete_v2_blank_link_id",
+    )
+    try:
+        update_scenario_table(
+            scenario_dir,
+            "candidate_links.csv",
+            lambda frame: frame.assign(link_id=frame["link_id"].where(frame["link_id"] != "L001", "")),
+        )
+
+        with pytest.raises(ValueError, match="blank link_id"):
+            load_scenario_bundle(scenario_dir)
+    finally:
+        cleanup_scenario_copy(scenario_dir)
+
+
+def test_loader_rejects_duplicated_link_ids() -> None:
+    scenario_dir = prepare_scenario_copy(
+        "data/decision_platform/maquete_v2",
+        "maquete_v2_duplicate_link_id",
+    )
+    try:
+        def _duplicate_link_id(frame):
+            updated = frame.copy()
+            updated.loc[updated["link_id"] == "L002", "link_id"] = "L001"
+            return updated
+
+        update_scenario_table(scenario_dir, "candidate_links.csv", _duplicate_link_id)
+
+        with pytest.raises(ValueError, match="duplicated link_id"):
+            load_scenario_bundle(scenario_dir)
+    finally:
+        cleanup_scenario_copy(scenario_dir)
+
+
+def test_loader_rejects_self_loop_candidate_link() -> None:
+    scenario_dir = prepare_scenario_copy(
+        "data/decision_platform/maquete_v2",
+        "maquete_v2_self_loop_link",
+    )
+    try:
+        update_scenario_table(
+            scenario_dir,
+            "candidate_links.csv",
+            lambda frame: frame.assign(to_node=frame["to_node"].where(frame["link_id"] != "L013", "J1")),
+        )
+
+        with pytest.raises(ValueError, match="self-loop edges"):
+            load_scenario_bundle(scenario_dir)
+    finally:
+        cleanup_scenario_copy(scenario_dir)
+
+
+def test_loader_rejects_candidate_link_with_missing_archetype_rule() -> None:
+    scenario_dir = prepare_scenario_copy(
+        "data/decision_platform/maquete_v2",
+        "maquete_v2_missing_archetype_rule",
+    )
+    try:
+        update_scenario_table(
+            scenario_dir,
+            "candidate_links.csv",
+            lambda frame: frame.assign(archetype=frame["archetype"].where(frame["link_id"] != "L013", "unknown_rule")),
+        )
+
+        with pytest.raises(ValueError, match="without matching edge_component_rules"):
+            load_scenario_bundle(scenario_dir)
+    finally:
+        cleanup_scenario_copy(scenario_dir)
+
+
+def test_loader_rejects_candidate_link_with_unknown_family_hint() -> None:
+    scenario_dir = prepare_scenario_copy(
+        "data/decision_platform/maquete_v2",
+        "maquete_v2_unknown_family_hint",
+    )
+    try:
+        update_scenario_table(
+            scenario_dir,
+            "candidate_links.csv",
+            lambda frame: frame.assign(family_hint=frame["family_hint"].where(frame["link_id"] != "L013", "alien")),
+        )
+
+        with pytest.raises(ValueError, match="family_hint values outside"):
+            load_scenario_bundle(scenario_dir)
+    finally:
+        cleanup_scenario_copy(scenario_dir)
+
+
+def test_loader_rejects_candidate_link_with_disabled_family_hint() -> None:
+    scenario_dir = prepare_scenario_copy(
+        "data/decision_platform/maquete_v2",
+        "maquete_v2_disabled_family_hint",
+    )
+    try:
+        update_scenario_yaml(
+            scenario_dir,
+            "scenario_settings.yaml",
+            lambda payload: {
+                **payload,
+                "enabled_families": ["star_manifolds"],
+            },
+        )
+
+        with pytest.raises(ValueError, match="family_hint values outside"):
             load_scenario_bundle(scenario_dir)
     finally:
         cleanup_scenario_copy(scenario_dir)

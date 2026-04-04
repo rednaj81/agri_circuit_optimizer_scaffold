@@ -44,6 +44,10 @@ def test_dash_app_exposes_authoring_save_reopen_controls() -> None:
 
     layout_repr = repr(app.layout)
     assert "save-reopen-bundle-button" in layout_repr
+    assert "candidate-links-grid" in layout_repr
+    assert "edge-component-rules-grid" in layout_repr
+    assert "layout-constraints-grid" in layout_repr
+    assert "topology-rules-editor" in layout_repr
     assert "scenario-settings-editor" in layout_repr
     assert "bundle-output-dir-input" in layout_repr
 
@@ -93,10 +97,26 @@ def test_ui_save_reopen_flow_persists_bundle_and_refreshes_pipeline() -> None:
         bundle = load_scenario_bundle(scenario_dir)
         nodes_rows = bundle.nodes.to_dict("records")
         components_rows = bundle.components.to_dict("records")
+        candidate_links_rows = bundle.candidate_links.to_dict("records")
+        edge_component_rules_rows = bundle.edge_component_rules.to_dict("records")
         route_rows = bundle.route_requirements.to_dict("records")
+        layout_constraints_rows = bundle.layout_constraints.to_dict("records")
         nodes_rows[0]["label"] = "W salvo na UI"
         components_rows[0]["cost"] = 321.0
+        candidate_links_rows[0]["notes"] = "Tap salvo na UI"
+        edge_component_rules_rows[0]["max_series_pumps"] = 1
         route_rows[0]["weight"] = 55.0
+        layout_constraints_rows[0]["value"] = 1.5
+        topology_rules = {
+            **bundle.topology_rules,
+            "families": {
+                **bundle.topology_rules["families"],
+                "hybrid_free": {
+                    **bundle.topology_rules["families"]["hybrid_free"],
+                    "max_active_pumps_per_route": 3,
+                },
+            },
+        }
         scenario_settings = bundle.scenario_settings | {
             "ui": {
                 **bundle.scenario_settings.get("ui", {}),
@@ -110,14 +130,22 @@ def test_ui_save_reopen_flow_persists_bundle_and_refreshes_pipeline() -> None:
                 output_dir=output_dir,
                 nodes_rows=nodes_rows,
                 components_rows=components_rows,
+                candidate_links_rows=candidate_links_rows,
+                edge_component_rules_rows=edge_component_rules_rows,
                 route_rows=route_rows,
+                layout_constraints_rows=layout_constraints_rows,
+                topology_rules_text=yaml.safe_dump(topology_rules, sort_keys=False, allow_unicode=True),
                 scenario_settings_text=yaml.safe_dump(scenario_settings, sort_keys=False, allow_unicode=True),
             )
 
         assert saved["scenario_dir"] == str(output_dir)
         assert saved["bundle"].nodes.iloc[0]["label"] == "W salvo na UI"
         assert float(saved["bundle"].components.iloc[0]["cost"]) == 321.0
+        assert saved["bundle"].candidate_links.iloc[0]["notes"] == "Tap salvo na UI"
+        assert int(saved["bundle"].edge_component_rules.iloc[0]["max_series_pumps"]) == 1
         assert float(saved["bundle"].route_requirements.iloc[0]["weight"]) == 55.0
+        assert float(saved["bundle"].layout_constraints.iloc[0]["value"]) == 1.5
+        assert saved["bundle"].topology_rules["families"]["hybrid_free"]["max_active_pumps_per_route"] == 3
         assert saved["bundle"].scenario_settings["ui"]["default_layout_mode"] == "save_reopen_ui"
         assert saved["result"] is not None
         assert saved["result"]["scenario_bundle_version"] == saved["bundle"].bundle_version
@@ -148,7 +176,11 @@ def test_ui_save_reopen_rejects_legacy_source_without_manifest() -> None:
                 output_dir=output_dir,
                 nodes_rows=bundle.nodes.to_dict("records"),
                 components_rows=bundle.components.to_dict("records"),
+                candidate_links_rows=bundle.candidate_links.to_dict("records"),
+                edge_component_rules_rows=bundle.edge_component_rules.to_dict("records"),
                 route_rows=bundle.route_requirements.to_dict("records"),
+                layout_constraints_rows=bundle.layout_constraints.to_dict("records"),
+                topology_rules_text=yaml.safe_dump(bundle.topology_rules, sort_keys=False, allow_unicode=True),
                 scenario_settings_text=yaml.safe_dump(
                     bundle.scenario_settings,
                     sort_keys=False,

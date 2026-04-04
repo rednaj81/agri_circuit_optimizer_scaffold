@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 import shutil
-from types import SimpleNamespace
 
 import pytest
 
@@ -95,13 +94,10 @@ def test_cli_accepts_canonical_bundle_and_preserves_manifest(monkeypatch) -> Non
 @pytest.mark.fast
 def test_run_decision_pipeline_skips_engine_comparison_by_default(monkeypatch) -> None:
     monkeypatch.delenv("DECISION_PLATFORM_DISABLE_REAL_JULIA_PROBE", raising=False)
-    bundle = SimpleNamespace(
-        scenario_settings={"hydraulic_engine": {"primary": "watermodels_jl", "fallback": "none"}}
-    )
+    bundle = load_scenario_bundle("data/decision_platform/maquete_v2")
     captured: dict[str, object] = {}
 
     monkeypatch.setattr(run_pipeline, "load_scenario_bundle", lambda scenario_dir: bundle)
-    monkeypatch.setattr(run_pipeline, "_require_canonical_scenario_bundle", lambda loaded_bundle, consumer: loaded_bundle)
     monkeypatch.setattr(
         run_pipeline,
         "build_solution_catalog",

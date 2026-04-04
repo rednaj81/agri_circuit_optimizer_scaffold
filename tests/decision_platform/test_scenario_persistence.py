@@ -125,12 +125,22 @@ def test_save_authored_bundle_persists_authoring_changes() -> None:
     try:
         nodes_rows = source_bundle.nodes.to_dict("records")
         components_rows = source_bundle.components.to_dict("records")
+        candidate_links_rows = source_bundle.candidate_links.to_dict("records")
+        edge_component_rules_rows = source_bundle.edge_component_rules.to_dict("records")
         route_rows = source_bundle.route_requirements.to_dict("records")
+        layout_constraints_rows = source_bundle.layout_constraints.to_dict("records")
 
         nodes_rows[0]["label"] = "W editado"
         components_rows[0]["cost"] = 123.0
+        candidate_links_rows[0]["notes"] = "Tap P1 editado"
+        edge_component_rules_rows[0]["max_series_pumps"] = 1
         route_rows[0]["weight"] = 77.0
+        layout_constraints_rows[0]["value"] = 1.5
 
+        topology_rules = dict(source_bundle.topology_rules)
+        topology_rules["families"] = dict(topology_rules["families"])
+        topology_rules["families"]["hybrid_free"] = dict(topology_rules["families"]["hybrid_free"])
+        topology_rules["families"]["hybrid_free"]["max_active_pumps_per_route"] = 3
         scenario_settings = dict(source_bundle.scenario_settings)
         scenario_settings["ui"] = dict(scenario_settings.get("ui", {}))
         scenario_settings["ui"]["default_layout_mode"] = "edited_layout"
@@ -140,14 +150,22 @@ def test_save_authored_bundle_persists_authoring_changes() -> None:
             output_dir,
             nodes_rows=nodes_rows,
             components_rows=components_rows,
+            candidate_links_rows=candidate_links_rows,
+            edge_component_rules_rows=edge_component_rules_rows,
             route_rows=route_rows,
+            layout_constraints_rows=layout_constraints_rows,
+            topology_rules_text=yaml.safe_dump(topology_rules, sort_keys=False, allow_unicode=True),
             scenario_settings_text=yaml.safe_dump(scenario_settings, sort_keys=False, allow_unicode=True),
         )
 
         assert exported["bundle_manifest"].name == BUNDLE_MANIFEST_FILENAME
         assert reloaded.nodes.iloc[0]["label"] == "W editado"
         assert float(reloaded.components.iloc[0]["cost"]) == 123.0
+        assert reloaded.candidate_links.iloc[0]["notes"] == "Tap P1 editado"
+        assert int(reloaded.edge_component_rules.iloc[0]["max_series_pumps"]) == 1
         assert float(reloaded.route_requirements.iloc[0]["weight"]) == 77.0
+        assert float(reloaded.layout_constraints.iloc[0]["value"]) == 1.5
+        assert reloaded.topology_rules["families"]["hybrid_free"]["max_active_pumps_per_route"] == 3
         assert reloaded.scenario_settings["ui"]["default_layout_mode"] == "edited_layout"
     finally:
         if output_dir.exists():
@@ -170,6 +188,11 @@ def test_save_authored_bundle_fails_closed_for_invalid_route_contract() -> None:
                 "data/decision_platform/maquete_v2",
                 output_dir,
                 route_rows=route_rows,
+                topology_rules_text=yaml.safe_dump(
+                    source_bundle.topology_rules,
+                    sort_keys=False,
+                    allow_unicode=True,
+                ),
                 scenario_settings_text=yaml.safe_dump(
                     source_bundle.scenario_settings,
                     sort_keys=False,
@@ -198,7 +221,11 @@ def test_save_authored_bundle_supports_explicit_legacy_source_layout() -> None:
             output_dir,
             nodes_rows=legacy_bundle.nodes.to_dict("records"),
             components_rows=legacy_bundle.components.to_dict("records"),
+            candidate_links_rows=legacy_bundle.candidate_links.to_dict("records"),
+            edge_component_rules_rows=legacy_bundle.edge_component_rules.to_dict("records"),
             route_rows=legacy_bundle.route_requirements.to_dict("records"),
+            layout_constraints_rows=legacy_bundle.layout_constraints.to_dict("records"),
+            topology_rules_text=yaml.safe_dump(legacy_bundle.topology_rules, sort_keys=False, allow_unicode=True),
             scenario_settings_text=yaml.safe_dump(
                 legacy_bundle.scenario_settings,
                 sort_keys=False,
@@ -216,3 +243,33 @@ def test_save_authored_bundle_supports_explicit_legacy_source_layout() -> None:
         if output_dir.exists():
             shutil.rmtree(output_dir)
         cleanup_scenario_copy(scenario_dir)
+
+
+def test_save_authored_bundle_fails_closed_for_invalid_topology_contract() -> None:
+    source_bundle = load_scenario_bundle("data/decision_platform/maquete_v2")
+    output_dir = Path("tests/_tmp/scenario_persistence_invalid_topology")
+    if output_dir.exists():
+        shutil.rmtree(output_dir)
+    try:
+        candidate_links_rows = source_bundle.candidate_links.to_dict("records")
+        candidate_links_rows[1]["link_id"] = candidate_links_rows[0]["link_id"]
+
+        with pytest.raises(ValueError, match="duplicated link_id"):
+            save_authored_scenario_bundle(
+                "data/decision_platform/maquete_v2",
+                output_dir,
+                candidate_links_rows=candidate_links_rows,
+                topology_rules_text=yaml.safe_dump(
+                    source_bundle.topology_rules,
+                    sort_keys=False,
+                    allow_unicode=True,
+                ),
+                scenario_settings_text=yaml.safe_dump(
+                    source_bundle.scenario_settings,
+                    sort_keys=False,
+                    allow_unicode=True,
+                ),
+            )
+    finally:
+        if output_dir.exists():
+            shutil.rmtree(output_dir)
