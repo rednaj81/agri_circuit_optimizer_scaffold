@@ -26,6 +26,8 @@ switch ($Action) {
         [pscustomobject]@{
             process_running = $state.process.running
             pid = $state.process.pid
+            run_id = $state.process.run_id
+            run_root = $state.process.run_root
             active_wave_index = $state.supervisor_state.active_wave_index
             active_role = $state.supervisor_state.active_role
             waves_completed = $state.supervisor_state.waves_completed

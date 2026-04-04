@@ -1,5 +1,6 @@
 param(
     [string]$Phase = "phase_0",
+    [string]$RunId = "",
     [int]$MaxWaves = 10,
     [string]$Backend = "codex-exec-external",
     [string]$Model = "gpt-5.4",
@@ -33,6 +34,7 @@ $argsList = @(
     $loopScript,
     "--repo-root", $repoRoot,
     "--phase", $Phase,
+    "--run-id", $RunId,
     "--max-waves", $MaxWaves,
     "--backend", $Backend,
     "--model", $Model,

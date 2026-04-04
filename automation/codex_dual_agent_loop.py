@@ -121,6 +121,9 @@ class AgentSessionState:
 class LoopState:
     phase_id: str
     backend: str
+    run_id: str
+    run_started_at: str
+    run_root: str
     preflight: dict[str, Any]
     waves: list[WaveState]
     agent_sessions: dict[str, AgentSessionState] = field(default_factory=dict)
@@ -177,8 +180,8 @@ def supervisor_guidance_path(repo_root: Path) -> Path:
     return runtime_dir(repo_root) / "supervisor_guidance.json"
 
 
-def runtime_scratch_dir(repo_root: Path) -> Path:
-    out = runtime_dir(repo_root) / "runs"
+def runtime_scratch_dir(repo_root: Path, run_id: str) -> Path:
+    out = runtime_dir(repo_root) / "runs" / run_id
     out.mkdir(parents=True, exist_ok=True)
     return out
 
@@ -209,6 +212,9 @@ def persist_state(repo_root: Path, state: LoopState) -> None:
             {
                 "phase_id": state.phase_id,
                 "backend": state.backend,
+                "run_id": state.run_id,
+                "run_started_at": state.run_started_at,
+                "run_root": state.run_root,
                 "active_wave_index": state.active_wave_index,
                 "active_role": state.active_role,
                 "consecutive_low_value": state.consecutive_low_value,
@@ -808,14 +814,19 @@ def run_loop(
     repo_root: Path,
     phase_id: str,
     backend: Backend,
+    run_id: str,
     max_waves: int,
     preflight: PreflightState,
     model_override: str | None,
     reasoning_effort_override: str | None,
 ) -> LoopState:
+    run_root_path = runtime_scratch_dir(repo_root, run_id)
     state = LoopState(
         phase_id=phase_id,
         backend=backend,
+        run_id=run_id,
+        run_started_at=now_iso(),
+        run_root=str(run_root_path),
         preflight=asdict(preflight),
         waves=[],
     )
@@ -828,7 +839,7 @@ def run_loop(
         state.active_wave_index = wave_index
         if backend == "codex-exec-external":
             ensure_real_backend_ready(preflight)
-            wave_run_root = runtime_scratch_dir(repo_root) / f"wave-{wave_index:02d}"
+            wave_run_root = run_root_path / f"wave-{wave_index:02d}"
             architect_session = get_or_create_agent_session(state, "architect")
             developer_session = get_or_create_agent_session(state, "developer")
             auditor_session = get_or_create_agent_session(state, "auditor")
@@ -903,7 +914,7 @@ def run_loop(
                 indent=2,
                 ensure_ascii=False,
             )
-            developer_run_root = runtime_scratch_dir(repo_root) / f"wave-{wave_index:02d}" / "developer"
+            developer_run_root = wave_run_root / "developer"
             developer_prompt = (
                 compose_resume_prompt(
                     role="developer",
@@ -959,7 +970,7 @@ def run_loop(
                 indent=2,
                 ensure_ascii=False,
             )
-            auditor_run_root = runtime_scratch_dir(repo_root) / f"wave-{wave_index:02d}" / "auditor"
+            auditor_run_root = wave_run_root / "auditor"
             auditor_prompt = (
                 compose_resume_prompt(
                     role="auditor",
@@ -1072,6 +1083,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--repo-root", required=True)
     parser.add_argument("--phase", required=True)
+    parser.add_argument("--run-id", default="")
     parser.add_argument("--max-waves", type=int, default=10)
     parser.add_argument(
         "--backend",
@@ -1087,6 +1099,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     repo_root = Path(args.repo_root).resolve()
+    run_id = args.run_id or datetime.now(timezone.utc).strftime("run-%Y%m%d-%H%M%S")
     preflight = run_preflight(repo_root, args.backend)
     persist_preflight(repo_root, preflight)
 
@@ -1099,6 +1112,7 @@ def main() -> None:
             repo_root=repo_root,
             phase_id=args.phase,
             backend=args.backend,
+            run_id=run_id,
             max_waves=args.max_waves,
             preflight=preflight,
             model_override=args.model or None,

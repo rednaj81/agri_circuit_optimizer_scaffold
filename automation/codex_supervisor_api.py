@@ -328,6 +328,8 @@ class SupervisorService:
         script = self.repo_root / "scripts" / "run_codex_dual_agent_loop.ps1"
         pwsh = shutil_which_pwsh()
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        run_id = f"run-{timestamp}"
+        run_root = str(runtime_dir(self.repo_root) / "runs" / run_id)
         stdout_path = self.api_root / f"loop-{timestamp}.stdout.log"
         stderr_path = self.api_root / f"loop-{timestamp}.stderr.log"
         stdout_handle = stdout_path.open("w", encoding="utf-8")
@@ -346,6 +348,8 @@ class SupervisorService:
                 str(script),
                 "-Phase",
                 phase,
+                "-RunId",
+                run_id,
                 "-Backend",
                 backend,
                 "-MaxWaves",
@@ -368,6 +372,8 @@ class SupervisorService:
             "started_at": now_iso(),
             "phase": phase,
             "backend": backend,
+            "run_id": run_id,
+            "run_root": run_root,
             "max_waves": max_waves,
             "model": model,
             "reasoning_effort": reasoning_effort,
