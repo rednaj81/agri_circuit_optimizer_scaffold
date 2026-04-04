@@ -14,14 +14,31 @@
 Fluxo canônico:
 - contrato declarativo: `scripts/decision_platform_runtime_validation_profiles.json`
 - script-base: `pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1`
+- profile `official_preflight`: `pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode official -OfficialPreflight`
 - profile `official`: `pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode official`
 - profile `diagnostic`: `pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode diagnostic -DisableRealJuliaProbe`
 - profile `diagnostic_comparison`: `pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode diagnostic -DisableRealJuliaProbe -IncludeEngineComparison`
 - aliases opcionais quando `make` existir no host: `decision-platform-validate-official`, `decision-platform-validate-diagnostic`, `decision-platform-validate-diagnostic-comparison`
 - fonte de verdade: `summary.json` sempre, `engine_comparison.json` apenas quando a comparação diagnóstica for solicitada
+- o profile `official_preflight` é apenas triagem operacional de ambiente e política; ele checa override proibido, `julia --version`, cenário oficial e o inventário `Project.toml`/`Manifest.toml` do projeto Julia local, mas não executa o pipeline completo e não substitui o gate oficial
 - o validador remove o diretório de saída antes da run para evitar artefato stale
 - o validador cruza `summary.json` com os artefatos principais do candidato oficial antes de declarar sucesso
 - o validador falha se o modo pedido não bater com o perfil declarativo e com a política exportada pelo pipeline
+
+### 0. Preflight oficial rápido
+- objetivo: detectar cedo erro de ambiente, override proibido, Julia/WaterModels indisponível ou configuração oficial inválida antes do gate completo
+- comando canônico:
+  `pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode official -OfficialPreflight`
+- profile declarativo:
+  `official_preflight`
+- regra:
+  não tratar este preflight como validação oficial suficiente
+- evidência esperada:
+  apenas relatório do script com triagem de `julia_available`, `watermodels_available`, política, configuração do cenário e inventário do projeto Julia local
+- rejeições obrigatórias do preflight:
+  `DECISION_PLATFORM_DISABLE_REAL_JULIA_PROBE` ativo, Julia indisponível, WaterModels indisponível ou política oficial inválida
+- observação:
+  a validação oficial da fase 0 continua sendo apenas o profile `official` com Julia real e execução completa do pipeline
 
 ### 1. Gate oficial Julia-only
 - objetivo: provar que o caminho oficial continua fail-closed e exporta o candidato oficial sem fallback implícito
