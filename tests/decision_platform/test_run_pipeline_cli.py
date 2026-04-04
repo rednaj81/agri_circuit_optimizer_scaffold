@@ -58,6 +58,9 @@ def test_run_decision_pipeline_skips_engine_comparison_by_default(monkeypatch) -
         "build_solution_catalog",
         lambda loaded_bundle: {
             "scenario_id": "maquete_v2",
+            "scenario_bundle_version": "decision_platform_scenario_bundle/v1",
+            "scenario_bundle_manifest": "dummy-scenario/scenario_bundle.yaml",
+            "scenario_bundle_files": {"components.csv": "component_catalog.csv"},
             "catalog": [{"metrics": {"feasible": True}}],
             "default_profile_id": "balanced",
             "selected_candidate_id": "candidate-001",
@@ -77,6 +80,9 @@ def test_run_decision_pipeline_skips_engine_comparison_by_default(monkeypatch) -
     result = run_pipeline.run_decision_pipeline("dummy-scenario", "dummy-output")
 
     assert "engine_comparison" not in result
+    assert result["scenario_bundle_version"] == "decision_platform_scenario_bundle/v1"
+    assert result["scenario_bundle_manifest"] == "dummy-scenario/scenario_bundle.yaml"
+    assert result["scenario_bundle_files"]["components.csv"] == "component_catalog.csv"
     assert result["runtime"]["execution_mode"] == "official"
     assert result["runtime"]["official_gate_valid"] is True
     assert result["runtime"]["started_at"]
@@ -110,6 +116,9 @@ def test_cli_uses_default_profile_and_selected_candidate_with_explicit_diagnosti
                 (Path(output_dir_arg) / "engine_comparison.json").write_text("{}", encoding="utf-8")
             return {
                 "scenario_id": "maquete_v2",
+                "scenario_bundle_version": "decision_platform_scenario_bundle/v1",
+                "scenario_bundle_manifest": "data/decision_platform/maquete_v2/scenario_bundle.yaml",
+                "scenario_bundle_files": {"components.csv": "component_catalog.csv"},
                 "catalog": [{"metrics": {"feasible": True}}],
                 "default_profile_id": "balanced",
                 "selected_candidate_id": "candidate-001",
@@ -142,6 +151,9 @@ def test_cli_uses_default_profile_and_selected_candidate_with_explicit_diagnosti
         assert captured["include_engine_comparison"] is True
         assert captured["allow_diagnostic_python_emulation"] is True
         assert summary["default_profile_id"] == "balanced"
+        assert summary["scenario_bundle_version"] == "decision_platform_scenario_bundle/v1"
+        assert summary["scenario_bundle_manifest"].endswith("scenario_bundle.yaml")
+        assert summary["scenario_bundle_files"]["components.csv"] == "component_catalog.csv"
         assert summary["selected_candidate_id"] == "candidate-001"
         assert summary["top_candidate"] == "candidate-001"
         assert summary["best_profile"] == "balanced"

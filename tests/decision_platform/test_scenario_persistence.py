@@ -8,7 +8,7 @@ import pytest
 import yaml
 
 from decision_platform.data_io.loader import BUNDLE_MANIFEST_FILENAME, load_scenario_bundle
-from decision_platform.data_io.storage import save_scenario_bundle
+from decision_platform.data_io.storage import save_authored_scenario_bundle, save_scenario_bundle
 from tests.decision_platform.scenario_utils import cleanup_scenario_copy, prepare_scenario_copy
 
 
@@ -115,3 +115,67 @@ def test_loader_rejects_manifest_missing_required_entries() -> None:
             load_scenario_bundle(scenario_dir)
     finally:
         cleanup_scenario_copy(scenario_dir)
+
+
+def test_save_authored_bundle_persists_authoring_changes() -> None:
+    source_bundle = load_scenario_bundle("data/decision_platform/maquete_v2")
+    output_dir = Path("tests/_tmp/scenario_persistence_authored")
+    if output_dir.exists():
+        shutil.rmtree(output_dir)
+    try:
+        nodes_rows = source_bundle.nodes.to_dict("records")
+        components_rows = source_bundle.components.to_dict("records")
+        route_rows = source_bundle.route_requirements.to_dict("records")
+
+        nodes_rows[0]["label"] = "W editado"
+        components_rows[0]["cost"] = 123.0
+        route_rows[0]["weight"] = 77.0
+
+        scenario_settings = dict(source_bundle.scenario_settings)
+        scenario_settings["ui"] = dict(scenario_settings.get("ui", {}))
+        scenario_settings["ui"]["default_layout_mode"] = "edited_layout"
+
+        reloaded, exported = save_authored_scenario_bundle(
+            "data/decision_platform/maquete_v2",
+            output_dir,
+            nodes_rows=nodes_rows,
+            components_rows=components_rows,
+            route_rows=route_rows,
+            scenario_settings_text=yaml.safe_dump(scenario_settings, sort_keys=False, allow_unicode=True),
+        )
+
+        assert exported["bundle_manifest"].name == BUNDLE_MANIFEST_FILENAME
+        assert reloaded.nodes.iloc[0]["label"] == "W editado"
+        assert float(reloaded.components.iloc[0]["cost"]) == 123.0
+        assert float(reloaded.route_requirements.iloc[0]["weight"]) == 77.0
+        assert reloaded.scenario_settings["ui"]["default_layout_mode"] == "edited_layout"
+    finally:
+        if output_dir.exists():
+            shutil.rmtree(output_dir)
+
+
+def test_save_authored_bundle_fails_closed_for_invalid_route_contract() -> None:
+    source_bundle = load_scenario_bundle("data/decision_platform/maquete_v2")
+    output_dir = Path("tests/_tmp/scenario_persistence_invalid_route")
+    if output_dir.exists():
+        shutil.rmtree(output_dir)
+    try:
+        route_rows = source_bundle.route_requirements.to_dict("records")
+        route_rows[0]["measurement_required"] = False
+        route_rows[0]["dose_min_l"] = 1.0
+        route_rows[0]["dose_error_max_pct"] = 2.0
+
+        with pytest.raises(ValueError, match="dosing routes without direct measurement"):
+            save_authored_scenario_bundle(
+                "data/decision_platform/maquete_v2",
+                output_dir,
+                route_rows=route_rows,
+                scenario_settings_text=yaml.safe_dump(
+                    source_bundle.scenario_settings,
+                    sort_keys=False,
+                    allow_unicode=True,
+                ),
+            )
+    finally:
+        if output_dir.exists():
+            shutil.rmtree(output_dir)

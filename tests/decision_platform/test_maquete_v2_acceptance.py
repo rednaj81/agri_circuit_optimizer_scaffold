@@ -81,6 +81,9 @@ def test_maquete_v2_pipeline_exports_and_route_metrics() -> None:
 
         assert summary["default_profile_id"] == result["default_profile_id"]
         assert summary["selected_candidate_id"] == result["selected_candidate_id"]
+        assert summary["scenario_bundle_version"] == result["scenario_bundle_version"]
+        assert summary["scenario_bundle_manifest"]
+        assert summary["scenario_bundle_files"]["components.csv"] == "component_catalog.csv"
         assert summary["selected_generation_source"] == result["selected_candidate"]["generation_source"]
         assert "viability_rate_by_family" in summary
         assert "infeasible_candidate_rate_by_reason" in summary
@@ -204,6 +207,9 @@ def test_maquete_v2_pipeline_runs_with_real_julia_and_exports_final_artifacts() 
         summary = json.loads((output_dir / "summary.json").read_text(encoding="utf-8"))
         assert summary["selected_candidate_id"] == result["selected_candidate_id"]
         assert summary["default_profile_id"] == result["default_profile_id"]
+        assert summary["scenario_bundle_version"] == result["scenario_bundle_version"]
+        assert summary["scenario_bundle_manifest"]
+        assert summary["scenario_bundle_files"]["components.csv"] == "component_catalog.csv"
         assert summary["engine_used"] == "watermodels_jl"
         assert summary["execution_mode"] == "official"
         assert summary["official_gate_valid"] is True

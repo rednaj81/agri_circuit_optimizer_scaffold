@@ -61,15 +61,17 @@ except Exception:  # pragma: no cover
         Dropdown=_factory("Dropdown"),
         Checklist=_factory("Checklist"),
         Input=_factory("Input"),
+        Textarea=_factory("Textarea"),
         Slider=_factory("Slider"),
     )
     dag = SimpleNamespace(AgGrid=_factory("AgGrid"))
     cyto = SimpleNamespace(Cytoscape=_factory("Cytoscape"))
 
     class Input:  # type: ignore[override]
-        def __init__(self, component_id: str, component_property: str):
+        def __init__(self, component_id: str, component_property: str, **kwargs: Any):
             self.component_id = component_id
             self.component_property = component_property
+            self.kwargs = kwargs
 
     class Output(Input):  # type: ignore[override]
         pass

@@ -10,6 +10,7 @@ from decision_platform.api.run_pipeline import run_decision_pipeline
 from decision_platform.catalog.explanation import build_selected_candidate_explanation
 from decision_platform.catalog.pipeline import resolve_selected_candidate
 from decision_platform.data_io.loader import load_scenario_bundle
+from decision_platform.data_io.storage import bundle_authoring_payload, save_authored_scenario_bundle
 from decision_platform.ranking.scoring import apply_dynamic_weights
 from decision_platform.rendering.circuit import build_solution_comparison_figure
 from decision_platform.ui_dash._compat import DASH_AVAILABLE, Dash, Input, Output, State, cyto, dag, dcc, html
@@ -18,7 +19,10 @@ from decision_platform.ui_dash._compat import DASH_AVAILABLE, Dash, Input, Outpu
 def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") -> Dash:
     bundle = load_scenario_bundle(scenario_dir)
     result, pipeline_error = _safe_run_pipeline(scenario_dir)
+    authoring_payload = bundle_authoring_payload(bundle)
+    initial_execution_summary = _build_execution_summary(result, pipeline_error)
     profile_id = bundle.scenario_settings["ranking"]["default_profile"]
+    family_options = _family_dropdown_options(bundle)
     initial_state = build_catalog_view_state(
         result,
         profile_id=profile_id,
@@ -43,6 +47,17 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
         profile_id=profile_id,
         active_selected_id=initial_state["selected_candidate_id"],
     )
+    initial_bundle_output_dir = str(Path(scenario_dir).parent / f"{Path(scenario_dir).name}_saved")
+    initial_bundle_io_summary = json.dumps(
+        {
+            "source_scenario_dir": str(Path(scenario_dir)),
+            "bundle_manifest": str(bundle.bundle_manifest_path) if bundle.bundle_manifest_path else None,
+            "bundle_version": bundle.bundle_version,
+            "status": "idle",
+        },
+        indent=2,
+        ensure_ascii=False,
+    )
 
     app = Dash(__name__)
     app.layout = html.Div(
@@ -55,9 +70,27 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
                         label="Dados",
                         children=[
                             html.H2("Tabelas"),
-                            _table("nodes-grid", bundle.nodes),
-                            _table("components-grid", bundle.components),
-                            _table("routes-grid", bundle.route_requirements),
+                            html.P("Diretório do bundle salvo"),
+                            dcc.Input(
+                                id="bundle-output-dir-input",
+                                type="text",
+                                value=initial_bundle_output_dir,
+                                persistence=True,
+                                persistence_type="session",
+                            ),
+                            html.Button("Salvar e reabrir bundle", id="save-reopen-bundle-button"),
+                            html.Pre(initial_bundle_io_summary, id="bundle-io-summary"),
+                            _table("nodes-grid", bundle.nodes, editable=True),
+                            _table("components-grid", bundle.components, editable=True),
+                            _table("routes-grid", bundle.route_requirements, editable=True),
+                            html.H3("scenario_settings.yaml"),
+                            dcc.Textarea(
+                                id="scenario-settings-editor",
+                                value=authoring_payload["scenario_settings_text"],
+                                style={"width": "100%", "height": "260px"},
+                                persistence=True,
+                                persistence_type="session",
+                            ),
                         ],
                     ),
                     dcc.Tab(
@@ -65,20 +98,7 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
                         children=[
                             html.H2("Execução"),
                             html.Button("Reexecutar pipeline", id="run-button"),
-                            html.Pre(
-                                json.dumps(
-                                    {
-                                        "candidate_count": len(result["catalog"]) if result else 0,
-                                        "feasible_count": sum(1 for item in result["catalog"] if item["metrics"]["feasible"]) if result else 0,
-                                        "default_profile_id": result.get("default_profile_id") if result else None,
-                                        "selected_candidate_id": result.get("selected_candidate_id") if result else None,
-                                        "error": pipeline_error,
-                                    },
-                                    indent=2,
-                                    ensure_ascii=False,
-                                ),
-                                id="execution-summary",
-                            ),
+                            html.Pre(initial_execution_summary, id="execution-summary"),
                         ],
                     ),
                     dcc.Tab(
@@ -87,14 +107,14 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
                             html.H2("Soluções"),
                             dcc.Dropdown(
                                 id="profile-dropdown",
-                                options=[{"label": profile, "value": profile} for profile in bundle.weight_profiles["profile_id"].tolist()],
+                                options=_profile_dropdown_options(bundle),
                                 value=profile_id,
                                 persistence=True,
                                 persistence_type="session",
                             ),
                             dcc.Dropdown(
                                 id="family-dropdown",
-                                options=[{"label": family, "value": family} for family in sorted(bundle.scenario_settings["enabled_families"])],
+                                options=family_options,
                                 value="ALL",
                                 persistence=True,
                                 persistence_type="session",
@@ -224,35 +244,135 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
     )
 
     @app.callback(
+        Output("scenario-dir", "data"),
+        Output("bundle-io-summary", "children"),
+        Output("nodes-grid", "rowData"),
+        Output("components-grid", "rowData"),
+        Output("routes-grid", "rowData"),
+        Output("scenario-settings-editor", "value"),
+        Output("execution-summary", "children", allow_duplicate=True),
+        Input("save-reopen-bundle-button", "n_clicks"),
+        State("scenario-dir", "data"),
+        State("bundle-output-dir-input", "value"),
+        State("nodes-grid", "rowData"),
+        State("components-grid", "rowData"),
+        State("routes-grid", "rowData"),
+        State("scenario-settings-editor", "value"),
+        prevent_initial_call=True,
+    )
+    def _save_and_reopen_bundle(
+        n_clicks: Any,
+        current_scenario_dir: str,
+        bundle_output_dir: str | None,
+        nodes_rows: list[dict[str, Any]] | None,
+        components_rows: list[dict[str, Any]] | None,
+        route_rows: list[dict[str, Any]] | None,
+        scenario_settings_text: str | None,
+    ) -> tuple[str, str, list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], str, str]:
+        if not n_clicks:
+            payload = bundle_authoring_payload(load_scenario_bundle(current_scenario_dir))
+            return (
+                current_scenario_dir,
+                initial_bundle_io_summary,
+                payload["nodes_rows"],
+                payload["components_rows"],
+                payload["route_rows"],
+                payload["scenario_settings_text"],
+                initial_execution_summary,
+            )
+        target_dir = str(Path(bundle_output_dir).expanduser()) if str(bundle_output_dir or "").strip() else current_scenario_dir
+        try:
+            saved = save_and_reopen_local_bundle(
+                current_scenario_dir=current_scenario_dir,
+                output_dir=target_dir,
+                nodes_rows=nodes_rows,
+                components_rows=components_rows,
+                route_rows=route_rows,
+                scenario_settings_text=scenario_settings_text,
+            )
+            payload = bundle_authoring_payload(saved["bundle"])
+            return (
+                saved["scenario_dir"],
+                json.dumps(saved["bundle_io_summary"], indent=2, ensure_ascii=False),
+                payload["nodes_rows"],
+                payload["components_rows"],
+                payload["route_rows"],
+                payload["scenario_settings_text"],
+                _build_execution_summary(saved["result"], saved["pipeline_error"]),
+            )
+        except Exception as exc:
+            return (
+                current_scenario_dir,
+                json.dumps(
+                    {
+                        "status": "error",
+                        "source_scenario_dir": current_scenario_dir,
+                        "requested_output_dir": target_dir,
+                        "error": str(exc),
+                    },
+                    indent=2,
+                    ensure_ascii=False,
+                ),
+                nodes_rows or [],
+                components_rows or [],
+                route_rows or [],
+                scenario_settings_text or "",
+                _build_execution_summary(None, str(exc)),
+            )
+
+    @app.callback(
+        Output("profile-dropdown", "options"),
+        Output("profile-dropdown", "value"),
+        Output("family-dropdown", "options"),
+        Output("family-dropdown", "value"),
+        Output("weight-cost", "value"),
+        Output("weight-quality", "value"),
+        Output("weight-flow", "value"),
+        Output("weight-resilience", "value"),
+        Output("weight-cleaning", "value"),
+        Output("weight-operability", "value"),
+        Input("scenario-dir", "data"),
+        State("profile-dropdown", "value"),
+        State("family-dropdown", "value"),
+    )
+    def _refresh_scenario_controls(
+        current_scenario_dir: str,
+        current_profile_id: str | None,
+        current_family: str | None,
+    ) -> tuple[list[dict[str, Any]], str, list[dict[str, Any]], str, float, float, float, float, float, float]:
+        current_bundle = load_scenario_bundle(current_scenario_dir)
+        profile_options = _profile_dropdown_options(current_bundle)
+        valid_profiles = {option["value"] for option in profile_options}
+        profile_value = current_profile_id if current_profile_id in valid_profiles else str(
+            current_bundle.scenario_settings["ranking"]["default_profile"]
+        )
+        family_options = _family_dropdown_options(current_bundle)
+        valid_families = {option["value"] for option in family_options}
+        family_value = current_family if current_family in valid_families else "ALL"
+        weights = _weight_input_values(current_bundle, profile_value)
+        return (
+            profile_options,
+            profile_value,
+            family_options,
+            family_value,
+            weights["cost_weight"],
+            weights["quality_weight"],
+            weights["flow_weight"],
+            weights["resilience_weight"],
+            weights["cleaning_weight"],
+            weights["operability_weight"],
+        )
+
+    @app.callback(
         Output("execution-summary", "children"),
         Input("run-button", "n_clicks"),
         State("scenario-dir", "data"),
     )
     def _run_pipeline(n_clicks: Any, current_scenario_dir: str) -> str:
         if not n_clicks:
-            return json.dumps(
-                {
-                    "candidate_count": len(result["catalog"]) if result else 0,
-                    "feasible_count": sum(1 for item in result["catalog"] if item["metrics"]["feasible"]) if result else 0,
-                    "default_profile_id": result.get("default_profile_id") if result else None,
-                    "selected_candidate_id": result.get("selected_candidate_id") if result else None,
-                    "error": pipeline_error,
-                },
-                indent=2,
-                ensure_ascii=False,
-            )
+            return _build_execution_summary(result, pipeline_error)
         rerun, rerun_error = _safe_run_pipeline(current_scenario_dir)
-        return json.dumps(
-            {
-                "candidate_count": len(rerun["catalog"]) if rerun else 0,
-                "feasible_count": sum(1 for item in rerun["catalog"] if item["metrics"]["feasible"]) if rerun else 0,
-                "default_profile_id": rerun.get("default_profile_id") if rerun else None,
-                "selected_candidate_id": rerun.get("selected_candidate_id") if rerun else None,
-                "error": rerun_error,
-            },
-            indent=2,
-            ensure_ascii=False,
-        )
+        return _build_execution_summary(rerun, rerun_error)
 
     @app.callback(
         Output("catalog-grid", "rowData"),
@@ -262,6 +382,7 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
         Output("compare-candidates-dropdown", "options"),
         Output("compare-candidates-dropdown", "value"),
         Output("catalog-state-summary", "children"),
+        Input("scenario-dir", "data"),
         Input("profile-dropdown", "value"),
         Input("family-dropdown", "value"),
         Input("feasible-only-checklist", "value"),
@@ -284,6 +405,7 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
         State("compare-candidates-dropdown", "value"),
     )
     def _rerank_catalog(
+        current_scenario_dir: str,
         profile: str,
         family: str,
         feasible_only: list[str],
@@ -305,7 +427,8 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
         current_selected_id: str | None,
         current_compare_ids: Any,
     ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], str | None, list[dict[str, Any]], list[str], str]:
-        if not result:
+        current_result, _ = _safe_run_pipeline(current_scenario_dir)
+        if not current_result:
             return [], [], [], None, [], [], json.dumps({}, ensure_ascii=False)
         weights = {
             "cost_weight": cost_weight,
@@ -316,7 +439,7 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
             "operability_weight": operability_weight,
         }
         view_state = build_catalog_view_state(
-            result,
+            current_result,
             profile_id=profile,
             weight_overrides=weights,
             family=family,
@@ -359,7 +482,7 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
                 selected_candidate_id=view_state["selected_candidate_id"],
                 ranked_records=view_state["ranked_records"],
                 filters=filters,
-                aggregate_summary=result.get("summary", {}),
+                aggregate_summary=current_result.get("summary", {}),
             ),
         )
 
@@ -371,17 +494,20 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
         Output("selected-candidate-summary", "children"),
         Output("candidate-breakdown", "children"),
         Output("official-candidate-summary", "children"),
+        Input("scenario-dir", "data"),
         Input("selected-candidate-dropdown", "value"),
         Input("profile-dropdown", "value"),
     )
     def _update_selected_candidate(
+        current_scenario_dir: str,
         candidate_id: str,
         active_profile_id: str,
     ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], str | None, list[dict[str, Any]], str, str, str]:
-        if not result or not candidate_id:
+        current_result, _ = _safe_run_pipeline(current_scenario_dir)
+        if not current_result or not candidate_id:
             empty = json.dumps({}, ensure_ascii=False)
             return [], [], None, [], empty, empty, empty
-        detail = build_candidate_detail(result, candidate_id, profile_id=active_profile_id)
+        detail = build_candidate_detail(current_result, candidate_id, profile_id=active_profile_id)
         route_options = _route_dropdown_options(detail["route_rows"])
         route_value = _default_route_highlight(detail["route_rows"])
         return (
@@ -392,7 +518,7 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
             json.dumps(detail["summary"], indent=2, ensure_ascii=False),
             json.dumps(detail["breakdown"], indent=2, ensure_ascii=False),
             json.dumps(
-                build_official_candidate_summary(result, profile_id=active_profile_id, candidate_id=None),
+                build_official_candidate_summary(current_result, profile_id=active_profile_id, candidate_id=None),
                 indent=2,
                 ensure_ascii=False,
             ),
@@ -400,13 +526,15 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
 
     @app.callback(
         Output("circuit-cytoscape", "stylesheet"),
+        Input("scenario-dir", "data"),
         Input("selected-candidate-dropdown", "value"),
         Input("route-highlight-dropdown", "value"),
     )
-    def _highlight_route(candidate_id: str | None, route_id: str | None) -> list[dict[str, Any]]:
-        if not result:
+    def _highlight_route(current_scenario_dir: str, candidate_id: str | None, route_id: str | None) -> list[dict[str, Any]]:
+        current_result, _ = _safe_run_pipeline(current_scenario_dir)
+        if not current_result:
             return _build_cytoscape_stylesheet({}, None, [])
-        detail = build_candidate_detail(result, candidate_id)
+        detail = build_candidate_detail(current_result, candidate_id)
         return _build_cytoscape_stylesheet(
             detail.get("route_highlights", {}),
             route_id,
@@ -416,18 +544,25 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
     @app.callback(
         Output("comparison-figure", "figure"),
         Output("comparison-grid", "rowData"),
+        Input("scenario-dir", "data"),
         Input("compare-candidates-dropdown", "value"),
         Input("profile-dropdown", "value"),
         Input("selected-candidate-dropdown", "value"),
     )
-    def _update_comparison(candidate_ids: Any, profile: str, selected_candidate_id: str | None) -> tuple[Any, list[dict[str, Any]]]:
-        if not result:
+    def _update_comparison(
+        current_scenario_dir: str,
+        candidate_ids: Any,
+        profile: str,
+        selected_candidate_id: str | None,
+    ) -> tuple[Any, list[dict[str, Any]]]:
+        current_result, _ = _safe_run_pipeline(current_scenario_dir)
+        if not current_result:
             return build_solution_comparison_figure([]), []
         normalized_ids = _normalize_compare_ids(candidate_ids)
         return (
-            build_solution_comparison_figure(_lookup_candidates(result, normalized_ids)),
+            build_solution_comparison_figure(_lookup_candidates(current_result, normalized_ids)),
             build_comparison_records(
-                result,
+                current_result,
                 normalized_ids,
                 profile_id=profile,
                 active_selected_id=selected_candidate_id,
@@ -455,6 +590,7 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
         State("weight-resilience", "value"),
         State("weight-cleaning", "value"),
         State("weight-operability", "value"),
+        State("scenario-dir", "data"),
         prevent_initial_call=True,
     )
     def _export_catalog(
@@ -477,8 +613,10 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
         resilience_weight: Any,
         cleaning_weight: Any,
         operability_weight: Any,
+        current_scenario_dir: str,
     ) -> Any:
-        if not n_clicks or not result:
+        current_result, _ = _safe_run_pipeline(current_scenario_dir)
+        if not n_clicks or not current_result:
             return None
         weights = {
             "cost_weight": cost_weight,
@@ -489,7 +627,7 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
             "operability_weight": operability_weight,
         }
         view_state = build_catalog_view_state(
-            result,
+            current_result,
             profile_id=profile,
             weight_overrides=weights,
             family=family,
@@ -515,13 +653,21 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
         State("compare-candidates-dropdown", "value"),
         State("profile-dropdown", "value"),
         State("selected-candidate-dropdown", "value"),
+        State("scenario-dir", "data"),
         prevent_initial_call=True,
     )
-    def _export_comparison(n_clicks: Any, candidate_ids: Any, profile: str, selected_candidate_id: str | None) -> Any:
-        if not n_clicks or not result:
+    def _export_comparison(
+        n_clicks: Any,
+        candidate_ids: Any,
+        profile: str,
+        selected_candidate_id: str | None,
+        current_scenario_dir: str,
+    ) -> Any:
+        current_result, _ = _safe_run_pipeline(current_scenario_dir)
+        if not n_clicks or not current_result:
             return None
         records = build_comparison_records(
-            result,
+            current_result,
             _normalize_compare_ids(candidate_ids),
             profile_id=profile,
             active_selected_id=selected_candidate_id,
@@ -539,6 +685,7 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
         State("compare-candidates-dropdown", "value"),
         State("profile-dropdown", "value"),
         State("selected-candidate-dropdown", "value"),
+        State("scenario-dir", "data"),
         prevent_initial_call=True,
     )
     def _export_comparison_json(
@@ -546,11 +693,13 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
         candidate_ids: Any,
         profile: str,
         selected_candidate_id: str | None,
+        current_scenario_dir: str,
     ) -> Any:
-        if not n_clicks or not result:
+        current_result, _ = _safe_run_pipeline(current_scenario_dir)
+        if not n_clicks or not current_result:
             return None
         records = build_comparison_records(
-            result,
+            current_result,
             _normalize_compare_ids(candidate_ids),
             profile_id=profile,
             active_selected_id=selected_candidate_id,
@@ -566,13 +715,15 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
         Output("selected-candidate-download", "data"),
         Input("export-selected-button", "n_clicks"),
         State("selected-candidate-dropdown", "value"),
+        State("scenario-dir", "data"),
         prevent_initial_call=True,
     )
-    def _export_selected_candidate(n_clicks: Any, candidate_id: str) -> Any:
-        if not n_clicks or not result or not candidate_id:
+    def _export_selected_candidate(n_clicks: Any, candidate_id: str, current_scenario_dir: str) -> Any:
+        current_result, _ = _safe_run_pipeline(current_scenario_dir)
+        if not n_clicks or not current_result or not candidate_id:
             return None
-        detail = build_candidate_detail(result, candidate_id)
-        candidate = next(item for item in result["catalog"] if item["candidate_id"] == candidate_id)
+        detail = build_candidate_detail(current_result, candidate_id)
+        candidate = next(item for item in current_result["catalog"] if item["candidate_id"] == candidate_id)
         payload = {
             "candidate_id": candidate_id,
             "topology_family": candidate["topology_family"],
@@ -935,16 +1086,110 @@ def build_comparison_records(
 
 def _safe_run_pipeline(scenario_dir: str | Path) -> tuple[dict[str, Any] | None, str | None]:
     try:
-        return run_decision_pipeline(scenario_dir), None
+        bundle = load_scenario_bundle(scenario_dir)
+        return run_decision_pipeline(
+            scenario_dir,
+            allow_diagnostic_python_emulation=_requires_diagnostic_python_emulation(bundle),
+        ), None
     except Exception as exc:  # pragma: no cover
         return None, str(exc)
 
 
-def _table(component_id: str, frame: pd.DataFrame) -> Any:
+def save_and_reopen_local_bundle(
+    *,
+    current_scenario_dir: str | Path,
+    output_dir: str | Path,
+    nodes_rows: list[dict[str, Any]] | None,
+    components_rows: list[dict[str, Any]] | None,
+    route_rows: list[dict[str, Any]] | None,
+    scenario_settings_text: str | None,
+) -> dict[str, Any]:
+    reloaded_bundle, exported_files = save_authored_scenario_bundle(
+        current_scenario_dir,
+        output_dir,
+        nodes_rows=nodes_rows,
+        components_rows=components_rows,
+        route_rows=route_rows,
+        scenario_settings_text=scenario_settings_text,
+    )
+    result, pipeline_error = _safe_run_pipeline(output_dir)
+    return {
+        "scenario_dir": str(Path(output_dir)),
+        "bundle": reloaded_bundle,
+        "result": result,
+        "pipeline_error": pipeline_error,
+        "bundle_io_summary": {
+            "status": "saved_and_reopened",
+            "source_scenario_dir": str(Path(current_scenario_dir)),
+            "saved_scenario_dir": str(Path(output_dir)),
+            "bundle_version": reloaded_bundle.bundle_version,
+            "bundle_manifest": str(reloaded_bundle.bundle_manifest_path) if reloaded_bundle.bundle_manifest_path else None,
+            "bundle_files": {
+                logical_name: str(path.relative_to(reloaded_bundle.base_dir))
+                for logical_name, path in reloaded_bundle.resolved_files.items()
+            },
+            "exported_files": {
+                logical_name: str(path)
+                for logical_name, path in exported_files.items()
+            },
+            "pipeline_error": pipeline_error,
+        },
+    }
+
+
+def _build_execution_summary(result: dict[str, Any] | None, error: str | None) -> str:
+    return json.dumps(
+        {
+            "candidate_count": len(result["catalog"]) if result else 0,
+            "feasible_count": sum(1 for item in result["catalog"] if item["metrics"]["feasible"]) if result else 0,
+            "default_profile_id": result.get("default_profile_id") if result else None,
+            "selected_candidate_id": result.get("selected_candidate_id") if result else None,
+            "scenario_bundle_version": result.get("scenario_bundle_version") if result else None,
+            "scenario_bundle_manifest": result.get("scenario_bundle_manifest") if result else None,
+            "scenario_bundle_files": result.get("scenario_bundle_files") if result else None,
+            "error": error,
+        },
+        indent=2,
+        ensure_ascii=False,
+    )
+
+
+def _requires_diagnostic_python_emulation(bundle: Any) -> bool:
+    engine_cfg = bundle.scenario_settings.get("hydraulic_engine", {})
+    primary_engine = str(engine_cfg.get("primary", "watermodels_jl")).strip()
+    fallback_engine = str(engine_cfg.get("fallback", "none")).strip()
+    return primary_engine != "watermodels_jl" or fallback_engine != "none"
+
+
+def _profile_dropdown_options(bundle: Any) -> list[dict[str, Any]]:
+    return [{"label": profile, "value": profile} for profile in bundle.weight_profiles["profile_id"].tolist()]
+
+
+def _family_dropdown_options(bundle: Any) -> list[dict[str, Any]]:
+    return [{"label": "Todas", "value": "ALL"}] + [
+        {"label": family, "value": family}
+        for family in sorted(bundle.scenario_settings["enabled_families"])
+    ]
+
+
+def _weight_input_values(bundle: Any, profile_id: str) -> dict[str, float]:
+    profile = bundle.weight_profiles.loc[bundle.weight_profiles["profile_id"] == profile_id].iloc[0]
+    return {
+        "cost_weight": float(profile["cost_weight"]),
+        "quality_weight": float(profile["quality_weight"]),
+        "flow_weight": float(profile["flow_weight"]),
+        "resilience_weight": float(profile["resilience_weight"]),
+        "cleaning_weight": float(profile["cleaning_weight"]),
+        "operability_weight": float(profile["operability_weight"]),
+    }
+
+
+def _table(component_id: str, frame: pd.DataFrame, *, editable: bool = False) -> Any:
     return dag.AgGrid(
         id=component_id,
         columnDefs=[{"field": column} for column in frame.columns],
         rowData=frame.to_dict("records"),
+        defaultColDef={"editable": editable, "resizable": True},
         dashGridOptions={"pagination": True, "animateRows": True},
     )
 
@@ -1092,18 +1337,16 @@ def _build_cytoscape_stylesheet(
 
 
 def _weight_inputs(bundle: Any) -> Any:
-    profile = bundle.weight_profiles.loc[
-        bundle.weight_profiles["profile_id"] == bundle.scenario_settings["ranking"]["default_profile"]
-    ].iloc[0]
+    profile = _weight_input_values(bundle, str(bundle.scenario_settings["ranking"]["default_profile"]))
     return html.Div(
         children=[
             html.H3("Pesos dinâmicos"),
-            dcc.Input(id="weight-cost", type="number", value=float(profile["cost_weight"]), persistence=True, persistence_type="session"),
-            dcc.Input(id="weight-quality", type="number", value=float(profile["quality_weight"]), persistence=True, persistence_type="session"),
-            dcc.Input(id="weight-flow", type="number", value=float(profile["flow_weight"]), persistence=True, persistence_type="session"),
-            dcc.Input(id="weight-resilience", type="number", value=float(profile["resilience_weight"]), persistence=True, persistence_type="session"),
-            dcc.Input(id="weight-cleaning", type="number", value=float(profile["cleaning_weight"]), persistence=True, persistence_type="session"),
-            dcc.Input(id="weight-operability", type="number", value=float(profile["operability_weight"]), persistence=True, persistence_type="session"),
+            dcc.Input(id="weight-cost", type="number", value=profile["cost_weight"], persistence=True, persistence_type="session"),
+            dcc.Input(id="weight-quality", type="number", value=profile["quality_weight"], persistence=True, persistence_type="session"),
+            dcc.Input(id="weight-flow", type="number", value=profile["flow_weight"], persistence=True, persistence_type="session"),
+            dcc.Input(id="weight-resilience", type="number", value=profile["resilience_weight"], persistence=True, persistence_type="session"),
+            dcc.Input(id="weight-cleaning", type="number", value=profile["cleaning_weight"], persistence=True, persistence_type="session"),
+            dcc.Input(id="weight-operability", type="number", value=profile["operability_weight"], persistence=True, persistence_type="session"),
         ],
     )
 

@@ -179,6 +179,8 @@ Persistência local introduzida na phase 1:
 - `component_catalog.csv` é o catálogo persistido de componentes
 - `components.csv` permanece apenas como alias legado de compatibilidade
 - `save_scenario_bundle(...)` grava o bundle determinístico e `load_scenario_bundle(...)` reabre tanto o formato novo quanto o layout legado
+- `save_authored_scenario_bundle(...)` persiste as tabelas de autoria (`nodes`, `components`, `route_requirements`) e o `scenario_settings.yaml` no mesmo bundle canônico
+- a aba `Dados` da UI local expõe um fluxo único de `Salvar e reabrir bundle` para gravar o cenário editado e recarregá-lo sem depender só do estado de sessão
 
 Execução reproduzida nesta máquina em 2026-04-04 e consolidada pelo manifesto `docs/codex_dual_agent_runtime/phase_0_validation_manifest.json`. O artefato `engine_comparison.json` continua sendo apenas diagnóstico e nunca substitui a validação oficial do profile `official`.
 
@@ -468,6 +470,9 @@ Somente na trilha diagnóstica explícita:
 - `engine_comparison_candidates.csv`
 
 `summary.json` agora também registra:
+- `scenario_bundle_version`
+- `scenario_bundle_manifest`
+- `scenario_bundle_files`
 - `runtime.started_at`
 - `runtime.finished_at`
 - `runtime.duration_s`

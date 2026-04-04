@@ -1,7 +1,12 @@
 from __future__ import annotations
 
-import pytest
+import shutil
+from pathlib import Path
 
+import pytest
+import yaml
+
+from decision_platform.data_io.loader import load_scenario_bundle
 from decision_platform.ui_dash._compat import DASH_AVAILABLE
 from decision_platform.ui_dash.app import (
     build_app,
@@ -11,8 +16,9 @@ from decision_platform.ui_dash.app import (
     build_catalog_view_state,
     filter_catalog_records,
     rerank_catalog,
+    save_and_reopen_local_bundle,
 )
-from tests.decision_platform.scenario_utils import diagnostic_runtime_test_mode
+from tests.decision_platform.scenario_utils import cleanup_scenario_copy, diagnostic_runtime_test_mode, prepare_scenario_copy
 
 pytestmark = [pytest.mark.requires_dash, pytest.mark.ui]
 
@@ -29,6 +35,16 @@ def test_dash_app_builds_layout_and_callbacks_even_when_fail_closed() -> None:
 
 def test_real_dash_stack_is_available() -> None:
     assert DASH_AVAILABLE is True
+
+
+def test_dash_app_exposes_authoring_save_reopen_controls() -> None:
+    with diagnostic_runtime_test_mode():
+        app = build_app("data/decision_platform/maquete_v2")
+
+    layout_repr = repr(app.layout)
+    assert "save-reopen-bundle-button" in layout_repr
+    assert "scenario-settings-editor" in layout_repr
+    assert "bundle-output-dir-input" in layout_repr
 
 
 @pytest.mark.slow
@@ -60,6 +76,56 @@ def test_ui_view_state_uses_official_selected_candidate_instead_of_catalog_first
     assert view_state["selected_candidate_id"] != manipulated["catalog"][0]["candidate_id"]
     assert detail["cytoscape_elements"] == result["selected_candidate"]["render"]["cytoscape_elements"]
     assert detail["summary"]["generation_source"] == result["selected_candidate"]["generation_source"]
+
+
+@pytest.mark.slow
+def test_ui_save_reopen_flow_persists_bundle_and_refreshes_pipeline() -> None:
+    scenario_dir = prepare_scenario_copy(
+        "data/decision_platform/maquete_v2",
+        "maquete_v2_ui_save_reopen_source",
+        scenario_overrides={"hydraulic_engine": {"fallback": "python_emulated_julia"}},
+    )
+    output_dir = Path("tests/_tmp/maquete_v2_ui_save_reopen_saved")
+    if output_dir.exists():
+        shutil.rmtree(output_dir)
+    try:
+        bundle = load_scenario_bundle(scenario_dir)
+        nodes_rows = bundle.nodes.to_dict("records")
+        components_rows = bundle.components.to_dict("records")
+        route_rows = bundle.route_requirements.to_dict("records")
+        nodes_rows[0]["label"] = "W salvo na UI"
+        components_rows[0]["cost"] = 321.0
+        route_rows[0]["weight"] = 55.0
+        scenario_settings = bundle.scenario_settings | {
+            "ui": {
+                **bundle.scenario_settings.get("ui", {}),
+                "default_layout_mode": "save_reopen_ui",
+            }
+        }
+
+        with diagnostic_runtime_test_mode():
+            saved = save_and_reopen_local_bundle(
+                current_scenario_dir=scenario_dir,
+                output_dir=output_dir,
+                nodes_rows=nodes_rows,
+                components_rows=components_rows,
+                route_rows=route_rows,
+                scenario_settings_text=yaml.safe_dump(scenario_settings, sort_keys=False, allow_unicode=True),
+            )
+
+        assert saved["scenario_dir"] == str(output_dir)
+        assert saved["bundle"].nodes.iloc[0]["label"] == "W salvo na UI"
+        assert float(saved["bundle"].components.iloc[0]["cost"]) == 321.0
+        assert float(saved["bundle"].route_requirements.iloc[0]["weight"]) == 55.0
+        assert saved["bundle"].scenario_settings["ui"]["default_layout_mode"] == "save_reopen_ui"
+        assert saved["result"] is not None
+        assert saved["result"]["scenario_bundle_version"] == saved["bundle"].bundle_version
+        assert saved["result"]["scenario_bundle_files"]["components.csv"] == "component_catalog.csv"
+        assert saved["pipeline_error"] is None
+    finally:
+        if output_dir.exists():
+            shutil.rmtree(output_dir)
+        cleanup_scenario_copy(scenario_dir)
 
 
 @pytest.mark.slow
