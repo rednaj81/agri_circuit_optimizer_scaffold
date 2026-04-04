@@ -7,6 +7,12 @@ from typing import Any
 import matplotlib.pyplot as plt
 import pandas as pd
 
+from decision_platform.catalog.explanation import (
+    build_family_summary_records,
+    build_infeasibility_summary,
+    build_selected_candidate_explanation,
+    render_selected_candidate_explanation_markdown,
+)
 from decision_platform.catalog.quality_rules import apply_quality_rules
 from decision_platform.catalog.viability import (
     serialize_constraint_failures,
@@ -75,8 +81,17 @@ def build_solution_catalog(bundle: ScenarioBundle) -> dict[str, Any]:
                     ensure_ascii=False,
                     sort_keys=True,
                 ),
+                "constraint_failure_reasons": json.dumps(
+                    item["metrics"].get("constraint_failure_reasons", {}),
+                    ensure_ascii=False,
+                    sort_keys=True,
+                ),
                 "constraint_failures": serialize_constraint_failures(
                     item["metrics"].get("constraint_failures", [])
+                ),
+                "mandatory_failed_route_ids": json.dumps(
+                    item["metrics"].get("mandatory_failed_route_ids", []),
+                    ensure_ascii=False,
                 ),
             }
             for item in evaluated
@@ -86,23 +101,32 @@ def build_solution_catalog(bundle: ScenarioBundle) -> dict[str, Any]:
         profile_id: apply_weight_profile(catalog_frame, bundle.weight_profiles, profile_id)
         for profile_id in bundle.weight_profiles["profile_id"].tolist()
     }
+    weight_profiles_lookup = {
+        str(record["profile_id"]): record
+        for record in bundle.weight_profiles.to_dict("records")
+    }
     default_profile_id = _get_default_profile_id(bundle)
     selected_candidate_id, selected_candidate = _resolve_selected_candidate(
         evaluated,
         ranked_profiles.get(default_profile_id, []),
     )
     summary = _build_catalog_summary(candidates, evaluated, generation_report)
-    return {
+    result = {
         "scenario_id": bundle.scenario_settings.get("scenario_id", bundle.base_dir.name),
         "catalog": evaluated,
         "catalog_frame": catalog_frame,
         "ranked_profiles": ranked_profiles,
+        "weight_profiles_lookup": weight_profiles_lookup,
         "default_profile_id": default_profile_id,
         "selected_candidate_id": selected_candidate_id,
         "selected_candidate": selected_candidate,
         "summary": summary,
         "generation_report": generation_report,
     }
+    result["selected_candidate_explanation"] = build_selected_candidate_explanation(result)
+    result["family_summary"] = build_family_summary_records(result)
+    result["infeasibility_summary"] = build_infeasibility_summary(result)
+    return result
 
 
 def export_catalog(result: dict[str, Any], output_dir: str | Path) -> dict[str, Path]:
@@ -149,6 +173,26 @@ def export_catalog(result: dict[str, Any], output_dir: str | Path) -> dict[str, 
         engine_comparison_json = out_dir / "engine_comparison.json"
         engine_comparison_json.write_text(json.dumps(engine_comparison, indent=2, ensure_ascii=False), encoding="utf-8")
         exported["engine_comparison_json"] = engine_comparison_json
+        candidate_rows = engine_comparison.get("candidate_rows", [])
+        if candidate_rows:
+            engine_comparison_candidates_csv = out_dir / "engine_comparison_candidates.csv"
+            pd.DataFrame(candidate_rows).to_csv(engine_comparison_candidates_csv, index=False)
+            exported["engine_comparison_candidates_csv"] = engine_comparison_candidates_csv
+
+    family_summary_records = list(result.get("family_summary", []))
+    if family_summary_records:
+        family_summary_csv = out_dir / "family_summary.csv"
+        pd.DataFrame(family_summary_records).to_csv(family_summary_csv, index=False)
+        exported["family_summary_csv"] = family_summary_csv
+
+    infeasibility_summary = result.get("infeasibility_summary")
+    if infeasibility_summary is not None:
+        infeasibility_summary_json = out_dir / "infeasibility_summary.json"
+        infeasibility_summary_json.write_text(
+            json.dumps(infeasibility_summary, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        exported["infeasibility_summary_json"] = infeasibility_summary_json
 
     decision_summary = _build_decision_summary(result, selected_profile_id, selected_candidate)
     final_summary_json = out_dir / "summary.json"
@@ -219,6 +263,22 @@ def export_catalog(result: dict[str, Any], output_dir: str | Path) -> dict[str, 
             encoding="utf-8",
         )
         exported["selected_candidate_score_breakdown_json"] = selected_candidate_score_json
+
+        selected_candidate_explanation = result.get("selected_candidate_explanation")
+        if selected_candidate_explanation:
+            selected_candidate_explanation_json = out_dir / "selected_candidate_explanation.json"
+            selected_candidate_explanation_json.write_text(
+                json.dumps(selected_candidate_explanation, indent=2, ensure_ascii=False),
+                encoding="utf-8",
+            )
+            exported["selected_candidate_explanation_json"] = selected_candidate_explanation_json
+
+            selected_candidate_explanation_md = out_dir / "selected_candidate_explanation.md"
+            selected_candidate_explanation_md.write_text(
+                render_selected_candidate_explanation_markdown(selected_candidate_explanation),
+                encoding="utf-8",
+            )
+            exported["selected_candidate_explanation_md"] = selected_candidate_explanation_md
 
         selected_candidate_render_json = out_dir / "selected_candidate_render.json"
         selected_candidate_render_json.write_text(
@@ -383,11 +443,15 @@ def _build_decision_summary(
             "infeasibility_reason": metrics.get("infeasibility_reason"),
             "constraint_failure_count": int(metrics.get("constraint_failure_count", 0)),
             "constraint_failure_categories": metrics.get("constraint_failure_categories", {}),
+            "constraint_failure_reasons": metrics.get("constraint_failure_reasons", {}),
             "constraint_failures": metrics.get("constraint_failures", []),
             "mandatory_failed_route_ids": metrics.get("mandatory_failed_route_ids", []),
             "route_count": len(metrics.get("route_metrics", [])),
             "bom_component_count": int(metrics.get("bom_summary", {}).get("total_components", 0)),
             "route_hydraulic_summary": route_hydraulic_summary,
+            "selected_candidate_explanation": result.get("selected_candidate_explanation", {}),
+            "family_summary": result.get("family_summary", []),
+            "infeasibility_summary": result.get("infeasibility_summary", {}),
         }
     )
     return summary

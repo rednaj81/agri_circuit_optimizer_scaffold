@@ -87,6 +87,32 @@ def test_catalog_filters_include_quality_resilience_flow_and_fallback(
 
 
 @pytest.mark.slow
+def test_catalog_filters_include_infeasibility_reason_and_family_summary(
+    maquete_v2_fallback_runtime: dict[str, object],
+) -> None:
+    result = maquete_v2_fallback_runtime["result"]
+    ranked = rerank_catalog(result, "balanced")
+    target_reason = next(
+        str(record["infeasibility_reason"])
+        for record in ranked
+        if record.get("infeasibility_reason") not in (None, "")
+    )
+    filtered = filter_catalog_records(
+        ranked,
+        infeasibility_reason=target_reason,
+    )
+    view_state = build_catalog_view_state(
+        result,
+        profile_id=result["default_profile_id"],
+        infeasibility_reason=target_reason,
+    )
+    assert filtered
+    assert all(str(record["infeasibility_reason"]) == target_reason for record in filtered)
+    assert view_state["family_summary_records"]
+    assert all("viability_rate" in row for row in view_state["family_summary_records"])
+
+
+@pytest.mark.slow
 def test_reranking_changes_visible_selected_candidate_when_weights_change(
     maquete_v2_fallback_runtime: dict[str, object],
 ) -> None:
@@ -120,8 +146,12 @@ def test_ui_summary_and_comparison_records_expose_decision_fields(maquete_v2_fal
         result,
         [record["candidate_id"] for record in result["ranked_profiles"]["balanced"][:2]],
         profile_id=result["default_profile_id"],
+        active_selected_id=result["selected_candidate_id"],
     )
     assert official["candidate_id"] == result["selected_candidate_id"]
     assert "critical_routes" in official
+    assert "winner_reason_summary" in official
+    assert official["runner_up_candidate_id"] == result["ranked_profiles"]["balanced"][1]["candidate_id"]
     assert comparison
+    assert comparison[0]["comparison_role"] in {"official,selected", "official"}
     assert all("score_final" in row for row in comparison)

@@ -42,11 +42,17 @@ def test_maquete_v2_pipeline_exports_and_route_metrics() -> None:
 
         summary = json.loads((output_dir / "summary.json").read_text(encoding="utf-8"))
         engine_comparison = json.loads((output_dir / "engine_comparison.json").read_text(encoding="utf-8"))
+        infeasibility_summary = json.loads((output_dir / "infeasibility_summary.json").read_text(encoding="utf-8"))
         selected_candidate = json.loads((output_dir / "selected_candidate.json").read_text(encoding="utf-8"))
+        selected_candidate_explanation = json.loads(
+            (output_dir / "selected_candidate_explanation.json").read_text(encoding="utf-8")
+        )
         selected_routes = json.loads((output_dir / "selected_candidate_routes.json").read_text(encoding="utf-8"))
         selected_render = json.loads((output_dir / "selected_candidate_render.json").read_text(encoding="utf-8"))
         selected_breakdown = json.loads((output_dir / "selected_candidate_score_breakdown.json").read_text(encoding="utf-8"))
         selected_bom = pd.read_csv(output_dir / "selected_candidate_bom.csv")
+        family_summary = pd.read_csv(output_dir / "family_summary.csv")
+        engine_comparison_candidates = pd.read_csv(output_dir / "engine_comparison_candidates.csv")
 
         assert (output_dir / "catalog.csv").exists()
         assert (output_dir / "catalog.json").exists()
@@ -55,7 +61,12 @@ def test_maquete_v2_pipeline_exports_and_route_metrics() -> None:
         assert (output_dir / "ranking_profiles.json").exists()
         assert (output_dir / "catalog_summary.json").exists()
         assert (output_dir / "engine_comparison.json").exists()
+        assert (output_dir / "engine_comparison_candidates.csv").exists()
+        assert (output_dir / "family_summary.csv").exists()
+        assert (output_dir / "infeasibility_summary.json").exists()
         assert (output_dir / "selected_candidate.svg").exists()
+        assert (output_dir / "selected_candidate_explanation.json").exists()
+        assert (output_dir / "selected_candidate_explanation.md").exists()
 
         assert summary["default_profile_id"] == result["default_profile_id"]
         assert summary["selected_candidate_id"] == result["selected_candidate_id"]
@@ -63,6 +74,9 @@ def test_maquete_v2_pipeline_exports_and_route_metrics() -> None:
         assert "viability_rate_by_family" in summary
         assert "infeasible_candidate_rate_by_reason" in summary
         assert "feasible_cost_distribution" in summary
+        assert "selected_candidate_explanation" in summary
+        assert "family_summary" in summary
+        assert "infeasibility_summary" in summary
         assert selected_candidate["candidate_id"] == result["selected_candidate_id"]
         assert "generation_metadata" in selected_candidate
         assert selected_routes["candidate_id"] == result["selected_candidate_id"]
@@ -77,8 +91,21 @@ def test_maquete_v2_pipeline_exports_and_route_metrics() -> None:
         assert all("route_effective_q_max_lpm" in route for route in selected_routes["routes"])
         assert all("critical_consequence" in route for route in selected_routes["routes"])
         assert summary["constraint_failure_categories"] == result["selected_candidate"]["metrics"]["constraint_failure_categories"]
+        assert summary["constraint_failure_reasons"] == result["selected_candidate"]["metrics"]["constraint_failure_reasons"]
+        assert selected_candidate_explanation["candidate_id"] == result["selected_candidate_id"]
+        assert selected_candidate_explanation["winner"]["candidate_id"] == result["selected_candidate_id"]
+        assert selected_candidate_explanation["runner_up"]["candidate_id"] != result["selected_candidate_id"]
+        assert selected_candidate_explanation["decision_status"] in {"winner_clear", "technical_tie"}
+        assert "decision_differences" in selected_candidate_explanation
+        assert family_summary["topology_family"].nunique() >= 1
+        assert set(engine_comparison_candidates["engine"]) == {"julia", "python"}
+        assert infeasibility_summary["total_infeasible_candidates"] >= 1
         assert engine_comparison["scenario_comparisons"]["maquete_v2"]["decision_difference_observed"] is True
         assert engine_comparison["scenario_comparisons"]["maquete_v2"]["selected_candidate"]["same"] is False
+        assert engine_comparison["scenario_comparisons"]["maquete_v2"]["same_winner"] is False
+        assert engine_comparison["scenario_comparisons"]["maquete_v2"]["ranking_difference_observed"] is True
+        assert "text_summary" in engine_comparison["scenario_comparisons"]["maquete_v2"]
+        assert "winner_vs_runner_up" in engine_comparison["scenario_comparisons"]["maquete_v2"]
         assert engine_comparison["scenario_comparisons"]["hybrid_free_focus_variant"]["selected_candidate"]["same"] is False
     finally:
         if output_dir.exists():

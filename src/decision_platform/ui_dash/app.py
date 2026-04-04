@@ -7,6 +7,7 @@ from typing import Any
 import pandas as pd
 
 from decision_platform.api.run_pipeline import run_decision_pipeline
+from decision_platform.catalog.explanation import build_selected_candidate_explanation
 from decision_platform.catalog.pipeline import resolve_selected_candidate
 from decision_platform.data_io.loader import load_scenario_bundle
 from decision_platform.ranking.scoring import apply_dynamic_weights
@@ -34,9 +35,14 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
     initial_official_summary = build_official_candidate_summary(
         result,
         profile_id=profile_id,
-        candidate_id=initial_state["selected_candidate_id"],
+        candidate_id=None,
     )
-    initial_comparison_records = build_comparison_records(result, initial_state["comparison_ids"], profile_id=profile_id)
+    initial_comparison_records = build_comparison_records(
+        result,
+        initial_state["comparison_ids"],
+        profile_id=profile_id,
+        active_selected_id=initial_state["selected_candidate_id"],
+    )
 
     app = Dash(__name__)
     app.layout = html.Div(
@@ -118,9 +124,18 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
                                 persistence=True,
                                 persistence_type="session",
                             ),
+                            dcc.Dropdown(
+                                id="infeasibility-reason-dropdown",
+                                options=_infeasibility_reason_options(result),
+                                value="ALL",
+                                persistence=True,
+                                persistence_type="session",
+                            ),
                             _weight_inputs(bundle),
                             html.Pre(initial_catalog_summary, id="catalog-state-summary"),
                             _catalog_grid(initial_state["ranked_records"]),
+                            html.H3("Resumo por família"),
+                            _family_summary_grid(initial_state.get("family_summary_records", [])),
                             html.Button("Exportar catálogo ranqueado", id="export-catalog-button"),
                             dcc.Download(id="catalog-download"),
                         ],
@@ -146,6 +161,8 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
                             _comparison_grid(initial_comparison_records),
                             html.Button("Exportar comparação", id="export-comparison-button"),
                             dcc.Download(id="comparison-download"),
+                            html.Button("Exportar comparação JSON", id="export-comparison-json-button"),
+                            dcc.Download(id="comparison-json-download"),
                         ],
                     ),
                     dcc.Tab(
@@ -180,6 +197,7 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
                                 stylesheet=_build_cytoscape_stylesheet(
                                     candidate_details.get("route_highlights", {}),
                                     _default_route_highlight(candidate_details.get("route_rows", [])),
+                                    candidate_details.get("critical_component_ids", []),
                                 ),
                             ),
                             _route_grid(candidate_details.get("route_rows", [])),
@@ -238,6 +256,7 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
 
     @app.callback(
         Output("catalog-grid", "rowData"),
+        Output("family-summary-grid", "rowData"),
         Output("selected-candidate-dropdown", "options"),
         Output("selected-candidate-dropdown", "value"),
         Output("compare-candidates-dropdown", "options"),
@@ -254,6 +273,7 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
         Input("min-operability-input", "value"),
         Input("top-n-family-input", "value"),
         Input("fallback-filter-dropdown", "value"),
+        Input("infeasibility-reason-dropdown", "value"),
         Input("weight-cost", "value"),
         Input("weight-quality", "value"),
         Input("weight-flow", "value"),
@@ -275,6 +295,7 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
         min_operability: Any,
         top_n_per_family: Any,
         fallback_filter: str,
+        infeasibility_reason: str,
         cost_weight: Any,
         quality_weight: Any,
         flow_weight: Any,
@@ -283,9 +304,9 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
         operability_weight: Any,
         current_selected_id: str | None,
         current_compare_ids: Any,
-    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], str | None, list[dict[str, Any]], list[str], str]:
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], str | None, list[dict[str, Any]], list[str], str]:
         if not result:
-            return [], [], None, [], [], json.dumps({}, ensure_ascii=False)
+            return [], [], [], None, [], [], json.dumps({}, ensure_ascii=False)
         weights = {
             "cost_weight": cost_weight,
             "quality_weight": quality_weight,
@@ -308,6 +329,7 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
             min_operability=min_operability,
             top_n_per_family=top_n_per_family,
             fallback_filter=fallback_filter,
+            infeasibility_reason=infeasibility_reason,
             current_selected_id=current_selected_id,
             current_compare_ids=current_compare_ids,
         )
@@ -322,10 +344,12 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
             "min_operability": min_operability,
             "top_n_per_family": top_n_per_family,
             "fallback_filter": fallback_filter,
+            "infeasibility_reason": infeasibility_reason,
             "weight_overrides": weights,
         }
         return (
             view_state["ranked_records"],
+            view_state["family_summary_records"],
             view_state["selected_options"],
             view_state["selected_candidate_id"],
             view_state["comparison_options"],
@@ -368,7 +392,7 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
             json.dumps(detail["summary"], indent=2, ensure_ascii=False),
             json.dumps(detail["breakdown"], indent=2, ensure_ascii=False),
             json.dumps(
-                build_official_candidate_summary(result, profile_id=active_profile_id, candidate_id=candidate_id),
+                build_official_candidate_summary(result, profile_id=active_profile_id, candidate_id=None),
                 indent=2,
                 ensure_ascii=False,
             ),
@@ -381,23 +405,33 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
     )
     def _highlight_route(candidate_id: str | None, route_id: str | None) -> list[dict[str, Any]]:
         if not result:
-            return _build_cytoscape_stylesheet({}, None)
+            return _build_cytoscape_stylesheet({}, None, [])
         detail = build_candidate_detail(result, candidate_id)
-        return _build_cytoscape_stylesheet(detail.get("route_highlights", {}), route_id)
+        return _build_cytoscape_stylesheet(
+            detail.get("route_highlights", {}),
+            route_id,
+            detail.get("critical_component_ids", []),
+        )
 
     @app.callback(
         Output("comparison-figure", "figure"),
         Output("comparison-grid", "rowData"),
         Input("compare-candidates-dropdown", "value"),
         Input("profile-dropdown", "value"),
+        Input("selected-candidate-dropdown", "value"),
     )
-    def _update_comparison(candidate_ids: Any, profile: str) -> tuple[Any, list[dict[str, Any]]]:
+    def _update_comparison(candidate_ids: Any, profile: str, selected_candidate_id: str | None) -> tuple[Any, list[dict[str, Any]]]:
         if not result:
             return build_solution_comparison_figure([]), []
         normalized_ids = _normalize_compare_ids(candidate_ids)
         return (
             build_solution_comparison_figure(_lookup_candidates(result, normalized_ids)),
-            build_comparison_records(result, normalized_ids, profile_id=profile),
+            build_comparison_records(
+                result,
+                normalized_ids,
+                profile_id=profile,
+                active_selected_id=selected_candidate_id,
+            ),
         )
 
     @app.callback(
@@ -414,6 +448,7 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
         State("min-operability-input", "value"),
         State("top-n-family-input", "value"),
         State("fallback-filter-dropdown", "value"),
+        State("infeasibility-reason-dropdown", "value"),
         State("weight-cost", "value"),
         State("weight-quality", "value"),
         State("weight-flow", "value"),
@@ -435,6 +470,7 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
         min_operability: Any,
         top_n_per_family: Any,
         fallback_filter: str,
+        infeasibility_reason: str,
         cost_weight: Any,
         quality_weight: Any,
         flow_weight: Any,
@@ -466,6 +502,7 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
             min_operability=min_operability,
             top_n_per_family=top_n_per_family,
             fallback_filter=fallback_filter,
+            infeasibility_reason=infeasibility_reason,
         )
         return _send_text_download(
             json.dumps(view_state["ranked_records"], indent=2, ensure_ascii=False),
@@ -477,17 +514,52 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
         Input("export-comparison-button", "n_clicks"),
         State("compare-candidates-dropdown", "value"),
         State("profile-dropdown", "value"),
+        State("selected-candidate-dropdown", "value"),
         prevent_initial_call=True,
     )
-    def _export_comparison(n_clicks: Any, candidate_ids: Any, profile: str) -> Any:
+    def _export_comparison(n_clicks: Any, candidate_ids: Any, profile: str, selected_candidate_id: str | None) -> Any:
         if not n_clicks or not result:
             return None
-        records = build_comparison_records(result, _normalize_compare_ids(candidate_ids), profile_id=profile)
+        records = build_comparison_records(
+            result,
+            _normalize_compare_ids(candidate_ids),
+            profile_id=profile,
+            active_selected_id=selected_candidate_id,
+        )
         if not records:
             return None
         return _send_text_download(
             pd.DataFrame(records).to_csv(index=False),
             f"comparison_{profile}.csv",
+        )
+
+    @app.callback(
+        Output("comparison-json-download", "data"),
+        Input("export-comparison-json-button", "n_clicks"),
+        State("compare-candidates-dropdown", "value"),
+        State("profile-dropdown", "value"),
+        State("selected-candidate-dropdown", "value"),
+        prevent_initial_call=True,
+    )
+    def _export_comparison_json(
+        n_clicks: Any,
+        candidate_ids: Any,
+        profile: str,
+        selected_candidate_id: str | None,
+    ) -> Any:
+        if not n_clicks or not result:
+            return None
+        records = build_comparison_records(
+            result,
+            _normalize_compare_ids(candidate_ids),
+            profile_id=profile,
+            active_selected_id=selected_candidate_id,
+        )
+        if not records:
+            return None
+        return _send_text_download(
+            json.dumps(records, indent=2, ensure_ascii=False),
+            f"comparison_{profile}.json",
         )
 
     @app.callback(
@@ -542,12 +614,14 @@ def build_catalog_view_state(
     min_operability: Any = None,
     top_n_per_family: Any = None,
     fallback_filter: str | None = None,
+    infeasibility_reason: str | None = None,
     current_selected_id: str | None = None,
     current_compare_ids: list[str] | str | None = None,
 ) -> dict[str, Any]:
     if not result:
         return {
             "ranked_records": [],
+            "family_summary_records": [],
             "selected_candidate_id": None,
             "selected_options": [],
             "comparison_ids": [],
@@ -566,7 +640,9 @@ def build_catalog_view_state(
         min_operability=min_operability,
         top_n_per_family=top_n_per_family,
         fallback_filter=fallback_filter,
+        infeasibility_reason=infeasibility_reason,
     )
+    family_summary_records = _family_summary_from_records(filtered_records)
     selected_candidate_id = select_visible_candidate_id(
         result,
         profile_id=profile_id,
@@ -584,6 +660,7 @@ def build_catalog_view_state(
             min_operability=min_operability,
             top_n_per_family=top_n_per_family,
             fallback_filter=fallback_filter,
+            infeasibility_reason=infeasibility_reason,
         ),
     )
     selected_options = [
@@ -594,10 +671,11 @@ def build_catalog_view_state(
     visible_ids = {record["candidate_id"] for record in filtered_records}
     comparison_ids = [candidate_id for candidate_id in normalized_compare_ids if candidate_id in visible_ids]
     if not comparison_ids:
-        comparison_ids = [record["candidate_id"] for record in filtered_records[:4]]
+        comparison_ids = _default_comparison_ids(result, profile_id, filtered_records, selected_candidate_id)
     comparison_options = selected_options[:8]
     return {
         "ranked_records": filtered_records,
+        "family_summary_records": family_summary_records,
         "selected_candidate_id": selected_candidate_id,
         "selected_options": selected_options,
         "comparison_ids": comparison_ids,
@@ -618,6 +696,7 @@ def filter_catalog_records(
     min_operability: Any = None,
     top_n_per_family: Any = None,
     fallback_filter: str | None = None,
+    infeasibility_reason: str | None = None,
 ) -> list[dict[str, Any]]:
     filtered = list(records)
     if family and family != "ALL":
@@ -640,6 +719,8 @@ def filter_catalog_records(
         filtered = [record for record in filtered if int(record["fallback_component_count"]) == 0]
     if fallback_filter == "WITH_FALLBACK":
         filtered = [record for record in filtered if int(record["fallback_component_count"]) > 0]
+    if infeasibility_reason not in (None, "", "ALL"):
+        filtered = [record for record in filtered if str(record.get("infeasibility_reason") or "NONE") == infeasibility_reason]
     if top_n_per_family not in (None, ""):
         limit = max(1, int(top_n_per_family))
         grouped: dict[str, list[dict[str, Any]]] = {}
@@ -656,7 +737,14 @@ def build_candidate_detail(
     profile_id: str | None = None,
 ) -> dict[str, Any]:
     if not result or not candidate_id:
-        return {"cytoscape_elements": [], "breakdown": {}, "summary": {}, "route_rows": [], "route_highlights": {}}
+        return {
+            "cytoscape_elements": [],
+            "breakdown": {},
+            "summary": {},
+            "route_rows": [],
+            "route_highlights": {},
+            "critical_component_ids": [],
+        }
     candidate = next(item for item in result["catalog"] if item["candidate_id"] == candidate_id)
     metrics = candidate["metrics"]
     route_rows = [
@@ -678,6 +766,7 @@ def build_candidate_detail(
     return {
         "cytoscape_elements": candidate["render"]["cytoscape_elements"],
         "route_highlights": candidate["render"].get("route_highlights", {}),
+        "critical_component_ids": _critical_component_ids(metrics.get("route_metrics", [])),
         "summary": {
             "candidate_id": candidate_id,
             "topology_family": candidate["topology_family"],
@@ -763,12 +852,17 @@ def build_official_candidate_summary(
     profile_id: str,
     candidate_id: str | None,
 ) -> dict[str, Any]:
-    if not result or not candidate_id:
+    if not result:
         return {}
-    candidate = next(item for item in result["catalog"] if item["candidate_id"] == candidate_id)
+    explanation = build_selected_candidate_explanation(result, profile_id=profile_id)
+    official_candidate_id = candidate_id or explanation.get("candidate_id")
+    if not official_candidate_id:
+        return {}
+    candidate = next(item for item in result["catalog"] if item["candidate_id"] == official_candidate_id)
     metrics = candidate["metrics"]
+    runner_up = explanation.get("runner_up") or {}
     return {
-        "candidate_id": candidate_id,
+        "candidate_id": official_candidate_id,
         "active_profile_id": profile_id,
         "topology_family": candidate["topology_family"],
         "generation_source": candidate.get("generation_source"),
@@ -784,6 +878,14 @@ def build_official_candidate_summary(
         "fallback_component_count": int(metrics.get("fallback_component_count", 0)),
         "quality_flags": metrics.get("quality_flags", []),
         "critical_routes": _critical_routes(metrics.get("route_metrics", [])),
+        "winner_reason_summary": explanation.get("winner_reason_summary"),
+        "runner_up_candidate_id": runner_up.get("candidate_id"),
+        "runner_up_topology_family": runner_up.get("topology_family"),
+        "runner_up_score_final": runner_up.get("score_final"),
+        "runner_up_total_cost": runner_up.get("total_cost"),
+        "decision_differences": explanation.get("decision_differences", {}),
+        "key_factors": explanation.get("key_factors", []),
+        "winner_penalties": explanation.get("winner_penalties", []),
     }
 
 
@@ -792,15 +894,27 @@ def build_comparison_records(
     candidate_ids: list[str],
     *,
     profile_id: str,
+    active_selected_id: str | None = None,
 ) -> list[dict[str, Any]]:
     if not result:
         return []
+    explanation = build_selected_candidate_explanation(result, profile_id=profile_id)
+    official_candidate_id = explanation.get("candidate_id")
+    runner_up_id = (explanation.get("runner_up") or {}).get("candidate_id")
     records = []
     for item in _lookup_candidates(result, candidate_ids):
         metrics = item["metrics"]
+        comparison_role = []
+        if item["candidate_id"] == official_candidate_id:
+            comparison_role.append("official")
+        if item["candidate_id"] == runner_up_id:
+            comparison_role.append("runner_up")
+        if item["candidate_id"] == active_selected_id:
+            comparison_role.append("selected")
         records.append(
             {
                 "candidate_id": item["candidate_id"],
+                "comparison_role": ",".join(comparison_role) or "candidate",
                 "topology_family": item["topology_family"],
                 "generation_source": item.get("generation_source"),
                 "score_final": _lookup_score(result, item["candidate_id"], profile_id=profile_id),
@@ -837,6 +951,7 @@ def _table(component_id: str, frame: pd.DataFrame) -> Any:
 
 def _comparison_grid(records: list[dict[str, Any]]) -> Any:
     columns = [
+        {"field": "comparison_role"},
         {"field": "candidate_id"},
         {"field": "topology_family"},
         {"field": "generation_source"},
@@ -854,6 +969,25 @@ def _comparison_grid(records: list[dict[str, Any]]) -> Any:
     ]
     return dag.AgGrid(
         id="comparison-grid",
+        columnDefs=columns,
+        rowData=records,
+        dashGridOptions={"pagination": True, "animateRows": True},
+    )
+
+
+def _family_summary_grid(records: list[dict[str, Any]]) -> Any:
+    columns = [
+        {"field": "topology_family"},
+        {"field": "candidate_count"},
+        {"field": "feasible_count"},
+        {"field": "infeasible_candidate_count"},
+        {"field": "viability_rate"},
+        {"field": "min_cost"},
+        {"field": "median_cost"},
+        {"field": "max_cost"},
+    ]
+    return dag.AgGrid(
+        id="family-summary-grid",
         columnDefs=columns,
         rowData=records,
         dashGridOptions={"pagination": True, "animateRows": True},
@@ -929,11 +1063,22 @@ def _default_route_highlight(records: list[dict[str, Any]]) -> str | None:
     return str(ranked[0]["route_id"])
 
 
-def _build_cytoscape_stylesheet(route_highlights: dict[str, Any], route_id: str | None) -> list[dict[str, Any]]:
+def _build_cytoscape_stylesheet(
+    route_highlights: dict[str, Any],
+    route_id: str | None,
+    critical_component_ids: list[str],
+) -> list[dict[str, Any]]:
     stylesheet = [
         {"selector": "node", "style": {"background-color": "#1f77b4", "label": "data(id)", "color": "#ffffff"}},
         {"selector": "edge", "style": {"line-color": "#9aa4af", "width": 3, "curve-style": "bezier"}},
     ]
+    for component_id in critical_component_ids:
+        stylesheet.append(
+            {
+                "selector": f'edge[id = "{component_id}"], node[id = "{component_id}"]',
+                "style": {"line-color": "#f0a202", "background-color": "#f0a202", "width": 5},
+            }
+        )
     if not route_id:
         return stylesheet
     for link_id in route_highlights.get(route_id, []):
@@ -1005,6 +1150,7 @@ def _build_catalog_state_summary(
         "selected_candidate_id": selected_candidate_id,
         "visible_candidate_count": len(ranked_records),
         "top_visible_candidate_id": ranked_records[0]["candidate_id"] if ranked_records else None,
+        "visible_family_summary": _family_summary_from_records(ranked_records),
         "filters": filters,
         "aggregate_summary": {
             "candidate_count": aggregate_summary.get("candidate_count"),
@@ -1040,6 +1186,7 @@ def _filters_active(
     min_operability: Any,
     top_n_per_family: Any,
     fallback_filter: str | None,
+    infeasibility_reason: str | None,
 ) -> bool:
     return any(
         [
@@ -1053,6 +1200,7 @@ def _filters_active(
             min_operability not in (None, ""),
             top_n_per_family not in (None, ""),
             fallback_filter not in (None, "", "ALL"),
+            infeasibility_reason not in (None, "", "ALL"),
         ]
     )
 
@@ -1063,6 +1211,76 @@ def _normalize_compare_ids(current_compare_ids: list[str] | str | None) -> list[
     if isinstance(current_compare_ids, str):
         return [current_compare_ids]
     return list(current_compare_ids)
+
+
+def _default_comparison_ids(
+    result: dict[str, Any],
+    profile_id: str,
+    filtered_records: list[dict[str, Any]],
+    selected_candidate_id: str | None,
+) -> list[str]:
+    if not filtered_records:
+        return []
+    explanation = build_selected_candidate_explanation(result, profile_id=profile_id)
+    visible_ids = {record["candidate_id"] for record in filtered_records}
+    preferred_ids = [
+        explanation.get("candidate_id"),
+        (explanation.get("runner_up") or {}).get("candidate_id"),
+        selected_candidate_id,
+    ]
+    comparison_ids = []
+    for candidate_id in preferred_ids:
+        if candidate_id and candidate_id in visible_ids and candidate_id not in comparison_ids:
+            comparison_ids.append(candidate_id)
+    if comparison_ids:
+        return comparison_ids
+    return [record["candidate_id"] for record in filtered_records[:4]]
+
+
+def _family_summary_from_records(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for record in records:
+        grouped.setdefault(str(record.get("topology_family")), []).append(record)
+    summary_rows = []
+    for family, family_records in sorted(grouped.items()):
+        feasible_records = [record for record in family_records if bool(record.get("feasible"))]
+        costs = [float(record.get("install_cost", 0.0)) + float(record.get("fallback_cost", 0.0)) for record in feasible_records]
+        summary_rows.append(
+            {
+                "topology_family": family,
+                "candidate_count": len(family_records),
+                "feasible_count": len(feasible_records),
+                "infeasible_candidate_count": len(family_records) - len(feasible_records),
+                "viability_rate": round(len(feasible_records) / max(len(family_records), 1), 4),
+                "min_cost": round(min(costs), 3) if costs else None,
+                "median_cost": round(float(pd.Series(costs).median()), 3) if costs else None,
+                "max_cost": round(max(costs), 3) if costs else None,
+            }
+        )
+    return summary_rows
+
+
+def _infeasibility_reason_options(result: dict[str, Any] | None) -> list[dict[str, Any]]:
+    options = [{"label": "Todos", "value": "ALL"}]
+    if not result:
+        return options
+    reasons = sorted(
+        {
+            str(item["metrics"].get("infeasibility_reason") or "NONE")
+            for item in result.get("catalog", [])
+        }
+    )
+    options.extend({"label": reason, "value": reason} for reason in reasons)
+    return options
+
+
+def _critical_component_ids(route_metrics: list[dict[str, Any]]) -> list[str]:
+    component_ids = []
+    for route in _critical_routes(route_metrics):
+        component_id = route.get("bottleneck_component_id")
+        if component_id and component_id not in component_ids:
+            component_ids.append(str(component_id))
+    return component_ids
 
 
 def main() -> None:

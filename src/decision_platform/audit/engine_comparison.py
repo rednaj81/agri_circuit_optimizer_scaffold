@@ -5,6 +5,7 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
+from decision_platform.catalog.explanation import build_selected_candidate_explanation
 from decision_platform.catalog.pipeline import build_solution_catalog
 from decision_platform.data_io.loader import ScenarioBundle
 
@@ -111,16 +112,29 @@ def build_engine_comparison_suite(bundle: ScenarioBundle, *, julia_result: dict[
     variant_bundle = _clone_bundle_with_overrides(bundle, ENGINE_DIFF_VARIANT)
     variant_julia_result = build_solution_catalog(variant_bundle)
     variant_python_result = build_solution_catalog(_clone_bundle_with_engine(variant_bundle, primary="python_emulated_julia", fallback="none"))
+    scenario_comparisons = {
+        "maquete_v2": _build_engine_comparison("maquete_v2", base_julia_result, base_python_result),
+        "hybrid_free_focus_variant": _build_engine_comparison(
+            "hybrid_free_focus_variant",
+            variant_julia_result,
+            variant_python_result,
+        ),
+    }
     return {
         "implementation_audit": audit_julia_engine_implementation(),
-        "scenario_comparisons": {
-            "maquete_v2": _build_engine_comparison("maquete_v2", base_julia_result, base_python_result),
-            "hybrid_free_focus_variant": _build_engine_comparison(
-                "hybrid_free_focus_variant",
-                variant_julia_result,
-                variant_python_result,
-            ),
-        },
+        "scenario_comparisons": scenario_comparisons,
+        "candidate_rows": _build_candidate_rows_for_suite(
+            {
+                "maquete_v2": {
+                    "julia": base_julia_result,
+                    "python": base_python_result,
+                },
+                "hybrid_free_focus_variant": {
+                    "julia": variant_julia_result,
+                    "python": variant_python_result,
+                },
+            }
+        ),
     }
 
 
@@ -131,8 +145,15 @@ def _build_engine_comparison(
 ) -> dict[str, Any]:
     profiles = sorted(julia_result.get("ranked_profiles", {}))
     candidate_differences = _candidate_differences(julia_result, python_result)
+    default_profile_id = str(julia_result.get("default_profile_id") or profiles[0] if profiles else "")
+    julia_explanation = build_selected_candidate_explanation(julia_result, profile_id=default_profile_id)
+    python_explanation = build_selected_candidate_explanation(python_result, profile_id=default_profile_id)
+    same_winner = julia_result.get("selected_candidate_id") == python_result.get("selected_candidate_id")
+    ranking_difference_observed = _ranking_difference_observed(julia_result, python_result, profiles)
+    route_metric_difference_observed = any(item["route_difference_count"] > 0 for item in candidate_differences)
     return {
         "label": label,
+        "default_profile_id": default_profile_id,
         "candidate_count": {
             "julia": len(julia_result["catalog"]),
             "python": len(python_result["catalog"]),
@@ -144,8 +165,9 @@ def _build_engine_comparison(
         "selected_candidate": {
             "julia": julia_result.get("selected_candidate_id"),
             "python": python_result.get("selected_candidate_id"),
-            "same": julia_result.get("selected_candidate_id") == python_result.get("selected_candidate_id"),
+            "same": same_winner,
         },
+        "same_winner": same_winner,
         "top_candidate_by_profile": {
             profile: {
                 "julia": _top_record(julia_result, profile),
@@ -158,10 +180,24 @@ def _build_engine_comparison(
             "julia": _selected_breakdown(julia_result),
             "python": _selected_breakdown(python_result),
         },
+        "winner_vs_runner_up": {
+            "julia": julia_explanation,
+            "python": python_explanation,
+        },
         "changed_candidate_count": len(candidate_differences),
         "changed_route_count": sum(item["route_difference_count"] for item in candidate_differences),
         "changed_candidates": candidate_differences[:20],
-        "decision_difference_observed": bool(candidate_differences) or julia_result.get("selected_candidate_id") != python_result.get("selected_candidate_id"),
+        "ranking_difference_observed": ranking_difference_observed,
+        "decision_difference_observed": bool(candidate_differences) or not same_winner,
+        "route_metric_difference_observed": route_metric_difference_observed,
+        "text_summary": _build_text_summary(
+            default_profile_id,
+            julia_explanation,
+            python_explanation,
+            same_winner=same_winner,
+            ranking_difference_observed=ranking_difference_observed,
+            route_metric_difference_observed=route_metric_difference_observed,
+        ),
     }
 
 
@@ -194,8 +230,12 @@ def _top_record(result: dict[str, Any], profile: str) -> dict[str, Any]:
     record = records[0]
     return {
         "candidate_id": record.get("candidate_id"),
+        "topology_family": record.get("topology_family"),
+        "generation_source": record.get("generation_source"),
         "score_final": record.get("score_final"),
         "install_cost": record.get("install_cost"),
+        "fallback_cost": record.get("fallback_cost"),
+        "total_cost": round(float(record.get("install_cost", 0.0)) + float(record.get("fallback_cost", 0.0)), 3),
         "quality_score_raw": record.get("quality_score_raw"),
         "flow_out_score": record.get("flow_out_score"),
         "resilience_score": record.get("resilience_score"),
@@ -258,3 +298,91 @@ def _candidate_differences(julia_result: dict[str, Any], python_result: dict[str
                 }
             )
     return differences
+
+
+def _ranking_difference_observed(
+    julia_result: dict[str, Any],
+    python_result: dict[str, Any],
+    profiles: list[str],
+) -> bool:
+    for profile in profiles:
+        julia_ranking = [record["candidate_id"] for record in julia_result.get("ranked_profiles", {}).get(profile, [])]
+        python_ranking = [record["candidate_id"] for record in python_result.get("ranked_profiles", {}).get(profile, [])]
+        if julia_ranking != python_ranking:
+            return True
+    return False
+
+
+def _build_text_summary(
+    profile_id: str,
+    julia_explanation: dict[str, Any],
+    python_explanation: dict[str, Any],
+    *,
+    same_winner: bool,
+    ranking_difference_observed: bool,
+    route_metric_difference_observed: bool,
+) -> dict[str, Any]:
+    julia_winner = (julia_explanation.get("winner") or {}).get("candidate_id")
+    python_winner = (python_explanation.get("winner") or {}).get("candidate_id")
+    if same_winner:
+        conclusion = (
+            f"Mesma decisão no perfil `{profile_id}`: Julia e Python escolheram `{julia_winner}`. "
+            f"Ranking_diff={ranking_difference_observed}; route_diff={route_metric_difference_observed}."
+        )
+    else:
+        conclusion = (
+            f"Decisão diferente no perfil `{profile_id}`: Julia escolheu `{julia_winner}` e Python escolheu "
+            f"`{python_winner}`. Ranking_diff={ranking_difference_observed}; route_diff={route_metric_difference_observed}."
+        )
+    return {
+        "julia_reason": julia_explanation.get("engineering_conclusion"),
+        "python_reason": python_explanation.get("engineering_conclusion"),
+        "summary": conclusion,
+    }
+
+
+def _build_candidate_rows_for_suite(
+    scenario_results: dict[str, dict[str, dict[str, Any]]],
+) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for scenario_label, engines in scenario_results.items():
+        for engine_name, result in engines.items():
+            default_profile_id = str(result.get("default_profile_id") or "")
+            explanations_by_profile = {
+                profile_id: build_selected_candidate_explanation(result, profile_id=profile_id)
+                for profile_id in result.get("ranked_profiles", {})
+            }
+            for profile_id, ranked_records in result.get("ranked_profiles", {}).items():
+                explanation = explanations_by_profile.get(profile_id, {})
+                runner_up_id = ((explanation.get("runner_up") or {}).get("candidate_id"))
+                winner_id = ((explanation.get("winner") or {}).get("candidate_id"))
+                for record in ranked_records:
+                    rows.append(
+                        {
+                            "scenario": scenario_label,
+                            "engine": engine_name,
+                            "profile_id": profile_id,
+                            "is_default_profile": profile_id == default_profile_id,
+                            "candidate_id": record.get("candidate_id"),
+                            "rank": int(record.get("rank", 0)),
+                            "topology_family": record.get("topology_family"),
+                            "feasible": bool(record.get("feasible")),
+                            "infeasibility_reason": record.get("infeasibility_reason"),
+                            "score_final": record.get("score_final"),
+                            "install_cost": record.get("install_cost"),
+                            "fallback_cost": record.get("fallback_cost"),
+                            "total_cost": round(
+                                float(record.get("install_cost", 0.0)) + float(record.get("fallback_cost", 0.0)),
+                                3,
+                            ),
+                            "quality_score_raw": record.get("quality_score_raw"),
+                            "flow_out_score": record.get("flow_out_score"),
+                            "resilience_score": record.get("resilience_score"),
+                            "cleaning_score": record.get("cleaning_score"),
+                            "operability_score": record.get("operability_score"),
+                            "fallback_component_count": record.get("fallback_component_count"),
+                            "is_winner": record.get("candidate_id") == winner_id,
+                            "is_runner_up": record.get("candidate_id") == runner_up_id,
+                        }
+                    )
+    return rows
