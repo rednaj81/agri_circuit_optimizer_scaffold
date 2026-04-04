@@ -22,6 +22,8 @@ def _load_profiles() -> dict:
 
 def _profile_to_args(profile_name: str, profile: dict) -> list[str]:
     args = ["-Mode", profile["mode"]]
+    if profile.get("validation_flow") == "preflight":
+        args.append("-OfficialPreflight")
     if profile.get("require_disable_real_julia_probe_flag"):
         args.append("-DisableRealJuliaProbe")
     if profile.get("include_engine_comparison"):
@@ -70,7 +72,9 @@ def test_runtime_validation_profiles_define_expected_matrix() -> None:
     profiles = _load_profiles()
 
     assert profiles["probe_override_env"] == "DECISION_PLATFORM_DISABLE_REAL_JULIA_PROBE"
-    assert set(profiles["profiles"]) == {"official", "diagnostic", "diagnostic_comparison"}
+    assert set(profiles["profiles"]) == {"official_preflight", "official", "diagnostic", "diagnostic_comparison"}
+    assert profiles["profiles"]["official_preflight"]["validation_flow"] == "preflight"
+    assert profiles["profiles"]["official_preflight"]["validation_sufficiency"] == "triage_only"
     assert profiles["profiles"]["official"]["mode"] == "official"
     assert profiles["profiles"]["diagnostic"]["mode"] == "diagnostic"
     assert profiles["profiles"]["diagnostic_comparison"]["include_engine_comparison"] is True
@@ -79,7 +83,7 @@ def test_runtime_validation_profiles_define_expected_matrix() -> None:
 
 
 @pytest.mark.fast
-@pytest.mark.parametrize("profile_name", ["official", "diagnostic", "diagnostic_comparison"])
+@pytest.mark.parametrize("profile_name", ["official_preflight", "official", "diagnostic", "diagnostic_comparison"])
 def test_runtime_validation_script_uses_declarative_profile_matrix(profile_name: str) -> None:
     profiles = _load_profiles()
     profile = profiles["profiles"][profile_name]
@@ -92,8 +96,14 @@ def test_runtime_validation_script_uses_declarative_profile_matrix(profile_name:
         report = _read_single_report(logs_dir)
         assert report["success"] is True
         assert report["validation_profile"] == profile_name
+        assert report["validation_sufficiency"] == profile["validation_sufficiency"]
         assert report["profile_config_path"].endswith("decision_platform_runtime_validation_profiles.json")
         assert report["steps"][-1]["status"] == "passed"
+        if profile["validation_flow"] == "preflight":
+            assert len(report["steps"]) == 3
+            assert report["steps"][-1]["name"] == "3. Validar preflight oficial"
+        else:
+            assert len(report["steps"]) == 5
     finally:
         shutil.rmtree(logs_dir, ignore_errors=True)
 
@@ -117,5 +127,27 @@ def test_runtime_validation_script_blocks_probe_override_for_official_profile() 
         assert report["steps"][0]["status"] == "failed"
         assert profiles["probe_override_env"] in report["steps"][0]["error"]
         assert "official" in report["steps"][0]["error"]
+    finally:
+        shutil.rmtree(logs_dir, ignore_errors=True)
+
+
+@pytest.mark.fast
+def test_runtime_validation_script_blocks_probe_override_for_official_preflight() -> None:
+    profiles = _load_profiles()
+    logs_dir = _make_logs_dir("official-preflight-negative")
+    try:
+        result = _run_validation_script(
+            *_profile_to_args("official_preflight", profiles["profiles"]["official_preflight"]),
+            logs_dir=logs_dir,
+            extra_env={profiles["probe_override_env"]: "1"},
+        )
+
+        assert result.returncode != 0
+
+        report = _read_single_report(logs_dir)
+        assert report["success"] is False
+        assert report["validation_profile"] == "official_preflight"
+        assert report["steps"][0]["status"] == "failed"
+        assert profiles["probe_override_env"] in report["steps"][0]["error"]
     finally:
         shutil.rmtree(logs_dir, ignore_errors=True)

@@ -47,12 +47,69 @@
     "engine_comparison_candidate_engines": [
       "julia",
       "python"
+    ],
+    "preflight_required_fields": [
+      "scenario_load_valid",
+      "scenario_primary_engine",
+      "scenario_fallback_engine",
+      "julia_available",
+      "watermodels_available",
+      "runtime_policy_valid",
+      "official_gate_valid",
+      "runtime_policy_mode",
+      "runtime_policy_message"
     ]
   },
   "profiles": {
+    "official_preflight": {
+      "description": "Fast official preflight for environment and runtime policy triage using Julia executable plus local project/manifest inventory",
+      "mode": "official",
+      "validation_flow": "preflight",
+      "validation_sufficiency": "triage_only",
+      "default_output_dir": "data/output/decision_platform/runtime_validation_official_preflight",
+      "allow_diagnostic_python_emulation": false,
+      "include_engine_comparison": false,
+      "require_disable_real_julia_probe_flag": false,
+      "reject_disable_real_julia_probe_flag": true,
+      "reject_process_probe_override": true,
+      "use_julia_depot": true,
+      "set_probe_override_env": null,
+      "scenario_fallback_override": null,
+      "summary_expectations": {
+        "string_fields": {},
+        "boolean_fields": {},
+        "runtime_string_fields": {},
+        "runtime_boolean_fields": {},
+        "contains": []
+      },
+      "preflight_expectations": {
+        "string_fields": {
+          "scenario_primary_engine": "watermodels_jl",
+          "scenario_fallback_engine": "none",
+          "runtime_policy_mode": "official_julia_only"
+        },
+        "boolean_fields": {
+          "scenario_load_valid": true,
+          "julia_available": true,
+          "watermodels_available": true,
+          "runtime_policy_valid": true,
+          "official_gate_valid": true
+        },
+        "contains": []
+      },
+      "artifacts": {
+        "required": [],
+        "forbidden": [
+          "engine_comparison.json",
+          "engine_comparison_candidates.csv"
+        ]
+      }
+    },
     "official": {
       "description": "Official Julia-only gate",
       "mode": "official",
+      "validation_flow": "full",
+      "validation_sufficiency": "official_evidence",
       "default_output_dir": "data/output/decision_platform/runtime_validation_official",
       "allow_diagnostic_python_emulation": false,
       "include_engine_comparison": false,
@@ -92,6 +149,8 @@
     "diagnostic": {
       "description": "Diagnostic lean profile with explicit probe override",
       "mode": "diagnostic",
+      "validation_flow": "full",
+      "validation_sufficiency": "diagnostic_evidence",
       "default_output_dir": "data/output/decision_platform/runtime_validation_diagnostic",
       "allow_diagnostic_python_emulation": true,
       "include_engine_comparison": false,
@@ -140,6 +199,8 @@
     "diagnostic_comparison": {
       "description": "Diagnostic comparison profile with explicit probe override",
       "mode": "diagnostic",
+      "validation_flow": "full",
+      "validation_sufficiency": "diagnostic_evidence",
       "default_output_dir": "data/output/decision_platform/runtime_validation_diagnostic_comparison",
       "allow_diagnostic_python_emulation": true,
       "include_engine_comparison": true,

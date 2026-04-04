@@ -16,24 +16,59 @@ Escopo deste documento:
 
 Este documento nao reabre arquitetura funcional de V1/V2/V3.
 
-## Comandos canonicos executados nesta wave
+## Matriz canonica suportada
+
+- `official_preflight`: triagem rapida de ambiente e politica; nao executa o pipeline completo e nao produz evidencia oficial suficiente
+- `official`: gate oficial Julia-only com validacao completa de `summary.json` e artefatos principais
+- `diagnostic`: trilha diagnostica lean com override explicito de probe Julia real
+- `diagnostic_comparison`: trilha diagnostica com comparacao explicita entre Julia e Python
+
+## Comandos reproduzidos neste codebase em 2026-04-04
 
 ```powershell
+pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode official -OfficialPreflight
 pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode official
 pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode diagnostic -DisableRealJuliaProbe
 pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode diagnostic -DisableRealJuliaProbe -IncludeEngineComparison
 ```
 
-Suporte automatizado executado na mesma rodada:
+Suporte automatizado reproduzido no mesmo codebase:
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest tests\decision_platform\test_run_pipeline_cli.py tests\decision_platform\test_runtime_validation_script.py -q --basetemp tests/_tmp/pytest-basetemp-wave3-target
-.\.venv\Scripts\python.exe -m pytest tests\scripts\test_decision_platform_runtime_validation.py -q --basetemp tests/_tmp/pytest-basetemp-wave3-script-suite
+.\.venv\Scripts\python.exe -m pytest tests\scripts\test_decision_platform_runtime_validation.py -q --basetemp tests/_tmp/pytest-basetemp-wave4-script-suite
 ```
 
 ## Evidencia persistida
 
-### 1. Perfil official
+### 1. Perfil official_preflight
+
+Relatorio salvo:
+
+- `scripts/logs/decision-platform-runtime-validation_official_preflight_20260404-173803-414.json`
+
+Campos observados no relatorio:
+
+- `validation_profile = official_preflight`
+- `validation_flow = preflight`
+- `validation_sufficiency = triage_only`
+- `scenario_primary_engine = watermodels_jl`
+- `scenario_fallback_engine = none`
+- `julia_available = true`
+- `watermodels_available = true`
+- `runtime_policy_valid = true`
+- `official_gate_valid = true`
+- `runtime_policy_mode = official_julia_only`
+
+Contrato de perfil observado:
+
+- o preflight nao gera `summary.json`
+- o preflight nao executa o pipeline completo
+- o preflight nao substitui o gate `official`
+- o relatorio do validador marca `success = true`
+- o relatorio expõe `profile_config_path = C:\d\dev\agri_circuit_optimizer_scaffold\scripts\decision_platform_runtime_validation_profiles.json`
+
+### 2. Perfil official
 
 Relatorio salvo:
 
@@ -67,7 +102,7 @@ Contrato de perfil observado:
 - o relatorio do validador marca `success = true`
 - o relatorio expõe `profile_config_path = C:\d\dev\agri_circuit_optimizer_scaffold\scripts\decision_platform_runtime_validation_profiles.json`
 
-### 2. Perfil diagnostic
+### 3. Perfil diagnostic
 
 Relatorio salvo:
 
@@ -96,7 +131,7 @@ Contrato de perfil observado:
 - a mensagem de politica menciona explicitamente `DECISION_PLATFORM_DISABLE_REAL_JULIA_PROBE`
 - o relatorio do validador marca `success = true`
 
-### 3. Perfil diagnostic_comparison
+### 4. Perfil diagnostic_comparison
 
 Relatorio salvo:
 
@@ -137,6 +172,8 @@ Leitura correta do artefato de comparacao:
 
 ## Comportamento operacional confirmado
 
+- a matriz declarativa suportada pelo validador canônico tem quatro perfis explicitos: `official_preflight`, `official`, `diagnostic` e `diagnostic_comparison`
+- `official_preflight` permanece suportado apenas como triagem rapida e explicitamente insuficiente para evidencia oficial
 - o script canonico usa `summary.json` como fonte de verdade e valida os artefatos principais a partir dele
 - o caminho oficial falha fechado se o override diagnostico estiver ativo no processo atual
 - o caminho oficial nao exporta comparacao entre engines
@@ -148,7 +185,9 @@ Leitura correta do artefato de comparacao:
 
 A phase 0 fica fechada com evidencia operacional reproduzivel de que:
 
+- a fonte de verdade da matriz canônica inclui quatro perfis explicitos, sem perfil oculto ou ambiguo
 - o caminho oficial da `decision_platform` e Julia-only
 - o gate oficial so vale com `execution_mode = official` e `official_gate_valid = true`
+- `official_preflight` e apenas triagem de ambiente e politica, nao evidencia oficial suficiente
 - qualquer execucao com `python_emulated_julia` permanece fora do gate oficial
 - a comparacao Julia vs Python e diagnostica, opt-in e explicitamente marcada como invalida para o gate oficial

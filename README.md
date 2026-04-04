@@ -101,6 +101,7 @@ Observações:
 ### Critério prático de aceite
 
 - `scripts/decision_platform_runtime_validation_profiles.json`
+- `pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode official -OfficialPreflight`
 - `pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode official`
 - `pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode diagnostic -DisableRealJuliaProbe`
 - `pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode diagnostic -DisableRealJuliaProbe -IncludeEngineComparison`
@@ -152,6 +153,8 @@ python -m agri_circuit_optimizer.solve.run_case --scenario data/scenario/maquete
 Fluxo canônico de validação da fase 0:
 
 ```powershell
+# profile: official_preflight
+pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode official -OfficialPreflight
 # profile: official
 pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode official
 # profile: diagnostic
@@ -160,12 +163,13 @@ pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode
 pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode diagnostic -DisableRealJuliaProbe -IncludeEngineComparison
 ```
 
-O script acima é a referência canônica da fase 0 e lê a matriz declarativa em `scripts/decision_platform_runtime_validation_profiles.json`. Quando `make` estiver disponível no host, os alvos `decision-platform-validate-*` apenas encapsulam esse mesmo comando. Ele usa `summary.json` como fonte de verdade, cruza o candidato oficial com os artefatos principais exportados e só aceita `engine_comparison.json` e `engine_comparison_candidates.csv` no perfil `diagnostic_comparison`. Use os comandos manuais abaixo apenas como apoio.
+O script acima é a referência canônica da fase 0 e lê a matriz declarativa em `scripts/decision_platform_runtime_validation_profiles.json`. O perfil `official_preflight` é apenas triagem rápida de ambiente e política; ele verifica override proibido, `julia --version`, configuração oficial do cenário e o inventário `Project.toml`/`Manifest.toml` do projeto Julia local, mas não executa o pipeline completo, não produz evidência oficial e não substitui o gate `official`. Quando `make` estiver disponível no host, os alvos `decision-platform-validate-*` apenas encapsulam os perfis completos. O validador usa `summary.json` como fonte de verdade nos perfis completos, cruza o candidato oficial com os artefatos principais exportados e só aceita `engine_comparison.json` e `engine_comparison_candidates.csv` no perfil `diagnostic_comparison`. Use os comandos manuais abaixo apenas como apoio.
 
 A comparação Julia vs Python permanece diagnóstica e exige os dois opt-ins explícitos: `--allow-diagnostic-python-emulation` e `--include-engine-comparison`.
 
 Execução reproduzida nesta máquina em 2026-04-04 com o validador canônico:
 
+- `scripts/logs/decision-platform-runtime-validation_official_preflight_20260404-173803-414.json`: `validation_profile=official_preflight`, `validation_flow=preflight`, `validation_sufficiency=triage_only`, `julia_available=true`, `watermodels_available=true`, `official_gate_valid=true`
 - `scripts/logs/decision-platform-runtime-validation_official_20260404-171759-547.json`: `execution_mode=official`, `official_gate_valid=true`, `engine_used=watermodels_jl`, `selected_candidate_id=bus_with_pump_islands__g18m1_1`, sem `engine_comparison.json`
 - `scripts/logs/decision-platform-runtime-validation_diagnostic_20260404-171626-776.json`: `execution_mode=diagnostic`, `official_gate_valid=false`, `engine_used=python_emulated_julia`, `real_julia_probe_disabled=true`
 - `scripts/logs/decision-platform-runtime-validation_diagnostic_comparison_20260404-171626-120.json`: `execution_mode=diagnostic`, `official_gate_valid=false`, `real_julia_probe_disabled=true`, com `engine_comparison.json`
@@ -571,6 +575,8 @@ Concluído:
 Fluxo operacional recomendado:
 
 ```powershell
+# profile: official_preflight
+pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode official -OfficialPreflight
 # profile: official
 pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode official
 # profile: diagnostic
@@ -579,7 +585,7 @@ pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode
 pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode diagnostic -DisableRealJuliaProbe -IncludeEngineComparison
 ```
 
-O script consolidado valida `summary.json` sempre, aplica o contrato declarativo em `scripts/decision_platform_runtime_validation_profiles.json`, cruza `selected_candidate.json`, `selected_candidate_routes.json`, `selected_candidate_explanation.json`, `selected_candidate_bom.csv`, `family_summary.csv` e `infeasibility_summary.json` contra o resumo oficial, bloqueia `engine_comparison.json` e `engine_comparison_candidates.csv` no perfil `official` e só aceita comparação quando ela foi solicitada explicitamente no perfil `diagnostic_comparison`. O `Makefile` oferece aliases equivalentes quando o executável `make` existir no host.
+O script consolidado aplica o contrato declarativo em `scripts/decision_platform_runtime_validation_profiles.json`. O perfil `official_preflight` só faz triagem rápida de ambiente e política, baseada em `julia --version`, cenário oficial e inventário `Project.toml`/`Manifest.toml` do projeto Julia local. A validação oficial suficiente continua sendo apenas o perfil `official`, que valida `summary.json`, cruza `selected_candidate.json`, `selected_candidate_routes.json`, `selected_candidate_explanation.json`, `selected_candidate_bom.csv`, `family_summary.csv` e `infeasibility_summary.json` contra o resumo oficial, bloqueia `engine_comparison.json` e `engine_comparison_candidates.csv` no perfil `official` e só aceita comparação quando ela foi solicitada explicitamente no perfil `diagnostic_comparison`. O `Makefile` oferece aliases equivalentes quando o executável `make` existir no host.
 
 Suíte rápida:
 

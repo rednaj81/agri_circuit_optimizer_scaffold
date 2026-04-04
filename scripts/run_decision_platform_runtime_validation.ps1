@@ -6,6 +6,7 @@ param(
     [string]$OutputDir,
     [string]$LogsDir = "scripts/logs",
     [switch]$IncludeEngineComparison,
+    [switch]$OfficialPreflight,
     [switch]$DisableRealJuliaProbe,
     [switch]$DryRun
 )
@@ -21,7 +22,10 @@ $script:ProbeOverrideEnv = [string]$script:ProfilesConfig["probe_override_env"]
 $script:PythonExe = Join-Path $script:RepoRoot ".venv\Scripts\python.exe"
 $script:JuliaDepotDir = Join-Path $script:RepoRoot "julia_depot_runtime"
 $script:ReportTimestamp = Get-Date
-$script:ValidationProfile = if ($Mode -eq "official") {
+$script:ValidationProfile = if ($OfficialPreflight) {
+    "official_preflight"
+}
+elseif ($Mode -eq "official") {
     "official"
 }
 elseif ($IncludeEngineComparison) {
@@ -33,6 +37,7 @@ else {
 $script:ProfileConfig = $script:ProfilesConfig["profiles"][$script:ValidationProfile]
 $script:RuntimeScenarioDir = $null
 $script:TemporaryScenarioDir = $null
+$script:PreflightResult = $null
 
 if (-not $script:ProfileConfig) {
     throw ("Perfil de validação não encontrado em {0}: {1}" -f $script:ProfilesPath, $script:ValidationProfile)
@@ -47,9 +52,12 @@ $script:Report = [ordered]@{
     mode = $Mode
     validation_profile = $script:ValidationProfile
     profile_description = [string]$script:ProfileConfig["description"]
+    validation_flow = [string]$script:ProfileConfig["validation_flow"]
+    validation_sufficiency = [string]$script:ProfileConfig["validation_sufficiency"]
     scenario_dir = $ScenarioDir
     output_dir = $OutputDir
     include_engine_comparison = [bool]$IncludeEngineComparison
+    official_preflight = [bool]$OfficialPreflight
     disable_real_julia_probe = [bool]$DisableRealJuliaProbe
     dry_run = [bool]$DryRun
     repo_root = $script:RepoRoot
@@ -143,7 +151,8 @@ function Invoke-ExternalCommand {
         [string]$FilePath,
         [string[]]$ArgumentList = @(),
         [hashtable]$Environment = @{},
-        [string]$Description
+        [string]$Description,
+        [switch]$CaptureOutput
     )
 
     $displayCommand = if ($ArgumentList.Count -gt 0) {
@@ -174,14 +183,24 @@ function Invoke-ExternalCommand {
     }
 
     try {
-        & $FilePath @ArgumentList
+        if ($CaptureOutput) {
+            $output = & $FilePath @ArgumentList 2>&1
+        }
+        else {
+            & $FilePath @ArgumentList
+            $output = @()
+        }
         $exitCode = $LASTEXITCODE
         if ($exitCode -ne 0) {
             throw ("Falha ao executar comando: {0} (exit code {1})" -f $displayCommand, $exitCode)
         }
+        foreach ($line in @($output)) {
+            Write-Host $line
+        }
         return [pscustomobject]@{
             Command = $displayCommand
             ExitCode = $exitCode
+            Output = @($output)
         }
     }
     finally {
@@ -343,6 +362,94 @@ function Get-PipelineArguments {
     return $args
 }
 
+function Get-OfficialPreflightArguments {
+    $pythonCode = @'
+import json
+import subprocess
+import sys
+import tomllib
+from pathlib import Path
+from decision_platform.api.run_pipeline import _build_runtime_policy, _validate_runtime_policy
+from decision_platform.data_io.loader import load_scenario_bundle
+from decision_platform.julia_bridge.bridge import find_julia_executable
+
+scenario_dir = sys.argv[1]
+result = {"scenario_dir": scenario_dir}
+try:
+    bundle = load_scenario_bundle(scenario_dir)
+    engine_cfg = bundle.scenario_settings.get("hydraulic_engine", {})
+    julia_exe = find_julia_executable()
+    julia_ok = False
+    watermodels_ok = False
+    watermodels_probe_mode = "project_manifest_inventory"
+    if julia_exe:
+        try:
+            subprocess.run(
+                [julia_exe, "--version"],
+                check=True,
+                capture_output=True,
+                text=True,
+                timeout=15,
+            )
+            julia_ok = True
+        except Exception:
+            julia_ok = False
+        if julia_ok:
+            try:
+                repo_root = Path.cwd()
+                required_packages = {"JSON3", "JuMP", "HiGHS", "WaterModels"}
+                project_toml = tomllib.loads((repo_root / "julia" / "Project.toml").read_text(encoding="utf-8"))
+                project_dependencies = set((project_toml.get("deps") or {}).keys())
+                manifest_text = (repo_root / "julia" / "Manifest.toml").read_text(encoding="utf-8")
+                manifest_dependencies = {
+                    line.removeprefix("[[deps.").removesuffix("]]").strip()
+                    for line in manifest_text.splitlines()
+                    if line.startswith("[[deps.") and line.endswith("]]")
+                }
+                watermodels_ok = required_packages.issubset(project_dependencies) and required_packages.issubset(manifest_dependencies)
+            except Exception:
+                watermodels_ok = False
+    runtime_policy = _build_runtime_policy(
+        allow_diagnostic_python_emulation=False,
+        include_engine_comparison=False,
+    )
+    result.update(
+        {
+            "scenario_load_valid": True,
+            "scenario_primary_engine": str(engine_cfg.get("primary", "watermodels_jl")).strip(),
+            "scenario_fallback_engine": str(engine_cfg.get("fallback", "none")).strip(),
+            "julia_available": julia_ok,
+            "watermodels_available": watermodels_ok,
+            "watermodels_probe_mode": watermodels_probe_mode,
+            "runtime_policy_mode": runtime_policy.get("policy_mode"),
+            "runtime_policy_message": runtime_policy.get("policy_message"),
+            "official_gate_valid": bool(runtime_policy.get("official_gate_valid")),
+        }
+    )
+    try:
+        _validate_runtime_policy(
+            bundle,
+            allow_diagnostic_python_emulation=False,
+            include_engine_comparison=False,
+        )
+        result["runtime_policy_valid"] = True
+    except Exception as exc:
+        result["runtime_policy_valid"] = False
+        result["runtime_policy_error"] = str(exc)
+except Exception as exc:
+    result.update(
+        {
+            "scenario_load_valid": False,
+            "runtime_policy_valid": False,
+            "runtime_policy_error": str(exc),
+        }
+    )
+
+print(json.dumps(result, ensure_ascii=False))
+'@
+    return @("-c", $pythonCode, $script:RuntimeScenarioDir)
+}
+
 function Prepare-ScenarioForMode {
     $resolvedScenarioDir = Resolve-WorkspacePath -PathValue $ScenarioDir
     $fallbackOverride = $script:ProfileConfig["scenario_fallback_override"]
@@ -374,6 +481,28 @@ function Prepare-ScenarioForMode {
     $script:RuntimeScenarioDir = $temporaryScenarioDir
     $script:TemporaryScenarioDir = $temporaryScenarioDir
     return $temporaryScenarioDir
+}
+
+function Assert-PreflightResult {
+    param(
+        [Parameter(Mandatory = $true)]
+        [hashtable]$PreflightResult
+    )
+
+    foreach ($field in @($script:SharedProfile["preflight_required_fields"])) {
+        Assert-FieldPresent -Data $PreflightResult -FieldName ([string]$field) -Context "official_preflight"
+    }
+
+    $expectations = $script:ProfileConfig["preflight_expectations"]
+    foreach ($pair in $expectations["string_fields"].GetEnumerator()) {
+        Assert-FieldEquals -Data $PreflightResult -FieldName ([string]$pair.Key) -ExpectedValue ([string]$pair.Value) -Context "official_preflight"
+    }
+    foreach ($pair in $expectations["boolean_fields"].GetEnumerator()) {
+        Assert-BooleanValue -Data $PreflightResult -FieldName ([string]$pair.Key) -ExpectedValue ([bool]$pair.Value) -Context "official_preflight"
+    }
+    foreach ($containsRule in @($expectations["contains"])) {
+        Assert-ContainsText -Value ([string]$PreflightResult[[string]$containsRule["field"]]) -ExpectedFragment ([string]$containsRule["text"]) -Context "official_preflight"
+    }
 }
 
 function Assert-TelemetryFields {
@@ -606,6 +735,12 @@ try {
         if (-not (Test-Path -LiteralPath $script:PythonExe) -and -not $DryRun) {
             throw ("Python da virtualenv não encontrado: {0}" -f $script:PythonExe)
         }
+        if ($OfficialPreflight -and $Mode -ne "official") {
+            throw "O preflight oficial só pode ser usado com -Mode official."
+        }
+        if ($Mode -ne [string]$script:ProfileConfig["mode"]) {
+            throw ("Os parâmetros informados não correspondem ao perfil {0}." -f $script:ValidationProfile)
+        }
 
         if ([bool]$script:ProfileConfig["reject_disable_real_julia_probe_flag"] -and $DisableRealJuliaProbe) {
             throw ("O perfil {0} não aceita -DisableRealJuliaProbe." -f $script:ValidationProfile)
@@ -622,11 +757,13 @@ try {
 
         $preparedScenarioDir = Prepare-ScenarioForMode
 
-        if ((Test-Path -LiteralPath $resolvedOutputDir) -and -not $DryRun) {
-            Remove-Item -LiteralPath $resolvedOutputDir -Recurse -Force
-        }
-        if (-not $DryRun) {
-            New-Item -ItemType Directory -Path $resolvedOutputDir -Force | Out-Null
+        if ([string]$script:ProfileConfig["validation_flow"] -eq "full") {
+            if ((Test-Path -LiteralPath $resolvedOutputDir) -and -not $DryRun) {
+                Remove-Item -LiteralPath $resolvedOutputDir -Recurse -Force
+            }
+            if (-not $DryRun) {
+                New-Item -ItemType Directory -Path $resolvedOutputDir -Force | Out-Null
+            }
         }
 
         return @{
@@ -637,74 +774,111 @@ try {
         }
     }
 
-    Invoke-Step -Name "2. Executar pipeline" -Action {
-        $environment = Get-ValidationEnvironment
-        $args = Get-PipelineArguments
-        $null = Invoke-ExternalCommand -FilePath $script:PythonExe -ArgumentList $args -Environment $environment -Description "Executando o pipeline da decision_platform"
-        return @{
-            python = $script:PythonExe
-            command = ((@($script:PythonExe) + $args) -join " ")
-            output_dir = $resolvedOutputDir
-            environment = $environment
+    if ([string]$script:ProfileConfig["validation_flow"] -eq "preflight") {
+        Invoke-Step -Name "2. Executar preflight oficial" -Action {
+            $environment = Get-ValidationEnvironment
+            $args = Get-OfficialPreflightArguments
+            $commandResult = Invoke-ExternalCommand -FilePath $script:PythonExe -ArgumentList $args -Environment $environment -Description "Executando o preflight oficial da decision_platform" -CaptureOutput
+            if ($DryRun) {
+                $script:PreflightResult = @{
+                    scenario_load_valid = $true
+                    scenario_primary_engine = "watermodels_jl"
+                    scenario_fallback_engine = "none"
+                    julia_available = $true
+                    watermodels_available = $true
+                    runtime_policy_valid = $true
+                    official_gate_valid = $true
+                    runtime_policy_mode = "official_julia_only"
+                    runtime_policy_message = "Official Julia-only gate: no diagnostic override or opt-in diagnostic feature is active."
+                }
+            }
+            else {
+                $jsonOutput = (@($commandResult.Output) | ForEach-Object { $_.ToString() }) -join "`n"
+                $script:PreflightResult = $jsonOutput | ConvertFrom-Json -AsHashtable
+            }
+            return $script:PreflightResult
+        }
+        Invoke-Step -Name "3. Validar preflight oficial" -Action {
+            Assert-PreflightResult -PreflightResult $script:PreflightResult
+            return @{
+                validation_profile = $script:ValidationProfile
+                validation_sufficiency = $script:ProfileConfig["validation_sufficiency"]
+                julia_available = $script:PreflightResult["julia_available"]
+                watermodels_available = $script:PreflightResult["watermodels_available"]
+                runtime_policy_valid = $script:PreflightResult["runtime_policy_valid"]
+            }
         }
     }
-
-    Invoke-Step -Name "3. Validar summary.json" -Action {
-        $summaryPath = Join-Path $resolvedOutputDir "summary.json"
-        if (-not (Test-ArtifactExists -PathValue $summaryPath) -and -not $DryRun) {
-            throw ("Artefato obrigatório ausente: {0}" -f $summaryPath)
+    else {
+        Invoke-Step -Name "2. Executar pipeline" -Action {
+            $environment = Get-ValidationEnvironment
+            $args = Get-PipelineArguments
+            $null = Invoke-ExternalCommand -FilePath $script:PythonExe -ArgumentList $args -Environment $environment -Description "Executando o pipeline da decision_platform"
+            return @{
+                python = $script:PythonExe
+                command = ((@($script:PythonExe) + $args) -join " ")
+                output_dir = $resolvedOutputDir
+                environment = $environment
+            }
         }
-        if ($DryRun) {
+
+        Invoke-Step -Name "3. Validar summary.json" -Action {
+            $summaryPath = Join-Path $resolvedOutputDir "summary.json"
+            if (-not (Test-ArtifactExists -PathValue $summaryPath) -and -not $DryRun) {
+                throw ("Artefato obrigatório ausente: {0}" -f $summaryPath)
+            }
+            if ($DryRun) {
+                return @{
+                    summary_path = $summaryPath
+                    simulated = $true
+                }
+            }
+
+            $summary = Read-JsonFile -PathValue $summaryPath
+            Assert-SummaryPolicy -Summary $summary
+
             return @{
                 summary_path = $summaryPath
-                simulated = $true
+                candidate_count = $summary["candidate_count"]
+                selected_candidate_id = $summary["selected_candidate_id"]
+                execution_mode = $summary["execution_mode"]
+                official_gate_valid = $summary["official_gate_valid"]
+                runtime_policy_mode = $summary["runtime_policy_mode"]
+                runtime_duration_s = $summary["runtime_duration_s"]
             }
         }
 
-        $summary = Read-JsonFile -PathValue $summaryPath
-        Assert-SummaryPolicy -Summary $summary
+        Invoke-Step -Name "4. Validar artefatos principais" -Action {
+            if ($DryRun) {
+                return @{
+                    output_dir = $resolvedOutputDir
+                    simulated = $true
+                }
+            }
 
-        return @{
-            summary_path = $summaryPath
-            candidate_count = $summary["candidate_count"]
-            selected_candidate_id = $summary["selected_candidate_id"]
-            execution_mode = $summary["execution_mode"]
-            official_gate_valid = $summary["official_gate_valid"]
-            runtime_policy_mode = $summary["runtime_policy_mode"]
-            runtime_duration_s = $summary["runtime_duration_s"]
-        }
-    }
-
-    Invoke-Step -Name "4. Validar artefatos principais" -Action {
-        if ($DryRun) {
+            $summary = Read-JsonFile -PathValue (Join-Path $resolvedOutputDir "summary.json")
+            Assert-CoreArtifacts -ResolvedOutputDir $resolvedOutputDir -Summary $summary
             return @{
                 output_dir = $resolvedOutputDir
-                simulated = $true
+                selected_candidate_id = $summary["selected_candidate_id"]
+                engine_used = $summary["engine_used"]
             }
         }
 
-        $summary = Read-JsonFile -PathValue (Join-Path $resolvedOutputDir "summary.json")
-        Assert-CoreArtifacts -ResolvedOutputDir $resolvedOutputDir -Summary $summary
-        return @{
-            output_dir = $resolvedOutputDir
-            selected_candidate_id = $summary["selected_candidate_id"]
-            engine_used = $summary["engine_used"]
-        }
-    }
+        Invoke-Step -Name "5. Validar artefatos do perfil" -Action {
+            if ($DryRun) {
+                return @{
+                    profile = $script:ValidationProfile
+                    simulated = $true
+                }
+            }
 
-    Invoke-Step -Name "5. Validar artefatos do perfil" -Action {
-        if ($DryRun) {
+            Assert-ProfileArtifacts -ResolvedOutputDir $resolvedOutputDir
             return @{
                 profile = $script:ValidationProfile
-                simulated = $true
+                required = @($script:ProfileConfig["artifacts"]["required"])
+                forbidden = @($script:ProfileConfig["artifacts"]["forbidden"])
             }
-        }
-
-        Assert-ProfileArtifacts -ResolvedOutputDir $resolvedOutputDir
-        return @{
-            profile = $script:ValidationProfile
-            required = @($script:ProfileConfig["artifacts"]["required"])
-            forbidden = @($script:ProfileConfig["artifacts"]["forbidden"])
         }
     }
 }
