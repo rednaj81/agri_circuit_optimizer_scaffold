@@ -18,6 +18,8 @@
 - comando de teste:
   `.\.venv\Scripts\python.exe -m pytest tests\decision_platform\test_maquete_v2_acceptance.py::test_maquete_v2_pipeline_runs_with_real_julia_and_exports_final_artifacts -q --basetemp tests/_tmp/pytest-basetemp-julia-gate`
 - regra: não usar `DECISION_PLATFORM_DISABLE_REAL_JULIA_PROBE`
+- evidência mínima em artefato:
+  `summary.json` com `execution_mode=official`, `official_gate_valid=true`, timestamps e duração
 
 ### 2. Aceite diagnóstico lean
 - objetivo: validar exports centrais, coerência do candidato oficial e métricas de rota sem depender do runtime Julia real
@@ -27,6 +29,8 @@
   `DECISION_PLATFORM_DISABLE_REAL_JULIA_PROBE=1`
 - janela operacional desta máquina: abaixo de `30 s`
 - regra: a saída diagnóstica não pode gerar `engine_comparison.json` por padrão
+- evidência mínima em artefato:
+  `summary.json` com `execution_mode=diagnostic`, `official_gate_valid=false` e menção explícita ao override
 
 ### 3. Comparação diagnóstica explícita
 - objetivo: provar que a comparação Julia vs Python continua disponível apenas por opt-in explícito
@@ -36,6 +40,8 @@
   `DECISION_PLATFORM_DISABLE_REAL_JULIA_PROBE=1`
 - janela operacional desta máquina: abaixo de `45 s`
 - regra: `engine_comparison.json` e `engine_comparison_candidates.csv` só aparecem nesta trilha
+- evidência mínima em artefato:
+  `engine_comparison.json` com `execution_policy` e `runtime` marcando o override e a invalidez para o gate oficial
 
 ### 4. Suite de suporte
 - smoke rápido:
@@ -50,6 +56,7 @@
 - diretórios temporários devem ficar sob `tests/_tmp/`
 - qualquer uso de `DECISION_PLATFORM_DISABLE_REAL_JULIA_PROBE` deve ficar restrito às trilhas diagnósticas
 - se o runtime oficial estiver sem Julia real, o comportamento esperado continua sendo fail-closed
+- qualquer artefato gerado com override diagnóstico precisa declarar explicitamente que não representa validação oficial
 
 ## Métricas mínimas
 - taxa de runs concluídos

@@ -398,11 +398,13 @@ def _build_decision_summary(
     selected_candidate: dict[str, Any] | None,
 ) -> dict[str, Any]:
     summary = dict(result.get("summary", {}))
+    runtime = dict(result.get("runtime", {}))
     summary["scenario_id"] = result.get("scenario_id")
     summary["default_profile_id"] = selected_profile_id
     summary["best_profile"] = selected_profile_id
     if selected_candidate is None:
         summary["selected_candidate_id"] = None
+        summary["runtime"] = runtime
         return summary
     metrics = selected_candidate["metrics"]
     route_hydraulic_summary = [
@@ -449,6 +451,15 @@ def _build_decision_summary(
             "route_count": len(metrics.get("route_metrics", [])),
             "bom_component_count": int(metrics.get("bom_summary", {}).get("total_components", 0)),
             "route_hydraulic_summary": route_hydraulic_summary,
+            "runtime": runtime,
+            "execution_mode": runtime.get("execution_mode"),
+            "official_gate_valid": runtime.get("official_gate_valid"),
+            "runtime_started_at": runtime.get("started_at"),
+            "runtime_finished_at": runtime.get("finished_at"),
+            "runtime_duration_s": runtime.get("duration_s"),
+            "real_julia_probe_disabled": runtime.get("real_julia_probe_disabled"),
+            "runtime_policy_mode": runtime.get("policy_mode"),
+            "runtime_policy_message": runtime.get("policy_message"),
             "selected_candidate_explanation": result.get("selected_candidate_explanation", {}),
             "family_summary": result.get("family_summary", []),
             "infeasibility_summary": result.get("infeasibility_summary", {}),

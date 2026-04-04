@@ -165,6 +165,14 @@ $env:JULIA_DEPOT_PATH = (Resolve-Path 'julia_depot_runtime')
 python -m decision_platform.api.run_pipeline --scenario data/decision_platform/maquete_v2 --output-dir data/output/decision_platform/maquete_v2_diag --include-engine-comparison --allow-diagnostic-python-emulation
 ```
 
+Override diagnóstico apenas para testes sem Julia real:
+
+```powershell
+$env:DECISION_PLATFORM_DISABLE_REAL_JULIA_PROBE = '1'
+```
+
+Esse override desabilita a sonda Julia real e invalida o gate oficial Julia-only. Use apenas nas trilhas diagnósticas documentadas.
+
 UI Dash:
 
 ```powershell
@@ -236,12 +244,15 @@ Os comandos abaixo foram executados com sucesso neste workspace:
 .\.venv\Scripts\python.exe -m agri_circuit_optimizer.solve.run_case --scenario data/scenario/example --dry-run
 .\.venv\Scripts\python.exe -m agri_circuit_optimizer.solve.run_case --scenario data/scenario/maquete_core --dry-run
 .\.venv\Scripts\python.exe -m agri_circuit_optimizer.solve.run_case --scenario data/scenario/maquete_core --output-dir data/output/maquete_core
-.\.venv\Scripts\python.exe -m pytest tests\decision_platform -m fast -q
-.\.venv\Scripts\python.exe -m pytest tests\decision_platform\test_maquete_v2_acceptance.py::test_maquete_v2_pipeline_exports_and_route_metrics -q
-.\.venv\Scripts\python.exe -m pytest tests\decision_platform\test_ui_smoke.py -m "not requires_julia" -q
+$env:DECISION_PLATFORM_DISABLE_REAL_JULIA_PROBE = '1'
+.\.venv\Scripts\python.exe -m pytest tests\decision_platform\test_run_pipeline_cli.py::test_cli_rejects_python_emulation_without_explicit_opt_in tests\decision_platform\test_julia_bridge.py::test_bridge_fails_closed_when_fallback_is_none tests\decision_platform\test_julia_bridge.py::test_bridge_can_disable_real_julia_probe_for_diagnostic_test_mode -q --basetemp tests/_tmp/pytest-basetemp-failclosed
+.\.venv\Scripts\python.exe -m pytest tests\decision_platform\test_maquete_v2_acceptance.py::test_maquete_v2_pipeline_exports_and_route_metrics -q --basetemp tests/_tmp/pytest-basetemp-accept
+.\.venv\Scripts\python.exe -m pytest tests\decision_platform\test_maquete_v2_acceptance.py::test_maquete_v2_diagnostic_engine_comparison_remains_explicit_opt_in -q --basetemp tests/_tmp/pytest-basetemp-accept-diag
+.\.venv\Scripts\python.exe -m pytest tests\decision_platform\test_ui_smoke.py -m "not requires_julia" -q --basetemp tests/_tmp/pytest-basetemp-ui-wave1
+$env:DECISION_PLATFORM_DISABLE_REAL_JULIA_PROBE = $null
 $env:JULIA_DEPOT_PATH = (Resolve-Path 'julia_depot_runtime')
-.\.venv\Scripts\python.exe -m pytest tests\decision_platform -m requires_julia -q
-.\.venv\Scripts\python.exe -m decision_platform.api.run_pipeline --scenario data/decision_platform/maquete_v2 --output-dir data/output/decision_platform/maquete_v2
+.\.venv\Scripts\python.exe -m pytest tests\decision_platform\test_julia_bridge.py::test_bridge_detects_real_julia_runtime_when_available -q --basetemp tests/_tmp/pytest-basetemp-realjulia
+.\.venv\Scripts\python.exe -m pytest tests\decision_platform\test_maquete_v2_acceptance.py::test_maquete_v2_pipeline_runs_with_real_julia_and_exports_final_artifacts -q --basetemp tests/_tmp/pytest-basetemp-accept-real
 ```
 
 Observações:
@@ -253,15 +264,19 @@ Observações:
 - `data/decision_platform/maquete_v2/scenario_settings.yaml` é `fail closed`: se `WaterModels` não estiver disponível e `fallback: none`, o pipeline oficial falha com mensagem clara.
 - o pipeline oficial não habilita `python_emulated_julia` nem exporta `engine_comparison.json` por padrão.
 - a comparação Julia vs Python e qualquer uso de `python_emulated_julia` ficaram restritos a trilhas diagnósticas explícitas com `--include-engine-comparison` e/ou `--allow-diagnostic-python-emulation`.
+- se `DECISION_PLATFORM_DISABLE_REAL_JULIA_PROBE=1` estiver ativo sem opt-in diagnóstico explícito, o pipeline falha informando que a execução é inválida para o gate oficial Julia-only.
+- quando o override diagnóstico é usado com opt-in explícito, `summary.json` e `engine_comparison.json` passam a marcar que a sonda Julia real foi desabilitada e que a execução não vale como validação oficial.
 - a suíte `decision_platform` usa `-p no:cacheprovider` por padrão para não poluir a saída com `PytestCacheWarning` neste workspace.
 - o override `DECISION_PLATFORM_DISABLE_REAL_JULIA_PROBE=1` existe para suites diagnósticas sem Julia real; no caminho oficial ele apenas força fail-closed.
 - O stack real do Dash está ativo na `.venv` e a UI é testada com o runtime real.
 - A suíte atual da `decision_platform` coleta `24` testes.
 - Os slices validados nesta rodada foram:
-  - `9 passed` em `-m fast`
+  - `3 passed` no gate de fail-closed (`test_run_pipeline_cli` + `test_julia_bridge`)
+  - `1 passed` no aceite exportador diagnóstico lean de `maquete_v2`
+  - `1 passed` na comparação diagnóstica explícita entre engines
   - `8 passed` em `tests/decision_platform/test_ui_smoke.py -m "not requires_julia"`
-  - `1 passed` no aceite exportador de `maquete_v2`
-  - `2 passed` em `-m requires_julia`
+  - `1 passed` na detecção do runtime Julia real
+  - `1 passed` no aceite end-to-end com Julia real
 - O pipeline oficial exporta `selected_candidate_explanation.json`, `selected_candidate_explanation.md`, `family_summary.csv`, `infeasibility_summary.json`, motivos de inviabilidade por candidato e métricas agregadas de viabilidade/custo por família.
 - `engine_comparison.json` e `engine_comparison_candidates.csv` só são exportados na trilha diagnóstica explícita.
 
@@ -357,6 +372,7 @@ Na UI:
 - logs de seleção de componentes por candidato
 - `selected_candidate_explanation.json` e `.md` para explicar por que o vencedor superou o runner-up
 - métricas de geração por família, viabilidade por família, distribuição de custo viável e motivos de inviabilidade
+- telemetria mínima de runtime exportada em `summary.json`, incluindo `started_at`, `finished_at`, `duration_s`, `execution_mode` e validade do gate oficial
 
 ## Relatórios gerados
 
@@ -406,6 +422,16 @@ Em `data/output/decision_platform/maquete_v2/`:
 Somente na trilha diagnóstica explícita:
 - `engine_comparison.json`
 - `engine_comparison_candidates.csv`
+
+`summary.json` agora também registra:
+- `runtime.started_at`
+- `runtime.finished_at`
+- `runtime.duration_s`
+- `runtime.execution_mode`
+- `runtime.official_gate_valid`
+- `runtime.real_julia_probe_disabled`
+- `runtime.policy_mode`
+- `runtime.policy_message`
 
 Os relatórios de rota incluem:
 - `selected_meter_id`
@@ -525,6 +551,8 @@ $env:DECISION_PLATFORM_DISABLE_REAL_JULIA_PROBE = '1'
 .\.venv\Scripts\python.exe -m pytest tests\decision_platform\test_maquete_v2_acceptance.py::test_maquete_v2_pipeline_exports_and_route_metrics -q --basetemp tests/_tmp/pytest-basetemp-accept
 ```
 
+Esse comando é diagnóstico e precisa gerar `summary.json` com `execution_mode=diagnostic` e `official_gate_valid=false`.
+
 Comparação diagnóstica explícita:
 
 Janela operacional esperada nesta máquina: abaixo de `45 s`.
@@ -544,6 +572,8 @@ $env:PYTHONPATH = 'src'
 $env:JULIA_DEPOT_PATH = (Resolve-Path 'julia_depot_runtime')
 .\.venv\Scripts\python.exe -m pytest tests\decision_platform -m "requires_julia" -q --basetemp tests/_tmp/pytest-basetemp-julia
 ```
+
+Esse gate precisa gerar `summary.json` com `execution_mode=official` e `official_gate_valid=true`.
 
 Suíte completa:
 

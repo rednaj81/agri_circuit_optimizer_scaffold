@@ -38,6 +38,9 @@ Executar cenários em background, com isolamento e acompanhamento.
 - engine_mode
 - julia_available
 - watermodels_available
+- real_julia_probe_disabled
+- execution_mode
+- official_gate_valid
 - started_at
 - finished_at
 - duration_s
@@ -48,7 +51,10 @@ Executar cenários em background, com isolamento e acompanhamento.
 Se Julia falhar no caminho oficial:
 - falhar fechado
 - não cair silenciosamente para Python
+- se `DECISION_PLATFORM_DISABLE_REAL_JULIA_PROBE=1` estiver ativo, falhar informando que a execução é inválida para o gate oficial
 
 Se for necessário rodar comparação diagnóstica:
 - habilitar explicitamente a trilha de comparação
+- habilitar explicitamente qualquer override diagnóstico
 - registrar que `python_emulated_julia` não compõe o candidato oficial
+- registrar em artefato exportado que a sonda Julia real foi desabilitada e que a execução não vale como gate oficial

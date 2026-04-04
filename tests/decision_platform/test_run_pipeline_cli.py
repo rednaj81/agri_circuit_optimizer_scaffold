@@ -27,7 +27,16 @@ def test_cli_rejects_python_emulation_without_explicit_opt_in() -> None:
 
 
 @pytest.mark.fast
+def test_cli_rejects_disabled_probe_without_explicit_diagnostic_opt_in(monkeypatch) -> None:
+    monkeypatch.setenv("DECISION_PLATFORM_DISABLE_REAL_JULIA_PROBE", "1")
+    with pytest.raises(OfficialRuntimeConfigError) as exc:
+        run_decision_pipeline("data/decision_platform/maquete_v2")
+    assert "invalid for the official Julia-only gate" in str(exc.value)
+
+
+@pytest.mark.fast
 def test_run_decision_pipeline_skips_engine_comparison_by_default(monkeypatch) -> None:
+    monkeypatch.delenv("DECISION_PLATFORM_DISABLE_REAL_JULIA_PROBE", raising=False)
     bundle = SimpleNamespace(
         scenario_settings={"hydraulic_engine": {"primary": "watermodels_jl", "fallback": "none"}}
     )
@@ -58,6 +67,11 @@ def test_run_decision_pipeline_skips_engine_comparison_by_default(monkeypatch) -
     result = run_pipeline.run_decision_pipeline("dummy-scenario", "dummy-output")
 
     assert "engine_comparison" not in result
+    assert result["runtime"]["execution_mode"] == "official"
+    assert result["runtime"]["official_gate_valid"] is True
+    assert result["runtime"]["started_at"]
+    assert result["runtime"]["finished_at"]
+    assert isinstance(result["runtime"]["duration_s"], float)
     assert captured["output_dir"] == "dummy-output"
     assert "engine_comparison" not in captured["result"]
 
@@ -89,6 +103,13 @@ def test_cli_uses_default_profile_and_selected_candidate_with_explicit_diagnosti
                 "catalog": [{"metrics": {"feasible": True}}],
                 "default_profile_id": "balanced",
                 "selected_candidate_id": "candidate-001",
+                "runtime": {
+                    "execution_mode": "diagnostic",
+                    "official_gate_valid": False,
+                    "started_at": "2026-04-04T00:00:00Z",
+                    "finished_at": "2026-04-04T00:00:01Z",
+                    "duration_s": 1.0,
+                },
             }
 
         monkeypatch.setattr(run_pipeline, "run_decision_pipeline", fake_run_decision_pipeline)
@@ -114,6 +135,9 @@ def test_cli_uses_default_profile_and_selected_candidate_with_explicit_diagnosti
         assert summary["selected_candidate_id"] == "candidate-001"
         assert summary["top_candidate"] == "candidate-001"
         assert summary["best_profile"] == "balanced"
+        assert summary["execution_mode"] == "diagnostic"
+        assert summary["official_gate_valid"] is False
+        assert summary["duration_s"] == 1.0
         assert (output_dir / "engine_comparison.json").exists()
     finally:
         if output_dir.exists():

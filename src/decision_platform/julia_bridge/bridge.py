@@ -146,6 +146,7 @@ def evaluate_candidates_via_bridge(
     engine_cfg = bundle.scenario_settings.get("hydraulic_engine", {})
     engine_requested = str(engine_cfg.get("primary", "watermodels_jl"))
     fallback_engine = str(engine_cfg.get("fallback", "none"))
+    probe_disabled = real_julia_probe_disabled()
     julia_ok = julia_available()
     watermodels_ok = watermodels_available()
 
@@ -158,7 +159,7 @@ def evaluate_candidates_via_bridge(
                 engine_mode="python_fallback_primary",
                 julia_ok=julia_ok,
                 watermodels_ok=watermodels_ok,
-                warning=None,
+                warning=_diagnostic_probe_warning(),
             )
             for payload in payloads
         ]
@@ -183,9 +184,11 @@ def evaluate_candidates_via_bridge(
         ]
 
     if fallback_engine == "python_emulated_julia":
-        warning = (
-            "Diagnostic-only fallback to python_emulated_julia because Julia/WaterModels is unavailable."
-        )
+        warning = _diagnostic_probe_warning()
+        if warning is None:
+            warning = "Diagnostic-only fallback to python_emulated_julia because Julia/WaterModels is unavailable."
+        else:
+            warning = f"{warning} Using python_emulated_julia fallback for this diagnostic run."
         return [
             _decorate_engine_metadata(
                 emulate_watermodels_cli(payload, bundle),
@@ -198,6 +201,12 @@ def evaluate_candidates_via_bridge(
             )
             for payload in payloads
         ]
+
+    if probe_disabled:
+        raise JuliaBridgeError(
+            f"Diagnostic override {DISABLE_REAL_JULIA_PROBE_ENV}=1 disabled the real Julia probe. "
+            "This execution is not valid for the official Julia-only gate."
+        )
 
     raise JuliaBridgeError(
         "Official runtime requires primary engine 'watermodels_jl' with fallback 'none', "
@@ -222,8 +231,21 @@ def _decorate_engine_metadata(
     enriched["engine_mode"] = engine_mode
     enriched["julia_available"] = julia_ok
     enriched["watermodels_available"] = watermodels_ok
+    enriched["real_julia_probe_disabled"] = real_julia_probe_disabled()
+    enriched["real_julia_probe_disable_env"] = (
+        DISABLE_REAL_JULIA_PROBE_ENV if enriched["real_julia_probe_disabled"] else None
+    )
     enriched["engine_warning"] = warning
     return enriched
+
+
+def _diagnostic_probe_warning() -> str | None:
+    if not real_julia_probe_disabled():
+        return None
+    return (
+        f"Diagnostic override {DISABLE_REAL_JULIA_PROBE_ENV}=1 disabled the real Julia probe. "
+        "This run is not valid for the official Julia-only gate."
+    )
 
 
 def _call_real_julia(payload: dict | list[dict]) -> dict | list[dict]:

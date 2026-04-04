@@ -9,6 +9,7 @@ import pandas as pd
 import pytest
 
 from decision_platform.api.run_pipeline import run_decision_pipeline
+from decision_platform.julia_bridge import bridge
 from decision_platform.julia_bridge.bridge import watermodels_available
 from tests.decision_platform.scenario_utils import (
     cleanup_scenario_copy,
@@ -114,6 +115,15 @@ def test_maquete_v2_pipeline_exports_and_route_metrics() -> None:
         assert summary["engine_requested"] == "watermodels_jl"
         assert summary["julia_available"] is False
         assert summary["watermodels_available"] is False
+        assert summary["execution_mode"] == "diagnostic"
+        assert summary["official_gate_valid"] is False
+        assert summary["real_julia_probe_disabled"] is True
+        assert summary["runtime_policy_mode"] == "diagnostic_override_probe_disabled"
+        assert summary["runtime_started_at"]
+        assert summary["runtime_finished_at"]
+        assert summary["runtime_duration_s"] >= 0
+        assert bridge.DISABLE_REAL_JULIA_PROBE_ENV in summary["runtime_policy_message"]
+        assert summary["runtime"]["real_julia_probe_disable_env"] == bridge.DISABLE_REAL_JULIA_PROBE_ENV
     finally:
         if output_dir.exists():
             shutil.rmtree(output_dir)
@@ -146,6 +156,9 @@ def test_maquete_v2_diagnostic_engine_comparison_remains_explicit_opt_in() -> No
         assert duration_s < 45
         assert engine_comparison["comparison_policy"]["official_runtime"] == "julia_only_fail_closed"
         assert engine_comparison["comparison_policy"]["python_emulation"] == "diagnostic_only_explicit_opt_in"
+        assert engine_comparison["execution_policy"]["official_gate_valid"] is False
+        assert engine_comparison["execution_policy"]["real_julia_probe_disabled"] is True
+        assert engine_comparison["runtime"]["execution_mode"] == "diagnostic"
         assert set(engine_comparison_candidates["engine"]) == {"julia", "python"}
         assert "decision_difference_observed" in engine_comparison["scenario_comparisons"]["maquete_v2"]
         assert "selected_candidate" in engine_comparison["scenario_comparisons"]["maquete_v2"]
@@ -192,6 +205,13 @@ def test_maquete_v2_pipeline_runs_with_real_julia_and_exports_final_artifacts() 
         assert summary["selected_candidate_id"] == result["selected_candidate_id"]
         assert summary["default_profile_id"] == result["default_profile_id"]
         assert summary["engine_used"] == "watermodels_jl"
+        assert summary["execution_mode"] == "official"
+        assert summary["official_gate_valid"] is True
+        assert summary["real_julia_probe_disabled"] is False
+        assert summary["runtime_policy_mode"] == "official_julia_only"
+        assert summary["runtime_started_at"]
+        assert summary["runtime_finished_at"]
+        assert summary["runtime_duration_s"] >= 0
     finally:
         if output_dir.exists():
             shutil.rmtree(output_dir)

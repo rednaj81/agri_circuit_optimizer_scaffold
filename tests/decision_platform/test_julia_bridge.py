@@ -13,6 +13,8 @@ from tests.decision_platform.scenario_utils import cleanup_scenario_copy, prepar
 
 @pytest.mark.fast
 def test_bridge_fails_closed_when_fallback_is_none(monkeypatch) -> None:
+    monkeypatch.delenv(bridge.DISABLE_REAL_JULIA_PROBE_ENV, raising=False)
+    bridge.clear_runtime_probe_caches()
     bundle = load_scenario_bundle("data/decision_platform/maquete_v2")
     candidate = generate_candidate_topologies(bundle)[0]
     payload = build_candidate_payload(normalize_candidate(candidate, bundle), bundle)
@@ -28,6 +30,8 @@ def test_bridge_fails_closed_when_fallback_is_none(monkeypatch) -> None:
 
 @pytest.mark.fast
 def test_bridge_falls_back_when_python_emulation_is_allowed(monkeypatch) -> None:
+    monkeypatch.delenv(bridge.DISABLE_REAL_JULIA_PROBE_ENV, raising=False)
+    bridge.clear_runtime_probe_caches()
     scenario_dir = prepare_scenario_copy(
         "data/decision_platform/maquete_v2",
         "maquete_v2_bridge_fallback",
@@ -44,12 +48,15 @@ def test_bridge_falls_back_when_python_emulation_is_allowed(monkeypatch) -> None
         assert metrics["engine_used"] == "python_emulated_julia"
         assert metrics["engine_mode"] == "fallback_emulated"
         assert "Diagnostic-only fallback" in str(metrics["engine_warning"])
+        assert metrics["real_julia_probe_disabled"] is False
     finally:
         cleanup_scenario_copy(scenario_dir)
 
 
 @pytest.mark.fast
 def test_bridge_allows_explicit_python_primary_for_diagnostic_paths(monkeypatch) -> None:
+    monkeypatch.delenv(bridge.DISABLE_REAL_JULIA_PROBE_ENV, raising=False)
+    bridge.clear_runtime_probe_caches()
     scenario_dir = prepare_scenario_copy(
         "data/decision_platform/maquete_v2",
         "maquete_v2_bridge_python_primary",
@@ -66,6 +73,7 @@ def test_bridge_allows_explicit_python_primary_for_diagnostic_paths(monkeypatch)
         assert metrics["engine_used"] == "python_emulated_julia"
         assert metrics["engine_mode"] == "python_fallback_primary"
         assert metrics["engine_warning"] is None
+        assert metrics["real_julia_probe_disabled"] is False
     finally:
         cleanup_scenario_copy(scenario_dir)
 
@@ -85,7 +93,51 @@ def test_bridge_can_disable_real_julia_probe_for_diagnostic_test_mode(monkeypatc
 
 
 @pytest.mark.fast
+def test_bridge_marks_override_when_diagnostic_probe_is_disabled(monkeypatch) -> None:
+    scenario_dir = prepare_scenario_copy(
+        "data/decision_platform/maquete_v2",
+        "maquete_v2_bridge_probe_override",
+        scenario_overrides={"hydraulic_engine": {"fallback": "python_emulated_julia"}},
+    )
+    try:
+        bundle = load_scenario_bundle(scenario_dir)
+        candidate = generate_candidate_topologies(bundle)[0]
+        payload = build_candidate_payload(normalize_candidate(candidate, bundle), bundle)
+        monkeypatch.setenv(bridge.DISABLE_REAL_JULIA_PROBE_ENV, "1")
+        bridge.clear_runtime_probe_caches()
+        metrics = evaluate_candidate_via_bridge(payload, bundle)
+        assert metrics["engine_used"] == "python_emulated_julia"
+        assert metrics["real_julia_probe_disabled"] is True
+        assert metrics["real_julia_probe_disable_env"] == bridge.DISABLE_REAL_JULIA_PROBE_ENV
+        assert "not valid for the official Julia-only gate" in str(metrics["engine_warning"])
+    finally:
+        monkeypatch.delenv(bridge.DISABLE_REAL_JULIA_PROBE_ENV, raising=False)
+        bridge.clear_runtime_probe_caches()
+        cleanup_scenario_copy(scenario_dir)
+
+
+@pytest.mark.fast
+def test_bridge_rejects_override_without_diagnostic_fallback(monkeypatch) -> None:
+    bundle = load_scenario_bundle("data/decision_platform/maquete_v2")
+    candidate = generate_candidate_topologies(bundle)[0]
+    payload = build_candidate_payload(normalize_candidate(candidate, bundle), bundle)
+    monkeypatch.setenv(bridge.DISABLE_REAL_JULIA_PROBE_ENV, "1")
+    bridge.clear_runtime_probe_caches()
+
+    try:
+        with pytest.raises(JuliaBridgeError) as exc:
+            evaluate_candidate_via_bridge(payload, bundle)
+        assert bridge.DISABLE_REAL_JULIA_PROBE_ENV in str(exc.value)
+        assert "not valid for the official Julia-only gate" in str(exc.value)
+    finally:
+        monkeypatch.delenv(bridge.DISABLE_REAL_JULIA_PROBE_ENV, raising=False)
+        bridge.clear_runtime_probe_caches()
+
+
+@pytest.mark.fast
 def test_bridge_uses_real_julia_when_available(monkeypatch) -> None:
+    monkeypatch.delenv(bridge.DISABLE_REAL_JULIA_PROBE_ENV, raising=False)
+    bridge.clear_runtime_probe_caches()
     scenario_dir = prepare_scenario_copy(
         "data/decision_platform/maquete_v2",
         "maquete_v2_bridge_real_mock",
