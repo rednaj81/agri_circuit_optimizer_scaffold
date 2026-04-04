@@ -1,0 +1,74 @@
+{
+  "version": 1,
+  "active_profile": "codex-balanced",
+  "profiles": {
+    "codex-balanced": {
+      "engine": "openai-codex-cli",
+      "command": "codex",
+      "working_directory": ".",
+      "runner_profile": "agri-hydraulic-balanced",
+      "instructions": {
+        "root_guidance": "AGENTS.md",
+        "project_config": ".codex/config.toml",
+        "agents_dir": ".codex/agents",
+        "skills_dir": ".codex/skills"
+      },
+      "defaults": {
+        "model": "gpt-5.4",
+        "reasoning_effort": "high"
+      },
+      "roles": {
+        "architect": {
+          "mode": "agent",
+          "entrypoint": "architect",
+          "model": "gpt-5.4"
+        },
+        "developer": {
+          "mode": "agent",
+          "entrypoint": "developer",
+          "model": "gpt-5.4"
+        },
+        "auditor": {
+          "mode": "agent",
+          "entrypoint": "auditor",
+          "model": "gpt-5.4"
+        }
+      },
+      "notes": "Perfil padrão para o loop Architect -> Developer -> Auditor via Codex CLI externo."
+    },
+    "codex-fast-feedback": {
+      "engine": "openai-codex-cli",
+      "command": "codex",
+      "working_directory": ".",
+      "runner_profile": "agri-hydraulic-fast-feedback",
+      "instructions": {
+        "root_guidance": "AGENTS.md",
+        "project_config": ".codex/config.toml",
+        "agents_dir": ".codex/agents",
+        "skills_dir": ".codex/skills"
+      },
+      "defaults": {
+        "model": "gpt-5.4-mini",
+        "reasoning_effort": "low"
+      },
+      "roles": {
+        "architect": {
+          "mode": "agent",
+          "entrypoint": "architect",
+          "model": "gpt-5.4-mini"
+        },
+        "developer": {
+          "mode": "agent",
+          "entrypoint": "developer",
+          "model": "gpt-5.4-mini"
+        },
+        "auditor": {
+          "mode": "agent",
+          "entrypoint": "auditor",
+          "model": "gpt-5.4"
+        }
+      },
+      "notes": "Perfil para preflight e iteração curta. Mantém o auditor mais forte."
+    }
+  }
+}

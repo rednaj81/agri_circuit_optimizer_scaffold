@@ -1,0 +1,12 @@
+{
+  "active_profile": "codex-balanced",
+  "profiles": {
+    "codex-balanced": {
+      "runner_profile": "agri-hydraulic-local",
+      "defaults": {
+        "model": "gpt-5.4",
+        "reasoning_effort": "medium"
+      }
+    }
+  }
+}

@@ -1,0 +1,39 @@
+phase_0:
+  target: "Garantir Julia-only no caminho oficial e documentação honesta"
+  exit_criteria:
+    - "engine oficial falha fechado sem Julia"
+    - "README e docs coerentes"
+phase_1:
+  target: "Normalizar domínio, persistência e cenários"
+  exit_criteria:
+    - "cenários versionáveis"
+    - "catálogo de componentes persistido"
+phase_2:
+  target: "Entregar studio de nós e arestas"
+  exit_criteria:
+    - "nós editáveis"
+    - "arestas editáveis"
+    - "salvar/reabrir cenário"
+phase_3:
+  target: "Fila e background runs"
+  exit_criteria:
+    - "jobs isolados"
+    - "status por run"
+    - "logs e artefatos"
+phase_4:
+  target: "Profundidade do engine Julia"
+  exit_criteria:
+    - "métricas de rota fortes"
+    - "viabilidade robusta"
+phase_5:
+  target: "UI de decisão humana"
+  exit_criteria:
+    - "comparação lado a lado"
+    - "explicabilidade do vencedor"
+    - "render 2D útil"
+phase_6:
+  target: "Polimento e estabilização"
+  exit_criteria:
+    - "bugs críticos resolvidos"
+    - "testes/execução documentados"
+    - "harden final"

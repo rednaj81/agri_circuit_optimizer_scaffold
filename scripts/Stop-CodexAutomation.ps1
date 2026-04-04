@@ -43,7 +43,10 @@ $targets = @(
     'run_codex_supervisor_api.ps1',
     'run_codex_dual_agent_loop.ps1',
     'Invoke-CodexSupervisorWatchdog.ps1',
-    'Start-CodexSupervisorWatchdogLoop.ps1'
+    'Start-CodexSupervisorWatchdogLoop.ps1',
+    'Invoke-CodexStrategicSupervisor.ps1',
+    'Start-CodexStrategicSupervisorLoop.ps1',
+    'Wait-CodexSupervisorState.ps1'
 )
 
 try {

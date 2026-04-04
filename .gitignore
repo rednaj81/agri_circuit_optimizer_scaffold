@@ -27,3 +27,14 @@ data/output/decision_platform/ui_validation/
 artifacts/
 chrome/
 chromedriver/
+automation/execution-profiles.local.json
+docs/codex_dual_agent_runtime/probe
+.tmp/
+docs/codex_dual_agent_runtime/api/
+docs/codex_dual_agent_runtime/agents/
+docs/codex_dual_agent_runtime/runs/
+docs/codex_dual_agent_runtime/agent_sessions.json
+docs/codex_dual_agent_runtime/loop_state.json
+docs/codex_dual_agent_runtime/preflight.json
+docs/codex_dual_agent_runtime/supervisor_state.json
+docs/codex_dual_agent_runtime/wave_policy.override.json
