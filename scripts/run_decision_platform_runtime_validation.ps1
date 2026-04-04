@@ -5,6 +5,7 @@ param(
     [string]$ScenarioDir = "data/decision_platform/maquete_v2",
     [string]$OutputDir,
     [string]$LogsDir = "scripts/logs",
+    [string]$ManifestPath = "docs/codex_dual_agent_runtime/phase_0_validation_manifest.json",
     [switch]$IncludeEngineComparison,
     [switch]$OfficialPreflight,
     [switch]$DisableRealJuliaProbe,
@@ -21,6 +22,7 @@ $script:SharedProfile = $script:ProfilesConfig["shared"]
 $script:ProbeOverrideEnv = [string]$script:ProfilesConfig["probe_override_env"]
 $script:PythonExe = Join-Path $script:RepoRoot ".venv\Scripts\python.exe"
 $script:JuliaDepotDir = Join-Path $script:RepoRoot "julia_depot_runtime"
+$script:ResolvedManifestPath = if ([System.IO.Path]::IsPathRooted($ManifestPath)) { $ManifestPath } else { Join-Path $script:RepoRoot $ManifestPath }
 $script:ReportTimestamp = Get-Date
 $script:ValidationProfile = if ($OfficialPreflight) {
     "official_preflight"
@@ -63,6 +65,7 @@ $script:Report = [ordered]@{
     dry_run = [bool]$DryRun
     repo_root = $script:RepoRoot
     profile_config_path = $script:ProfilesPath
+    validation_manifest_path = $script:ResolvedManifestPath
     steps = @()
 }
 
@@ -94,7 +97,6 @@ function Resolve-WorkspacePath {
     }
     return $candidate
 }
-
 function Read-JsonFile {
     param(
         [Parameter(Mandatory = $true)]
@@ -144,6 +146,144 @@ function Save-Report {
     $script:Report.report_path = $reportPath
     ($script:Report | ConvertTo-Json -Depth 20) | Set-Content -LiteralPath $reportPath -Encoding utf8
     return $reportPath
+}
+
+function Get-ReportStepDetails {
+    param(
+        [Parameter(Mandatory = $true)]
+        [hashtable]$Report,
+        [Parameter(Mandatory = $true)]
+        [string]$StepName
+    )
+
+    foreach ($step in @($Report["steps"])) {
+        if ([string]$step["name"] -eq $StepName) {
+            if ($step.ContainsKey("details") -and $step["details"] -is [hashtable]) {
+                return $step["details"]
+            }
+            return $null
+        }
+    }
+    return $null
+}
+
+function New-ManifestProfileEntry {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ProfileName,
+        [Parameter(Mandatory = $true)]
+        [hashtable]$ProfileDeclaration,
+        [string]$LogsPath
+    )
+
+    $entry = [ordered]@{
+        validation_profile = $ProfileName
+        description = [string]$ProfileDeclaration["description"]
+        validation_flow = [string]$ProfileDeclaration["validation_flow"]
+        validation_sufficiency = [string]$ProfileDeclaration["validation_sufficiency"]
+        official_gate_complete = ([string]$ProfileDeclaration["validation_sufficiency"] -eq "official_evidence")
+        status = "not_run"
+        success = $null
+        last_report_path = $null
+        started_at = $null
+        finished_at = $null
+        output_dir = Resolve-WorkspacePath -PathValue ([string]$ProfileDeclaration["default_output_dir"])
+        runtime_scenario_dir = $null
+        summary_path = $null
+        evidence = $null
+    }
+
+    if (-not $LogsPath -or -not (Test-Path -LiteralPath $LogsPath)) {
+        return $entry
+    }
+
+    $matchingReports = @()
+    foreach ($candidateReport in @(Get-ChildItem -LiteralPath $LogsPath -Filter "decision-platform-runtime-validation_*.json")) {
+        $candidateData = Read-JsonFile -PathValue $candidateReport.FullName
+        if ([string]$candidateData["validation_profile"] -eq $ProfileName) {
+            $matchingReports += [pscustomobject]@{
+                File = $candidateReport
+                Data = $candidateData
+            }
+        }
+    }
+
+    $latestReport = $matchingReports | Sort-Object { $_.File.LastWriteTime }, { $_.File.Name } | Select-Object -Last 1
+    if (-not $latestReport) {
+        return $entry
+    }
+
+    $report = $latestReport.Data
+    $entry.status = if ([bool]$report["success"]) { "passed" } else { "failed" }
+    $entry.success = [bool]$report["success"]
+    $entry.last_report_path = $latestReport.File.FullName
+    $entry.started_at = $report["started_at"]
+    $entry.finished_at = $report["finished_at"]
+    $entry.output_dir = $report["output_dir"]
+    $entry.runtime_scenario_dir = $report["runtime_scenario_dir"]
+
+    if ([string]$entry["validation_flow"] -eq "preflight") {
+        $preflightDetails = Get-ReportStepDetails -Report $report -StepName "2. Executar preflight oficial"
+        if ($preflightDetails) {
+            $entry.evidence = [ordered]@{
+                julia_available = $preflightDetails["julia_available"]
+                watermodels_available = $preflightDetails["watermodels_available"]
+                watermodels_probe_mode = $preflightDetails["watermodels_probe_mode"]
+                runtime_policy_mode = $preflightDetails["runtime_policy_mode"]
+                official_gate_valid = $preflightDetails["official_gate_valid"]
+            }
+        }
+        return $entry
+    }
+
+    $summaryDetails = Get-ReportStepDetails -Report $report -StepName "3. Validar summary.json"
+    $artifactDetails = Get-ReportStepDetails -Report $report -StepName "4. Validar artefatos principais"
+    $profileArtifactDetails = Get-ReportStepDetails -Report $report -StepName "5. Validar artefatos do perfil"
+    if ($summaryDetails) {
+        $entry.summary_path = $summaryDetails["summary_path"]
+    }
+    $entry.evidence = [ordered]@{
+        execution_mode = if ($summaryDetails) { $summaryDetails["execution_mode"] } else { $null }
+        official_gate_valid = if ($summaryDetails) { $summaryDetails["official_gate_valid"] } else { $null }
+        runtime_policy_mode = if ($summaryDetails) { $summaryDetails["runtime_policy_mode"] } else { $null }
+        selected_candidate_id = if ($summaryDetails) { $summaryDetails["selected_candidate_id"] } else { $null }
+        runtime_duration_s = if ($summaryDetails) { $summaryDetails["runtime_duration_s"] } else { $null }
+        engine_used = if ($artifactDetails) { $artifactDetails["engine_used"] } else { $null }
+        required_artifacts = if ($profileArtifactDetails) { @($profileArtifactDetails["required"]) } else { @() }
+        forbidden_artifacts = if ($profileArtifactDetails) { @($profileArtifactDetails["forbidden"]) } else { @() }
+    }
+    return $entry
+}
+
+function Save-Phase0ValidationManifest {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$LogsPath
+    )
+
+    $manifestDirectory = Split-Path -Path $script:ResolvedManifestPath -Parent
+    if (-not (Test-Path -LiteralPath $manifestDirectory)) {
+        New-Item -ItemType Directory -Path $manifestDirectory -Force | Out-Null
+    }
+
+    $profiles = [ordered]@{}
+    foreach ($profileName in @($script:ProfilesConfig["profiles"].Keys | Sort-Object)) {
+        $profiles[$profileName] = New-ManifestProfileEntry -ProfileName ([string]$profileName) -ProfileDeclaration $script:ProfilesConfig["profiles"][[string]$profileName] -LogsPath $LogsPath
+    }
+
+    $manifest = [ordered]@{
+        phase_id = "phase_0"
+        generated_at = (Get-Date).ToString("o")
+        script_path = $PSCommandPath
+        profiles_path = $script:ProfilesPath
+        logs_dir = $LogsPath
+        official_validation_profile = "official"
+        official_validation_sufficiency = "official_evidence"
+        profiles = $profiles
+    }
+
+    ($manifest | ConvertTo-Json -Depth 20) | Set-Content -LiteralPath $script:ResolvedManifestPath -Encoding utf8
+    return $script:ResolvedManifestPath
 }
 
 function Invoke-ExternalCommand {
@@ -829,9 +969,16 @@ try {
                 throw ("Artefato obrigatório ausente: {0}" -f $summaryPath)
             }
             if ($DryRun) {
+                $expectedSummary = $script:ProfileConfig["summary_expectations"]
                 return @{
                     summary_path = $summaryPath
                     simulated = $true
+                    candidate_count = 1
+                    selected_candidate_id = "simulated_candidate"
+                    execution_mode = $expectedSummary["string_fields"]["execution_mode"]
+                    official_gate_valid = $expectedSummary["boolean_fields"]["official_gate_valid"]
+                    runtime_policy_mode = $expectedSummary["string_fields"]["runtime_policy_mode"]
+                    runtime_duration_s = 0.0
                 }
             }
 
@@ -854,6 +1001,8 @@ try {
                 return @{
                     output_dir = $resolvedOutputDir
                     simulated = $true
+                    selected_candidate_id = "simulated_candidate"
+                    engine_used = if ($script:ValidationProfile -eq "official") { "watermodels_jl" } else { "python_emulated_julia" }
                 }
             }
 
@@ -871,6 +1020,8 @@ try {
                 return @{
                     profile = $script:ValidationProfile
                     simulated = $true
+                    required = @($script:ProfileConfig["artifacts"]["required"])
+                    forbidden = @($script:ProfileConfig["artifacts"]["forbidden"])
                 }
             }
 
@@ -893,6 +1044,7 @@ finally {
     $script:Report.runtime_scenario_dir = $script:RuntimeScenarioDir
     $script:Report.success = -not $scriptFailed
     $reportPath = Save-Report
+    $manifestPath = Save-Phase0ValidationManifest -LogsPath (Resolve-WorkspacePath -PathValue $LogsDir)
 
     if ($script:TemporaryScenarioDir -and (Test-Path -LiteralPath $script:TemporaryScenarioDir) -and -not $DryRun) {
         Remove-Item -LiteralPath $script:TemporaryScenarioDir -Recurse -Force
@@ -901,6 +1053,7 @@ finally {
     Show-FinalSummary
     Write-Host ""
     Write-Host ("Relatório salvo em: {0}" -f $reportPath) -ForegroundColor Green
+    Write-Host ("Manifesto salvo em: {0}" -f $manifestPath) -ForegroundColor Green
 
     if ($scriptFailed) {
         exit 1

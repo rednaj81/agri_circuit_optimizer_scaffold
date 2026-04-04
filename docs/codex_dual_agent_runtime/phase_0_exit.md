@@ -8,14 +8,13 @@ Data-base do registro: `2026-04-04`
 
 - script canônico: `scripts/run_decision_platform_runtime_validation.ps1`
 - matriz declarativa: `scripts/decision_platform_runtime_validation_profiles.json`
+- manifesto regenerável da fase: `docs/codex_dual_agent_runtime/phase_0_validation_manifest.json`
 - registro operacional desta fase: este arquivo
 
-Relatórios usados para derivar este registro:
+Rastreabilidade bruta:
 
-- `scripts/logs/decision-platform-runtime-validation_official_preflight_20260404-175037-758.json`
-- `scripts/logs/decision-platform-runtime-validation_official_20260404-175049-236.json`
-- `scripts/logs/decision-platform-runtime-validation_diagnostic_20260404-174813-118.json`
-- `scripts/logs/decision-platform-runtime-validation_diagnostic_comparison_20260404-174813-348.json`
+- os últimos relatórios relevantes por perfil ficam indexados no manifesto em `profiles.<profile>.last_report_path`
+- este documento não depende de nomes timestampados copiados manualmente
 
 ## Regra de encerramento
 
@@ -33,35 +32,43 @@ Relatórios usados para derivar este registro:
 | `diagnostic` | `full` | `diagnostic_evidence` | validar exports centrais e coerência do candidato com override diagnóstico explícito | não |
 | `diagnostic_comparison` | `full` | `diagnostic_evidence` | executar a trilha diagnóstica explícita com comparação entre engines | não |
 
-## Evidência derivada dos relatórios do validador
+## Evidência derivada do manifesto do validador
 
 ### `official_preflight`
 
-Relatório: `scripts/logs/decision-platform-runtime-validation_official_preflight_20260404-175037-758.json`
+Fonte estável:
+
+- `docs/codex_dual_agent_runtime/phase_0_validation_manifest.json`
+- entrada `profiles.official_preflight`
 
 - `validation_profile=official_preflight`
 - `validation_flow=preflight`
 - `validation_sufficiency=triage_only`
-- etapa `2. Executar preflight oficial`: `julia_available=true`
-- etapa `2. Executar preflight oficial`: `watermodels_available=true`
-- etapa `2. Executar preflight oficial`: `watermodels_probe_mode=project_manifest_inventory`
-- etapa `2. Executar preflight oficial`: `runtime_policy_mode=official_julia_only`
-- etapa `2. Executar preflight oficial`: `official_gate_valid=true`
+- `status=passed`
+- `evidence.julia_available=true`
+- `evidence.watermodels_available=true`
+- `evidence.watermodels_probe_mode=project_manifest_inventory`
+- `evidence.runtime_policy_mode=official_julia_only`
+- `evidence.official_gate_valid=true`
 - esta run não exporta `summary.json` e não substitui o gate completo
 
 ### `official`
 
-Relatório: `scripts/logs/decision-platform-runtime-validation_official_20260404-175049-236.json`
+Fonte estável:
+
+- `docs/codex_dual_agent_runtime/phase_0_validation_manifest.json`
+- entrada `profiles.official`
 
 - `validation_profile=official`
 - `validation_flow=full`
 - `validation_sufficiency=official_evidence`
-- etapa `3. Validar summary.json`: `execution_mode=official`
-- etapa `3. Validar summary.json`: `official_gate_valid=true`
-- etapa `3. Validar summary.json`: `runtime_policy_mode=official_julia_only`
-- etapa `3. Validar summary.json`: `selected_candidate_id=bus_with_pump_islands__g18m1_1`
-- etapa `4. Validar artefatos principais`: `engine_used=watermodels_jl`
-- etapa `5. Validar artefatos do perfil`: `engine_comparison.json` e `engine_comparison_candidates.csv` proibidos
+- `status=passed`
+- `evidence.execution_mode=official`
+- `evidence.official_gate_valid=true`
+- `evidence.runtime_policy_mode=official_julia_only`
+- `evidence.selected_candidate_id`
+- `evidence.engine_used=watermodels_jl`
+- `evidence.forbidden_artifacts` inclui `engine_comparison.json` e `engine_comparison_candidates.csv`
 
 Campos exportados em `data/output/decision_platform/runtime_validation_official/summary.json` usados por este encerramento:
 
@@ -80,31 +87,37 @@ Campos exportados em `data/output/decision_platform/runtime_validation_official/
 
 ### `diagnostic`
 
-Relatório: `scripts/logs/decision-platform-runtime-validation_diagnostic_20260404-174813-118.json`
+Fonte estável:
+
+- `docs/codex_dual_agent_runtime/phase_0_validation_manifest.json`
+- entrada `profiles.diagnostic`
 
 - `validation_profile=diagnostic`
 - `validation_flow=full`
 - `validation_sufficiency=diagnostic_evidence`
-- etapa `2. Executar pipeline`: ambiente com `DECISION_PLATFORM_DISABLE_REAL_JULIA_PROBE=1`
-- etapa `3. Validar summary.json`: `execution_mode=diagnostic`
-- etapa `3. Validar summary.json`: `official_gate_valid=false`
-- etapa `3. Validar summary.json`: `runtime_policy_mode=diagnostic_override_probe_disabled`
-- etapa `4. Validar artefatos principais`: `engine_used=python_emulated_julia`
-- etapa `5. Validar artefatos do perfil`: `engine_comparison.json` proibido
+- `status=passed`
+- `evidence.execution_mode=diagnostic`
+- `evidence.official_gate_valid=false`
+- `evidence.runtime_policy_mode=diagnostic_override_probe_disabled`
+- `evidence.engine_used=python_emulated_julia`
+- `evidence.forbidden_artifacts` inclui `engine_comparison.json`
 
 ### `diagnostic_comparison`
 
-Relatório: `scripts/logs/decision-platform-runtime-validation_diagnostic_comparison_20260404-174813-348.json`
+Fonte estável:
+
+- `docs/codex_dual_agent_runtime/phase_0_validation_manifest.json`
+- entrada `profiles.diagnostic_comparison`
 
 - `validation_profile=diagnostic_comparison`
 - `validation_flow=full`
 - `validation_sufficiency=diagnostic_evidence`
-- etapa `2. Executar pipeline`: ambiente com `DECISION_PLATFORM_DISABLE_REAL_JULIA_PROBE=1`
-- etapa `3. Validar summary.json`: `execution_mode=diagnostic`
-- etapa `3. Validar summary.json`: `official_gate_valid=false`
-- etapa `3. Validar summary.json`: `runtime_policy_mode=diagnostic_override_probe_disabled`
-- etapa `4. Validar artefatos principais`: `engine_used=python_emulated_julia`
-- etapa `5. Validar artefatos do perfil`: `engine_comparison.json` e `engine_comparison_candidates.csv` obrigatórios quando a comparação é pedida explicitamente
+- `status=passed`
+- `evidence.execution_mode=diagnostic`
+- `evidence.official_gate_valid=false`
+- `evidence.runtime_policy_mode=diagnostic_override_probe_disabled`
+- `evidence.engine_used=python_emulated_julia`
+- `evidence.required_artifacts` inclui `engine_comparison.json` e `engine_comparison_candidates.csv`
 
 ## Contrato auditável usado neste encerramento
 
@@ -113,14 +126,24 @@ Campos mínimos lidos do relatório do validador:
 - `validation_profile`
 - `validation_flow`
 - `validation_sufficiency`
+- `official_gate_complete`
 - `profile_config_path`
-- `steps[].name`
-- `steps[].status`
-- `steps[].details`
+- `validation_manifest_path`
 - `report_path`
 - `runtime_scenario_dir`
 
-Campos mínimos lidos do runtime oficial em `summary.json`:
+Campos mínimos lidos do manifesto estável:
+
+- `generated_at`
+- `phase_id`
+- `official_validation_profile`
+- `official_validation_sufficiency`
+- `profiles.<profile>.status`
+- `profiles.<profile>.last_report_path`
+- `profiles.<profile>.summary_path`
+- `profiles.<profile>.evidence`
+
+Campos mínimos lidos do runtime oficial em `summary.json`, quando o manifesto aponta um `summary_path` válido:
 
 - `execution_mode`
 - `official_gate_valid`

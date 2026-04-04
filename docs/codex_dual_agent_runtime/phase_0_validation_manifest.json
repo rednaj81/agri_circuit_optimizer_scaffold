@@ -1,0 +1,117 @@
+{
+  "phase_id": "phase_0",
+  "generated_at": "2026-04-04T18:15:44.8068976-03:00",
+  "script_path": "C:\\d\\dev\\agri_circuit_optimizer_scaffold\\scripts\\run_decision_platform_runtime_validation.ps1",
+  "profiles_path": "C:\\d\\dev\\agri_circuit_optimizer_scaffold\\scripts\\decision_platform_runtime_validation_profiles.json",
+  "logs_dir": "C:\\d\\dev\\agri_circuit_optimizer_scaffold\\scripts\\logs",
+  "official_validation_profile": "official",
+  "official_validation_sufficiency": "official_evidence",
+  "profiles": {
+    "diagnostic": {
+      "validation_profile": "diagnostic",
+      "description": "Diagnostic lean profile with explicit probe override",
+      "validation_flow": "full",
+      "validation_sufficiency": "diagnostic_evidence",
+      "official_gate_complete": false,
+      "status": "passed",
+      "success": true,
+      "last_report_path": "C:\\d\\dev\\agri_circuit_optimizer_scaffold\\scripts\\logs\\decision-platform-runtime-validation_diagnostic_20260404-180117-944.json",
+      "started_at": "2026-04-04T18:01:17.9447473-03:00",
+      "finished_at": "2026-04-04T18:01:53.968898-03:00",
+      "output_dir": "C:\\d\\dev\\agri_circuit_optimizer_scaffold\\data\\output\\decision_platform\\runtime_validation_diagnostic",
+      "runtime_scenario_dir": "C:\\d\\dev\\agri_circuit_optimizer_scaffold\\tests\\_tmp\\runtime_validation_diagnostic_scenario",
+      "summary_path": "C:\\d\\dev\\agri_circuit_optimizer_scaffold\\data\\output\\decision_platform\\runtime_validation_diagnostic\\summary.json",
+      "evidence": {
+        "execution_mode": "diagnostic",
+        "official_gate_valid": false,
+        "runtime_policy_mode": "diagnostic_override_probe_disabled",
+        "selected_candidate_id": "loop_ring__g18m1_1",
+        "runtime_duration_s": 30.216,
+        "engine_used": "python_emulated_julia",
+        "required_artifacts": null,
+        "forbidden_artifacts": [
+          "engine_comparison.json",
+          "engine_comparison_candidates.csv"
+        ]
+      }
+    },
+    "diagnostic_comparison": {
+      "validation_profile": "diagnostic_comparison",
+      "description": "Diagnostic comparison profile with explicit probe override",
+      "validation_flow": "full",
+      "validation_sufficiency": "diagnostic_evidence",
+      "official_gate_complete": false,
+      "status": "passed",
+      "success": true,
+      "last_report_path": "C:\\d\\dev\\agri_circuit_optimizer_scaffold\\scripts\\logs\\decision-platform-runtime-validation_diagnostic_comparison_20260404-180118-334.json",
+      "started_at": "2026-04-04T18:01:18.3346052-03:00",
+      "finished_at": "2026-04-04T18:02:47.7592233-03:00",
+      "output_dir": "C:\\d\\dev\\agri_circuit_optimizer_scaffold\\data\\output\\decision_platform\\runtime_validation_diagnostic_comparison",
+      "runtime_scenario_dir": "C:\\d\\dev\\agri_circuit_optimizer_scaffold\\tests\\_tmp\\runtime_validation_diagnostic_comparison_scenario",
+      "summary_path": "C:\\d\\dev\\agri_circuit_optimizer_scaffold\\data\\output\\decision_platform\\runtime_validation_diagnostic_comparison\\summary.json",
+      "evidence": {
+        "execution_mode": "diagnostic",
+        "official_gate_valid": false,
+        "runtime_policy_mode": "diagnostic_override_probe_disabled",
+        "selected_candidate_id": "loop_ring__g18m1_1",
+        "runtime_duration_s": 83.26,
+        "engine_used": "python_emulated_julia",
+        "required_artifacts": [
+          "engine_comparison.json",
+          "engine_comparison_candidates.csv"
+        ],
+        "forbidden_artifacts": null
+      }
+    },
+    "official": {
+      "validation_profile": "official",
+      "description": "Official Julia-only gate",
+      "validation_flow": "full",
+      "validation_sufficiency": "official_evidence",
+      "official_gate_complete": true,
+      "status": "passed",
+      "success": true,
+      "last_report_path": "C:\\d\\dev\\agri_circuit_optimizer_scaffold\\scripts\\logs\\decision-platform-runtime-validation_official_20260404-180252-991.json",
+      "started_at": "2026-04-04T18:02:52.9913785-03:00",
+      "finished_at": "2026-04-04T18:08:49.3889435-03:00",
+      "output_dir": "C:\\d\\dev\\agri_circuit_optimizer_scaffold\\data\\output\\decision_platform\\runtime_validation_official",
+      "runtime_scenario_dir": "C:\\d\\dev\\agri_circuit_optimizer_scaffold\\data\\decision_platform\\maquete_v2",
+      "summary_path": "C:\\d\\dev\\agri_circuit_optimizer_scaffold\\data\\output\\decision_platform\\runtime_validation_official\\summary.json",
+      "evidence": {
+        "execution_mode": "official",
+        "official_gate_valid": true,
+        "runtime_policy_mode": "official_julia_only",
+        "selected_candidate_id": "bus_with_pump_islands__g18m1_1",
+        "runtime_duration_s": 349.443,
+        "engine_used": "watermodels_jl",
+        "required_artifacts": null,
+        "forbidden_artifacts": [
+          "engine_comparison.json",
+          "engine_comparison_candidates.csv"
+        ]
+      }
+    },
+    "official_preflight": {
+      "validation_profile": "official_preflight",
+      "description": "Fast official preflight for environment and runtime policy triage using Julia executable plus local project/manifest inventory",
+      "validation_flow": "preflight",
+      "validation_sufficiency": "triage_only",
+      "official_gate_complete": false,
+      "status": "passed",
+      "success": true,
+      "last_report_path": "C:\\d\\dev\\agri_circuit_optimizer_scaffold\\scripts\\logs\\decision-platform-runtime-validation_official_preflight_20260404-181542-588.json",
+      "started_at": "2026-04-04T18:15:42.5881151-03:00",
+      "finished_at": "2026-04-04T18:15:44.2600235-03:00",
+      "output_dir": "C:\\d\\dev\\agri_circuit_optimizer_scaffold\\data\\output\\decision_platform\\runtime_validation_official_preflight",
+      "runtime_scenario_dir": "C:\\d\\dev\\agri_circuit_optimizer_scaffold\\data\\decision_platform\\maquete_v2",
+      "summary_path": null,
+      "evidence": {
+        "julia_available": true,
+        "watermodels_available": true,
+        "watermodels_probe_mode": "project_manifest_inventory",
+        "runtime_policy_mode": "official_julia_only",
+        "official_gate_valid": true
+      }
+    }
+  }
+}

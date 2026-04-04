@@ -100,8 +100,9 @@ Observações:
 
 ### Critério prático de aceite
 
+- `docs/codex_dual_agent_runtime/phase_0_validation_manifest.json`
+- `docs/codex_dual_agent_runtime/phase_0_exit.md`
 - `docs/codex_dual_agent_hydraulic_autonomy_bundle/automation/phase_plan.yaml` em `phase_0.phase_exit_checklist`
-- `docs/2026-04-03_handoff_decision_platform_runtime.md`
 - `scripts/decision_platform_runtime_validation_profiles.json`
 - `pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode official -OfficialPreflight`
 - `pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode official`
@@ -165,11 +166,11 @@ pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode
 pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode diagnostic -DisableRealJuliaProbe -IncludeEngineComparison
 ```
 
-O script acima é a referência canônica da fase 0 e lê a matriz declarativa em `scripts/decision_platform_runtime_validation_profiles.json`. O checklist único de saída desta fase está em `docs/codex_dual_agent_hydraulic_autonomy_bundle/automation/phase_plan.yaml`, chave `phase_0.phase_exit_checklist`, e o resumo operacional correspondente está em `docs/2026-04-03_handoff_decision_platform_runtime.md`. Use esses dois artefatos como fonte única para papéis, garantias, limites e evidência aprovada dos perfis; mantenha este README apenas como índice operacional e apoio rápido.
+O script acima é a referência canônica da fase 0 e lê a matriz declarativa em `scripts/decision_platform_runtime_validation_profiles.json`. A rastreabilidade estável desta fase fica em `docs/codex_dual_agent_runtime/phase_0_validation_manifest.json`, gerado pelo próprio validador, e o resumo humano correspondente fica em `docs/codex_dual_agent_runtime/phase_0_exit.md`. Use esses dois artefatos como fonte única para papéis, garantias, limites e evidência aprovada dos perfis; mantenha este README apenas como índice operacional e apoio rápido.
 
 A comparação Julia vs Python permanece diagnóstica e exige os dois opt-ins explícitos: `--allow-diagnostic-python-emulation` e `--include-engine-comparison`.
 
-Execução reproduzida nesta máquina em 2026-04-04 e consolidada pelo checklist `phase_0.phase_exit_checklist`. O artefato `engine_comparison.json` continua sendo apenas diagnóstico e nunca substitui a validação oficial do profile `official`.
+Execução reproduzida nesta máquina em 2026-04-04 e consolidada pelo manifesto `docs/codex_dual_agent_runtime/phase_0_validation_manifest.json`. O artefato `engine_comparison.json` continua sendo apenas diagnóstico e nunca substitui a validação oficial do profile `official`.
 
 Pipeline oficial Julia-only do cenário `maquete_v2`:
 

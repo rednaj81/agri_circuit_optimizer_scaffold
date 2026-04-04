@@ -68,7 +68,12 @@ def _make_logs_dir(prefix: str) -> Path:
     return logs_dir
 
 
-def _run_validation_script(*args: str, logs_dir: Path, extra_env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
+def _run_validation_script(
+    *args: str,
+    logs_dir: Path,
+    manifest_path: Path,
+    extra_env: dict[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
     if extra_env:
         env.update(extra_env)
@@ -80,6 +85,8 @@ def _run_validation_script(*args: str, logs_dir: Path, extra_env: dict[str, str]
         *args,
         "-LogsDir",
         str(logs_dir),
+        "-ManifestPath",
+        str(manifest_path),
         "-DryRun",
     ]
     return subprocess.run(
@@ -96,6 +103,10 @@ def _read_single_report(logs_dir: Path) -> dict:
     reports = sorted(logs_dir.glob("decision-platform-runtime-validation_*.json"))
     assert len(reports) == 1
     return json.loads(reports[0].read_text(encoding="utf-8"))
+
+
+def _read_manifest(manifest_path: Path) -> dict:
+    return json.loads(manifest_path.read_text(encoding="utf-8"))
 
 
 @pytest.mark.fast
@@ -158,24 +169,45 @@ def test_runtime_validation_script_uses_declarative_profile_matrix(profile_name:
     profile = profiles["profiles"][profile_name]
     semantics = EXPECTED_PROFILE_SEMANTICS[profile_name]
     logs_dir = _make_logs_dir(profile_name)
+    manifest_path = logs_dir / "phase_0_validation_manifest.json"
     try:
-        result = _run_validation_script(*_profile_to_args(profile_name, profile), logs_dir=logs_dir)
+        result = _run_validation_script(
+            *_profile_to_args(profile_name, profile),
+            logs_dir=logs_dir,
+            manifest_path=manifest_path,
+        )
 
         assert result.returncode == 0, result.stderr or result.stdout
 
         report = _read_single_report(logs_dir)
+        manifest = _read_manifest(manifest_path)
         assert report["success"] is True
         assert report["validation_profile"] == profile_name
         assert report["validation_flow"] == semantics["validation_flow"]
         assert report["validation_sufficiency"] == profile["validation_sufficiency"]
         assert report["official_gate_complete"] is semantics["official_gate_complete"]
         assert report["profile_config_path"].endswith("decision_platform_runtime_validation_profiles.json")
+        assert report["validation_manifest_path"].endswith("phase_0_validation_manifest.json")
         assert report["steps"][-1]["status"] == "passed"
+        assert manifest["phase_id"] == "phase_0"
+        assert manifest["official_validation_profile"] == "official"
+        assert set(manifest["profiles"]) == set(EXPECTED_PROFILE_SEMANTICS)
+        manifest_entry = manifest["profiles"][profile_name]
+        assert manifest_entry["validation_profile"] == profile_name
+        assert manifest_entry["validation_flow"] == semantics["validation_flow"]
+        assert manifest_entry["validation_sufficiency"] == semantics["validation_sufficiency"]
+        assert manifest_entry["official_gate_complete"] is semantics["official_gate_complete"]
+        assert manifest_entry["status"] == "passed"
+        assert Path(manifest_entry["last_report_path"]).name.startswith(f"decision-platform-runtime-validation_{profile_name}_")
         if profile["validation_flow"] == "preflight":
             assert len(report["steps"]) == 3
             assert report["steps"][-1]["name"] == "3. Validar preflight oficial"
+            assert manifest_entry["summary_path"] is None
+            assert manifest_entry["evidence"]["official_gate_valid"] is True
         else:
             assert len(report["steps"]) == 5
+            assert manifest_entry["evidence"]["execution_mode"] == semantics["execution_mode"]
+            assert manifest_entry["evidence"]["official_gate_valid"] is semantics["official_gate_valid"]
     finally:
         shutil.rmtree(logs_dir, ignore_errors=True)
 
@@ -184,21 +216,25 @@ def test_runtime_validation_script_uses_declarative_profile_matrix(profile_name:
 def test_runtime_validation_script_blocks_probe_override_for_official_profile() -> None:
     profiles = _load_profiles()
     logs_dir = _make_logs_dir("official-negative")
+    manifest_path = logs_dir / "phase_0_validation_manifest.json"
     try:
         result = _run_validation_script(
             *_profile_to_args("official", profiles["profiles"]["official"]),
             logs_dir=logs_dir,
+            manifest_path=manifest_path,
             extra_env={profiles["probe_override_env"]: "1"},
         )
 
         assert result.returncode != 0
 
         report = _read_single_report(logs_dir)
+        manifest = _read_manifest(manifest_path)
         assert report["success"] is False
         assert report["validation_profile"] == "official"
         assert report["steps"][0]["status"] == "failed"
         assert profiles["probe_override_env"] in report["steps"][0]["error"]
         assert "official" in report["steps"][0]["error"]
+        assert manifest["profiles"]["official"]["status"] == "failed"
     finally:
         shutil.rmtree(logs_dir, ignore_errors=True)
 
@@ -207,20 +243,24 @@ def test_runtime_validation_script_blocks_probe_override_for_official_profile() 
 def test_runtime_validation_script_blocks_probe_override_for_official_preflight() -> None:
     profiles = _load_profiles()
     logs_dir = _make_logs_dir("official-preflight-negative")
+    manifest_path = logs_dir / "phase_0_validation_manifest.json"
     try:
         result = _run_validation_script(
             *_profile_to_args("official_preflight", profiles["profiles"]["official_preflight"]),
             logs_dir=logs_dir,
+            manifest_path=manifest_path,
             extra_env={profiles["probe_override_env"]: "1"},
         )
 
         assert result.returncode != 0
 
         report = _read_single_report(logs_dir)
+        manifest = _read_manifest(manifest_path)
         assert report["success"] is False
         assert report["validation_profile"] == "official_preflight"
         assert report["official_gate_complete"] is False
         assert report["steps"][0]["status"] == "failed"
         assert profiles["probe_override_env"] in report["steps"][0]["error"]
+        assert manifest["profiles"]["official_preflight"]["status"] == "failed"
     finally:
         shutil.rmtree(logs_dir, ignore_errors=True)

@@ -13,6 +13,7 @@
 
 Registro de saída humano e auditável:
 
+- `docs/codex_dual_agent_runtime/phase_0_validation_manifest.json`
 - `docs/codex_dual_agent_runtime/phase_0_exit.md`
 
 Fluxo canônico:
@@ -28,6 +29,7 @@ Fluxo canônico:
 - o validador remove o diretório de saída antes da run para evitar artefato stale
 - o validador cruza `summary.json` com os artefatos principais do candidato oficial antes de declarar sucesso
 - o validador falha se o modo pedido não bater com o perfil declarativo e com a política exportada pelo pipeline
+- o validador atualiza `docs/codex_dual_agent_runtime/phase_0_validation_manifest.json` com o último resultado bruto por profile
 - o detalhamento humano aprovado das garantias, limites e evidências desta fase fica centralizado em `docs/codex_dual_agent_runtime/phase_0_exit.md`
 
 ### 0. Preflight oficial rápido
