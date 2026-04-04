@@ -17,6 +17,7 @@ from decision_platform.ui_dash._compat import DASH_AVAILABLE, Dash, Input, Outpu
 
 
 def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") -> Dash:
+    scenario_dir = _normalize_scenario_dir(scenario_dir)
     bundle = load_scenario_bundle(scenario_dir)
     result, pipeline_error = _safe_run_pipeline(scenario_dir)
     authoring_payload = bundle_authoring_payload(bundle)
@@ -1142,13 +1143,14 @@ def build_comparison_records(
 
 
 def _safe_run_pipeline(scenario_dir: str | Path) -> tuple[dict[str, Any] | None, str | None]:
+    normalized_scenario_dir = _normalize_scenario_dir(scenario_dir)
     try:
         bundle = _require_canonical_scenario_bundle(
-            load_scenario_bundle(scenario_dir),
+            load_scenario_bundle(normalized_scenario_dir),
             consumer="Decision Platform UI pipeline",
         )
         return run_decision_pipeline(
-            scenario_dir,
+            normalized_scenario_dir,
             allow_diagnostic_python_emulation=_requires_diagnostic_python_emulation(bundle),
         ), None
     except Exception as exc:  # pragma: no cover
@@ -1168,13 +1170,15 @@ def save_and_reopen_local_bundle(
     topology_rules_text: str | None,
     scenario_settings_text: str | None,
 ) -> dict[str, Any]:
+    normalized_source_dir = _normalize_scenario_dir(current_scenario_dir)
+    normalized_output_dir = _normalize_scenario_dir(output_dir)
     _require_canonical_scenario_bundle(
-        load_scenario_bundle(current_scenario_dir),
+        load_scenario_bundle(normalized_source_dir),
         consumer="Decision Platform UI save/reopen",
     )
     reloaded_bundle, exported_files = save_authored_scenario_bundle(
-        current_scenario_dir,
-        output_dir,
+        normalized_source_dir,
+        normalized_output_dir,
         nodes_rows=nodes_rows,
         components_rows=components_rows,
         candidate_links_rows=candidate_links_rows,
@@ -1184,16 +1188,16 @@ def save_and_reopen_local_bundle(
         topology_rules_text=topology_rules_text,
         scenario_settings_text=scenario_settings_text,
     )
-    result, pipeline_error = _safe_run_pipeline(output_dir)
+    result, pipeline_error = _safe_run_pipeline(normalized_output_dir)
     return {
-        "scenario_dir": str(Path(output_dir)),
+        "scenario_dir": str(normalized_output_dir),
         "bundle": reloaded_bundle,
         "result": result,
         "pipeline_error": pipeline_error,
         "bundle_io_summary": {
             "status": "saved_and_reopened",
-            "source_scenario_dir": str(Path(current_scenario_dir)),
-            "saved_scenario_dir": str(Path(output_dir)),
+            "source_scenario_dir": str(normalized_source_dir),
+            "saved_scenario_dir": str(normalized_output_dir),
             "bundle_version": reloaded_bundle.bundle_version,
             "bundle_manifest": str(reloaded_bundle.bundle_manifest_path) if reloaded_bundle.bundle_manifest_path else None,
             "bundle_files": {
@@ -1206,7 +1210,11 @@ def save_and_reopen_local_bundle(
             },
             "pipeline_error": pipeline_error,
         },
-    }
+}
+
+
+def _normalize_scenario_dir(path: str | Path) -> Path:
+    return Path(path).expanduser().resolve(strict=False)
 
 
 def _require_canonical_scenario_bundle(bundle: Any, *, consumer: str) -> Any:

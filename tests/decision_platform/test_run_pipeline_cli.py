@@ -9,7 +9,7 @@ import pytest
 from decision_platform.api import run_pipeline
 from decision_platform.api.run_pipeline import OfficialRuntimeConfigError, run_decision_pipeline
 from decision_platform.data_io.loader import load_scenario_bundle
-from tests.decision_platform.scenario_utils import cleanup_scenario_copy, prepare_scenario_copy
+from tests.decision_platform.scenario_utils import cleanup_scenario_copy, prepare_isolated_tmp_dir, prepare_scenario_copy
 
 
 @pytest.mark.slow
@@ -138,10 +138,11 @@ def test_run_decision_pipeline_skips_engine_comparison_by_default(monkeypatch) -
 
 
 @pytest.mark.slow
-def test_cli_uses_default_profile_and_selected_candidate_with_explicit_diagnostic_opt_in(monkeypatch, capsys) -> None:
-    output_dir = Path("tests/_tmp/decision_platform_cli_out")
-    if output_dir.exists():
-        shutil.rmtree(output_dir)
+def test_cli_uses_default_profile_and_selected_candidate_with_explicit_diagnostic_opt_in(
+    monkeypatch,
+    capsys,
+) -> None:
+    output_dir = prepare_isolated_tmp_dir("decision_platform_cli_out")
     try:
         captured: dict[str, object] = {}
 

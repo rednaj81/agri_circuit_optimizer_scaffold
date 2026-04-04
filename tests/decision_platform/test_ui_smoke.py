@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import shutil
 from pathlib import Path
 
 import pytest
@@ -19,7 +18,12 @@ from decision_platform.ui_dash.app import (
     rerank_catalog,
     save_and_reopen_local_bundle,
 )
-from tests.decision_platform.scenario_utils import cleanup_scenario_copy, diagnostic_runtime_test_mode, prepare_scenario_copy
+from tests.decision_platform.scenario_utils import (
+    cleanup_scenario_copy,
+    diagnostic_runtime_test_mode,
+    prepare_isolated_tmp_dir,
+    prepare_scenario_copy,
+)
 
 pytestmark = [pytest.mark.requires_dash, pytest.mark.ui]
 
@@ -90,9 +94,7 @@ def test_ui_save_reopen_flow_persists_bundle_and_refreshes_pipeline() -> None:
         "maquete_v2_ui_save_reopen_source",
         scenario_overrides={"hydraulic_engine": {"fallback": "python_emulated_julia"}},
     )
-    output_dir = Path("tests/_tmp/maquete_v2_ui_save_reopen_saved")
-    if output_dir.exists():
-        shutil.rmtree(output_dir)
+    output_dir = prepare_isolated_tmp_dir("maquete_v2_ui_save_reopen_saved")
     try:
         bundle = load_scenario_bundle(scenario_dir)
         nodes_rows = bundle.nodes.to_dict("records")
@@ -138,7 +140,7 @@ def test_ui_save_reopen_flow_persists_bundle_and_refreshes_pipeline() -> None:
                 scenario_settings_text=yaml.safe_dump(scenario_settings, sort_keys=False, allow_unicode=True),
             )
 
-        assert saved["scenario_dir"] == str(output_dir)
+        assert saved["scenario_dir"] == str(output_dir.resolve())
         assert saved["bundle"].nodes.iloc[0]["label"] == "W salvo na UI"
         assert float(saved["bundle"].components.iloc[0]["cost"]) == 321.0
         assert saved["bundle"].candidate_links.iloc[0]["notes"] == "Tap salvo na UI"
@@ -152,8 +154,6 @@ def test_ui_save_reopen_flow_persists_bundle_and_refreshes_pipeline() -> None:
         assert saved["result"]["scenario_bundle_files"]["components.csv"] == "component_catalog.csv"
         assert saved["pipeline_error"] is None
     finally:
-        if output_dir.exists():
-            shutil.rmtree(output_dir)
         cleanup_scenario_copy(scenario_dir)
 
 
@@ -163,9 +163,7 @@ def test_ui_save_reopen_rejects_legacy_source_without_manifest() -> None:
         "data/decision_platform/maquete_v2",
         "maquete_v2_ui_save_reopen_legacy_source",
     )
-    output_dir = Path("tests/_tmp/maquete_v2_ui_save_reopen_legacy_saved")
-    if output_dir.exists():
-        shutil.rmtree(output_dir)
+    output_dir = prepare_isolated_tmp_dir("maquete_v2_ui_save_reopen_legacy_saved")
     try:
         bundle = load_scenario_bundle(scenario_dir)
         (Path(scenario_dir) / "scenario_bundle.yaml").unlink()
@@ -190,9 +188,51 @@ def test_ui_save_reopen_rejects_legacy_source_without_manifest() -> None:
 
         assert not output_dir.exists()
     finally:
-        if output_dir.exists():
-            shutil.rmtree(output_dir)
         cleanup_scenario_copy(scenario_dir)
+
+
+@pytest.mark.slow
+def test_ui_rebuilds_from_saved_bundle_after_source_cleanup() -> None:
+    scenario_dir = prepare_scenario_copy(
+        "data/decision_platform/maquete_v2",
+        "maquete_v2_ui_rebuild_saved_bundle",
+        scenario_overrides={"hydraulic_engine": {"fallback": "python_emulated_julia"}},
+    )
+    output_dir = prepare_isolated_tmp_dir("maquete_v2_ui_rebuild_saved_bundle")
+    try:
+        bundle = load_scenario_bundle(scenario_dir)
+
+        with diagnostic_runtime_test_mode():
+            saved = save_and_reopen_local_bundle(
+                current_scenario_dir=scenario_dir,
+                output_dir=output_dir,
+                nodes_rows=bundle.nodes.to_dict("records"),
+                components_rows=bundle.components.to_dict("records"),
+                candidate_links_rows=bundle.candidate_links.to_dict("records"),
+                edge_component_rules_rows=bundle.edge_component_rules.to_dict("records"),
+                route_rows=bundle.route_requirements.to_dict("records"),
+                layout_constraints_rows=bundle.layout_constraints.to_dict("records"),
+                topology_rules_text=yaml.safe_dump(bundle.topology_rules, sort_keys=False, allow_unicode=True),
+                scenario_settings_text=yaml.safe_dump(
+                    bundle.scenario_settings,
+                    sort_keys=False,
+                    allow_unicode=True,
+                ),
+            )
+
+        cleanup_scenario_copy(scenario_dir)
+        scenario_dir = None
+
+        with diagnostic_runtime_test_mode():
+            app = build_app(saved["scenario_dir"])
+
+        assert hasattr(app, "layout")
+        assert app.layout is not None
+        assert saved["scenario_dir"] == str(output_dir.resolve())
+        assert load_scenario_bundle(saved["scenario_dir"]).bundle_manifest_path is not None
+    finally:
+        if scenario_dir is not None and Path(scenario_dir).exists():
+            cleanup_scenario_copy(scenario_dir)
 
 
 @pytest.mark.slow

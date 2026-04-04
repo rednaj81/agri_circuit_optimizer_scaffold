@@ -9,7 +9,7 @@ import yaml
 
 from decision_platform.data_io.loader import BUNDLE_MANIFEST_FILENAME, load_scenario_bundle
 from decision_platform.data_io.storage import save_authored_scenario_bundle, save_scenario_bundle
-from tests.decision_platform.scenario_utils import cleanup_scenario_copy, prepare_scenario_copy
+from tests.decision_platform.scenario_utils import cleanup_scenario_copy, prepare_isolated_tmp_dir, prepare_scenario_copy
 
 
 pytestmark = [pytest.mark.fast]
@@ -17,9 +17,7 @@ pytestmark = [pytest.mark.fast]
 
 def test_save_scenario_bundle_round_trip_is_lossless() -> None:
     bundle = load_scenario_bundle("data/decision_platform/maquete_v2")
-    output_dir = Path("tests/_tmp/scenario_persistence_roundtrip")
-    if output_dir.exists():
-        shutil.rmtree(output_dir)
+    output_dir = prepare_isolated_tmp_dir("scenario_persistence_roundtrip")
     try:
         exported = save_scenario_bundle(bundle, output_dir)
         reloaded = load_scenario_bundle(output_dir)
@@ -45,9 +43,7 @@ def test_save_scenario_bundle_round_trip_is_lossless() -> None:
 
 def test_manifest_prefers_component_catalog_over_legacy_alias() -> None:
     bundle = load_scenario_bundle("data/decision_platform/maquete_v2")
-    output_dir = Path("tests/_tmp/scenario_persistence_manifest_precedence")
-    if output_dir.exists():
-        shutil.rmtree(output_dir)
+    output_dir = prepare_isolated_tmp_dir("scenario_persistence_manifest_precedence")
     try:
         exported = save_scenario_bundle(bundle, output_dir, include_legacy_components_alias=True)
 
@@ -119,9 +115,7 @@ def test_loader_rejects_manifest_missing_required_entries() -> None:
 
 def test_save_authored_bundle_persists_authoring_changes() -> None:
     source_bundle = load_scenario_bundle("data/decision_platform/maquete_v2")
-    output_dir = Path("tests/_tmp/scenario_persistence_authored")
-    if output_dir.exists():
-        shutil.rmtree(output_dir)
+    output_dir = prepare_isolated_tmp_dir("scenario_persistence_authored")
     try:
         nodes_rows = source_bundle.nodes.to_dict("records")
         components_rows = source_bundle.components.to_dict("records")
@@ -174,9 +168,7 @@ def test_save_authored_bundle_persists_authoring_changes() -> None:
 
 def test_save_authored_bundle_fails_closed_for_invalid_route_contract() -> None:
     source_bundle = load_scenario_bundle("data/decision_platform/maquete_v2")
-    output_dir = Path("tests/_tmp/scenario_persistence_invalid_route")
-    if output_dir.exists():
-        shutil.rmtree(output_dir)
+    output_dir = prepare_isolated_tmp_dir("scenario_persistence_invalid_route")
     try:
         route_rows = source_bundle.route_requirements.to_dict("records")
         route_rows[0]["measurement_required"] = False
@@ -209,9 +201,7 @@ def test_save_authored_bundle_supports_explicit_legacy_source_layout() -> None:
         "data/decision_platform/maquete_v2",
         "maquete_v2_explicit_legacy_source",
     )
-    output_dir = Path("tests/_tmp/scenario_persistence_legacy_source_saved")
-    if output_dir.exists():
-        shutil.rmtree(output_dir)
+    output_dir = prepare_isolated_tmp_dir("scenario_persistence_legacy_source_saved")
     try:
         (Path(scenario_dir) / BUNDLE_MANIFEST_FILENAME).unlink()
         legacy_bundle = load_scenario_bundle(scenario_dir)
@@ -247,9 +237,7 @@ def test_save_authored_bundle_supports_explicit_legacy_source_layout() -> None:
 
 def test_save_authored_bundle_fails_closed_for_invalid_topology_contract() -> None:
     source_bundle = load_scenario_bundle("data/decision_platform/maquete_v2")
-    output_dir = Path("tests/_tmp/scenario_persistence_invalid_topology")
-    if output_dir.exists():
-        shutil.rmtree(output_dir)
+    output_dir = prepare_isolated_tmp_dir("scenario_persistence_invalid_topology")
     try:
         candidate_links_rows = source_bundle.candidate_links.to_dict("records")
         candidate_links_rows[1]["link_id"] = candidate_links_rows[0]["link_id"]
