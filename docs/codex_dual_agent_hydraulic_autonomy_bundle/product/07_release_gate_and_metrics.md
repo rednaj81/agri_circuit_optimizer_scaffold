@@ -16,6 +16,12 @@ Registro de saída humano e auditável:
 - `docs/codex_dual_agent_runtime/phase_0_validation_manifest.json`
 - `docs/codex_dual_agent_runtime/phase_0_exit.md`
 
+Decisão de stop da phase_0:
+
+- a `phase_0` está encerrada
+- não abrir novas ondas funcionais dentro desta fase
+- qualquer nova evolução deve abrir a próxima fase e preservar a política `Julia-only` já validada
+
 Fluxo canônico:
 - contrato declarativo: `scripts/decision_platform_runtime_validation_profiles.json`
 - script-base: `pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1`

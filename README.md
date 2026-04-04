@@ -168,6 +168,8 @@ pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode
 
 O script acima é a referência canônica da fase 0 e lê a matriz declarativa em `scripts/decision_platform_runtime_validation_profiles.json`. A rastreabilidade estável desta fase fica em `docs/codex_dual_agent_runtime/phase_0_validation_manifest.json`, gerado pelo próprio validador, e o resumo humano correspondente fica em `docs/codex_dual_agent_runtime/phase_0_exit.md`. Use esses dois artefatos como fonte única para papéis, garantias, limites e evidência aprovada dos perfis; mantenha este README apenas como índice operacional e apoio rápido.
 
+A `phase_0` está encerrada. Não há novas ondas funcionais dentro dela; qualquer evolução posterior deve abrir a próxima fase e tratar `docs/codex_dual_agent_runtime/phase_0_exit.md` como handoff congelado do tema Julia-only.
+
 A comparação Julia vs Python permanece diagnóstica e exige os dois opt-ins explícitos: `--allow-diagnostic-python-emulation` e `--include-engine-comparison`.
 
 Execução reproduzida nesta máquina em 2026-04-04 e consolidada pelo manifesto `docs/codex_dual_agent_runtime/phase_0_validation_manifest.json`. O artefato `engine_comparison.json` continua sendo apenas diagnóstico e nunca substitui a validação oficial do profile `official`.

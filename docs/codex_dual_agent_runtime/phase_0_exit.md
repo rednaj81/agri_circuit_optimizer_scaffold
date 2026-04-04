@@ -4,6 +4,8 @@ Status: encerrada para a `phase_0`
 
 Data-base do registro: `2026-04-04`
 
+Decisão desta onda final: `stop`
+
 ## Fontes de verdade
 
 - script canônico: `scripts/run_decision_platform_runtime_validation.ps1`
@@ -22,6 +24,15 @@ Rastreabilidade bruta:
 - apenas o profile `official` com `validation_sufficiency=official_evidence` conta como validação oficial suficiente
 - o profile `official_preflight` é apenas triagem operacional rápida
 - os profiles `diagnostic` e `diagnostic_comparison` continuam auxiliares e não contam como aprovação oficial da fase
+
+## Decisão de stop
+
+- a `phase_0` está formalmente concluída e não deve receber novas ondas funcionais
+- o mecanismo operacional aprovado para esta fase permanece congelado em torno de:
+  `scripts/run_decision_platform_runtime_validation.ps1`
+- a rastreabilidade mínima aprovada permanece em:
+  `docs/codex_dual_agent_runtime/phase_0_validation_manifest.json`
+- qualquer novo trabalho deve abrir a próxima fase, sem reabrir a discussão conceitual sobre `Julia-only` no caminho oficial
 
 ## Matriz aprovada de perfis
 
@@ -186,3 +197,10 @@ pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode
 - continuar tratando `scripts/run_decision_platform_runtime_validation.ps1` e `scripts/decision_platform_runtime_validation_profiles.json` como fonte operacional principal
 - usar este registro como resumo humano auditável da `phase_0`
 - qualquer evolução de fase seguinte deve preservar `official_gate_valid=true` apenas no profile `official` com Julia real
+
+## Critério de transição de fase
+
+- o manifesto deve continuar apontando `official_validation_profile=official`
+- o manifesto deve continuar registrando `profiles.official.status=passed`
+- o resumo humano desta fase continua sendo este arquivo; a próxima fase deve referenciá-lo, não reescrever a política Julia-only
+- se surgir necessidade de alterar perfis, `official_gate_valid` ou a política fail-closed, isso já não pertence à `phase_0`
