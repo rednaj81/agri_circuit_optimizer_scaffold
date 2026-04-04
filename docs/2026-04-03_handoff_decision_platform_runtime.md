@@ -201,3 +201,19 @@ A phase 0 fica fechada com evidencia operacional reproduzivel de que:
 - `official_preflight` e apenas triagem de ambiente e politica, nao evidencia oficial suficiente
 - qualquer execucao com `python_emulated_julia` permanece fora do gate oficial
 - a comparacao Julia vs Python e diagnostica, opt-in e explicitamente marcada como invalida para o gate oficial
+
+## Encerramento da phase_0
+
+Esta phase termina congelada com os seguintes invariantes operacionais:
+
+- a matriz canonica suportada permanece em quatro perfis: `official_preflight`, `official`, `diagnostic` e `diagnostic_comparison`
+- `official_preflight` permanece `triage_only`
+- `diagnostic` e `diagnostic_comparison` permanecem fora do gate oficial
+- apenas `official` constitui evidencia oficial suficiente do gate Julia-only completo
+- `official_gate_complete=true` permanece reservado ao perfil `official`
+
+Transicao liberada para a proxima fase:
+
+- trate `docs/codex_dual_agent_hydraulic_autonomy_bundle/automation/phase_plan.yaml`, chave `phase_0.phase_exit_checklist`, como contrato congelado da phase encerrada
+- use este handoff apenas como resumo operacional da evidencia ja reproduzida
+- nao reabra a semantica do gate Julia-only na fase seguinte sem justificativa objetiva e nova aprovacao arquitetural

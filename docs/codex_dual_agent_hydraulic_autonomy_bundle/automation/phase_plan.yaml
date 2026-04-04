@@ -1,5 +1,8 @@
 phase_0:
   target: "Garantir Julia-only no caminho oficial e documentação honesta"
+  status: "closed"
+  closure_mode: "frozen_after_wave_7"
+  next_phase_id: "phase_1"
   exit_criteria:
     - "engine oficial falha fechado sem Julia"
     - "README e docs coerentes"
@@ -14,6 +17,10 @@ phase_0:
     - "`diagnostic` deve permanecer nao oficial com `validation_flow=full`, `validation_sufficiency=diagnostic_evidence`, `official_gate_complete=false`, `execution_mode=diagnostic`, `official_gate_valid=false` e sem `engine_comparison.json`."
     - "`diagnostic_comparison` deve permanecer nao oficial com `validation_flow=full`, `validation_sufficiency=diagnostic_evidence`, `official_gate_complete=false`, `execution_mode=diagnostic`, `official_gate_valid=false` e `engine_comparison.json` obrigatorio."
     - "README e `docs/2026-04-03_handoff_decision_platform_runtime.md` devem apontar para este checklist como fonte unica de saida da phase_0."
+  closure_handoff:
+    summary_doc: "docs/2026-04-03_handoff_decision_platform_runtime.md"
+    freeze_rule: "Nao reinterpretar `official_preflight` como gate completo e nao reinterpretar `diagnostic*` como evidencia oficial."
+    transition_note: "A phase_1 pode iniciar sobre esta base congelada sem reabrir a semantica do gate Julia-only."
 phase_1:
   target: "Normalizar domínio, persistência e cenários"
   exit_criteria:
