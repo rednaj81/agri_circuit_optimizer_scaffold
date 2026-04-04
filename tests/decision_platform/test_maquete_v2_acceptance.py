@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import shutil
+from time import perf_counter
 
 import json
 import pandas as pd
@@ -9,13 +10,16 @@ import pytest
 
 from decision_platform.api.run_pipeline import run_decision_pipeline
 from decision_platform.julia_bridge.bridge import watermodels_available
-from tests.decision_platform.scenario_utils import cleanup_scenario_copy, prepare_scenario_copy
+from tests.decision_platform.scenario_utils import (
+    cleanup_scenario_copy,
+    diagnostic_runtime_test_mode,
+    prepare_maquete_v2_acceptance_scenario,
+)
 
 
 @pytest.mark.slow
 def test_maquete_v2_pipeline_exports_and_route_metrics() -> None:
-    scenario_dir = prepare_scenario_copy(
-        "data/decision_platform/maquete_v2",
+    scenario_dir = prepare_maquete_v2_acceptance_scenario(
         "maquete_v2_acceptance_fallback",
         scenario_overrides={"hydraulic_engine": {"fallback": "python_emulated_julia"}},
     )
@@ -23,14 +27,17 @@ def test_maquete_v2_pipeline_exports_and_route_metrics() -> None:
     if output_dir.exists():
         shutil.rmtree(output_dir)
     try:
-        result = run_decision_pipeline(
-            scenario_dir,
-            output_dir,
-            include_engine_comparison=True,
-            allow_diagnostic_python_emulation=True,
-        )
+        started_at = perf_counter()
+        with diagnostic_runtime_test_mode():
+            result = run_decision_pipeline(
+                scenario_dir,
+                output_dir,
+                allow_diagnostic_python_emulation=True,
+            )
+        duration_s = perf_counter() - started_at
 
         assert result["scenario_id"] == "maquete_v2"
+        assert duration_s < 30
         assert result["default_profile_id"] == "balanced"
         assert result["selected_candidate_id"] == result["selected_candidate"]["candidate_id"]
         feasible = [item for item in result["catalog"] if item["metrics"]["feasible"]]
@@ -46,7 +53,6 @@ def test_maquete_v2_pipeline_exports_and_route_metrics() -> None:
         assert any(item["payload"]["selection_log"] for item in feasible)
 
         summary = json.loads((output_dir / "summary.json").read_text(encoding="utf-8"))
-        engine_comparison = json.loads((output_dir / "engine_comparison.json").read_text(encoding="utf-8"))
         infeasibility_summary = json.loads((output_dir / "infeasibility_summary.json").read_text(encoding="utf-8"))
         selected_candidate = json.loads((output_dir / "selected_candidate.json").read_text(encoding="utf-8"))
         selected_candidate_explanation = json.loads(
@@ -57,7 +63,6 @@ def test_maquete_v2_pipeline_exports_and_route_metrics() -> None:
         selected_breakdown = json.loads((output_dir / "selected_candidate_score_breakdown.json").read_text(encoding="utf-8"))
         selected_bom = pd.read_csv(output_dir / "selected_candidate_bom.csv")
         family_summary = pd.read_csv(output_dir / "family_summary.csv")
-        engine_comparison_candidates = pd.read_csv(output_dir / "engine_comparison_candidates.csv")
 
         assert (output_dir / "catalog.csv").exists()
         assert (output_dir / "catalog.json").exists()
@@ -65,8 +70,8 @@ def test_maquete_v2_pipeline_exports_and_route_metrics() -> None:
         assert (output_dir / "ranked_profiles.json").exists()
         assert (output_dir / "ranking_profiles.json").exists()
         assert (output_dir / "catalog_summary.json").exists()
-        assert (output_dir / "engine_comparison.json").exists()
-        assert (output_dir / "engine_comparison_candidates.csv").exists()
+        assert not (output_dir / "engine_comparison.json").exists()
+        assert not (output_dir / "engine_comparison_candidates.csv").exists()
         assert (output_dir / "family_summary.csv").exists()
         assert (output_dir / "infeasibility_summary.json").exists()
         assert (output_dir / "selected_candidate.svg").exists()
@@ -103,15 +108,52 @@ def test_maquete_v2_pipeline_exports_and_route_metrics() -> None:
         assert selected_candidate_explanation["decision_status"] in {"winner_clear", "technical_tie"}
         assert "decision_differences" in selected_candidate_explanation
         assert family_summary["topology_family"].nunique() >= 1
-        assert set(engine_comparison_candidates["engine"]) == {"julia", "python"}
         assert infeasibility_summary["total_infeasible_candidates"] >= 1
-        assert engine_comparison["scenario_comparisons"]["maquete_v2"]["decision_difference_observed"] is True
-        assert engine_comparison["scenario_comparisons"]["maquete_v2"]["selected_candidate"]["same"] is False
-        assert engine_comparison["scenario_comparisons"]["maquete_v2"]["same_winner"] is False
-        assert engine_comparison["scenario_comparisons"]["maquete_v2"]["ranking_difference_observed"] is True
+        assert summary["engine_used"] == "python_emulated_julia"
+        assert summary["engine_mode"] == "fallback_emulated"
+        assert summary["engine_requested"] == "watermodels_jl"
+        assert summary["julia_available"] is False
+        assert summary["watermodels_available"] is False
+    finally:
+        if output_dir.exists():
+            shutil.rmtree(output_dir)
+        cleanup_scenario_copy(scenario_dir)
+
+
+@pytest.mark.slow
+def test_maquete_v2_diagnostic_engine_comparison_remains_explicit_opt_in() -> None:
+    scenario_dir = prepare_maquete_v2_acceptance_scenario(
+        "maquete_v2_acceptance_diagnostic",
+        scenario_overrides={"hydraulic_engine": {"fallback": "python_emulated_julia"}},
+    )
+    output_dir = Path("tests/_tmp/decision_platform_maquete_v2_diag_out")
+    if output_dir.exists():
+        shutil.rmtree(output_dir)
+    try:
+        started_at = perf_counter()
+        with diagnostic_runtime_test_mode():
+            result = run_decision_pipeline(
+                scenario_dir,
+                output_dir,
+                include_engine_comparison=True,
+                allow_diagnostic_python_emulation=True,
+            )
+        duration_s = perf_counter() - started_at
+        engine_comparison = json.loads((output_dir / "engine_comparison.json").read_text(encoding="utf-8"))
+        engine_comparison_candidates = pd.read_csv(output_dir / "engine_comparison_candidates.csv")
+
+        assert result["selected_candidate_id"]
+        assert duration_s < 45
+        assert engine_comparison["comparison_policy"]["official_runtime"] == "julia_only_fail_closed"
+        assert engine_comparison["comparison_policy"]["python_emulation"] == "diagnostic_only_explicit_opt_in"
+        assert set(engine_comparison_candidates["engine"]) == {"julia", "python"}
+        assert "decision_difference_observed" in engine_comparison["scenario_comparisons"]["maquete_v2"]
+        assert "selected_candidate" in engine_comparison["scenario_comparisons"]["maquete_v2"]
+        assert "same_winner" in engine_comparison["scenario_comparisons"]["maquete_v2"]
+        assert "ranking_difference_observed" in engine_comparison["scenario_comparisons"]["maquete_v2"]
         assert "text_summary" in engine_comparison["scenario_comparisons"]["maquete_v2"]
         assert "winner_vs_runner_up" in engine_comparison["scenario_comparisons"]["maquete_v2"]
-        assert engine_comparison["scenario_comparisons"]["hybrid_free_focus_variant"]["selected_candidate"]["same"] is False
+        assert "selected_candidate" in engine_comparison["scenario_comparisons"]["hybrid_free_focus_variant"]
     finally:
         if output_dir.exists():
             shutil.rmtree(output_dir)

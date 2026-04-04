@@ -5,6 +5,7 @@ import os
 import shutil
 import subprocess
 import uuid
+from contextlib import contextmanager
 from functools import lru_cache
 from pathlib import Path
 
@@ -16,7 +17,16 @@ class JuliaBridgeError(RuntimeError):
     pass
 
 
+DISABLE_REAL_JULIA_PROBE_ENV = "DECISION_PLATFORM_DISABLE_REAL_JULIA_PROBE"
+
+
+def real_julia_probe_disabled() -> bool:
+    return os.environ.get(DISABLE_REAL_JULIA_PROBE_ENV, "").strip().lower() in {"1", "true", "yes", "on"}
+
+
 def find_julia_executable() -> str | None:
+    if real_julia_probe_disabled():
+        return None
     env_override = os.environ.get("JULIA_EXE", "").strip()
     if env_override and Path(env_override).exists():
         return env_override
@@ -30,6 +40,8 @@ def find_julia_executable() -> str | None:
 
 
 def julia_available() -> bool:
+    if real_julia_probe_disabled():
+        return False
     julia_exe = find_julia_executable()
     if not julia_exe:
         return False
@@ -68,8 +80,7 @@ def runtime_tmp_dir() -> Path:
 
 
 @lru_cache(maxsize=4)
-def watermodels_available(project_dir: str | None = None) -> bool:
-    julia_exe = find_julia_executable()
+def _watermodels_available_cached(project_dir: str | None, julia_exe: str) -> bool:
     if not julia_exe:
         return False
     repo_root = Path(__file__).resolve().parents[3]
@@ -92,6 +103,34 @@ def watermodels_available(project_dir: str | None = None) -> bool:
         return "watermodels-ok" in completed.stdout
     except Exception:
         return False
+
+
+def watermodels_available(project_dir: str | None = None) -> bool:
+    if real_julia_probe_disabled():
+        return False
+    julia_exe = find_julia_executable()
+    if not julia_exe:
+        return False
+    return _watermodels_available_cached(project_dir, julia_exe)
+
+
+def clear_runtime_probe_caches() -> None:
+    _watermodels_available_cached.cache_clear()
+
+
+@contextmanager
+def disable_real_julia_probe():
+    previous = os.environ.get(DISABLE_REAL_JULIA_PROBE_ENV)
+    os.environ[DISABLE_REAL_JULIA_PROBE_ENV] = "1"
+    clear_runtime_probe_caches()
+    try:
+        yield
+    finally:
+        if previous is None:
+            os.environ.pop(DISABLE_REAL_JULIA_PROBE_ENV, None)
+        else:
+            os.environ[DISABLE_REAL_JULIA_PROBE_ENV] = previous
+        clear_runtime_probe_caches()
 
 
 def evaluate_candidate_via_bridge(payload: dict, bundle: ScenarioBundle, *, prefer_real_julia: bool = True) -> dict:

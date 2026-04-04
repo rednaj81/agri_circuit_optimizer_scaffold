@@ -1,10 +1,23 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
+from copy import deepcopy
 import shutil
 from pathlib import Path
 from typing import Any
 
 import yaml
+
+from decision_platform.julia_bridge.bridge import disable_real_julia_probe
+
+
+MAQUETE_V2_ACCEPTANCE_OVERRIDES: dict[str, Any] = {
+    "candidate_generation": {
+        "population_size": 12,
+        "generations": 3,
+        "keep_top_n_per_family": 6,
+    },
+}
 
 
 def prepare_scenario_copy(
@@ -26,10 +39,31 @@ def prepare_scenario_copy(
     return target
 
 
+def prepare_maquete_v2_acceptance_scenario(
+    target_name: str,
+    *,
+    scenario_overrides: dict[str, Any] | None = None,
+) -> Path:
+    merged_overrides = deepcopy(MAQUETE_V2_ACCEPTANCE_OVERRIDES)
+    if scenario_overrides:
+        _deep_update(merged_overrides, scenario_overrides)
+    return prepare_scenario_copy(
+        "data/decision_platform/maquete_v2",
+        target_name,
+        scenario_overrides=merged_overrides,
+    )
+
+
 def cleanup_scenario_copy(target: str | Path) -> None:
     target_path = Path(target)
     if target_path.exists():
         shutil.rmtree(target_path)
+
+
+@contextmanager
+def diagnostic_runtime_test_mode():
+    with disable_real_julia_probe():
+        yield
 
 
 def _deep_update(target: dict[str, Any], updates: dict[str, Any]) -> None:

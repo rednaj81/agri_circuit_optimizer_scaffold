@@ -100,9 +100,11 @@ Observações:
 
 ### Critério prático de aceite
 
-- `pytest tests/decision_platform -m fast -q`
-- `pytest tests/decision_platform -m "not requires_julia" -q`
-- `pytest tests/decision_platform -m requires_julia -q`
+- `.\.venv\Scripts\python.exe -m pytest tests\decision_platform -m fast -q --basetemp tests/_tmp/pytest-basetemp-fast`
+- `.\.venv\Scripts\python.exe -m pytest tests\decision_platform\test_maquete_v2_acceptance.py::test_maquete_v2_pipeline_exports_and_route_metrics -q --basetemp tests/_tmp/pytest-basetemp-accept`
+- `.\.venv\Scripts\python.exe -m pytest tests\decision_platform\test_maquete_v2_acceptance.py::test_maquete_v2_diagnostic_engine_comparison_remains_explicit_opt_in -q --basetemp tests/_tmp/pytest-basetemp-accept-diag`
+- `.\.venv\Scripts\python.exe -m pytest tests\decision_platform -m "not requires_julia" -q --basetemp tests/_tmp/pytest-basetemp-no-julia`
+- `.\.venv\Scripts\python.exe -m pytest tests\decision_platform -m requires_julia -q --basetemp tests/_tmp/pytest-basetemp-julia`
 - `python -m decision_platform.api.run_pipeline --scenario data/decision_platform/maquete_v2 --output-dir data/output/decision_platform/maquete_v2`
 - `python -m decision_platform.api.run_pipeline --scenario data/decision_platform/maquete_v2 --output-dir data/output/decision_platform/maquete_v2 --include-engine-comparison`
 - `python -m decision_platform.ui_dash.app`
@@ -176,14 +178,31 @@ Smoke rápido da `decision_platform`:
 
 ```powershell
 $env:PYTHONPATH = 'src'
-.\.venv\Scripts\python.exe -m pytest tests\decision_platform -m fast -q
+.\.venv\Scripts\python.exe -m pytest tests\decision_platform -m fast -q --basetemp tests/_tmp/pytest-basetemp-fast
+```
+
+Aceite diagnóstico lean, sem Julia real:
+
+```powershell
+$env:PYTHONPATH = 'src'
+$env:DECISION_PLATFORM_DISABLE_REAL_JULIA_PROBE = '1'
+.\.venv\Scripts\python.exe -m pytest tests\decision_platform\test_maquete_v2_acceptance.py::test_maquete_v2_pipeline_exports_and_route_metrics -q --basetemp tests/_tmp/pytest-basetemp-accept
 ```
 
 Suíte sem Julia real:
 
 ```powershell
 $env:PYTHONPATH = 'src'
-.\.venv\Scripts\python.exe -m pytest tests\decision_platform -m "not requires_julia" -q
+$env:DECISION_PLATFORM_DISABLE_REAL_JULIA_PROBE = '1'
+.\.venv\Scripts\python.exe -m pytest tests\decision_platform -m "not requires_julia" -q --basetemp tests/_tmp/pytest-basetemp-no-julia
+```
+
+Comparação diagnóstica Julia vs Python:
+
+```powershell
+$env:PYTHONPATH = 'src'
+$env:DECISION_PLATFORM_DISABLE_REAL_JULIA_PROBE = '1'
+.\.venv\Scripts\python.exe -m pytest tests\decision_platform\test_maquete_v2_acceptance.py::test_maquete_v2_diagnostic_engine_comparison_remains_explicit_opt_in -q --basetemp tests/_tmp/pytest-basetemp-accept-diag
 ```
 
 Suíte com Julia real:
@@ -191,7 +210,7 @@ Suíte com Julia real:
 ```powershell
 $env:PYTHONPATH = 'src'
 $env:JULIA_DEPOT_PATH = (Resolve-Path 'julia_depot_runtime')
-.\.venv\Scripts\python.exe -m pytest tests\decision_platform -m requires_julia -q
+.\.venv\Scripts\python.exe -m pytest tests\decision_platform -m requires_julia -q --basetemp tests/_tmp/pytest-basetemp-julia
 ```
 
 UI e view-state:
@@ -234,6 +253,8 @@ Observações:
 - `data/decision_platform/maquete_v2/scenario_settings.yaml` é `fail closed`: se `WaterModels` não estiver disponível e `fallback: none`, o pipeline oficial falha com mensagem clara.
 - o pipeline oficial não habilita `python_emulated_julia` nem exporta `engine_comparison.json` por padrão.
 - a comparação Julia vs Python e qualquer uso de `python_emulated_julia` ficaram restritos a trilhas diagnósticas explícitas com `--include-engine-comparison` e/ou `--allow-diagnostic-python-emulation`.
+- a suíte `decision_platform` usa `-p no:cacheprovider` por padrão para não poluir a saída com `PytestCacheWarning` neste workspace.
+- o override `DECISION_PLATFORM_DISABLE_REAL_JULIA_PROBE=1` existe para suites diagnósticas sem Julia real; no caminho oficial ele apenas força fail-closed.
 - O stack real do Dash está ativo na `.venv` e a UI é testada com o runtime real.
 - A suíte atual da `decision_platform` coleta `24` testes.
 - Os slices validados nesta rodada foram:
@@ -491,15 +512,37 @@ Suíte rápida:
 
 ```powershell
 $env:PYTHONPATH = 'src'
-.\.venv\Scripts\python.exe -m pytest tests\decision_platform -p no:tmpdir --basetemp tests/_tmp/pytest-basetemp-fast -m "not slow and not requires_julia" -q
+.\.venv\Scripts\python.exe -m pytest tests\decision_platform -m fast -q --basetemp tests/_tmp/pytest-basetemp-fast
+```
+
+Aceite diagnóstico lean:
+
+Janela operacional esperada nesta máquina: abaixo de `30 s`.
+
+```powershell
+$env:PYTHONPATH = 'src'
+$env:DECISION_PLATFORM_DISABLE_REAL_JULIA_PROBE = '1'
+.\.venv\Scripts\python.exe -m pytest tests\decision_platform\test_maquete_v2_acceptance.py::test_maquete_v2_pipeline_exports_and_route_metrics -q --basetemp tests/_tmp/pytest-basetemp-accept
+```
+
+Comparação diagnóstica explícita:
+
+Janela operacional esperada nesta máquina: abaixo de `45 s`.
+
+```powershell
+$env:PYTHONPATH = 'src'
+$env:DECISION_PLATFORM_DISABLE_REAL_JULIA_PROBE = '1'
+.\.venv\Scripts\python.exe -m pytest tests\decision_platform\test_maquete_v2_acceptance.py::test_maquete_v2_diagnostic_engine_comparison_remains_explicit_opt_in -q --basetemp tests/_tmp/pytest-basetemp-accept-diag
 ```
 
 Suíte com Julia real:
 
+Gate oficial Julia-only. Não use `DECISION_PLATFORM_DISABLE_REAL_JULIA_PROBE`.
+
 ```powershell
 $env:PYTHONPATH = 'src'
 $env:JULIA_DEPOT_PATH = (Resolve-Path 'julia_depot_runtime')
-.\.venv\Scripts\python.exe -m pytest tests\decision_platform -p no:tmpdir --basetemp tests/_tmp/pytest-basetemp-julia -m "requires_julia" -vv -s
+.\.venv\Scripts\python.exe -m pytest tests\decision_platform -m "requires_julia" -q --basetemp tests/_tmp/pytest-basetemp-julia
 ```
 
 Suíte completa:
@@ -507,7 +550,7 @@ Suíte completa:
 ```powershell
 $env:PYTHONPATH = 'src'
 $env:JULIA_DEPOT_PATH = (Resolve-Path 'julia_depot_runtime')
-.\.venv\Scripts\python.exe -m pytest tests\decision_platform -p no:tmpdir --basetemp tests/_tmp/pytest-basetemp-full -vv -s
+.\.venv\Scripts\python.exe -m pytest tests\decision_platform -q --basetemp tests/_tmp/pytest-basetemp-full
 ```
 
 UI local:

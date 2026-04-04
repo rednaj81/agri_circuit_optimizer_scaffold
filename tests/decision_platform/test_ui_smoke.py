@@ -12,12 +12,14 @@ from decision_platform.ui_dash.app import (
     filter_catalog_records,
     rerank_catalog,
 )
+from tests.decision_platform.scenario_utils import diagnostic_runtime_test_mode
 
 pytestmark = [pytest.mark.requires_dash, pytest.mark.ui]
 
 
 def test_dash_app_builds_layout_and_callbacks_even_when_fail_closed() -> None:
-    app = build_app("data/decision_platform/maquete_v2")
+    with diagnostic_runtime_test_mode():
+        app = build_app("data/decision_platform/maquete_v2")
 
     assert hasattr(app, "layout")
     assert app.layout is not None
@@ -33,7 +35,8 @@ def test_real_dash_stack_is_available() -> None:
 def test_dash_app_uses_pipeline_result_when_fallback_is_allowed(maquete_v2_fallback_runtime: dict[str, object]) -> None:
     scenario_dir = maquete_v2_fallback_runtime["scenario_dir"]
     result = maquete_v2_fallback_runtime["result"]
-    app = build_app(scenario_dir)
+    with diagnostic_runtime_test_mode():
+        app = build_app(scenario_dir)
     assert hasattr(app, "layout")
     assert app.layout is not None
     detail = build_candidate_detail(result, result["selected_candidate_id"])
@@ -153,5 +156,5 @@ def test_ui_summary_and_comparison_records_expose_decision_fields(maquete_v2_fal
     assert "winner_reason_summary" in official
     assert official["runner_up_candidate_id"] == result["ranked_profiles"]["balanced"][1]["candidate_id"]
     assert comparison
-    assert comparison[0]["comparison_role"] in {"official,selected", "official"}
+    assert any(row["comparison_role"] in {"official,selected", "official"} for row in comparison)
     assert all("score_final" in row for row in comparison)

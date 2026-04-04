@@ -71,6 +71,20 @@ def test_bridge_allows_explicit_python_primary_for_diagnostic_paths(monkeypatch)
 
 
 @pytest.mark.fast
+def test_bridge_can_disable_real_julia_probe_for_diagnostic_test_mode(monkeypatch) -> None:
+    monkeypatch.setenv(bridge.DISABLE_REAL_JULIA_PROBE_ENV, "1")
+    bridge.clear_runtime_probe_caches()
+
+    try:
+        assert bridge.find_julia_executable() is None
+        assert bridge.julia_available() is False
+        assert bridge.watermodels_available() is False
+    finally:
+        monkeypatch.delenv(bridge.DISABLE_REAL_JULIA_PROBE_ENV, raising=False)
+        bridge.clear_runtime_probe_caches()
+
+
+@pytest.mark.fast
 def test_bridge_uses_real_julia_when_available(monkeypatch) -> None:
     scenario_dir = prepare_scenario_copy(
         "data/decision_platform/maquete_v2",
