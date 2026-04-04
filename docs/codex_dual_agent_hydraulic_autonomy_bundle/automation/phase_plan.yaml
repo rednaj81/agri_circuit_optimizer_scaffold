@@ -32,6 +32,7 @@ phase_1:
   canonical_acceptance_target: "tests/decision_platform/test_phase1_exit_acceptance.py"
   phase_exit_checklist:
     - "Executar `.\.venv\\Scripts\\python.exe -m pytest tests/decision_platform/test_phase1_exit_acceptance.py -q` como gate único e objetivo da fase."
+    - "O gate acima deve permanecer reproduzível no codebase local sem limpeza manual prévia de `tests/_tmp`."
     - "Usar `docs/2026-04-04_phase1_exit.md` como fonte única de saída operacional da phase_1."
     - "O bundle oficial `data/decision_platform/maquete_v2` deve continuar canônico, versionável e rastreável via `scenario_bundle.yaml`, `component_catalog.csv`, `scenario_bundle_manifest` e `scenario_bundle_files`."
     - "Os entrypoints oficiais (`run_decision_pipeline` e `save_and_reopen_local_bundle`) devem continuar falhando fechado para layout legado sem manifesto."

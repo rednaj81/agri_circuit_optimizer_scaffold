@@ -5,6 +5,7 @@ from copy import deepcopy
 import shutil
 from pathlib import Path
 from typing import Any, Callable
+from uuid import uuid4
 
 import pandas as pd
 import yaml
@@ -21,6 +22,15 @@ MAQUETE_V2_ACCEPTANCE_OVERRIDES: dict[str, Any] = {
 }
 
 
+def prepare_isolated_tmp_dir(target_name: str, *, create: bool = False) -> Path:
+    tmp_root = Path("tests/_tmp")
+    tmp_root.mkdir(parents=True, exist_ok=True)
+    target = tmp_root / f"{target_name}_{uuid4().hex}"
+    if create:
+        target.mkdir(parents=True, exist_ok=False)
+    return target
+
+
 def prepare_scenario_copy(
     source_dir: str | Path,
     target_name: str,
@@ -28,9 +38,7 @@ def prepare_scenario_copy(
     scenario_overrides: dict[str, Any] | None = None,
 ) -> Path:
     source = Path(source_dir)
-    target = Path("tests/_tmp") / target_name
-    if target.exists():
-        shutil.rmtree(target)
+    target = prepare_isolated_tmp_dir(target_name)
     shutil.copytree(source, target)
     if scenario_overrides:
         settings_path = target / "scenario_settings.yaml"
@@ -58,7 +66,7 @@ def prepare_maquete_v2_acceptance_scenario(
 def cleanup_scenario_copy(target: str | Path) -> None:
     target_path = Path(target)
     if target_path.exists():
-        shutil.rmtree(target_path)
+        shutil.rmtree(target_path, onerror=_handle_remove_readonly)
 
 
 def update_scenario_table(
@@ -104,3 +112,9 @@ def _deep_update(target: dict[str, Any], updates: dict[str, Any]) -> None:
             _deep_update(target[key], value)
             continue
         target[key] = value
+
+
+def _handle_remove_readonly(func: Any, path: str, exc_info: tuple[type[BaseException], BaseException, Any]) -> None:
+    path_obj = Path(path)
+    path_obj.chmod(0o700)
+    func(path)

@@ -5,6 +5,7 @@
 - `phase_1` está encerrada.
 - `phase_2` deve iniciar sobre a baseline já validada do bundle canônico.
 - o gate único de saída da fase anterior permanece `tests/decision_platform/test_phase1_exit_acceptance.py`.
+- o gate foi reproduzido no codebase local atual sem limpeza manual prévia de `tests/_tmp`.
 
 ## Baseline obrigatória
 

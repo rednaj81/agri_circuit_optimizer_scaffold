@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import shutil
 from pathlib import Path
 
 import pytest
@@ -14,6 +13,7 @@ from tests.decision_platform.scenario_utils import (
     cleanup_scenario_copy,
     diagnostic_runtime_test_mode,
     prepare_maquete_v2_acceptance_scenario,
+    prepare_isolated_tmp_dir,
 )
 
 
@@ -23,11 +23,8 @@ def test_phase1_exit_canonical_bundle_flow_is_versionable_and_traceable() -> Non
         "maquete_v2_phase1_exit_source",
         scenario_overrides={"hydraulic_engine": {"fallback": "python_emulated_julia"}},
     )
-    save_dir = Path("tests/_tmp/maquete_v2_phase1_exit_saved")
-    export_dir = Path("tests/_tmp/maquete_v2_phase1_exit_export")
-    for path in (save_dir, export_dir):
-        if path.exists():
-            shutil.rmtree(path)
+    save_dir = prepare_isolated_tmp_dir("maquete_v2_phase1_exit_saved")
+    export_dir = prepare_isolated_tmp_dir("maquete_v2_phase1_exit_export")
     try:
         source_bundle = load_scenario_bundle(scenario_dir)
         assert source_bundle.bundle_manifest_path is not None
@@ -86,7 +83,7 @@ def test_phase1_exit_canonical_bundle_flow_is_versionable_and_traceable() -> Non
 
         summary = json.loads((export_dir / "summary.json").read_text(encoding="utf-8"))
 
-        assert saved["scenario_dir"] == str(save_dir)
+        assert Path(saved["scenario_dir"]).resolve() == save_dir.resolve()
         assert saved["bundle"].bundle_manifest_path is not None
         assert saved["bundle"].resolved_files["components.csv"].name == "component_catalog.csv"
         assert saved["bundle"].nodes.iloc[0]["label"] == "W phase1 exit"
@@ -114,9 +111,8 @@ def test_phase1_exit_canonical_bundle_flow_is_versionable_and_traceable() -> Non
         assert summary["scenario_bundle_files"]["components.csv"] == "component_catalog.csv"
         assert summary["selected_candidate_id"] == result["selected_candidate_id"]
     finally:
-        for path in (save_dir, export_dir):
-            if path.exists():
-                shutil.rmtree(path)
+        cleanup_scenario_copy(save_dir)
+        cleanup_scenario_copy(export_dir)
         cleanup_scenario_copy(scenario_dir)
 
 
@@ -126,9 +122,7 @@ def test_phase1_exit_official_entrypoints_reject_legacy_layout() -> None:
         "maquete_v2_phase1_exit_legacy",
         scenario_overrides={"hydraulic_engine": {"fallback": "python_emulated_julia"}},
     )
-    save_dir = Path("tests/_tmp/maquete_v2_phase1_exit_legacy_saved")
-    if save_dir.exists():
-        shutil.rmtree(save_dir)
+    save_dir = prepare_isolated_tmp_dir("maquete_v2_phase1_exit_legacy_saved")
     try:
         bundle = load_scenario_bundle(scenario_dir)
         (Path(scenario_dir) / "scenario_bundle.yaml").unlink()
@@ -159,6 +153,5 @@ def test_phase1_exit_official_entrypoints_reject_legacy_layout() -> None:
 
         assert not save_dir.exists()
     finally:
-        if save_dir.exists():
-            shutil.rmtree(save_dir)
+        cleanup_scenario_copy(save_dir)
         cleanup_scenario_copy(scenario_dir)
