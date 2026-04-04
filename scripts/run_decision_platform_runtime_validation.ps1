@@ -1,12 +1,12 @@
 [CmdletBinding()]
 param(
-    [string]$Branch = "codex/new-architecture-platform",
+    [ValidateSet("official", "diagnostic")]
+    [string]$Mode = "official",
     [string]$ScenarioDir = "data/decision_platform/maquete_v2",
-    [string]$OutputDir = "data/output/decision_platform/maquete_v2",
+    [string]$OutputDir,
     [string]$LogsDir = "scripts/logs",
-    [switch]$SkipUi,
-    [switch]$WaitForUi,
-    [int]$UiStartupWaitSeconds = 5,
+    [switch]$IncludeEngineComparison,
+    [switch]$DisableRealJuliaProbe,
     [switch]$DryRun
 )
 
@@ -15,31 +15,42 @@ $ErrorActionPreference = "Stop"
 
 $script:RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $script:PythonExe = Join-Path $script:RepoRoot ".venv\Scripts\python.exe"
-$script:ActivateScript = Join-Path $script:RepoRoot ".venv\Scripts\Activate.ps1"
 $script:JuliaDepotDir = Join-Path $script:RepoRoot "julia_depot_runtime"
-$script:ExpectedArtifacts = @(
-    "summary.json",
-    "catalog.csv",
-    "catalog_detailed.json",
-    "ranking_profiles.json",
-    "selected_candidate.json",
-    "selected_candidate_routes.json",
-    "selected_candidate_score_breakdown.json",
-    "selected_candidate_render.json",
-    "selected_candidate_bom.csv",
-    "selected_candidate.svg",
-    "selected_candidate.png"
-)
-$script:PipelineStepStartedAt = $null
+$script:ProbeOverrideEnv = "DECISION_PLATFORM_DISABLE_REAL_JULIA_PROBE"
 $script:ReportTimestamp = Get-Date
+$script:ValidationProfile = if ($Mode -eq "official") {
+    "official"
+}
+elseif ($IncludeEngineComparison) {
+    "diagnostic_comparison"
+}
+else {
+    "diagnostic"
+}
+$script:RuntimeScenarioDir = $null
+$script:TemporaryScenarioDir = $null
 $script:Report = [ordered]@{
     started_at = $script:ReportTimestamp.ToString("o")
-    repo_root = $script:RepoRoot
-    branch = $Branch
+    mode = $Mode
+    validation_profile = $script:ValidationProfile
     scenario_dir = $ScenarioDir
-    output_dir = $OutputDir
+    include_engine_comparison = [bool]$IncludeEngineComparison
+    disable_real_julia_probe = [bool]$DisableRealJuliaProbe
     dry_run = [bool]$DryRun
+    repo_root = $script:RepoRoot
     steps = @()
+}
+
+if ([string]::IsNullOrWhiteSpace($OutputDir)) {
+    $OutputDir = if ($script:ValidationProfile -eq "official") {
+        "data/output/decision_platform/runtime_validation_official"
+    }
+    elseif ($script:ValidationProfile -eq "diagnostic_comparison") {
+        "data/output/decision_platform/runtime_validation_diagnostic_comparison"
+    }
+    else {
+        "data/output/decision_platform/runtime_validation_diagnostic"
+    }
 }
 
 function Format-Duration {
@@ -49,27 +60,6 @@ function Format-Duration {
     )
 
     return ("{0:00}:{1:00}:{2:00}.{3:000}" -f $Duration.Hours, $Duration.Minutes, $Duration.Seconds, $Duration.Milliseconds)
-}
-
-function Write-StepBanner {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$Name
-    )
-
-    Write-Host ""
-    Write-Host ("=== {0} ===" -f $Name) -ForegroundColor Cyan
-}
-
-function Save-Report {
-    $logsPath = Join-Path $script:RepoRoot $LogsDir
-    if (-not (Test-Path -LiteralPath $logsPath)) {
-        New-Item -ItemType Directory -Path $logsPath -Force | Out-Null
-    }
-
-    $reportPath = Join-Path $logsPath ("decision-platform-runtime-validation_{0}.json" -f $script:ReportTimestamp.ToString("yyyyMMdd-HHmmss"))
-    ($script:Report | ConvertTo-Json -Depth 20) | Set-Content -LiteralPath $reportPath -Encoding utf8
-    return $reportPath
 }
 
 function Resolve-WorkspacePath {
@@ -101,13 +91,37 @@ function Read-JsonFile {
     return Get-Content -LiteralPath $PathValue -Raw | ConvertFrom-Json -AsHashtable
 }
 
+function Write-StepBanner {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Name
+    )
+
+    Write-Host ""
+    Write-Host ("=== {0} ===" -f $Name) -ForegroundColor Cyan
+}
+
+function Save-Report {
+    $logsPath = Resolve-WorkspacePath -PathValue $LogsDir
+    if (-not (Test-Path -LiteralPath $logsPath)) {
+        New-Item -ItemType Directory -Path $logsPath -Force | Out-Null
+    }
+
+    $reportPath = Join-Path $logsPath (
+        "decision-platform-runtime-validation_{0}_{1}.json" -f $script:ValidationProfile, $script:ReportTimestamp.ToString("yyyyMMdd-HHmmss-fff")
+    )
+    $script:Report.report_path = $reportPath
+    ($script:Report | ConvertTo-Json -Depth 20) | Set-Content -LiteralPath $reportPath -Encoding utf8
+    return $reportPath
+}
+
 function Invoke-ExternalCommand {
     param(
         [Parameter(Mandatory = $true)]
         [string]$FilePath,
         [string[]]$ArgumentList = @(),
-        [string]$Description,
-        [switch]$CaptureOutput
+        [hashtable]$Environment = @{},
+        [string]$Description
     )
 
     $displayCommand = if ($ArgumentList.Count -gt 0) {
@@ -128,35 +142,30 @@ function Invoke-ExternalCommand {
         return [pscustomobject]@{
             Command = $displayCommand
             ExitCode = 0
-            Output = @()
         }
     }
 
-    if ($CaptureOutput) {
-        $output = & $FilePath @ArgumentList 2>&1
+    $savedEnv = @{}
+    foreach ($pair in $Environment.GetEnumerator()) {
+        $savedEnv[$pair.Key] = [Environment]::GetEnvironmentVariable($pair.Key, "Process")
+        [Environment]::SetEnvironmentVariable($pair.Key, $pair.Value, "Process")
+    }
+
+    try {
+        & $FilePath @ArgumentList
         $exitCode = $LASTEXITCODE
-        foreach ($line in @($output)) {
-            Write-Host $line
-        }
         if ($exitCode -ne 0) {
             throw ("Falha ao executar comando: {0} (exit code {1})" -f $displayCommand, $exitCode)
         }
         return [pscustomobject]@{
             Command = $displayCommand
             ExitCode = $exitCode
-            Output = @($output)
         }
     }
-
-    & $FilePath @ArgumentList
-    $exitCode = $LASTEXITCODE
-    if ($exitCode -ne 0) {
-        throw ("Falha ao executar comando: {0} (exit code {1})" -f $displayCommand, $exitCode)
-    }
-    return [pscustomobject]@{
-        Command = $displayCommand
-        ExitCode = $exitCode
-        Output = @()
+    finally {
+        foreach ($pair in $savedEnv.GetEnumerator()) {
+            [Environment]::SetEnvironmentVariable($pair.Key, $pair.Value, "Process")
+        }
     }
 }
 
@@ -199,57 +208,6 @@ function Invoke-Step {
     }
 }
 
-function Add-SkippedStep {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$Name,
-        [string]$Reason
-    )
-
-    Write-StepBanner -Name $Name
-    $record = [pscustomobject]@{
-        name = $Name
-        started_at = (Get-Date).ToString("o")
-        finished_at = (Get-Date).ToString("o")
-        status = "skipped"
-        duration_seconds = 0.0
-        duration_display = "00:00:00.000"
-        details = @{
-            reason = $Reason
-        }
-    }
-    $script:Report.steps += $record
-    Write-Host ("Status: skipped | Motivo: {0}" -f $Reason) -ForegroundColor Yellow
-}
-
-function Get-JuliaCommand {
-    $existingJuliaVar = Get-Variable -Name JuliaCommand -Scope Script -ErrorAction SilentlyContinue
-    if ($existingJuliaVar -and $null -ne $existingJuliaVar.Value -and -not [string]::IsNullOrWhiteSpace([string]$existingJuliaVar.Value)) {
-        return $existingJuliaVar.Value
-    }
-
-    if ($DryRun) {
-        $script:JuliaCommand = "julia"
-        return $script:JuliaCommand
-    }
-
-    $resolved = Get-Command julia -ErrorAction SilentlyContinue | Select-Object -First 1
-    if ($resolved) {
-        $script:JuliaCommand = $resolved.Source
-        return $script:JuliaCommand
-    }
-
-    if ($env:JULIA_EXE) {
-        if (-not (Test-Path -LiteralPath $env:JULIA_EXE)) {
-            throw ("JULIA_EXE foi definido, mas o caminho não existe: {0}" -f $env:JULIA_EXE)
-        }
-        $script:JuliaCommand = (Resolve-Path -LiteralPath $env:JULIA_EXE).Path
-        return $script:JuliaCommand
-    }
-
-    throw "Julia não foi encontrado no PATH. Defina JULIA_EXE se o alias do sistema não estiver disponível."
-}
-
 function Assert-FieldPresent {
     param(
         [Parameter(Mandatory = $true)]
@@ -263,26 +221,340 @@ function Assert-FieldPresent {
     if (-not $Data.ContainsKey($FieldName)) {
         throw ("Campo obrigatório ausente em {0}: {1}" -f $Context, $FieldName)
     }
-    if ([string]::IsNullOrWhiteSpace([string]$Data[$FieldName])) {
+    if ($null -eq $Data[$FieldName]) {
+        throw ("Campo obrigatório nulo em {0}: {1}" -f $Context, $FieldName)
+    }
+    if ($Data[$FieldName] -is [string] -and [string]::IsNullOrWhiteSpace([string]$Data[$FieldName])) {
         throw ("Campo obrigatório vazio em {0}: {1}" -f $Context, $FieldName)
     }
 }
 
-function Assert-BooleanTrue {
+function Assert-FieldEquals {
     param(
         [Parameter(Mandatory = $true)]
         [hashtable]$Data,
         [Parameter(Mandatory = $true)]
         [string]$FieldName,
         [Parameter(Mandatory = $true)]
+        [object]$ExpectedValue,
+        [Parameter(Mandatory = $true)]
         [string]$Context
     )
 
-    if (-not $Data.ContainsKey($FieldName)) {
-        throw ("Campo obrigatório ausente em {0}: {1}" -f $Context, $FieldName)
+    Assert-FieldPresent -Data $Data -FieldName $FieldName -Context $Context
+    if ($Data[$FieldName] -ne $ExpectedValue) {
+        throw ("Campo {0} em {1} deveria ser '{2}', mas foi '{3}'." -f $FieldName, $Context, $ExpectedValue, $Data[$FieldName])
     }
-    if (-not [bool]$Data[$FieldName]) {
-        throw ("Campo {0} em {1} deveria ser true." -f $FieldName, $Context)
+}
+
+function Assert-BooleanValue {
+    param(
+        [Parameter(Mandatory = $true)]
+        [hashtable]$Data,
+        [Parameter(Mandatory = $true)]
+        [string]$FieldName,
+        [Parameter(Mandatory = $true)]
+        [bool]$ExpectedValue,
+        [Parameter(Mandatory = $true)]
+        [string]$Context
+    )
+
+    Assert-FieldPresent -Data $Data -FieldName $FieldName -Context $Context
+    if ([bool]$Data[$FieldName] -ne $ExpectedValue) {
+        throw ("Campo {0} em {1} deveria ser '{2}', mas foi '{3}'." -f $FieldName, $Context, $ExpectedValue, [bool]$Data[$FieldName])
+    }
+}
+
+function Assert-ContainsText {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Value,
+        [Parameter(Mandatory = $true)]
+        [string]$ExpectedFragment,
+        [Parameter(Mandatory = $true)]
+        [string]$Context
+    )
+
+    if ($Value -notlike ("*{0}*" -f $ExpectedFragment)) {
+        throw ("Valor em {0} não contém o trecho obrigatório '{1}'." -f $Context, $ExpectedFragment)
+    }
+}
+
+function Test-ArtifactExists {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$PathValue
+    )
+
+    return Test-Path -LiteralPath $PathValue
+}
+
+function Get-ValidationEnvironment {
+    $environment = @{
+        PYTHONPATH = "src"
+    }
+
+    if ($Mode -eq "official") {
+        $environment[$script:ProbeOverrideEnv] = $null
+        $environment["JULIA_DEPOT_PATH"] = Resolve-WorkspacePath -PathValue $script:JuliaDepotDir
+        return $environment
+    }
+
+    if ($DisableRealJuliaProbe) {
+        $environment[$script:ProbeOverrideEnv] = "1"
+    }
+    else {
+        $environment[$script:ProbeOverrideEnv] = $null
+    }
+
+    if (-not $DisableRealJuliaProbe -and (Test-Path -LiteralPath $script:JuliaDepotDir)) {
+        $environment["JULIA_DEPOT_PATH"] = Resolve-WorkspacePath -PathValue $script:JuliaDepotDir
+    }
+
+    return $environment
+}
+
+function Get-PipelineArguments {
+    $args = @(
+        "-m", "decision_platform.api.run_pipeline",
+        "--scenario", $script:RuntimeScenarioDir,
+        "--output-dir", $OutputDir
+    )
+
+    if ($Mode -eq "diagnostic") {
+        $args += "--allow-diagnostic-python-emulation"
+    }
+    if ($IncludeEngineComparison) {
+        $args += "--include-engine-comparison"
+    }
+
+    return $args
+}
+
+function Prepare-ScenarioForMode {
+    $resolvedScenarioDir = Resolve-WorkspacePath -PathValue $ScenarioDir
+    if ($Mode -eq "official") {
+        $script:RuntimeScenarioDir = $resolvedScenarioDir
+        return $resolvedScenarioDir
+    }
+
+    $temporaryScenarioDir = Join-Path $script:RepoRoot ("tests/_tmp/runtime_validation_{0}_scenario" -f $script:ValidationProfile)
+    if ((Test-Path -LiteralPath $temporaryScenarioDir) -and -not $DryRun) {
+        Remove-Item -LiteralPath $temporaryScenarioDir -Recurse -Force
+    }
+    if (-not $DryRun) {
+        Copy-Item -LiteralPath $resolvedScenarioDir -Destination $temporaryScenarioDir -Recurse
+        $settingsPath = Join-Path $temporaryScenarioDir "scenario_settings.yaml"
+        $settingsContent = Get-Content -LiteralPath $settingsPath -Raw
+        if ($settingsContent -notmatch "(?m)^\s*fallback:\s*") {
+            throw ("scenario_settings.yaml não contém hydraulic_engine.fallback em {0}" -f $settingsPath)
+        }
+        $updatedContent = [regex]::Replace(
+            $settingsContent,
+            "(?m)^(\s*fallback:\s*).+$",
+            '${1}python_emulated_julia',
+            1
+        )
+        Set-Content -LiteralPath $settingsPath -Value $updatedContent -Encoding utf8
+    }
+
+    $script:RuntimeScenarioDir = $temporaryScenarioDir
+    $script:TemporaryScenarioDir = $temporaryScenarioDir
+    return $temporaryScenarioDir
+}
+
+function Assert-TelemetryFields {
+    param(
+        [Parameter(Mandatory = $true)]
+        [hashtable]$Runtime,
+        [Parameter(Mandatory = $true)]
+        [string]$Context
+    )
+
+    foreach ($field in @("started_at", "finished_at", "duration_s", "execution_mode", "official_gate_valid", "policy_mode", "policy_message")) {
+        Assert-FieldPresent -Data $Runtime -FieldName $field -Context $Context
+    }
+
+    if ([double]$Runtime["duration_s"] -lt 0) {
+        throw ("Campo duration_s em {0} precisa ser não negativo." -f $Context)
+    }
+}
+
+function Assert-SummaryPolicy {
+    param(
+        [Parameter(Mandatory = $true)]
+        [hashtable]$Summary
+    )
+
+    foreach ($field in @("candidate_count", "selected_candidate_id", "engine_requested", "engine_used", "engine_mode", "runtime")) {
+        Assert-FieldPresent -Data $Summary -FieldName $field -Context "summary.json"
+    }
+
+    if (-not ($Summary["runtime"] -is [hashtable])) {
+        throw "summary.json não contém runtime no formato esperado."
+    }
+
+    $runtime = $Summary["runtime"]
+    Assert-TelemetryFields -Runtime $runtime -Context "summary.json.runtime"
+
+    if ($Mode -eq "official") {
+        Assert-FieldEquals -Data $Summary -FieldName "execution_mode" -ExpectedValue "official" -Context "summary.json"
+        Assert-BooleanValue -Data $Summary -FieldName "official_gate_valid" -ExpectedValue $true -Context "summary.json"
+        Assert-BooleanValue -Data $Summary -FieldName "real_julia_probe_disabled" -ExpectedValue $false -Context "summary.json"
+        Assert-FieldEquals -Data $Summary -FieldName "runtime_policy_mode" -ExpectedValue "official_julia_only" -Context "summary.json"
+        Assert-FieldEquals -Data $runtime -FieldName "execution_mode" -ExpectedValue "official" -Context "summary.json.runtime"
+        Assert-BooleanValue -Data $runtime -FieldName "official_gate_valid" -ExpectedValue $true -Context "summary.json.runtime"
+        Assert-BooleanValue -Data $runtime -FieldName "real_julia_probe_disabled" -ExpectedValue $false -Context "summary.json.runtime"
+        Assert-FieldEquals -Data $runtime -FieldName "policy_mode" -ExpectedValue "official_julia_only" -Context "summary.json.runtime"
+    }
+    else {
+        Assert-FieldEquals -Data $Summary -FieldName "execution_mode" -ExpectedValue "diagnostic" -Context "summary.json"
+        Assert-BooleanValue -Data $Summary -FieldName "official_gate_valid" -ExpectedValue $false -Context "summary.json"
+        Assert-FieldEquals -Data $runtime -FieldName "execution_mode" -ExpectedValue "diagnostic" -Context "summary.json.runtime"
+        Assert-BooleanValue -Data $runtime -FieldName "official_gate_valid" -ExpectedValue $false -Context "summary.json.runtime"
+
+        if ($DisableRealJuliaProbe) {
+            Assert-BooleanValue -Data $Summary -FieldName "real_julia_probe_disabled" -ExpectedValue $true -Context "summary.json"
+            Assert-FieldEquals -Data $Summary -FieldName "runtime_policy_mode" -ExpectedValue "diagnostic_override_probe_disabled" -Context "summary.json"
+            Assert-BooleanValue -Data $runtime -FieldName "real_julia_probe_disabled" -ExpectedValue $true -Context "summary.json.runtime"
+            Assert-FieldEquals -Data $runtime -FieldName "policy_mode" -ExpectedValue "diagnostic_override_probe_disabled" -Context "summary.json.runtime"
+            Assert-ContainsText -Value ([string]$Summary["runtime_policy_message"]) -ExpectedFragment $script:ProbeOverrideEnv -Context "summary.json.runtime_policy_message"
+            Assert-ContainsText -Value ([string]$runtime["policy_message"]) -ExpectedFragment $script:ProbeOverrideEnv -Context "summary.json.runtime.policy_message"
+        }
+        else {
+            Assert-FieldEquals -Data $Summary -FieldName "runtime_policy_mode" -ExpectedValue "diagnostic_opt_in" -Context "summary.json"
+            Assert-FieldEquals -Data $runtime -FieldName "policy_mode" -ExpectedValue "diagnostic_opt_in" -Context "summary.json.runtime"
+        }
+    }
+
+    if ([int]$Summary["candidate_count"] -le 0) {
+        throw "summary.json precisa expor candidate_count maior que zero."
+    }
+}
+
+function Assert-CoreArtifacts {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ResolvedOutputDir,
+        [Parameter(Mandatory = $true)]
+        [hashtable]$Summary
+    )
+
+    $requiredArtifacts = @(
+        "selected_candidate.json",
+        "selected_candidate_routes.json",
+        "selected_candidate_score_breakdown.json",
+        "selected_candidate_bom.csv",
+        "selected_candidate_render.json",
+        "selected_candidate_explanation.json",
+        "selected_candidate_explanation.md",
+        "family_summary.csv",
+        "infeasibility_summary.json"
+    )
+    foreach ($artifact in $requiredArtifacts) {
+        $artifactPath = Join-Path $ResolvedOutputDir $artifact
+        if (-not (Test-ArtifactExists -PathValue $artifactPath)) {
+            throw ("Artefato obrigatório ausente: {0}" -f $artifactPath)
+        }
+    }
+
+    $selectedCandidate = Read-JsonFile -PathValue (Join-Path $ResolvedOutputDir "selected_candidate.json")
+    $selectedRoutes = Read-JsonFile -PathValue (Join-Path $ResolvedOutputDir "selected_candidate_routes.json")
+    $selectedBreakdown = Read-JsonFile -PathValue (Join-Path $ResolvedOutputDir "selected_candidate_score_breakdown.json")
+    $selectedRender = Read-JsonFile -PathValue (Join-Path $ResolvedOutputDir "selected_candidate_render.json")
+    $selectedExplanation = Read-JsonFile -PathValue (Join-Path $ResolvedOutputDir "selected_candidate_explanation.json")
+    $infeasibilitySummary = Read-JsonFile -PathValue (Join-Path $ResolvedOutputDir "infeasibility_summary.json")
+    $familySummary = Import-Csv -LiteralPath (Join-Path $ResolvedOutputDir "family_summary.csv")
+    $selectedBom = Import-Csv -LiteralPath (Join-Path $ResolvedOutputDir "selected_candidate_bom.csv")
+    $selectedCandidateId = [string]$Summary["selected_candidate_id"]
+
+    Assert-FieldEquals -Data $selectedCandidate -FieldName "candidate_id" -ExpectedValue $selectedCandidateId -Context "selected_candidate.json"
+    Assert-FieldEquals -Data $selectedRoutes -FieldName "candidate_id" -ExpectedValue $selectedCandidateId -Context "selected_candidate_routes.json"
+    Assert-FieldEquals -Data $selectedBreakdown -FieldName "candidate_id" -ExpectedValue $selectedCandidateId -Context "selected_candidate_score_breakdown.json"
+    Assert-FieldEquals -Data $selectedRender -FieldName "candidate_id" -ExpectedValue $selectedCandidateId -Context "selected_candidate_render.json"
+    Assert-FieldEquals -Data $selectedExplanation -FieldName "candidate_id" -ExpectedValue $selectedCandidateId -Context "selected_candidate_explanation.json"
+
+    Assert-FieldPresent -Data $selectedCandidate -FieldName "metrics" -Context "selected_candidate.json"
+    if (-not ($selectedCandidate["metrics"] -is [hashtable])) {
+        throw "selected_candidate.json.metrics não está no formato esperado."
+    }
+    $metrics = $selectedCandidate["metrics"]
+    Assert-FieldEquals -Data $metrics -FieldName "engine_requested" -ExpectedValue ([string]$Summary["engine_requested"]) -Context "selected_candidate.json.metrics"
+    Assert-FieldEquals -Data $metrics -FieldName "engine_used" -ExpectedValue ([string]$Summary["engine_used"]) -Context "selected_candidate.json.metrics"
+    Assert-FieldEquals -Data $metrics -FieldName "engine_mode" -ExpectedValue ([string]$Summary["engine_mode"]) -Context "selected_candidate.json.metrics"
+
+    if ($selectedExplanation.ContainsKey("winner")) {
+        if (-not ($selectedExplanation["winner"] -is [hashtable])) {
+            throw "selected_candidate_explanation.json.winner não está no formato esperado."
+        }
+        Assert-FieldEquals -Data $selectedExplanation["winner"] -FieldName "candidate_id" -ExpectedValue $selectedCandidateId -Context "selected_candidate_explanation.json.winner"
+    }
+
+    if ($familySummary.Count -le 0) {
+        throw "family_summary.csv precisa conter ao menos uma linha."
+    }
+    if ($selectedBom.Count -le 0) {
+        throw "selected_candidate_bom.csv precisa conter ao menos uma linha."
+    }
+    if (-not ($selectedBom[0].PSObject.Properties.Name -contains "candidate_id")) {
+        throw "selected_candidate_bom.csv precisa conter a coluna candidate_id."
+    }
+    $invalidBomRows = @($selectedBom | Where-Object { $_.candidate_id -ne $selectedCandidateId })
+    if ($invalidBomRows.Count -gt 0) {
+        throw "selected_candidate_bom.csv contém candidate_id divergente do summary.json."
+    }
+
+    Assert-FieldPresent -Data $infeasibilitySummary -FieldName "total_infeasible_candidates" -Context "infeasibility_summary.json"
+}
+
+function Assert-EngineComparisonPolicy {
+    param(
+        [Parameter(Mandatory = $true)]
+        [hashtable]$EngineComparison,
+        [Parameter(Mandatory = $true)]
+        [string]$ResolvedOutputDir
+    )
+
+    foreach ($field in @("execution_policy", "runtime")) {
+        Assert-FieldPresent -Data $EngineComparison -FieldName $field -Context "engine_comparison.json"
+    }
+    if (-not ($EngineComparison["execution_policy"] -is [hashtable])) {
+        throw "engine_comparison.json.execution_policy não está no formato esperado."
+    }
+    if (-not ($EngineComparison["runtime"] -is [hashtable])) {
+        throw "engine_comparison.json.runtime não está no formato esperado."
+    }
+
+    $executionPolicy = $EngineComparison["execution_policy"]
+    $runtime = $EngineComparison["runtime"]
+    Assert-TelemetryFields -Runtime $runtime -Context "engine_comparison.json.runtime"
+
+    Assert-BooleanValue -Data $executionPolicy -FieldName "official_gate_valid" -ExpectedValue $false -Context "engine_comparison.json.execution_policy"
+    Assert-FieldEquals -Data $executionPolicy -FieldName "execution_mode" -ExpectedValue "diagnostic" -Context "engine_comparison.json.execution_policy"
+    Assert-BooleanValue -Data $runtime -FieldName "official_gate_valid" -ExpectedValue $false -Context "engine_comparison.json.runtime"
+    Assert-FieldEquals -Data $runtime -FieldName "execution_mode" -ExpectedValue "diagnostic" -Context "engine_comparison.json.runtime"
+
+    if ($DisableRealJuliaProbe) {
+        Assert-BooleanValue -Data $executionPolicy -FieldName "real_julia_probe_disabled" -ExpectedValue $true -Context "engine_comparison.json.execution_policy"
+        Assert-BooleanValue -Data $runtime -FieldName "real_julia_probe_disabled" -ExpectedValue $true -Context "engine_comparison.json.runtime"
+    }
+
+    $engineComparisonCandidatesPath = Join-Path $ResolvedOutputDir "engine_comparison_candidates.csv"
+    if (-not (Test-ArtifactExists -PathValue $engineComparisonCandidatesPath)) {
+        throw ("Artefato obrigatório ausente: {0}" -f $engineComparisonCandidatesPath)
+    }
+    $engineComparisonCandidates = Import-Csv -LiteralPath $engineComparisonCandidatesPath
+    if ($engineComparisonCandidates.Count -le 0) {
+        throw "engine_comparison_candidates.csv precisa conter ao menos uma linha."
+    }
+    if (-not ($engineComparisonCandidates[0].PSObject.Properties.Name -contains "engine")) {
+        throw "engine_comparison_candidates.csv precisa conter a coluna engine."
+    }
+    $engineNames = @($engineComparisonCandidates | ForEach-Object { [string]$_.engine } | Sort-Object -Unique)
+    foreach ($expectedEngine in @("julia", "python")) {
+        if ($engineNames -notcontains $expectedEngine) {
+            throw ("engine_comparison_candidates.csv precisa conter o engine '{0}'." -f $expectedEngine)
+        }
     }
 }
 
@@ -298,362 +570,155 @@ Set-Location $script:RepoRoot
 
 $reportPath = $null
 $scriptFailed = $false
+$resolvedOutputDir = Resolve-WorkspacePath -PathValue $OutputDir
 
 try {
-    Invoke-Step -Name "1. Branch e ambiente" -Action {
+    Invoke-Step -Name "1. Preparar ambiente" -Action {
         if (-not (Test-Path -LiteralPath $script:PythonExe) -and -not $DryRun) {
             throw ("Python da virtualenv não encontrado: {0}" -f $script:PythonExe)
         }
-
-        $null = Invoke-ExternalCommand -FilePath "git" -ArgumentList @("checkout", $Branch) -Description "Trocando para a branch alvo"
-
-        if (-not $DryRun) {
-            if (-not (Test-Path -LiteralPath $script:ActivateScript)) {
-                throw ("Script de ativação não encontrado: {0}" -f $script:ActivateScript)
-            }
-            . $script:ActivateScript
+        if ($Mode -eq "official" -and $IncludeEngineComparison) {
+            throw "O modo official não aceita --include-engine-comparison."
         }
-        else {
-            Write-Host ("> . {0}" -f $script:ActivateScript) -ForegroundColor DarkGray
+        if ($Mode -eq "official" -and $DisableRealJuliaProbe) {
+            throw "O modo official não aceita override diagnóstico da sonda Julia."
         }
-
-        $env:PYTHONPATH = "src"
-        if (-not (Test-Path -LiteralPath $script:JuliaDepotDir) -and -not $DryRun) {
+        if ($Mode -eq "diagnostic" -and -not $DisableRealJuliaProbe) {
+            throw "O gate canônico de diagnostic da fase 0 exige -DisableRealJuliaProbe para marcar explicitamente que a execução não compõe o caminho oficial."
+        }
+        if ($Mode -eq "official" -and [Environment]::GetEnvironmentVariable($script:ProbeOverrideEnv, "Process")) {
+            throw ("{0} está ativo no processo atual. O modo official exige Julia-only sem override diagnóstico." -f $script:ProbeOverrideEnv)
+        }
+        if ($Mode -eq "official" -and -not (Test-Path -LiteralPath $script:JuliaDepotDir) -and -not $DryRun) {
             throw ("Diretório do depot Julia não encontrado: {0}" -f $script:JuliaDepotDir)
         }
-        $env:JULIA_DEPOT_PATH = Resolve-WorkspacePath -PathValue $script:JuliaDepotDir
+        $preparedScenarioDir = Prepare-ScenarioForMode
 
-        $branchOutput = Invoke-ExternalCommand -FilePath "git" -ArgumentList @("branch", "--show-current") -Description "Branch ativa" -CaptureOutput
-        $activeBranch = if ($DryRun) {
-            $Branch
+        if ((Test-Path -LiteralPath $resolvedOutputDir) -and -not $DryRun) {
+            Remove-Item -LiteralPath $resolvedOutputDir -Recurse -Force
         }
-        else {
-            (@($branchOutput.Output) | Select-Object -Last 1).ToString().Trim()
-        }
-        if (-not $DryRun -and $activeBranch -ne $Branch) {
-            throw ("Branch ativa inesperada após checkout: {0}" -f $activeBranch)
-        }
-
-        $pythonVersion = Invoke-ExternalCommand -FilePath $script:PythonExe -ArgumentList @("--version") -Description "Versão do Python da virtualenv" -CaptureOutput
-        $pythonVersionText = if ($DryRun) {
-            "python --version"
-        }
-        else {
-            (@($pythonVersion.Output) | Select-Object -Last 1).ToString().Trim()
+        if (-not $DryRun) {
+            New-Item -ItemType Directory -Path $resolvedOutputDir -Force | Out-Null
         }
 
         return @{
-            active_branch = $activeBranch
-            pythonpath = $env:PYTHONPATH
-            julia_depot_path = $env:JULIA_DEPOT_PATH
-            python_version = $pythonVersionText
-        }
-    }
-
-    Invoke-Step -Name "2. Validar Julia" -Action {
-        $juliaCommand = Get-JuliaCommand
-        $versionResult = Invoke-ExternalCommand -FilePath $juliaCommand -ArgumentList @("--version") -Description "Validando acesso ao Julia" -CaptureOutput
-        $depotResult = Invoke-ExternalCommand -FilePath $juliaCommand -ArgumentList @("-e", "println(DEPOT_PATH)") -Description "Listando DEPOT_PATH" -CaptureOutput
-
-        $versionLine = if ($DryRun) {
-            "julia --version"
-        }
-        else {
-            (@($versionResult.Output) | Select-Object -Last 1).ToString().Trim()
-        }
-        $depotLines = if ($DryRun) {
-            @($env:JULIA_DEPOT_PATH)
-        }
-        else {
-            @($depotResult.Output | ForEach-Object { $_.ToString().Trim() }) | Where-Object { $_ }
-        }
-        $depotVisible = $DryRun -or (($depotLines -join "`n") -match [regex]::Escape((Split-Path $env:JULIA_DEPOT_PATH -Leaf)))
-        if (-not $depotVisible) {
-            throw ("O JULIA_DEPOT_PATH atual não apareceu na saída de DEPOT_PATH: {0}" -f $env:JULIA_DEPOT_PATH)
-        }
-
-        return @{
-            julia_command = $juliaCommand
-            julia_version = $versionLine
-            depot_visible = $depotVisible
-            depot_path = $env:JULIA_DEPOT_PATH
-        }
-    }
-
-    Invoke-Step -Name "3. Suíte rápida" -Action {
-        $null = Invoke-ExternalCommand -FilePath $script:PythonExe -ArgumentList @(
-            "-m", "pytest",
-            "tests/decision_platform",
-            "-p", "no:tmpdir",
-            "--basetemp", "tests/_tmp/pytest-basetemp-fast",
-            "-m", "not slow and not requires_julia",
-            "-q"
-        ) -Description "Executando a suíte rápida"
-
-        return @{
-            marker = "not slow and not requires_julia"
-            basetemp = "tests/_tmp/pytest-basetemp-fast"
-        }
-    }
-
-    Invoke-Step -Name "4. Suíte com Julia real" -Action {
-        $null = Invoke-ExternalCommand -FilePath $script:PythonExe -ArgumentList @(
-            "-m", "pytest",
-            "tests/decision_platform",
-            "-p", "no:tmpdir",
-            "--basetemp", "tests/_tmp/pytest-basetemp-julia",
-            "-m", "requires_julia",
-            "-vv",
-            "-s"
-        ) -Description "Executando a suíte marcada com requires_julia"
-
-        return @{
-            marker = "requires_julia"
-            basetemp = "tests/_tmp/pytest-basetemp-julia"
-            expected_engine = "watermodels_jl"
-            expected_mode = "real_julia"
-        }
-    }
-
-    Invoke-Step -Name "5. Pipeline maquete_v2" -Action {
-        $script:PipelineStepStartedAt = Get-Date
-        $null = Invoke-ExternalCommand -FilePath $script:PythonExe -ArgumentList @(
-            "-m", "decision_platform.api.run_pipeline",
-            "--scenario", $ScenarioDir,
-            "--output-dir", $OutputDir
-        ) -Description "Executando o pipeline principal"
-
-        $summaryPath = Join-Path (Resolve-WorkspacePath -PathValue $OutputDir) "summary.json"
-        $summary = if ((Test-Path -LiteralPath $summaryPath) -and -not $DryRun) { Read-JsonFile -PathValue $summaryPath } else { @{} }
-
-        return @{
-            output_dir = Resolve-WorkspacePath -PathValue $OutputDir
-            selected_candidate_id = $summary["selected_candidate_id"]
-            engine_requested = $summary["engine_requested"]
-            engine_used = $summary["engine_used"]
-            engine_mode = $summary["engine_mode"]
-        }
-    }
-
-    Invoke-Step -Name "6. Conferir artefatos de saída" -Action {
-        if ($DryRun) {
-            return @{
-                artifact_count_checked = $script:ExpectedArtifacts.Count
-                output_dir = Resolve-WorkspacePath -PathValue $OutputDir
-                simulated = $true
-            }
-        }
-
-        $resolvedOutputDir = Resolve-WorkspacePath -PathValue $OutputDir
-        if (-not (Test-Path -LiteralPath $resolvedOutputDir) -and -not $DryRun) {
-            throw ("Diretório de saída não encontrado: {0}" -f $resolvedOutputDir)
-        }
-
-        $missing = New-Object System.Collections.Generic.List[string]
-        $stale = New-Object System.Collections.Generic.List[string]
-        foreach ($artifact in $script:ExpectedArtifacts) {
-            $artifactPath = Join-Path $resolvedOutputDir $artifact
-            if (-not (Test-Path -LiteralPath $artifactPath)) {
-                $missing.Add($artifactPath)
-                continue
-            }
-            if ($script:PipelineStepStartedAt) {
-                $artifactItem = Get-Item -LiteralPath $artifactPath
-                if ($artifactItem.LastWriteTime -lt $script:PipelineStepStartedAt.AddSeconds(-2)) {
-                    $stale.Add($artifactPath)
-                }
-            }
-        }
-
-        if ($missing.Count -gt 0) {
-            throw ("Artefatos ausentes após o pipeline:`n- {0}" -f ($missing -join "`n- "))
-        }
-        if ($stale.Count -gt 0) {
-            throw ("Artefatos não foram atualizados nesta execução:`n- {0}" -f ($stale -join "`n- "))
-        }
-
-        return @{
-            artifact_count_checked = $script:ExpectedArtifacts.Count
             output_dir = $resolvedOutputDir
+            scenario_dir = $preparedScenarioDir
+            mode = $Mode
+            validation_profile = $script:ValidationProfile
         }
     }
 
-    Invoke-Step -Name "7. Checklist de consistência" -Action {
+    Invoke-Step -Name "2. Executar pipeline" -Action {
+        $environment = Get-ValidationEnvironment
+        $args = Get-PipelineArguments
+        $null = Invoke-ExternalCommand -FilePath $script:PythonExe -ArgumentList $args -Environment $environment -Description "Executando o pipeline da decision_platform"
+        return @{
+            python = $script:PythonExe
+            command = ((@($script:PythonExe) + $args) -join " ")
+            output_dir = $resolvedOutputDir
+            environment = $environment
+        }
+    }
+
+    Invoke-Step -Name "3. Validar summary.json" -Action {
+        $summaryPath = Join-Path $resolvedOutputDir "summary.json"
+        if (-not (Test-ArtifactExists -PathValue $summaryPath) -and -not $DryRun) {
+            throw ("Artefato obrigatório ausente: {0}" -f $summaryPath)
+        }
         if ($DryRun) {
             return @{
-                selected_candidate_id = "dry-run"
-                default_profile_id = "balanced"
-                topology_family = "dry-run"
-                score_final = 0
+                summary_path = $summaryPath
                 simulated = $true
             }
         }
 
-        $resolvedOutputDir = Resolve-WorkspacePath -PathValue $OutputDir
-        $summary = Read-JsonFile -PathValue (Join-Path $resolvedOutputDir "summary.json")
-        $selectedCandidate = Read-JsonFile -PathValue (Join-Path $resolvedOutputDir "selected_candidate.json")
-        $selectedRoutes = Read-JsonFile -PathValue (Join-Path $resolvedOutputDir "selected_candidate_routes.json")
-        $selectedRender = Read-JsonFile -PathValue (Join-Path $resolvedOutputDir "selected_candidate_render.json")
-        $selectedBreakdown = Read-JsonFile -PathValue (Join-Path $resolvedOutputDir "selected_candidate_score_breakdown.json")
-        $rankingProfiles = Read-JsonFile -PathValue (Join-Path $resolvedOutputDir "ranking_profiles.json")
-        $selectedBom = Import-Csv -LiteralPath (Join-Path $resolvedOutputDir "selected_candidate_bom.csv")
+        $summary = Read-JsonFile -PathValue $summaryPath
+        Assert-SummaryPolicy -Summary $summary
 
-        Assert-FieldPresent -Data $summary -FieldName "default_profile_id" -Context "summary.json"
-        Assert-FieldPresent -Data $summary -FieldName "selected_candidate_id" -Context "summary.json"
-        Assert-FieldPresent -Data $summary -FieldName "engine_requested" -Context "summary.json"
-        Assert-FieldPresent -Data $summary -FieldName "engine_used" -Context "summary.json"
-        Assert-FieldPresent -Data $summary -FieldName "engine_mode" -Context "summary.json"
+        return @{
+            summary_path = $summaryPath
+            candidate_count = $summary["candidate_count"]
+            selected_candidate_id = $summary["selected_candidate_id"]
+            execution_mode = $summary["execution_mode"]
+            official_gate_valid = $summary["official_gate_valid"]
+            runtime_policy_mode = $summary["runtime_policy_mode"]
+            runtime_duration_s = $summary["runtime_duration_s"]
+        }
+    }
 
-        $selectedCandidateId = [string]$summary["selected_candidate_id"]
-        $defaultProfileId = [string]$summary["default_profile_id"]
-
-        if ([string]$summary["engine_requested"] -ne "watermodels_jl") {
-            throw ("engine_requested inesperado em summary.json: {0}" -f $summary["engine_requested"])
-        }
-        if ([string]$summary["engine_used"] -ne "watermodels_jl") {
-            throw ("engine_used inesperado em summary.json: {0}" -f $summary["engine_used"])
-        }
-        if ([string]$summary["engine_mode"] -ne "real_julia") {
-            throw ("engine_mode inesperado em summary.json: {0}" -f $summary["engine_mode"])
-        }
-        Assert-BooleanTrue -Data $summary -FieldName "julia_available" -Context "summary.json"
-        Assert-BooleanTrue -Data $summary -FieldName "watermodels_available" -Context "summary.json"
-
-        Assert-FieldPresent -Data $selectedCandidate -FieldName "candidate_id" -Context "selected_candidate.json"
-        Assert-FieldPresent -Data $selectedCandidate -FieldName "topology_family" -Context "selected_candidate.json"
-        if ([string]$selectedCandidate["candidate_id"] -ne $selectedCandidateId) {
-            throw "candidate_id de selected_candidate.json difere de summary.json."
-        }
-
-        $metrics = $selectedCandidate["metrics"]
-        if (-not ($metrics -is [hashtable])) {
-            throw "selected_candidate.json não contém metrics no formato esperado."
-        }
-        foreach ($field in @("feasible", "install_cost", "fallback_cost", "quality_score_raw", "flow_out_score", "resilience_score", "cleaning_score", "engine_requested", "engine_used", "engine_mode")) {
-            if (-not $metrics.ContainsKey($field)) {
-                throw ("Campo obrigatório ausente em selected_candidate.json.metrics: {0}" -f $field)
+    Invoke-Step -Name "4. Validar artefatos principais" -Action {
+        $summaryPath = Join-Path $resolvedOutputDir "summary.json"
+        if ($DryRun) {
+            return @{
+                output_dir = $resolvedOutputDir
+                simulated = $true
             }
         }
-        if ([string]$metrics["engine_used"] -ne "watermodels_jl") {
-            throw ("selected_candidate.json.metrics.engine_used inesperado: {0}" -f $metrics["engine_used"])
-        }
-        if ([string]$metrics["engine_mode"] -ne "real_julia") {
-            throw ("selected_candidate.json.metrics.engine_mode inesperado: {0}" -f $metrics["engine_mode"])
-        }
 
-        Assert-FieldPresent -Data $selectedRoutes -FieldName "candidate_id" -Context "selected_candidate_routes.json"
-        Assert-FieldPresent -Data $selectedRoutes -FieldName "topology_family" -Context "selected_candidate_routes.json"
-        if ([string]$selectedRoutes["candidate_id"] -ne $selectedCandidateId) {
-            throw "candidate_id de selected_candidate_routes.json difere do selecionado."
+        $summary = Read-JsonFile -PathValue $summaryPath
+        Assert-CoreArtifacts -ResolvedOutputDir $resolvedOutputDir -Summary $summary
+        return @{
+            output_dir = $resolvedOutputDir
+            selected_candidate_id = $summary["selected_candidate_id"]
+            engine_used = $summary["engine_used"]
         }
-        if ([string]$selectedRoutes["topology_family"] -ne [string]$selectedCandidate["topology_family"]) {
-            throw "topology_family de selected_candidate_routes.json difere de selected_candidate.json."
-        }
+    }
 
-        Assert-FieldPresent -Data $selectedRender -FieldName "candidate_id" -Context "selected_candidate_render.json"
-        Assert-FieldPresent -Data $selectedRender -FieldName "topology_family" -Context "selected_candidate_render.json"
-        if ([string]$selectedRender["candidate_id"] -ne $selectedCandidateId) {
-            throw "candidate_id de selected_candidate_render.json difere do selecionado."
-        }
-        if ([string]$selectedRender["topology_family"] -ne [string]$selectedCandidate["topology_family"]) {
-            throw "topology_family de selected_candidate_render.json difere de selected_candidate.json."
-        }
+    Invoke-Step -Name "5. Validar artefatos diagnósticos" -Action {
+        $engineComparisonPath = Join-Path $resolvedOutputDir "engine_comparison.json"
+        $engineComparisonCandidatesPath = Join-Path $resolvedOutputDir "engine_comparison_candidates.csv"
+        $engineComparisonExists = Test-ArtifactExists -PathValue $engineComparisonPath
+        $engineComparisonCandidatesExists = Test-ArtifactExists -PathValue $engineComparisonCandidatesPath
 
-        Assert-FieldPresent -Data $selectedBreakdown -FieldName "candidate_id" -Context "selected_candidate_score_breakdown.json"
-        Assert-FieldPresent -Data $selectedBreakdown -FieldName "profile_id" -Context "selected_candidate_score_breakdown.json"
-        foreach ($field in @("quality_score_breakdown", "quality_flags", "rules_triggered", "selection_log")) {
-            if (-not $selectedBreakdown.ContainsKey($field)) {
-                throw ("Campo obrigatório ausente em selected_candidate_score_breakdown.json: {0}" -f $field)
+        if ($Mode -eq "official") {
+            if ($engineComparisonExists) {
+                throw ("engine_comparison.json não pode existir no modo official: {0}" -f $engineComparisonPath)
+            }
+            if ($engineComparisonCandidatesExists) {
+                throw ("engine_comparison_candidates.csv não pode existir no modo official: {0}" -f $engineComparisonCandidatesPath)
+            }
+            return @{
+                engine_comparison_expected = $false
+                engine_comparison_found = $engineComparisonExists
+                engine_comparison_candidates_found = $engineComparisonCandidatesExists
             }
         }
-        if ([string]$selectedBreakdown["candidate_id"] -ne $selectedCandidateId) {
-            throw "candidate_id de selected_candidate_score_breakdown.json difere do selecionado."
-        }
-        if ([string]$selectedBreakdown["profile_id"] -ne $defaultProfileId) {
-            throw "profile_id de selected_candidate_score_breakdown.json difere do perfil padrão."
+
+        if ($IncludeEngineComparison) {
+            if (-not $engineComparisonExists -and -not $DryRun) {
+                throw ("engine_comparison.json era obrigatório no modo diagnostic com comparação explícita: {0}" -f $engineComparisonPath)
+            }
+            if ($DryRun) {
+                return @{
+                    engine_comparison_expected = $true
+                    engine_comparison_found = $true
+                    simulated = $true
+                }
+            }
+
+            $engineComparison = Read-JsonFile -PathValue $engineComparisonPath
+            Assert-EngineComparisonPolicy -EngineComparison $engineComparison -ResolvedOutputDir $resolvedOutputDir
+            return @{
+                engine_comparison_expected = $true
+                engine_comparison_found = $true
+                engine_comparison_candidates_found = $true
+                execution_mode = $engineComparison["runtime"]["execution_mode"]
+                official_gate_valid = $engineComparison["runtime"]["official_gate_valid"]
+            }
         }
 
-        if (-not $rankingProfiles.ContainsKey($defaultProfileId)) {
-            throw ("Perfil padrão ausente em ranking_profiles.json: {0}" -f $defaultProfileId)
+        if ($engineComparisonExists) {
+            throw ("engine_comparison.json não pode existir sem comparação explícita no modo diagnostic: {0}" -f $engineComparisonPath)
         }
-        $rankingRecords = @($rankingProfiles[$defaultProfileId])
-        if ($rankingRecords.Count -eq 0) {
-            throw ("ranking_profiles.json não contém registros para o perfil padrão: {0}" -f $defaultProfileId)
-        }
-        if ([string]$rankingRecords[0]["candidate_id"] -ne $selectedCandidateId) {
-            throw "O candidato selecionado não é o primeiro do ranking do perfil padrão."
-        }
-        if (-not $rankingRecords[0].ContainsKey("score_final")) {
-            throw "ranking_profiles.json não expôs o campo score_final para o candidato selecionado."
-        }
-
-        if ($selectedBom.Count -eq 0) {
-            throw "selected_candidate_bom.csv não contém linhas."
-        }
-        if (-not ($selectedBom[0].PSObject.Properties.Name -contains "candidate_id")) {
-            throw "selected_candidate_bom.csv não contém a coluna candidate_id."
-        }
-        $invalidBomRows = @($selectedBom | Where-Object { $_.candidate_id -ne $selectedCandidateId })
-        if ($invalidBomRows.Count -gt 0) {
-            throw "selected_candidate_bom.csv contém linhas com candidate_id diferente do candidato selecionado."
+        if ($engineComparisonCandidatesExists) {
+            throw ("engine_comparison_candidates.csv não pode existir sem comparação explícita no modo diagnostic: {0}" -f $engineComparisonCandidatesPath)
         }
 
         return @{
-            selected_candidate_id = $selectedCandidateId
-            default_profile_id = $defaultProfileId
-            topology_family = $selectedCandidate["topology_family"]
-            score_final = $rankingRecords[0]["score_final"]
-            install_cost = $metrics["install_cost"]
-            fallback_cost = $metrics["fallback_cost"]
-            quality_score_raw = $metrics["quality_score_raw"]
-            resilience_score = $metrics["resilience_score"]
-            cleaning_score = $metrics["cleaning_score"]
-        }
-    }
-
-    if ($SkipUi) {
-        Add-SkippedStep -Name "8. UI local" -Reason "Execução da UI foi desabilitada via -SkipUi."
-    }
-    else {
-        Invoke-Step -Name "8. UI local" -Action {
-            $argumentList = @("-m", "decision_platform.ui_dash.app")
-
-            if ($DryRun) {
-                Write-Host ("> {0} {1}" -f $script:PythonExe, ($argumentList -join " ")) -ForegroundColor DarkGray
-                return @{
-                    launched = $true
-                    mode = "dry_run"
-                    url_hint = "http://127.0.0.1:8050"
-                }
-            }
-
-            if ($WaitForUi) {
-                & $script:PythonExe @argumentList
-                $exitCode = $LASTEXITCODE
-                if ($exitCode -ne 0) {
-                    throw ("A UI encerrou com exit code {0}." -f $exitCode)
-                }
-                return @{
-                    launched = $true
-                    mode = "wait"
-                    url_hint = "http://127.0.0.1:8050"
-                }
-            }
-
-            $process = Start-Process -FilePath $script:PythonExe -ArgumentList $argumentList -WorkingDirectory $script:RepoRoot -PassThru
-            Start-Sleep -Seconds $UiStartupWaitSeconds
-            $process.Refresh()
-            if ($process.HasExited -and $process.ExitCode -ne 0) {
-                throw ("A UI encerrou logo após o start com exit code {0}." -f $process.ExitCode)
-            }
-
-            return @{
-                launched = $true
-                mode = "background"
-                pid = $process.Id
-                url_hint = "http://127.0.0.1:8050"
-                wait_seconds = $UiStartupWaitSeconds
-            }
+            engine_comparison_expected = $false
+            engine_comparison_found = $false
+            engine_comparison_candidates_found = $false
         }
     }
 }
@@ -663,9 +728,14 @@ catch {
 }
 finally {
     $script:Report.finished_at = (Get-Date).ToString("o")
+    $script:Report.output_dir = $resolvedOutputDir
+    $script:Report.runtime_scenario_dir = $script:RuntimeScenarioDir
     $script:Report.success = -not $scriptFailed
     $reportPath = Save-Report
-    $script:Report.report_path = $reportPath
+
+    if ($script:TemporaryScenarioDir -and (Test-Path -LiteralPath $script:TemporaryScenarioDir) -and -not $DryRun) {
+        Remove-Item -LiteralPath $script:TemporaryScenarioDir -Recurse -Force
+    }
 
     Show-FinalSummary
     Write-Host ""

@@ -44,6 +44,8 @@ Executar cenários em background, com isolamento e acompanhamento.
 - started_at
 - finished_at
 - duration_s
+- policy_mode
+- policy_message
 - failure_reason
 - failure_stacktrace_excerpt
 
@@ -58,3 +60,16 @@ Se for necessário rodar comparação diagnóstica:
 - habilitar explicitamente qualquer override diagnóstico
 - registrar que `python_emulated_julia` não compõe o candidato oficial
 - registrar em artefato exportado que a sonda Julia real foi desabilitada e que a execução não vale como gate oficial
+
+## Fluxo operacional da fase 0
+- validador canônico: `scripts/run_decision_platform_runtime_validation.ps1`
+- modo official:
+  `pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode official`
+- modo diagnostic lean:
+  `pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode diagnostic -DisableRealJuliaProbe`
+- modo diagnostic com comparação:
+  `pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode diagnostic -DisableRealJuliaProbe -IncludeEngineComparison`
+- o modo official falha se detectar override diagnóstico no ambiente, `official_gate_valid=false` ou `engine_comparison.json`
+- o modo diagnostic exige `official_gate_valid=false`, override explícito e valida a marcação diagnóstica em `summary.json`
+- o validador cruza `summary.json` com `selected_candidate.json`, `selected_candidate_routes.json`, `selected_candidate_explanation.json`, `selected_candidate_bom.csv`, `family_summary.csv` e `infeasibility_summary.json`
+- `engine_comparison.json` e `engine_comparison_candidates.csv` só são aceitos quando `-IncludeEngineComparison` foi pedido explicitamente

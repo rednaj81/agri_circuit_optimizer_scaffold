@@ -1,4 +1,4 @@
-.PHONY: install test smoke
+.PHONY: install test smoke decision-platform-validate decision-platform-validate-official decision-platform-validate-diagnostic decision-platform-validate-diagnostic-comparison
 
 install:
 	python -m pip install --upgrade pip
@@ -10,3 +10,14 @@ smoke:
 
 test:
 	pytest -q
+
+decision-platform-validate: decision-platform-validate-official
+
+decision-platform-validate-official:
+	pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode official
+
+decision-platform-validate-diagnostic:
+	pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode diagnostic -DisableRealJuliaProbe
+
+decision-platform-validate-diagnostic-comparison:
+	pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode diagnostic -DisableRealJuliaProbe -IncludeEngineComparison

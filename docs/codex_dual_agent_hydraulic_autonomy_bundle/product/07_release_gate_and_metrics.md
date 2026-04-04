@@ -11,37 +11,64 @@
 
 ## Matriz de validação da fase 0
 
+Fluxo canônico:
+- script-base: `pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1`
+- oficial: `pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode official`
+- diagnóstico lean: `pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode diagnostic -DisableRealJuliaProbe`
+- diagnóstico com comparação: `pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode diagnostic -DisableRealJuliaProbe -IncludeEngineComparison`
+- aliases opcionais quando `make` existir no host: `decision-platform-validate-official`, `decision-platform-validate-diagnostic`, `decision-platform-validate-diagnostic-comparison`
+- fonte de verdade: `summary.json` sempre, `engine_comparison.json` apenas quando a comparação diagnóstica for solicitada
+- o validador remove o diretório de saída antes da run para evitar artefato stale
+- o validador cruza `summary.json` com os artefatos principais do candidato oficial antes de declarar sucesso
+- o validador falha se o modo pedido não bater com a política exportada pelo pipeline
+
 ### 1. Gate oficial Julia-only
 - objetivo: provar que o caminho oficial continua fail-closed e exporta o candidato oficial sem fallback implícito
-- comando de pipeline:
-  `python -m decision_platform.api.run_pipeline --scenario data/decision_platform/maquete_v2 --output-dir data/output/decision_platform/maquete_v2`
+- comando canônico:
+  `pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode official`
+- alias opcional:
+  `make decision-platform-validate-official`
 - comando de teste:
   `.\.venv\Scripts\python.exe -m pytest tests\decision_platform\test_maquete_v2_acceptance.py::test_maquete_v2_pipeline_runs_with_real_julia_and_exports_final_artifacts -q --basetemp tests/_tmp/pytest-basetemp-julia-gate`
 - regra: não usar `DECISION_PLATFORM_DISABLE_REAL_JULIA_PROBE`
 - evidência mínima em artefato:
   `summary.json` com `execution_mode=official`, `official_gate_valid=true`, timestamps e duração
+- rejeições obrigatórias do validador:
+  `DECISION_PLATFORM_DISABLE_REAL_JULIA_PROBE` ativo, `official_gate_valid=false` ou presença indevida de `engine_comparison.json`
 
 ### 2. Aceite diagnóstico lean
 - objetivo: validar exports centrais, coerência do candidato oficial e métricas de rota sem depender do runtime Julia real
-- comando:
+- comando canônico:
+  `pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode diagnostic -DisableRealJuliaProbe`
+- alias opcional:
+  `make decision-platform-validate-diagnostic`
+- comando de teste:
   `.\.venv\Scripts\python.exe -m pytest tests\decision_platform\test_maquete_v2_acceptance.py::test_maquete_v2_pipeline_exports_and_route_metrics -q --basetemp tests/_tmp/pytest-basetemp-accept`
 - ambiente:
   `DECISION_PLATFORM_DISABLE_REAL_JULIA_PROBE=1`
-- janela operacional desta máquina: abaixo de `30 s`
+- janela operacional observada nesta máquina: cerca de `40 s`
 - regra: a saída diagnóstica não pode gerar `engine_comparison.json` por padrão
 - evidência mínima em artefato:
   `summary.json` com `execution_mode=diagnostic`, `official_gate_valid=false` e menção explícita ao override
+- validações obrigatórias do validador:
+  `policy_mode=diagnostic_override_probe_disabled`, `real_julia_probe_disabled=true`, artefatos principais coerentes com `summary.json` e `engine_comparison.json` ausente quando a comparação não foi pedida
 
 ### 3. Comparação diagnóstica explícita
 - objetivo: provar que a comparação Julia vs Python continua disponível apenas por opt-in explícito
-- comando:
+- comando canônico:
+  `pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode diagnostic -DisableRealJuliaProbe -IncludeEngineComparison`
+- alias opcional:
+  `make decision-platform-validate-diagnostic-comparison`
+- comando de teste:
   `.\.venv\Scripts\python.exe -m pytest tests\decision_platform\test_maquete_v2_acceptance.py::test_maquete_v2_diagnostic_engine_comparison_remains_explicit_opt_in -q --basetemp tests/_tmp/pytest-basetemp-accept-diag`
 - ambiente:
   `DECISION_PLATFORM_DISABLE_REAL_JULIA_PROBE=1`
-- janela operacional desta máquina: abaixo de `45 s`
+- janela operacional observada nesta máquina: cerca de `70 s`
 - regra: `engine_comparison.json` e `engine_comparison_candidates.csv` só aparecem nesta trilha
 - evidência mínima em artefato:
   `engine_comparison.json` com `execution_policy` e `runtime` marcando o override e a invalidez para o gate oficial
+- validações obrigatórias do validador:
+  `engine_comparison.json` e `engine_comparison_candidates.csv` presentes e coerentes com a política diagnóstica exportada
 
 ### 4. Suite de suporte
 - smoke rápido:

@@ -100,13 +100,14 @@ Observações:
 
 ### Critério prático de aceite
 
+- `pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode official`
+- `pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode diagnostic -DisableRealJuliaProbe`
+- `pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode diagnostic -DisableRealJuliaProbe -IncludeEngineComparison`
 - `.\.venv\Scripts\python.exe -m pytest tests\decision_platform -m fast -q --basetemp tests/_tmp/pytest-basetemp-fast`
 - `.\.venv\Scripts\python.exe -m pytest tests\decision_platform\test_maquete_v2_acceptance.py::test_maquete_v2_pipeline_exports_and_route_metrics -q --basetemp tests/_tmp/pytest-basetemp-accept`
 - `.\.venv\Scripts\python.exe -m pytest tests\decision_platform\test_maquete_v2_acceptance.py::test_maquete_v2_diagnostic_engine_comparison_remains_explicit_opt_in -q --basetemp tests/_tmp/pytest-basetemp-accept-diag`
 - `.\.venv\Scripts\python.exe -m pytest tests\decision_platform -m "not requires_julia" -q --basetemp tests/_tmp/pytest-basetemp-no-julia`
 - `.\.venv\Scripts\python.exe -m pytest tests\decision_platform -m requires_julia -q --basetemp tests/_tmp/pytest-basetemp-julia`
-- `python -m decision_platform.api.run_pipeline --scenario data/decision_platform/maquete_v2 --output-dir data/output/decision_platform/maquete_v2`
-- `python -m decision_platform.api.run_pipeline --scenario data/decision_platform/maquete_v2 --output-dir data/output/decision_platform/maquete_v2 --include-engine-comparison`
 - `python -m decision_platform.ui_dash.app`
 
 ## Quick start
@@ -147,7 +148,17 @@ python -m agri_circuit_optimizer.solve.run_case --scenario data/scenario/maquete
 
 ### Nova plataforma de decisão
 
-Pipeline do cenário `maquete_v2`:
+Fluxo canônico de validação da fase 0:
+
+```powershell
+pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode official
+pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode diagnostic -DisableRealJuliaProbe
+pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode diagnostic -DisableRealJuliaProbe -IncludeEngineComparison
+```
+
+O script acima é a referência canônica da fase 0. Quando `make` estiver disponível no host, os alvos `decision-platform-validate-*` apenas encapsulam esse mesmo comando. Ele usa `summary.json` como fonte de verdade, cruza o candidato oficial com os artefatos principais exportados e só aceita `engine_comparison.json` e `engine_comparison_candidates.csv` na trilha diagnóstica com comparação explícita. Use os comandos manuais abaixo apenas como apoio.
+
+Pipeline oficial Julia-only do cenário `maquete_v2`:
 
 ```powershell
 .\.venv\Scripts\activate
@@ -156,13 +167,22 @@ $env:JULIA_DEPOT_PATH = (Resolve-Path 'julia_depot_runtime')
 python -m decision_platform.api.run_pipeline --scenario data/decision_platform/maquete_v2 --output-dir data/output/decision_platform/maquete_v2
 ```
 
-Comparação diagnóstica Julia vs Python, fora do caminho oficial:
+Trilha diagnóstica explícita, sem validade para o gate oficial:
 
 ```powershell
 .\.venv\Scripts\activate
 $env:PYTHONPATH = 'src'
-$env:JULIA_DEPOT_PATH = (Resolve-Path 'julia_depot_runtime')
-python -m decision_platform.api.run_pipeline --scenario data/decision_platform/maquete_v2 --output-dir data/output/decision_platform/maquete_v2_diag --include-engine-comparison --allow-diagnostic-python-emulation
+$env:DECISION_PLATFORM_DISABLE_REAL_JULIA_PROBE = '1'
+python -m decision_platform.api.run_pipeline --scenario data/decision_platform/maquete_v2 --output-dir data/output/decision_platform/maquete_v2_diag --allow-diagnostic-python-emulation
+```
+
+Comparação diagnóstica Julia vs Python, ainda fora do caminho oficial:
+
+```powershell
+.\.venv\Scripts\activate
+$env:PYTHONPATH = 'src'
+$env:DECISION_PLATFORM_DISABLE_REAL_JULIA_PROBE = '1'
+python -m decision_platform.api.run_pipeline --scenario data/decision_platform/maquete_v2 --output-dir data/output/decision_platform/maquete_v2_diag --allow-diagnostic-python-emulation --include-engine-comparison
 ```
 
 Override diagnóstico apenas para testes sem Julia real:
@@ -534,6 +554,16 @@ Concluído:
 
 ## Testes da decision platform
 
+Fluxo operacional recomendado:
+
+```powershell
+pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode official
+pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode diagnostic -DisableRealJuliaProbe
+pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode diagnostic -DisableRealJuliaProbe -IncludeEngineComparison
+```
+
+O script consolidado valida `summary.json` sempre, cruza `selected_candidate.json`, `selected_candidate_routes.json`, `selected_candidate_explanation.json`, `selected_candidate_bom.csv`, `family_summary.csv` e `infeasibility_summary.json` contra o resumo oficial, bloqueia `engine_comparison.json` e `engine_comparison_candidates.csv` no modo oficial e só aceita comparação quando ela foi solicitada explicitamente no modo diagnóstico. O `Makefile` oferece aliases equivalentes quando o executável `make` existir no host.
+
 Suíte rápida:
 
 ```powershell
@@ -543,7 +573,7 @@ $env:PYTHONPATH = 'src'
 
 Aceite diagnóstico lean:
 
-Janela operacional esperada nesta máquina: abaixo de `30 s`.
+Janela operacional observada nesta máquina: cerca de `40 s`.
 
 ```powershell
 $env:PYTHONPATH = 'src'
@@ -555,7 +585,7 @@ Esse comando é diagnóstico e precisa gerar `summary.json` com `execution_mode=
 
 Comparação diagnóstica explícita:
 
-Janela operacional esperada nesta máquina: abaixo de `45 s`.
+Janela operacional observada nesta máquina: cerca de `70 s`.
 
 ```powershell
 $env:PYTHONPATH = 'src'
