@@ -9,6 +9,7 @@ import pytest
 
 from decision_platform.api import run_pipeline
 from decision_platform.api.run_pipeline import OfficialRuntimeConfigError, run_decision_pipeline
+from decision_platform.data_io.loader import load_scenario_bundle
 from tests.decision_platform.scenario_utils import cleanup_scenario_copy, prepare_scenario_copy
 
 
@@ -35,6 +36,22 @@ def test_cli_rejects_disabled_probe_without_explicit_diagnostic_opt_in(monkeypat
 
 
 @pytest.mark.fast
+def test_cli_rejects_legacy_layout_without_manifest() -> None:
+    scenario_dir = prepare_scenario_copy(
+        "data/decision_platform/maquete_v2",
+        "maquete_v2_cli_legacy_layout",
+    )
+    try:
+        (Path(scenario_dir) / "scenario_bundle.yaml").unlink()
+        with pytest.raises(OfficialRuntimeConfigError) as exc:
+            run_decision_pipeline(scenario_dir)
+        assert "requires a canonical scenario bundle" in str(exc.value)
+        assert "scenario_bundle.yaml" in str(exc.value)
+    finally:
+        cleanup_scenario_copy(scenario_dir)
+
+
+@pytest.mark.fast
 def test_cli_rejects_engine_comparison_without_explicit_diagnostic_opt_in() -> None:
     with pytest.raises(OfficialRuntimeConfigError) as exc:
         run_decision_pipeline(
@@ -42,6 +59,37 @@ def test_cli_rejects_engine_comparison_without_explicit_diagnostic_opt_in() -> N
             include_engine_comparison=True,
         )
     assert "--allow-diagnostic-python-emulation" in str(exc.value)
+
+
+@pytest.mark.fast
+def test_cli_accepts_canonical_bundle_and_preserves_manifest(monkeypatch) -> None:
+    monkeypatch.delenv("DECISION_PLATFORM_DISABLE_REAL_JULIA_PROBE", raising=False)
+    bundle = load_scenario_bundle("data/decision_platform/maquete_v2")
+
+    monkeypatch.setattr(
+        run_pipeline,
+        "build_solution_catalog",
+        lambda loaded_bundle: {
+            "scenario_id": loaded_bundle.scenario_settings["scenario_id"],
+            "scenario_bundle_version": loaded_bundle.bundle_version,
+            "scenario_bundle_manifest": str(loaded_bundle.bundle_manifest_path),
+            "scenario_bundle_files": {
+                logical_name: str(path.relative_to(loaded_bundle.base_dir))
+                for logical_name, path in loaded_bundle.resolved_files.items()
+            },
+            "catalog": [{"metrics": {"feasible": True}}],
+            "default_profile_id": loaded_bundle.scenario_settings["ranking"]["default_profile"],
+            "selected_candidate_id": "candidate-001",
+        },
+    )
+
+    result = run_pipeline.run_decision_pipeline(bundle.base_dir)
+
+    assert result["scenario_bundle_version"] == bundle.bundle_version
+    assert result["scenario_bundle_manifest"].endswith("scenario_bundle.yaml")
+    assert result["scenario_bundle_files"]["components.csv"] == "component_catalog.csv"
+    assert result["runtime"]["execution_mode"] == "official"
+    assert result["runtime"]["official_gate_valid"] is True
 
 
 @pytest.mark.fast
@@ -53,6 +101,7 @@ def test_run_decision_pipeline_skips_engine_comparison_by_default(monkeypatch) -
     captured: dict[str, object] = {}
 
     monkeypatch.setattr(run_pipeline, "load_scenario_bundle", lambda scenario_dir: bundle)
+    monkeypatch.setattr(run_pipeline, "_require_canonical_scenario_bundle", lambda loaded_bundle, consumer: loaded_bundle)
     monkeypatch.setattr(
         run_pipeline,
         "build_solution_catalog",

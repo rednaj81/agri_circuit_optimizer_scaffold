@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 import yaml
 
+from decision_platform.api.run_pipeline import OfficialRuntimeConfigError
 from decision_platform.data_io.loader import load_scenario_bundle
 from decision_platform.ui_dash._compat import DASH_AVAILABLE
 from decision_platform.ui_dash.app import (
@@ -122,6 +123,40 @@ def test_ui_save_reopen_flow_persists_bundle_and_refreshes_pipeline() -> None:
         assert saved["result"]["scenario_bundle_version"] == saved["bundle"].bundle_version
         assert saved["result"]["scenario_bundle_files"]["components.csv"] == "component_catalog.csv"
         assert saved["pipeline_error"] is None
+    finally:
+        if output_dir.exists():
+            shutil.rmtree(output_dir)
+        cleanup_scenario_copy(scenario_dir)
+
+
+@pytest.mark.fast
+def test_ui_save_reopen_rejects_legacy_source_without_manifest() -> None:
+    scenario_dir = prepare_scenario_copy(
+        "data/decision_platform/maquete_v2",
+        "maquete_v2_ui_save_reopen_legacy_source",
+    )
+    output_dir = Path("tests/_tmp/maquete_v2_ui_save_reopen_legacy_saved")
+    if output_dir.exists():
+        shutil.rmtree(output_dir)
+    try:
+        bundle = load_scenario_bundle(scenario_dir)
+        (Path(scenario_dir) / "scenario_bundle.yaml").unlink()
+
+        with pytest.raises(OfficialRuntimeConfigError, match="Decision Platform UI save/reopen requires a canonical scenario bundle"):
+            save_and_reopen_local_bundle(
+                current_scenario_dir=scenario_dir,
+                output_dir=output_dir,
+                nodes_rows=bundle.nodes.to_dict("records"),
+                components_rows=bundle.components.to_dict("records"),
+                route_rows=bundle.route_requirements.to_dict("records"),
+                scenario_settings_text=yaml.safe_dump(
+                    bundle.scenario_settings,
+                    sort_keys=False,
+                    allow_unicode=True,
+                ),
+            )
+
+        assert not output_dir.exists()
     finally:
         if output_dir.exists():
             shutil.rmtree(output_dir)

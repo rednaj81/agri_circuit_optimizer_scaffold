@@ -6,10 +6,10 @@ from typing import Any
 
 import pandas as pd
 
-from decision_platform.api.run_pipeline import run_decision_pipeline
+from decision_platform.api.run_pipeline import OfficialRuntimeConfigError, run_decision_pipeline
 from decision_platform.catalog.explanation import build_selected_candidate_explanation
 from decision_platform.catalog.pipeline import resolve_selected_candidate
-from decision_platform.data_io.loader import load_scenario_bundle
+from decision_platform.data_io.loader import BUNDLE_MANIFEST_FILENAME, SCENARIO_BUNDLE_VERSION, load_scenario_bundle
 from decision_platform.data_io.storage import bundle_authoring_payload, save_authored_scenario_bundle
 from decision_platform.ranking.scoring import apply_dynamic_weights
 from decision_platform.rendering.circuit import build_solution_comparison_figure
@@ -1086,7 +1086,10 @@ def build_comparison_records(
 
 def _safe_run_pipeline(scenario_dir: str | Path) -> tuple[dict[str, Any] | None, str | None]:
     try:
-        bundle = load_scenario_bundle(scenario_dir)
+        bundle = _require_canonical_scenario_bundle(
+            load_scenario_bundle(scenario_dir),
+            consumer="Decision Platform UI pipeline",
+        )
         return run_decision_pipeline(
             scenario_dir,
             allow_diagnostic_python_emulation=_requires_diagnostic_python_emulation(bundle),
@@ -1104,6 +1107,10 @@ def save_and_reopen_local_bundle(
     route_rows: list[dict[str, Any]] | None,
     scenario_settings_text: str | None,
 ) -> dict[str, Any]:
+    _require_canonical_scenario_bundle(
+        load_scenario_bundle(current_scenario_dir),
+        consumer="Decision Platform UI save/reopen",
+    )
     reloaded_bundle, exported_files = save_authored_scenario_bundle(
         current_scenario_dir,
         output_dir,
@@ -1135,6 +1142,16 @@ def save_and_reopen_local_bundle(
             "pipeline_error": pipeline_error,
         },
     }
+
+
+def _require_canonical_scenario_bundle(bundle: Any, *, consumer: str) -> Any:
+    if bundle.bundle_version == SCENARIO_BUNDLE_VERSION and bundle.bundle_manifest_path is not None:
+        return bundle
+    raise OfficialRuntimeConfigError(
+        f"{consumer} requires a canonical scenario bundle with '{BUNDLE_MANIFEST_FILENAME}' "
+        f"and bundle_version '{SCENARIO_BUNDLE_VERSION}'. Legacy directory layouts are only "
+        "supported for explicit low-level migration or test helpers."
+    )
 
 
 def _build_execution_summary(result: dict[str, Any] | None, error: str | None) -> str:

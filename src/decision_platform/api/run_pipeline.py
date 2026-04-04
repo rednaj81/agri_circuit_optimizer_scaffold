@@ -8,7 +8,7 @@ from typing import Any
 
 from decision_platform.audit import build_engine_comparison_suite
 from decision_platform.catalog.pipeline import build_solution_catalog, export_catalog
-from decision_platform.data_io.loader import ScenarioBundle, load_scenario_bundle
+from decision_platform.data_io.loader import BUNDLE_MANIFEST_FILENAME, SCENARIO_BUNDLE_VERSION, ScenarioBundle, load_scenario_bundle
 from decision_platform.julia_bridge.bridge import DISABLE_REAL_JULIA_PROBE_ENV, real_julia_probe_disabled
 
 
@@ -24,7 +24,13 @@ def run_decision_pipeline(
     allow_diagnostic_python_emulation: bool = False,
 ) -> dict[str, Any]:
     started_at = datetime.now(UTC)
-    bundle = load_scenario_bundle(scenario_dir)
+    try:
+        bundle = _require_canonical_scenario_bundle(
+            load_scenario_bundle(scenario_dir),
+            consumer="Official decision_platform pipeline",
+        )
+    except ValueError as exc:
+        raise OfficialRuntimeConfigError(str(exc)) from exc
     should_build_engine_comparison = False if include_engine_comparison is None else include_engine_comparison
     _validate_runtime_policy(
         bundle,
@@ -49,6 +55,20 @@ def run_decision_pipeline(
     if output_dir is not None:
         export_catalog(result, output_dir)
     return result
+
+
+def _require_canonical_scenario_bundle(
+    bundle: ScenarioBundle,
+    *,
+    consumer: str,
+) -> ScenarioBundle:
+    if bundle.bundle_version == SCENARIO_BUNDLE_VERSION and bundle.bundle_manifest_path is not None:
+        return bundle
+    raise ValueError(
+        f"{consumer} requires a canonical scenario bundle with '{BUNDLE_MANIFEST_FILENAME}' "
+        f"and bundle_version '{SCENARIO_BUNDLE_VERSION}'. Legacy directory layouts are only "
+        "supported for explicit low-level migration or test helpers."
+    )
 
 
 def _parse_args() -> argparse.Namespace:

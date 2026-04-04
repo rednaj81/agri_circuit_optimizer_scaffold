@@ -179,3 +179,40 @@ def test_save_authored_bundle_fails_closed_for_invalid_route_contract() -> None:
     finally:
         if output_dir.exists():
             shutil.rmtree(output_dir)
+
+
+def test_save_authored_bundle_supports_explicit_legacy_source_layout() -> None:
+    scenario_dir = prepare_scenario_copy(
+        "data/decision_platform/maquete_v2",
+        "maquete_v2_explicit_legacy_source",
+    )
+    output_dir = Path("tests/_tmp/scenario_persistence_legacy_source_saved")
+    if output_dir.exists():
+        shutil.rmtree(output_dir)
+    try:
+        (Path(scenario_dir) / BUNDLE_MANIFEST_FILENAME).unlink()
+        legacy_bundle = load_scenario_bundle(scenario_dir)
+
+        reloaded, exported = save_authored_scenario_bundle(
+            scenario_dir,
+            output_dir,
+            nodes_rows=legacy_bundle.nodes.to_dict("records"),
+            components_rows=legacy_bundle.components.to_dict("records"),
+            route_rows=legacy_bundle.route_requirements.to_dict("records"),
+            scenario_settings_text=yaml.safe_dump(
+                legacy_bundle.scenario_settings,
+                sort_keys=False,
+                allow_unicode=True,
+            ),
+        )
+
+        assert legacy_bundle.bundle_version == "legacy_directory_layout"
+        assert legacy_bundle.bundle_manifest_path is None
+        assert exported["bundle_manifest"].name == BUNDLE_MANIFEST_FILENAME
+        assert reloaded.bundle_version != "legacy_directory_layout"
+        assert reloaded.bundle_manifest_path is not None
+        assert reloaded.resolved_files["components.csv"].name == "component_catalog.csv"
+    finally:
+        if output_dir.exists():
+            shutil.rmtree(output_dir)
+        cleanup_scenario_copy(scenario_dir)
