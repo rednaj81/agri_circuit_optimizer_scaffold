@@ -113,6 +113,12 @@ def build_solution_catalog(bundle: ScenarioBundle) -> dict[str, Any]:
     summary = _build_catalog_summary(candidates, evaluated, generation_report)
     result = {
         "scenario_id": bundle.scenario_settings.get("scenario_id", bundle.base_dir.name),
+        "scenario_bundle_version": bundle.bundle_version,
+        "scenario_bundle_manifest": str(bundle.bundle_manifest_path) if bundle.bundle_manifest_path else None,
+        "scenario_bundle_files": {
+            logical_name: str(path.relative_to(bundle.base_dir))
+            for logical_name, path in bundle.resolved_files.items()
+        },
         "catalog": evaluated,
         "catalog_frame": catalog_frame,
         "ranked_profiles": ranked_profiles,
@@ -400,6 +406,9 @@ def _build_decision_summary(
     summary = dict(result.get("summary", {}))
     runtime = dict(result.get("runtime", {}))
     summary["scenario_id"] = result.get("scenario_id")
+    summary["scenario_bundle_version"] = result.get("scenario_bundle_version")
+    summary["scenario_bundle_manifest"] = result.get("scenario_bundle_manifest")
+    summary["scenario_bundle_files"] = result.get("scenario_bundle_files", {})
     summary["default_profile_id"] = selected_profile_id
     summary["best_profile"] = selected_profile_id
     if selected_candidate is None:

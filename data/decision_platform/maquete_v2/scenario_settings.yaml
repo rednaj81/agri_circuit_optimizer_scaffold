@@ -39,3 +39,7 @@ exports:
   write_catalog_parquet: true
   write_solution_json: true
   write_bom_csv: true
+
+storage:
+  bundle_manifest: scenario_bundle.yaml
+  component_catalog: component_catalog.csv

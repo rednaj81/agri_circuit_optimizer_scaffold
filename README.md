@@ -83,6 +83,7 @@ Observações:
 - o pipeline oficial exporta catálogo, ranking, candidato oficial, explicação do vencedor e agregados de viabilidade.
 - a comparação Julia vs Python existe apenas como trilha diagnóstica explícita.
 - a UI Dash já cobre catálogo, comparação, circuito, candidato oficial e filtros de decisão com persistência simples em sessão.
+- o cenário `maquete_v2` agora tem save/reopen local versionado via `scenario_bundle.yaml` e `component_catalog.csv`.
 
 ### O que já está validado
 
@@ -97,6 +98,7 @@ Observações:
 - `DecisionEngine.jl` roda em Julia real e importa `WaterModels`, `JuMP` e `HiGHS`, mas a avaliação hidráulica decisória ainda é lógica própria em Julia, não um solve completo de rede via API do `WaterModels`
 - resiliência e parte da exploração topológica continuam heurísticas
 - a UI ainda é orientada a análise local; não há persistência multiusuário nem workflow de aprovação
+- studio visual, fila/background runs e workflow completo de decisão humana assistida continuam fora desta onda
 
 ### Critério prático de aceite
 
@@ -171,6 +173,12 @@ O script acima é a referência canônica da fase 0 e lê a matriz declarativa e
 A `phase_0` está encerrada. Não há novas ondas funcionais dentro dela; qualquer evolução posterior deve abrir a próxima fase e tratar `docs/codex_dual_agent_runtime/phase_0_exit.md` como handoff congelado do tema Julia-only.
 
 A comparação Julia vs Python permanece diagnóstica e exige os dois opt-ins explícitos: `--allow-diagnostic-python-emulation` e `--include-engine-comparison`.
+
+Persistência local introduzida na phase 1:
+- `data/decision_platform/maquete_v2/scenario_bundle.yaml` define o bundle canônico versionado
+- `component_catalog.csv` é o catálogo persistido de componentes
+- `components.csv` permanece apenas como alias legado de compatibilidade
+- `save_scenario_bundle(...)` grava o bundle determinístico e `load_scenario_bundle(...)` reabre tanto o formato novo quanto o layout legado
 
 Execução reproduzida nesta máquina em 2026-04-04 e consolidada pelo manifesto `docs/codex_dual_agent_runtime/phase_0_validation_manifest.json`. O artefato `engine_comparison.json` continua sendo apenas diagnóstico e nunca substitui a validação oficial do profile `official`.
 
