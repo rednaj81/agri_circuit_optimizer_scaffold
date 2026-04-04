@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from decision_platform.catalog.quality_rules import apply_quality_rules
 from decision_platform.data_io.loader import load_scenario_bundle
 from decision_platform.graph_generation.generator import generate_candidate_topologies
@@ -7,6 +9,9 @@ from decision_platform.graph_repair.repair import normalize_candidate
 from decision_platform.julia_bridge.python_engine import emulate_watermodels_cli
 from decision_platform.scenario_engine.installer import build_candidate_payload
 from tests.decision_platform.scenario_utils import cleanup_scenario_copy, prepare_scenario_copy
+
+
+pytestmark = [pytest.mark.fast]
 
 
 def test_quality_rules_drive_breakdown_and_flags() -> None:

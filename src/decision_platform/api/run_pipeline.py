@@ -5,13 +5,22 @@ import json
 from pathlib import Path
 from typing import Any
 
+from decision_platform.audit import build_engine_comparison_suite
 from decision_platform.catalog.pipeline import build_solution_catalog, export_catalog
 from decision_platform.data_io.loader import load_scenario_bundle
 
 
-def run_decision_pipeline(scenario_dir: str | Path, output_dir: str | Path | None = None) -> dict[str, Any]:
+def run_decision_pipeline(
+    scenario_dir: str | Path,
+    output_dir: str | Path | None = None,
+    *,
+    include_engine_comparison: bool | None = None,
+) -> dict[str, Any]:
     bundle = load_scenario_bundle(scenario_dir)
     result = build_solution_catalog(bundle)
+    should_build_engine_comparison = output_dir is not None if include_engine_comparison is None else include_engine_comparison
+    if should_build_engine_comparison:
+        result["engine_comparison"] = build_engine_comparison_suite(bundle, julia_result=result)
     if output_dir is not None:
         export_catalog(result, output_dir)
     return result

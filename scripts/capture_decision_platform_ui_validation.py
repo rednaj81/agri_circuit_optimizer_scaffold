@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import ctypes
+import os
+import socket
 import subprocess
 import time
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
@@ -15,6 +18,9 @@ OUTPUT_DIR = ROOT / "data" / "output" / "decision_platform" / "ui_validation"
 README_PATH = OUTPUT_DIR / "README.md"
 CHROME_PATH = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
 URL = "http://127.0.0.1:8050"
+PYTHON_EXE = ROOT / ".venv" / "Scripts" / "python.exe"
+UI_STDOUT = OUTPUT_DIR / "ui_server_stdout.log"
+UI_STDERR = OUTPUT_DIR / "ui_server_stderr.log"
 
 WM_CLOSE = 0x0010
 SW_RESTORE = 9
@@ -148,6 +154,49 @@ def find_dash_window(timeout_seconds: float = 30.0) -> WindowInfo:
     raise RuntimeError("Dash window not found.")
 
 
+@contextmanager
+def launch_ui_server() -> Iterable[subprocess.Popen[bytes]]:
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    env = os.environ.copy()
+    env["PYTHONPATH"] = "src"
+    depot_path = ROOT / "julia_depot_runtime"
+    if depot_path.exists():
+        env.setdefault("JULIA_DEPOT_PATH", str(depot_path))
+    with UI_STDOUT.open("w", encoding="utf-8") as stdout_handle, UI_STDERR.open("w", encoding="utf-8") as stderr_handle:
+        process = subprocess.Popen(
+            [str(PYTHON_EXE), "-u", "-m", "decision_platform.ui_dash.app"],
+            cwd=ROOT,
+            env=env,
+            stdout=stdout_handle,
+            stderr=stderr_handle,
+        )
+        try:
+            wait_for_http_ready()
+            yield process
+        finally:
+            process.terminate()
+            try:
+                process.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait(timeout=10)
+
+
+def wait_for_http_ready(timeout_seconds: float = 420.0) -> None:
+    deadline = time.time() + timeout_seconds
+    while time.time() < deadline:
+        if _port_open("127.0.0.1", 8050):
+            return
+        time.sleep(2)
+    raise RuntimeError(f"Decision Platform UI did not become ready within {timeout_seconds} seconds.")
+
+
+def _port_open(host: str, port: int) -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+        probe.settimeout(1.0)
+        return probe.connect_ex((host, port)) == 0
+
+
 def focus_and_resize(window: WindowInfo, *, width: int = 1500, height: int = 1400) -> WindowInfo:
     user32.ShowWindow(window.hwnd, SW_RESTORE)
     user32.SetWindowPos(window.hwnd, HWND_TOPMOST, 0, 0, width, height, SWP_SHOWWINDOW)
@@ -263,55 +312,60 @@ def _write_readme(entries: Iterable[tuple[str, str]]) -> None:
 
 def main() -> None:
     close_existing_dash_windows()
-    launch_browser()
-    time.sleep(15)
+    with launch_ui_server():
+        browser = launch_browser()
+        try:
+            time.sleep(15)
 
-    window = focus_and_resize(find_dash_window())
-    click(window, 390, 78, delay=4.0)
-    shot_01 = capture(window, "01_home_or_initial_state.png")
+            window = focus_and_resize(find_dash_window())
+            click(window, 290, 118, delay=4.0)
+            shot_01 = capture(window, "01_home_or_initial_state.png")
 
-    click(window, 640, 78, delay=4.0)
-    shot_02 = capture(window, "02_catalog_with_default_profile.png")
+            click(window, 430, 118, delay=4.0)
+            shot_02 = capture(window, "02_catalog_with_default_profile.png")
 
-    replace_input(window, 150, 458, "1200", settle_seconds=4.0)
-    replace_input(window, 150, 503, "50", settle_seconds=4.0)
-    shot_03 = capture(window, "03_filters_applied.png")
+            replace_input(window, 150, 223, "1200", settle_seconds=4.0)
+            replace_input(window, 150, 247, "50", settle_seconds=4.0)
+            shot_03 = capture(window, "03_filters_applied.png")
 
-    replace_input(window, 150, 700, "1", settle_seconds=4.0)
-    replace_input(window, 150, 747, "0", settle_seconds=4.0)
-    shot_04 = capture(window, "04_weights_changed.png")
+            replace_input(window, 150, 467, "1", settle_seconds=4.0)
+            replace_input(window, 150, 491, "0", settle_seconds=4.0)
+            shot_04 = capture(window, "04_weights_changed.png")
 
-    select_next_dropdown_option(window, 150, 324, steps=1, settle_seconds=4.0)
-    shot_10 = capture(window, "10_profile_changed.png")
+            select_next_dropdown_option(window, 150, 151, steps=1, settle_seconds=4.0)
+            shot_10 = capture(window, "10_profile_changed.png")
 
-    click(window, 1120, 78, delay=4.0)
-    select_next_dropdown_option(window, 220, 324, steps=1, settle_seconds=5.0)
-    shot_05 = capture(window, "05_selected_candidate_changed.png")
-    shot_09 = capture(window, "09_export_or_final_selection_state.png", crop_bottom=250)
+            click(window, 1125, 118, delay=4.0)
+            select_next_dropdown_option(window, 220, 359, steps=1, settle_seconds=5.0)
+            shot_05 = capture(window, "05_selected_candidate_changed.png")
+            shot_09 = capture(window, "09_export_or_final_selection_state.png", crop_bottom=250)
 
-    wheel(window, 700, 1100, -3000, delay=2.0)
-    shot_06 = capture(window, "06_circuit_view_selected_candidate.png", crop_top=350)
+            wheel(window, 700, 1135, -3000, delay=2.0)
+            shot_06 = capture(window, "06_circuit_view_selected_candidate.png", crop_top=350)
 
-    click(window, 1360, 78, delay=4.0)
-    shot_07 = capture(window, "07_score_breakdown_selected_candidate.png")
+            click(window, 1325, 118, delay=4.0)
+            shot_07 = capture(window, "07_score_breakdown_selected_candidate.png")
 
-    click(window, 880, 78, delay=4.0)
-    shot_08 = capture(window, "08_comparison_or_decision_view.png")
+            click(window, 600, 118, delay=4.0)
+            shot_08 = capture(window, "08_comparison_or_decision_view.png")
 
-    entries = [
-        (shot_01.name, "Tela inicial na aba de execução com candidato inicial e perfil padrão reportados."),
-        (shot_02.name, "Catálogo carregado com o perfil padrão e a visão inicial do ranking."),
-        (shot_03.name, "Catálogo após filtros numéricos aplicados."),
-        (shot_04.name, "Catálogo após alteração manual dos pesos dinâmicos."),
-        (shot_05.name, "Mudança explícita do candidato selecionado na aba de circuito."),
-        (shot_06.name, "Visualização 2D do circuito do candidato selecionado."),
-        (shot_07.name, "Breakdown do score na aba de escolha final."),
-        (shot_08.name, "Visão de comparação entre candidatos."),
-        (shot_09.name, "Estado final com candidato atual e ação de exportação disponível."),
-        (shot_10.name, "Print extra evidenciando mudança de perfil na UI."),
-    ]
-    _write_readme(entries)
-    print(OUTPUT_DIR)
+            entries = [
+                (shot_01.name, "Tela inicial na aba de execução com candidato inicial e perfil padrão reportados."),
+                (shot_02.name, "Catálogo carregado com o perfil padrão e a visão inicial do ranking."),
+                (shot_03.name, "Catálogo após filtros numéricos aplicados."),
+                (shot_04.name, "Catálogo após alteração manual dos pesos dinâmicos."),
+                (shot_05.name, "Mudança explícita do candidato selecionado na aba de circuito."),
+                (shot_06.name, "Visualização 2D do circuito do candidato selecionado."),
+                (shot_07.name, "Breakdown do score na aba de escolha final."),
+                (shot_08.name, "Visão de comparação entre candidatos."),
+                (shot_09.name, "Estado final com candidato atual e ação de exportação disponível."),
+                (shot_10.name, "Print extra evidenciando mudança de perfil na UI."),
+            ]
+            _write_readme(entries)
+            print(OUTPUT_DIR)
+        finally:
+            browser.terminate()
+            browser.wait(timeout=10)
 
 
 if __name__ == "__main__":

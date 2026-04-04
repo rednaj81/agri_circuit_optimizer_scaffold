@@ -135,15 +135,53 @@ A UI agora suporta:
 - filtro de viabilidade
 - custo máximo
 - qualidade mínima
+- flow mínimo
 - resiliência mínima
+- cleaning mínimo
+- operability mínimo
+- top N por família
 - filtro por uso de fallback
 - pesos editáveis
 - reranking local
 - seleção explícita do candidato
+- resumo do candidato oficial com flags e rotas críticas
+- comparação lado a lado em grid
+- export de comparação em CSV
+- persistência simples em sessão para perfil/filtros/pesos
+- destaque de rota no Cytoscape ao trocar a rota visível
 - export do catálogo filtrado
 - export do candidato selecionado
 - seleção inicial alinhada ao `selected_candidate_id` oficial
 - troca explícita do selecionado quando perfil/filtros/pesos mudam
+
+### 6. Evidência objetiva do papel do engine Julia real
+
+Arquivo principal:
+
+- `data/output/decision_platform/maquete_v2/engine_comparison.json`
+
+O runtime agora exporta:
+
+- auditoria estática do `DecisionEngine.jl`
+- diff `maquete_v2` Julia vs Python
+- diff de uma variante focada `hybrid_free`
+- `candidate_count`
+- `feasible_count`
+- top candidato por perfil
+- `score_breakdown`
+- diferenças de métricas por rota
+
+Estado validado nesta máquina:
+
+- `DecisionEngine.jl` importa `WaterModels`, `JuMP` e `HiGHS`
+- o solve hidráulico ainda é lógica própria em Julia, não formulação explícita de rede via API do `WaterModels`
+- mesmo assim o Julia real altera a decisão final no `maquete_v2`
+- no cenário base:
+  - Julia seleciona `bus_with_pump_islands__g18m1_1`
+  - Python seleciona `loop_ring__g18m1_1`
+- na variante `hybrid_free_focus_variant`:
+  - Julia seleciona `hybrid_free__g14m2_2`
+  - Python seleciona `hybrid_free__g11m2_2`
 
 ## Validação executada
 
@@ -160,13 +198,15 @@ $env:JULIA_DEPOT_PATH=(Resolve-Path 'julia_depot_runtime')
 Resumo observado:
 
 - `scenario_id = maquete_v2`
-- `candidate_count = 74`
-- `feasible_count = 73`
+- `candidate_count = 76`
+- `feasible_count = 49`
 - `engine_requested = watermodels_jl`
 - `engine_used = watermodels_jl`
 - `engine_mode = real_julia`
 - `julia_available = true`
 - `watermodels_available = true`
+- `engine_comparison.json` exportado
+- `summary.json` com `viability_rate_by_family`, `infeasible_candidate_rate_by_reason` e `feasible_cost_distribution`
 
 Artefatos gerados em:
 
@@ -205,7 +245,9 @@ $env:JULIA_DEPOT_PATH=(Resolve-Path 'julia_depot_runtime')
 
 Resultado final mais recente:
 
-- `20 passed in 1677.22s (0:27:57)`
+- `21 passed, 2 deselected` em `16:46` para `-m "not requires_julia"`
+- `2 passed, 21 deselected` em `04:41` para `-m requires_julia`
+- contagem final consolidada válida: `23 passed`
 
 ## Comandos recomendados para validação local
 
@@ -233,6 +275,20 @@ $env:JULIA_DEPOT_PATH=(Resolve-Path 'julia_depot_runtime')
 .\.venv\Scripts\python.exe -m pytest tests\decision_platform -p no:tmpdir -vv -s
 ```
 
+### Smoke rápido
+
+```powershell
+$env:PYTHONPATH='src'
+.\.venv\Scripts\python.exe -m pytest tests\decision_platform -m fast -q
+```
+
+### UI
+
+```powershell
+$env:PYTHONPATH='src'
+.\.venv\Scripts\python.exe -m pytest tests\decision_platform -m ui -q
+```
+
 ### Subconjunto crítico
 
 ```powershell
@@ -253,6 +309,7 @@ $env:PYTHONPATH='src'
 - o runtime Julia real foi ativado no host atual, mas o setup depende do depot local `julia_depot_runtime`
 - a instalação Julia no host ainda não está “limpa” o suficiente para dispensar esse depot local
 - a engine Julia continua simplificada no conteúdo do `DecisionEngine.jl`; o runtime real está ativo, mas a lógica hidráulica ali ainda não é uma modelagem completa de WaterModels
+- a evidência visual da UI foi automatizada por captura desktop; a navegação de abas ficou confiável, mas a aba final ainda depende de layout/viewport do host
 
 ## Estado objetivo no fim desta rodada
 

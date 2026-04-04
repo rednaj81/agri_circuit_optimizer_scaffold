@@ -41,6 +41,7 @@ def test_maquete_v2_pipeline_exports_and_route_metrics() -> None:
         assert any(item["payload"]["selection_log"] for item in feasible)
 
         summary = json.loads((output_dir / "summary.json").read_text(encoding="utf-8"))
+        engine_comparison = json.loads((output_dir / "engine_comparison.json").read_text(encoding="utf-8"))
         selected_candidate = json.loads((output_dir / "selected_candidate.json").read_text(encoding="utf-8"))
         selected_routes = json.loads((output_dir / "selected_candidate_routes.json").read_text(encoding="utf-8"))
         selected_render = json.loads((output_dir / "selected_candidate_render.json").read_text(encoding="utf-8"))
@@ -53,11 +54,15 @@ def test_maquete_v2_pipeline_exports_and_route_metrics() -> None:
         assert (output_dir / "ranked_profiles.json").exists()
         assert (output_dir / "ranking_profiles.json").exists()
         assert (output_dir / "catalog_summary.json").exists()
+        assert (output_dir / "engine_comparison.json").exists()
         assert (output_dir / "selected_candidate.svg").exists()
 
         assert summary["default_profile_id"] == result["default_profile_id"]
         assert summary["selected_candidate_id"] == result["selected_candidate_id"]
         assert summary["selected_generation_source"] == result["selected_candidate"]["generation_source"]
+        assert "viability_rate_by_family" in summary
+        assert "infeasible_candidate_rate_by_reason" in summary
+        assert "feasible_cost_distribution" in summary
         assert selected_candidate["candidate_id"] == result["selected_candidate_id"]
         assert "generation_metadata" in selected_candidate
         assert selected_routes["candidate_id"] == result["selected_candidate_id"]
@@ -71,6 +76,10 @@ def test_maquete_v2_pipeline_exports_and_route_metrics() -> None:
         assert selected_routes["routes"] == selected_candidate["metrics"]["route_metrics"]
         assert all("route_effective_q_max_lpm" in route for route in selected_routes["routes"])
         assert all("critical_consequence" in route for route in selected_routes["routes"])
+        assert summary["constraint_failure_categories"] == result["selected_candidate"]["metrics"]["constraint_failure_categories"]
+        assert engine_comparison["scenario_comparisons"]["maquete_v2"]["decision_difference_observed"] is True
+        assert engine_comparison["scenario_comparisons"]["maquete_v2"]["selected_candidate"]["same"] is False
+        assert engine_comparison["scenario_comparisons"]["hybrid_free_focus_variant"]["selected_candidate"]["same"] is False
     finally:
         if output_dir.exists():
             shutil.rmtree(output_dir)
@@ -98,6 +107,7 @@ def test_maquete_v2_pipeline_runs_with_real_julia_and_exports_final_artifacts() 
         assert (output_dir / "catalog.csv").exists()
         assert (output_dir / "catalog.json").exists()
         assert (output_dir / "ranked_profiles.json").exists()
+        assert (output_dir / "engine_comparison.json").exists()
         assert (output_dir / "selected_candidate.json").exists()
         assert (output_dir / "selected_candidate_routes.json").exists()
         assert (output_dir / "selected_candidate_bom.csv").exists()
@@ -107,6 +117,7 @@ def test_maquete_v2_pipeline_runs_with_real_julia_and_exports_final_artifacts() 
         summary = json.loads((output_dir / "summary.json").read_text(encoding="utf-8"))
         assert summary["selected_candidate_id"] == result["selected_candidate_id"]
         assert summary["default_profile_id"] == result["default_profile_id"]
+        assert summary["engine_used"] == "watermodels_jl"
     finally:
         if output_dir.exists():
             shutil.rmtree(output_dir)

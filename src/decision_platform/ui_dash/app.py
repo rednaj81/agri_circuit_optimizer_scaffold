@@ -29,7 +29,14 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
         selected_candidate_id=initial_state["selected_candidate_id"],
         ranked_records=initial_state["ranked_records"],
         filters={},
+        aggregate_summary=result.get("summary", {}) if result else {},
     )
+    initial_official_summary = build_official_candidate_summary(
+        result,
+        profile_id=profile_id,
+        candidate_id=initial_state["selected_candidate_id"],
+    )
+    initial_comparison_records = build_comparison_records(result, initial_state["comparison_ids"], profile_id=profile_id)
 
     app = Dash(__name__)
     app.layout = html.Div(
@@ -76,20 +83,30 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
                                 id="profile-dropdown",
                                 options=[{"label": profile, "value": profile} for profile in bundle.weight_profiles["profile_id"].tolist()],
                                 value=profile_id,
+                                persistence=True,
+                                persistence_type="session",
                             ),
                             dcc.Dropdown(
                                 id="family-dropdown",
                                 options=[{"label": family, "value": family} for family in sorted(bundle.scenario_settings["enabled_families"])],
                                 value="ALL",
+                                persistence=True,
+                                persistence_type="session",
                             ),
                             dcc.Checklist(
                                 id="feasible-only-checklist",
                                 options=[{"label": "Apenas viáveis", "value": "feasible_only"}],
                                 value=["feasible_only"] if bundle.scenario_settings["ranking"].get("keep_only_feasible", True) else [],
+                                persistence=True,
+                                persistence_type="session",
                             ),
-                            dcc.Input(id="max-cost-input", type="number", value=None),
-                            dcc.Input(id="min-quality-input", type="number", value=None),
-                            dcc.Input(id="min-resilience-input", type="number", value=None),
+                            dcc.Input(id="max-cost-input", type="number", value=None, persistence=True, persistence_type="session"),
+                            dcc.Input(id="min-quality-input", type="number", value=None, persistence=True, persistence_type="session"),
+                            dcc.Input(id="min-flow-input", type="number", value=None, persistence=True, persistence_type="session"),
+                            dcc.Input(id="min-resilience-input", type="number", value=None, persistence=True, persistence_type="session"),
+                            dcc.Input(id="min-cleaning-input", type="number", value=None, persistence=True, persistence_type="session"),
+                            dcc.Input(id="min-operability-input", type="number", value=None, persistence=True, persistence_type="session"),
+                            dcc.Input(id="top-n-family-input", type="number", value=None, persistence=True, persistence_type="session"),
                             dcc.Dropdown(
                                 id="fallback-filter-dropdown",
                                 options=[
@@ -98,6 +115,8 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
                                     {"label": "Com fallback", "value": "WITH_FALLBACK"},
                                 ],
                                 value="ALL",
+                                persistence=True,
+                                persistence_type="session",
                             ),
                             _weight_inputs(bundle),
                             html.Pre(initial_catalog_summary, id="catalog-state-summary"),
@@ -115,6 +134,8 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
                                 options=initial_state["comparison_options"],
                                 value=initial_state["comparison_ids"],
                                 multi=True,
+                                persistence=True,
+                                persistence_type="session",
                             ),
                             dcc.Graph(
                                 id="comparison-figure",
@@ -122,6 +143,9 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
                                 if result
                                 else build_solution_comparison_figure([]),
                             ),
+                            _comparison_grid(initial_comparison_records),
+                            html.Button("Exportar comparação", id="export-comparison-button"),
+                            dcc.Download(id="comparison-download"),
                         ],
                     ),
                     dcc.Tab(
@@ -132,6 +156,15 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
                                 id="selected-candidate-dropdown",
                                 options=initial_state["selected_options"],
                                 value=initial_state["selected_candidate_id"],
+                                persistence=True,
+                                persistence_type="session",
+                            ),
+                            dcc.Dropdown(
+                                id="route-highlight-dropdown",
+                                options=_route_dropdown_options(candidate_details.get("route_rows", [])),
+                                value=_default_route_highlight(candidate_details.get("route_rows", [])),
+                                persistence=True,
+                                persistence_type="session",
                             ),
                             html.Pre(
                                 json.dumps(candidate_details.get("summary", {}), indent=2, ensure_ascii=False),
@@ -144,6 +177,10 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
                                 elements=candidate_details.get("cytoscape_elements", []),
                                 layout={"name": "preset"},
                                 style={"width": "100%", "height": "520px"},
+                                stylesheet=_build_cytoscape_stylesheet(
+                                    candidate_details.get("route_highlights", {}),
+                                    _default_route_highlight(candidate_details.get("route_rows", [])),
+                                ),
                             ),
                             _route_grid(candidate_details.get("route_rows", [])),
                         ],
@@ -151,6 +188,11 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
                     dcc.Tab(
                         label="Escolha final",
                         children=[
+                            html.H2("Candidato oficial"),
+                            html.Pre(
+                                json.dumps(initial_official_summary, indent=2, ensure_ascii=False),
+                                id="official-candidate-summary",
+                            ),
                             html.H2("Justificativa"),
                             html.Pre(
                                 json.dumps(candidate_details.get("breakdown", {}), indent=2, ensure_ascii=False),
@@ -170,7 +212,17 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
     )
     def _run_pipeline(n_clicks: Any, current_scenario_dir: str) -> str:
         if not n_clicks:
-            return json.dumps({"status": "idle"}, ensure_ascii=False)
+            return json.dumps(
+                {
+                    "candidate_count": len(result["catalog"]) if result else 0,
+                    "feasible_count": sum(1 for item in result["catalog"] if item["metrics"]["feasible"]) if result else 0,
+                    "default_profile_id": result.get("default_profile_id") if result else None,
+                    "selected_candidate_id": result.get("selected_candidate_id") if result else None,
+                    "error": pipeline_error,
+                },
+                indent=2,
+                ensure_ascii=False,
+            )
         rerun, rerun_error = _safe_run_pipeline(current_scenario_dir)
         return json.dumps(
             {
@@ -196,7 +248,11 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
         Input("feasible-only-checklist", "value"),
         Input("max-cost-input", "value"),
         Input("min-quality-input", "value"),
+        Input("min-flow-input", "value"),
         Input("min-resilience-input", "value"),
+        Input("min-cleaning-input", "value"),
+        Input("min-operability-input", "value"),
+        Input("top-n-family-input", "value"),
         Input("fallback-filter-dropdown", "value"),
         Input("weight-cost", "value"),
         Input("weight-quality", "value"),
@@ -213,7 +269,11 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
         feasible_only: list[str],
         max_cost: Any,
         min_quality: Any,
+        min_flow: Any,
         min_resilience: Any,
+        min_cleaning: Any,
+        min_operability: Any,
+        top_n_per_family: Any,
         fallback_filter: str,
         cost_weight: Any,
         quality_weight: Any,
@@ -242,7 +302,11 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
             feasible_only="feasible_only" in (feasible_only or []),
             max_cost=max_cost,
             min_quality=min_quality,
+            min_flow=min_flow,
             min_resilience=min_resilience,
+            min_cleaning=min_cleaning,
+            min_operability=min_operability,
+            top_n_per_family=top_n_per_family,
             fallback_filter=fallback_filter,
             current_selected_id=current_selected_id,
             current_compare_ids=current_compare_ids,
@@ -252,7 +316,11 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
             "feasible_only": "feasible_only" in (feasible_only or []),
             "max_cost": max_cost,
             "min_quality": min_quality,
+            "min_flow": min_flow,
             "min_resilience": min_resilience,
+            "min_cleaning": min_cleaning,
+            "min_operability": min_operability,
+            "top_n_per_family": top_n_per_family,
             "fallback_filter": fallback_filter,
             "weight_overrides": weights,
         }
@@ -267,35 +335,70 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
                 selected_candidate_id=view_state["selected_candidate_id"],
                 ranked_records=view_state["ranked_records"],
                 filters=filters,
+                aggregate_summary=result.get("summary", {}),
             ),
         )
 
     @app.callback(
         Output("circuit-cytoscape", "elements"),
+        Output("route-highlight-dropdown", "options"),
+        Output("route-highlight-dropdown", "value"),
         Output("route-metrics-grid", "rowData"),
         Output("selected-candidate-summary", "children"),
         Output("candidate-breakdown", "children"),
+        Output("official-candidate-summary", "children"),
         Input("selected-candidate-dropdown", "value"),
+        Input("profile-dropdown", "value"),
     )
-    def _update_selected_candidate(candidate_id: str) -> tuple[list[dict[str, Any]], list[dict[str, Any]], str, str]:
+    def _update_selected_candidate(
+        candidate_id: str,
+        active_profile_id: str,
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], str | None, list[dict[str, Any]], str, str, str]:
         if not result or not candidate_id:
-            return [], [], json.dumps({}, ensure_ascii=False), json.dumps({}, ensure_ascii=False)
-        detail = build_candidate_detail(result, candidate_id)
+            empty = json.dumps({}, ensure_ascii=False)
+            return [], [], None, [], empty, empty, empty
+        detail = build_candidate_detail(result, candidate_id, profile_id=active_profile_id)
+        route_options = _route_dropdown_options(detail["route_rows"])
+        route_value = _default_route_highlight(detail["route_rows"])
         return (
             detail["cytoscape_elements"],
+            route_options,
+            route_value,
             detail["route_rows"],
             json.dumps(detail["summary"], indent=2, ensure_ascii=False),
             json.dumps(detail["breakdown"], indent=2, ensure_ascii=False),
+            json.dumps(
+                build_official_candidate_summary(result, profile_id=active_profile_id, candidate_id=candidate_id),
+                indent=2,
+                ensure_ascii=False,
+            ),
         )
 
     @app.callback(
-        Output("comparison-figure", "figure"),
-        Input("compare-candidates-dropdown", "value"),
+        Output("circuit-cytoscape", "stylesheet"),
+        Input("selected-candidate-dropdown", "value"),
+        Input("route-highlight-dropdown", "value"),
     )
-    def _update_comparison(candidate_ids: Any) -> Any:
+    def _highlight_route(candidate_id: str | None, route_id: str | None) -> list[dict[str, Any]]:
         if not result:
-            return build_solution_comparison_figure([])
-        return build_solution_comparison_figure(_lookup_candidates(result, _normalize_compare_ids(candidate_ids)))
+            return _build_cytoscape_stylesheet({}, None)
+        detail = build_candidate_detail(result, candidate_id)
+        return _build_cytoscape_stylesheet(detail.get("route_highlights", {}), route_id)
+
+    @app.callback(
+        Output("comparison-figure", "figure"),
+        Output("comparison-grid", "rowData"),
+        Input("compare-candidates-dropdown", "value"),
+        Input("profile-dropdown", "value"),
+    )
+    def _update_comparison(candidate_ids: Any, profile: str) -> tuple[Any, list[dict[str, Any]]]:
+        if not result:
+            return build_solution_comparison_figure([]), []
+        normalized_ids = _normalize_compare_ids(candidate_ids)
+        return (
+            build_solution_comparison_figure(_lookup_candidates(result, normalized_ids)),
+            build_comparison_records(result, normalized_ids, profile_id=profile),
+        )
 
     @app.callback(
         Output("catalog-download", "data"),
@@ -305,7 +408,11 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
         State("feasible-only-checklist", "value"),
         State("max-cost-input", "value"),
         State("min-quality-input", "value"),
+        State("min-flow-input", "value"),
         State("min-resilience-input", "value"),
+        State("min-cleaning-input", "value"),
+        State("min-operability-input", "value"),
+        State("top-n-family-input", "value"),
         State("fallback-filter-dropdown", "value"),
         State("weight-cost", "value"),
         State("weight-quality", "value"),
@@ -322,7 +429,11 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
         feasible_only: list[str],
         max_cost: Any,
         min_quality: Any,
+        min_flow: Any,
         min_resilience: Any,
+        min_cleaning: Any,
+        min_operability: Any,
+        top_n_per_family: Any,
         fallback_filter: str,
         cost_weight: Any,
         quality_weight: Any,
@@ -349,12 +460,34 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
             feasible_only="feasible_only" in (feasible_only or []),
             max_cost=max_cost,
             min_quality=min_quality,
+            min_flow=min_flow,
             min_resilience=min_resilience,
+            min_cleaning=min_cleaning,
+            min_operability=min_operability,
+            top_n_per_family=top_n_per_family,
             fallback_filter=fallback_filter,
         )
         return _send_text_download(
             json.dumps(view_state["ranked_records"], indent=2, ensure_ascii=False),
             "ranked_catalog.json",
+        )
+
+    @app.callback(
+        Output("comparison-download", "data"),
+        Input("export-comparison-button", "n_clicks"),
+        State("compare-candidates-dropdown", "value"),
+        State("profile-dropdown", "value"),
+        prevent_initial_call=True,
+    )
+    def _export_comparison(n_clicks: Any, candidate_ids: Any, profile: str) -> Any:
+        if not n_clicks or not result:
+            return None
+        records = build_comparison_records(result, _normalize_compare_ids(candidate_ids), profile_id=profile)
+        if not records:
+            return None
+        return _send_text_download(
+            pd.DataFrame(records).to_csv(index=False),
+            f"comparison_{profile}.csv",
         )
 
     @app.callback(
@@ -403,7 +536,11 @@ def build_catalog_view_state(
     feasible_only: bool = False,
     max_cost: Any = None,
     min_quality: Any = None,
+    min_flow: Any = None,
     min_resilience: Any = None,
+    min_cleaning: Any = None,
+    min_operability: Any = None,
+    top_n_per_family: Any = None,
     fallback_filter: str | None = None,
     current_selected_id: str | None = None,
     current_compare_ids: list[str] | str | None = None,
@@ -423,7 +560,11 @@ def build_catalog_view_state(
         feasible_only=feasible_only,
         max_cost=max_cost,
         min_quality=min_quality,
+        min_flow=min_flow,
         min_resilience=min_resilience,
+        min_cleaning=min_cleaning,
+        min_operability=min_operability,
+        top_n_per_family=top_n_per_family,
         fallback_filter=fallback_filter,
     )
     selected_candidate_id = select_visible_candidate_id(
@@ -437,7 +578,11 @@ def build_catalog_view_state(
             feasible_only=feasible_only,
             max_cost=max_cost,
             min_quality=min_quality,
+            min_flow=min_flow,
             min_resilience=min_resilience,
+            min_cleaning=min_cleaning,
+            min_operability=min_operability,
+            top_n_per_family=top_n_per_family,
             fallback_filter=fallback_filter,
         ),
     )
@@ -467,7 +612,11 @@ def filter_catalog_records(
     feasible_only: bool = False,
     max_cost: Any = None,
     min_quality: Any = None,
+    min_flow: Any = None,
     min_resilience: Any = None,
+    min_cleaning: Any = None,
+    min_operability: Any = None,
+    top_n_per_family: Any = None,
     fallback_filter: str | None = None,
 ) -> list[dict[str, Any]]:
     filtered = list(records)
@@ -479,18 +628,35 @@ def filter_catalog_records(
         filtered = [record for record in filtered if float(record["install_cost"]) <= float(max_cost)]
     if min_quality not in (None, ""):
         filtered = [record for record in filtered if float(record["quality_score_raw"]) >= float(min_quality)]
+    if min_flow not in (None, ""):
+        filtered = [record for record in filtered if float(record["flow_out_score"]) >= float(min_flow)]
     if min_resilience not in (None, ""):
         filtered = [record for record in filtered if float(record["resilience_score"]) >= float(min_resilience)]
+    if min_cleaning not in (None, ""):
+        filtered = [record for record in filtered if float(record["cleaning_score"]) >= float(min_cleaning)]
+    if min_operability not in (None, ""):
+        filtered = [record for record in filtered if float(record["operability_score"]) >= float(min_operability)]
     if fallback_filter == "NO_FALLBACK":
         filtered = [record for record in filtered if int(record["fallback_component_count"]) == 0]
     if fallback_filter == "WITH_FALLBACK":
         filtered = [record for record in filtered if int(record["fallback_component_count"]) > 0]
+    if top_n_per_family not in (None, ""):
+        limit = max(1, int(top_n_per_family))
+        grouped: dict[str, list[dict[str, Any]]] = {}
+        for record in filtered:
+            grouped.setdefault(str(record["topology_family"]), []).append(record)
+        filtered = [record for family_records in grouped.values() for record in family_records[:limit]]
     return filtered
 
 
-def build_candidate_detail(result: dict[str, Any] | None, candidate_id: str | None) -> dict[str, Any]:
+def build_candidate_detail(
+    result: dict[str, Any] | None,
+    candidate_id: str | None,
+    *,
+    profile_id: str | None = None,
+) -> dict[str, Any]:
     if not result or not candidate_id:
-        return {"cytoscape_elements": [], "breakdown": {}, "summary": {}, "route_rows": []}
+        return {"cytoscape_elements": [], "breakdown": {}, "summary": {}, "route_rows": [], "route_highlights": {}}
     candidate = next(item for item in result["catalog"] if item["candidate_id"] == candidate_id)
     metrics = candidate["metrics"]
     route_rows = [
@@ -505,11 +671,13 @@ def build_candidate_detail(result: dict[str, Any] | None, candidate_id: str | No
             "total_loss_lpm_equiv": route.get("total_loss_lpm_equiv"),
             "bottleneck_component_id": route.get("bottleneck_component_id"),
             "critical_consequence": route.get("critical_consequence"),
+            "path_link_ids": route.get("path_link_ids", []),
         }
         for route in metrics.get("route_metrics", [])
     ]
     return {
         "cytoscape_elements": candidate["render"]["cytoscape_elements"],
+        "route_highlights": candidate["render"].get("route_highlights", {}),
         "summary": {
             "candidate_id": candidate_id,
             "topology_family": candidate["topology_family"],
@@ -518,7 +686,12 @@ def build_candidate_detail(result: dict[str, Any] | None, candidate_id: str | No
             "engine_used": metrics.get("engine_used"),
             "engine_mode": metrics.get("engine_mode"),
             "install_cost": metrics["install_cost"],
-            "score_final": _lookup_score(result, candidate_id),
+            "fallback_cost": metrics.get("fallback_cost"),
+            "fallback_component_count": metrics.get("fallback_component_count"),
+            "feasible": metrics.get("feasible"),
+            "infeasibility_reason": metrics.get("infeasibility_reason"),
+            "critical_routes": _critical_routes(metrics.get("route_metrics", [])),
+            "score_final": _lookup_score(result, candidate_id, profile_id=profile_id),
         },
         "route_rows": route_rows,
         "breakdown": {
@@ -535,6 +708,10 @@ def build_candidate_detail(result: dict[str, Any] | None, candidate_id: str | No
             "operability_score": metrics["operability_score"],
             "cleaning_score": metrics["cleaning_score"],
             "fallback_component_count": metrics["fallback_component_count"],
+            "infeasibility_reason": metrics.get("infeasibility_reason"),
+            "constraint_failure_count": metrics.get("constraint_failure_count"),
+            "constraint_failure_categories": metrics.get("constraint_failure_categories", {}),
+            "constraint_failures": metrics.get("constraint_failures", []),
             "quality_score_breakdown": metrics.get("quality_score_breakdown", []),
             "quality_flags": metrics.get("quality_flags", []),
             "rules_triggered": metrics.get("rules_triggered", []),
@@ -580,6 +757,68 @@ def _lookup_candidates(result: dict[str, Any] | None, candidate_ids: list[str]) 
     return [item for item in result["catalog"] if item["candidate_id"] in wanted]
 
 
+def build_official_candidate_summary(
+    result: dict[str, Any] | None,
+    *,
+    profile_id: str,
+    candidate_id: str | None,
+) -> dict[str, Any]:
+    if not result or not candidate_id:
+        return {}
+    candidate = next(item for item in result["catalog"] if item["candidate_id"] == candidate_id)
+    metrics = candidate["metrics"]
+    return {
+        "candidate_id": candidate_id,
+        "active_profile_id": profile_id,
+        "topology_family": candidate["topology_family"],
+        "generation_source": candidate.get("generation_source"),
+        "lineage_label": candidate.get("generation_metadata", {}).get("lineage_label"),
+        "feasible": bool(metrics.get("feasible")),
+        "infeasibility_reason": metrics.get("infeasibility_reason"),
+        "install_cost": float(metrics.get("install_cost", 0.0)),
+        "fallback_cost": float(metrics.get("fallback_cost", 0.0)),
+        "total_cost": round(float(metrics.get("install_cost", 0.0)) + float(metrics.get("fallback_cost", 0.0)), 3),
+        "score_final": _lookup_score(result, candidate_id, profile_id=profile_id),
+        "engine_used": metrics.get("engine_used"),
+        "engine_mode": metrics.get("engine_mode"),
+        "fallback_component_count": int(metrics.get("fallback_component_count", 0)),
+        "quality_flags": metrics.get("quality_flags", []),
+        "critical_routes": _critical_routes(metrics.get("route_metrics", [])),
+    }
+
+
+def build_comparison_records(
+    result: dict[str, Any] | None,
+    candidate_ids: list[str],
+    *,
+    profile_id: str,
+) -> list[dict[str, Any]]:
+    if not result:
+        return []
+    records = []
+    for item in _lookup_candidates(result, candidate_ids):
+        metrics = item["metrics"]
+        records.append(
+            {
+                "candidate_id": item["candidate_id"],
+                "topology_family": item["topology_family"],
+                "generation_source": item.get("generation_source"),
+                "score_final": _lookup_score(result, item["candidate_id"], profile_id=profile_id),
+                "feasible": bool(metrics.get("feasible")),
+                "infeasibility_reason": metrics.get("infeasibility_reason"),
+                "install_cost": float(metrics.get("install_cost", 0.0)),
+                "fallback_cost": float(metrics.get("fallback_cost", 0.0)),
+                "quality_score_raw": float(metrics.get("quality_score_raw", 0.0)),
+                "flow_out_score": float(metrics.get("flow_out_score", 0.0)),
+                "resilience_score": float(metrics.get("resilience_score", 0.0)),
+                "cleaning_score": float(metrics.get("cleaning_score", 0.0)),
+                "operability_score": float(metrics.get("operability_score", 0.0)),
+                "fallback_component_count": int(metrics.get("fallback_component_count", 0)),
+            }
+        )
+    return records
+
+
 def _safe_run_pipeline(scenario_dir: str | Path) -> tuple[dict[str, Any] | None, str | None]:
     try:
         return run_decision_pipeline(scenario_dir), None
@@ -592,6 +831,31 @@ def _table(component_id: str, frame: pd.DataFrame) -> Any:
         id=component_id,
         columnDefs=[{"field": column} for column in frame.columns],
         rowData=frame.to_dict("records"),
+        dashGridOptions={"pagination": True, "animateRows": True},
+    )
+
+
+def _comparison_grid(records: list[dict[str, Any]]) -> Any:
+    columns = [
+        {"field": "candidate_id"},
+        {"field": "topology_family"},
+        {"field": "generation_source"},
+        {"field": "score_final"},
+        {"field": "feasible"},
+        {"field": "infeasibility_reason"},
+        {"field": "install_cost"},
+        {"field": "fallback_cost"},
+        {"field": "quality_score_raw"},
+        {"field": "flow_out_score"},
+        {"field": "resilience_score"},
+        {"field": "cleaning_score"},
+        {"field": "operability_score"},
+        {"field": "fallback_component_count"},
+    ]
+    return dag.AgGrid(
+        id="comparison-grid",
+        columnDefs=columns,
+        rowData=records,
         dashGridOptions={"pagination": True, "animateRows": True},
     )
 
@@ -609,8 +873,13 @@ def _catalog_grid(records: list[dict[str, Any]]) -> Any:
         {"field": "score_final"},
         {"field": "install_cost"},
         {"field": "quality_score_raw"},
+        {"field": "flow_out_score"},
         {"field": "resilience_score"},
+        {"field": "cleaning_score"},
+        {"field": "operability_score"},
         {"field": "fallback_component_count"},
+        {"field": "infeasibility_reason"},
+        {"field": "constraint_failure_count"},
     ]
     return dag.AgGrid(
         id="catalog-grid",
@@ -632,6 +901,7 @@ def _route_grid(records: list[dict[str, Any]]) -> Any:
         {"field": "total_loss_lpm_equiv"},
         {"field": "bottleneck_component_id"},
         {"field": "critical_consequence"},
+        {"field": "path_link_ids"},
     ]
     return dag.AgGrid(
         id="route-metrics-grid",
@@ -641,6 +911,41 @@ def _route_grid(records: list[dict[str, Any]]) -> Any:
     )
 
 
+def _route_dropdown_options(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [{"label": str(record["route_id"]), "value": str(record["route_id"])} for record in records]
+
+
+def _default_route_highlight(records: list[dict[str, Any]]) -> str | None:
+    if not records:
+        return None
+    ranked = sorted(
+        records,
+        key=lambda record: (
+            bool(record.get("feasible", True)),
+            float(record.get("hydraulic_slack_lpm") or 0.0),
+            str(record.get("route_id")),
+        ),
+    )
+    return str(ranked[0]["route_id"])
+
+
+def _build_cytoscape_stylesheet(route_highlights: dict[str, Any], route_id: str | None) -> list[dict[str, Any]]:
+    stylesheet = [
+        {"selector": "node", "style": {"background-color": "#1f77b4", "label": "data(id)", "color": "#ffffff"}},
+        {"selector": "edge", "style": {"line-color": "#9aa4af", "width": 3, "curve-style": "bezier"}},
+    ]
+    if not route_id:
+        return stylesheet
+    for link_id in route_highlights.get(route_id, []):
+        stylesheet.append(
+            {
+                "selector": f'edge[id = "{link_id}"]',
+                "style": {"line-color": "#d94f04", "width": 7, "target-arrow-color": "#d94f04"},
+            }
+        )
+    return stylesheet
+
+
 def _weight_inputs(bundle: Any) -> Any:
     profile = bundle.weight_profiles.loc[
         bundle.weight_profiles["profile_id"] == bundle.scenario_settings["ranking"]["default_profile"]
@@ -648,12 +953,12 @@ def _weight_inputs(bundle: Any) -> Any:
     return html.Div(
         children=[
             html.H3("Pesos dinâmicos"),
-            dcc.Input(id="weight-cost", type="number", value=float(profile["cost_weight"])),
-            dcc.Input(id="weight-quality", type="number", value=float(profile["quality_weight"])),
-            dcc.Input(id="weight-flow", type="number", value=float(profile["flow_weight"])),
-            dcc.Input(id="weight-resilience", type="number", value=float(profile["resilience_weight"])),
-            dcc.Input(id="weight-cleaning", type="number", value=float(profile["cleaning_weight"])),
-            dcc.Input(id="weight-operability", type="number", value=float(profile["operability_weight"])),
+            dcc.Input(id="weight-cost", type="number", value=float(profile["cost_weight"]), persistence=True, persistence_type="session"),
+            dcc.Input(id="weight-quality", type="number", value=float(profile["quality_weight"]), persistence=True, persistence_type="session"),
+            dcc.Input(id="weight-flow", type="number", value=float(profile["flow_weight"]), persistence=True, persistence_type="session"),
+            dcc.Input(id="weight-resilience", type="number", value=float(profile["resilience_weight"]), persistence=True, persistence_type="session"),
+            dcc.Input(id="weight-cleaning", type="number", value=float(profile["cleaning_weight"]), persistence=True, persistence_type="session"),
+            dcc.Input(id="weight-operability", type="number", value=float(profile["operability_weight"]), persistence=True, persistence_type="session"),
         ],
     )
 
@@ -665,12 +970,35 @@ def _send_text_download(content: str, filename: str) -> Any:
     return {"content": content, "filename": filename}
 
 
+def _critical_routes(route_metrics: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    ranked = sorted(
+        route_metrics,
+        key=lambda route: (
+            bool(route.get("feasible", True)),
+            float(route.get("hydraulic_slack_lpm") or 0.0),
+            -float(route.get("required_flow_lpm") or 0.0),
+        ),
+    )
+    return [
+        {
+            "route_id": route.get("route_id"),
+            "feasible": route.get("feasible"),
+            "reason": route.get("reason"),
+            "hydraulic_slack_lpm": route.get("hydraulic_slack_lpm"),
+            "bottleneck_component_id": route.get("bottleneck_component_id"),
+            "critical_consequence": route.get("critical_consequence"),
+        }
+        for route in ranked[:3]
+    ]
+
+
 def _build_catalog_state_summary(
     *,
     profile_id: str,
     selected_candidate_id: str | None,
     ranked_records: list[dict[str, Any]],
     filters: dict[str, Any],
+    aggregate_summary: dict[str, Any],
 ) -> str:
     summary = {
         "profile_id": profile_id,
@@ -678,12 +1006,18 @@ def _build_catalog_state_summary(
         "visible_candidate_count": len(ranked_records),
         "top_visible_candidate_id": ranked_records[0]["candidate_id"] if ranked_records else None,
         "filters": filters,
+        "aggregate_summary": {
+            "candidate_count": aggregate_summary.get("candidate_count"),
+            "viability_rate_by_family": aggregate_summary.get("viability_rate_by_family", {}),
+            "infeasible_candidate_rate_by_reason": aggregate_summary.get("infeasible_candidate_rate_by_reason", {}),
+            "feasible_cost_distribution": aggregate_summary.get("feasible_cost_distribution", {}),
+        },
     }
     return json.dumps(summary, indent=2, ensure_ascii=False)
 
 
-def _lookup_score(result: dict[str, Any], candidate_id: str) -> float | None:
-    ranked = result.get("ranked_profiles", {}).get(result.get("default_profile_id"), [])
+def _lookup_score(result: dict[str, Any], candidate_id: str, profile_id: str | None = None) -> float | None:
+    ranked = result.get("ranked_profiles", {}).get(profile_id or result.get("default_profile_id"), [])
     for record in ranked:
         if record["candidate_id"] == candidate_id:
             return float(record.get("score_final", 0.0))
@@ -700,7 +1034,11 @@ def _filters_active(
     feasible_only: bool,
     max_cost: Any,
     min_quality: Any,
+    min_flow: Any,
     min_resilience: Any,
+    min_cleaning: Any,
+    min_operability: Any,
+    top_n_per_family: Any,
     fallback_filter: str | None,
 ) -> bool:
     return any(
@@ -709,7 +1047,11 @@ def _filters_active(
             feasible_only,
             max_cost not in (None, ""),
             min_quality not in (None, ""),
+            min_flow not in (None, ""),
             min_resilience not in (None, ""),
+            min_cleaning not in (None, ""),
+            min_operability not in (None, ""),
+            top_n_per_family not in (None, ""),
             fallback_filter not in (None, "", "ALL"),
         ]
     )

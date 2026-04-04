@@ -8,6 +8,11 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 from decision_platform.catalog.quality_rules import apply_quality_rules
+from decision_platform.catalog.viability import (
+    serialize_constraint_failures,
+    summarize_constraint_failures,
+    viable_cost_distribution,
+)
 from decision_platform.data_io.loader import ScenarioBundle
 from decision_platform.graph_generation.generator import generate_candidate_topology_bundle
 from decision_platform.graph_repair.repair import normalize_candidate
@@ -23,7 +28,7 @@ def build_solution_catalog(bundle: ScenarioBundle) -> dict[str, Any]:
     candidates = [normalize_candidate(candidate, bundle) for candidate in generation_bundle["candidates"]]
     payloads = [build_candidate_payload(candidate, bundle) for candidate in candidates]
     metrics_list = [
-        apply_quality_rules(metrics, bundle)
+        _enrich_viability_metrics(apply_quality_rules(metrics, bundle))
         for metrics in evaluate_candidates_via_bridge(payloads, bundle)
     ]
     evaluated = []
@@ -63,6 +68,16 @@ def build_solution_catalog(bundle: ScenarioBundle) -> dict[str, Any]:
                 "fallback_component_count": int(item["metrics"]["fallback_component_count"]),
                 "engine_used": item["metrics"]["engine_used"],
                 "engine_mode": item["metrics"]["engine_mode"],
+                "infeasibility_reason": item["metrics"].get("infeasibility_reason"),
+                "constraint_failure_count": int(item["metrics"].get("constraint_failure_count", 0)),
+                "constraint_failure_categories": json.dumps(
+                    item["metrics"].get("constraint_failure_categories", {}),
+                    ensure_ascii=False,
+                    sort_keys=True,
+                ),
+                "constraint_failures": serialize_constraint_failures(
+                    item["metrics"].get("constraint_failures", [])
+                ),
             }
             for item in evaluated
         ]
@@ -128,6 +143,12 @@ def export_catalog(result: dict[str, Any], output_dir: str | Path) -> dict[str, 
     summary_json = out_dir / "catalog_summary.json"
     summary_json.write_text(json.dumps(result.get("summary", {}), indent=2, ensure_ascii=False), encoding="utf-8")
     exported["catalog_summary"] = summary_json
+
+    engine_comparison = result.get("engine_comparison")
+    if engine_comparison is not None:
+        engine_comparison_json = out_dir / "engine_comparison.json"
+        engine_comparison_json.write_text(json.dumps(engine_comparison, indent=2, ensure_ascii=False), encoding="utf-8")
+        exported["engine_comparison_json"] = engine_comparison_json
 
     decision_summary = _build_decision_summary(result, selected_profile_id, selected_candidate)
     final_summary_json = out_dir / "summary.json"
@@ -258,9 +279,12 @@ def _build_catalog_summary(
 ) -> dict[str, Any]:
     family_counts: dict[str, int] = {}
     feasible_by_family: dict[str, int] = {}
+    infeasible_candidates_by_family: dict[str, int] = {}
     repaired_count = 0
     infeasible_by_reason: dict[str, int] = {}
     infeasible_routes_by_family: dict[str, int] = {}
+    feasible_costs: list[float] = []
+    feasible_costs_by_family: dict[str, list[float]] = {}
     for candidate in candidates:
         family = candidate["topology_family"]
         family_counts[family] = family_counts.get(family, 0) + 1
@@ -269,16 +293,38 @@ def _build_catalog_summary(
         family = item["topology_family"]
         if bool(item["metrics"]["feasible"]):
             feasible_by_family[family] = feasible_by_family.get(family, 0) + 1
+            total_cost = float(item["metrics"].get("install_cost", 0.0)) + float(item["metrics"].get("fallback_cost", 0.0))
+            feasible_costs.append(total_cost)
+            feasible_costs_by_family.setdefault(family, []).append(total_cost)
+        else:
+            infeasible_candidates_by_family[family] = infeasible_candidates_by_family.get(family, 0) + 1
+            reason = str(item["metrics"].get("infeasibility_reason") or "unknown")
+            infeasible_by_reason[reason] = infeasible_by_reason.get(reason, 0) + 1
         for route in item["metrics"]["route_metrics"]:
             if route.get("feasible", True):
                 continue
             reason = str(route.get("reason", "unknown"))
-            infeasible_by_reason[reason] = infeasible_by_reason.get(reason, 0) + 1
             infeasible_routes_by_family[family] = infeasible_routes_by_family.get(family, 0) + 1
+    viability_rate_by_family = {
+        family: round(feasible_by_family.get(family, 0) / max(count, 1), 4)
+        for family, count in family_counts.items()
+    }
+    infeasible_candidate_rate_by_reason = {
+        reason: round(count / max(len(evaluated), 1), 4)
+        for reason, count in sorted(infeasible_by_reason.items())
+    }
     return {
         "candidate_count": len(candidates),
         "candidates_by_family": family_counts,
         "feasible_by_family": feasible_by_family,
+        "infeasible_candidates_by_family": infeasible_candidates_by_family,
+        "viability_rate_by_family": viability_rate_by_family,
+        "infeasible_candidate_rate_by_reason": infeasible_candidate_rate_by_reason,
+        "feasible_cost_distribution": viable_cost_distribution(feasible_costs),
+        "feasible_cost_distribution_by_family": {
+            family: viable_cost_distribution(values)
+            for family, values in sorted(feasible_costs_by_family.items())
+        },
         "infeasible_routes_by_family": infeasible_routes_by_family,
         "repair_rate": round(repaired_count / max(len(candidates), 1), 4),
         "infeasible_rate_by_reason": infeasible_by_reason,
@@ -299,6 +345,19 @@ def _build_decision_summary(
         summary["selected_candidate_id"] = None
         return summary
     metrics = selected_candidate["metrics"]
+    route_hydraulic_summary = [
+        {
+            "route_id": route.get("route_id"),
+            "feasible": route.get("feasible"),
+            "reason": route.get("reason"),
+            "route_effective_q_max_lpm": route.get("route_effective_q_max_lpm"),
+            "hydraulic_slack_lpm": route.get("hydraulic_slack_lpm"),
+            "total_loss_lpm_equiv": route.get("total_loss_lpm_equiv"),
+            "bottleneck_component_id": route.get("bottleneck_component_id"),
+            "critical_consequence": route.get("critical_consequence"),
+        }
+        for route in metrics.get("route_metrics", [])
+    ]
     summary.update(
         {
             "selected_candidate_id": selected_candidate["candidate_id"],
@@ -321,8 +380,14 @@ def _build_decision_summary(
             "cleaning_total": float(metrics.get("cleaning_score", 0.0)),
             "maintenance_total": float(metrics.get("maintenance_score", 0.0)),
             "fallback_component_count": int(metrics.get("fallback_component_count", 0)),
+            "infeasibility_reason": metrics.get("infeasibility_reason"),
+            "constraint_failure_count": int(metrics.get("constraint_failure_count", 0)),
+            "constraint_failure_categories": metrics.get("constraint_failure_categories", {}),
+            "constraint_failures": metrics.get("constraint_failures", []),
+            "mandatory_failed_route_ids": metrics.get("mandatory_failed_route_ids", []),
             "route_count": len(metrics.get("route_metrics", [])),
             "bom_component_count": int(metrics.get("bom_summary", {}).get("total_components", 0)),
+            "route_hydraulic_summary": route_hydraulic_summary,
         }
     )
     return summary
@@ -437,3 +502,9 @@ def _build_png(render_payload: dict[str, Any], output_path: Path) -> None:
     fig.tight_layout()
     fig.savefig(output_path, dpi=140, bbox_inches="tight")
     plt.close(fig)
+
+
+def _enrich_viability_metrics(metrics: dict[str, Any]) -> dict[str, Any]:
+    enriched = dict(metrics)
+    enriched.update(summarize_constraint_failures(enriched))
+    return enriched

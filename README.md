@@ -126,6 +126,35 @@ $env:JULIA_DEPOT_PATH = (Resolve-Path 'julia_depot_runtime')
 python -m decision_platform.ui_dash.app
 ```
 
+Smoke rápido da `decision_platform`:
+
+```powershell
+$env:PYTHONPATH = 'src'
+.\.venv\Scripts\python.exe -m pytest tests\decision_platform -m fast -q
+```
+
+Suíte sem Julia real:
+
+```powershell
+$env:PYTHONPATH = 'src'
+.\.venv\Scripts\python.exe -m pytest tests\decision_platform -m "not requires_julia" -q
+```
+
+Suíte com Julia real:
+
+```powershell
+$env:PYTHONPATH = 'src'
+$env:JULIA_DEPOT_PATH = (Resolve-Path 'julia_depot_runtime')
+.\.venv\Scripts\python.exe -m pytest tests\decision_platform -m requires_julia -q
+```
+
+UI e view-state:
+
+```powershell
+$env:PYTHONPATH = 'src'
+.\.venv\Scripts\python.exe -m pytest tests\decision_platform -m ui -q
+```
+
 Dependências:
 - base: `pip install -r requirements.txt`
 - UI completa: `pip install -e .[ui]`
@@ -142,7 +171,10 @@ Os comandos abaixo foram executados com sucesso neste workspace:
 .\.venv\Scripts\python.exe -m agri_circuit_optimizer.solve.run_case --scenario data/scenario/example --dry-run
 .\.venv\Scripts\python.exe -m agri_circuit_optimizer.solve.run_case --scenario data/scenario/maquete_core --dry-run
 .\.venv\Scripts\python.exe -m agri_circuit_optimizer.solve.run_case --scenario data/scenario/maquete_core --output-dir data/output/maquete_core
-.\.venv\Scripts\python.exe -m pytest tests\decision_platform -p no:tmpdir --basetemp tests/_tmp/pytest-basetemp-full -vv -s
+.\.venv\Scripts\python.exe -m pytest tests\decision_platform -m "not requires_julia" -q
+$env:JULIA_DEPOT_PATH = (Resolve-Path 'julia_depot_runtime')
+.\.venv\Scripts\python.exe -m pytest tests\decision_platform -m requires_julia -q
+.\.venv\Scripts\python.exe -m decision_platform.api.run_pipeline --scenario data/decision_platform/maquete_v2 --output-dir data/output/decision_platform/maquete_v2
 ```
 
 Observações:
@@ -153,6 +185,8 @@ Observações:
 - Julia, `WaterModels`, `JuMP` e `HiGHS` estão ativos nesta máquina via `julia_depot_runtime/`.
 - `data/decision_platform/maquete_v2/scenario_settings.yaml` agora é `fail closed`: se `WaterModels` não estiver disponível e `fallback: none`, o pipeline falha com mensagem clara.
 - O stack real do Dash está ativo na `.venv` e a UI é testada com o runtime real.
+- A bateria atual válida da `decision_platform` está em `23 passed`: `21 passed` sem `requires_julia` e `2 passed` em `requires_julia`.
+- O pipeline exporta `engine_comparison.json`, motivos de inviabilidade por candidato e métricas agregadas de viabilidade/custo por família.
 
 ## Candidato selecionado oficial
 
@@ -234,12 +268,16 @@ Na UI:
 - bridge Python -> Julia com `fail closed` respeitando o contrato do cenário
 - fallback explícito e rastreável quando o cenário permitir `python_emulated_julia`
 - catálogo com soluções viáveis e inviáveis
+- auditoria explícita do engine Julia real versus `python_emulated_julia`
+- `engine_comparison.json` com diff de decisão, ranking e métricas por rota
 - ranking multicritério por `weight_profiles.csv`
 - renderização 2D e comparação por radar
 - UI Dash com abas de dados, execução, catálogo, comparação, circuito e escolha final
+- UI com persistência simples em sessão para perfil, filtros e pesos
+- UI com resumo do candidato oficial, comparação lado a lado, export de comparação e destaque de rota no circuito
 - `quality_rules.csv` aplicado de verdade no score com breakdown, flags e regras disparadas
 - logs de seleção de componentes por candidato
-- métricas de geração por família, viabilidade por família e motivos de inviabilidade
+- métricas de geração por família, viabilidade por família, distribuição de custo viável e motivos de inviabilidade
 
 ## Relatórios gerados
 
@@ -271,6 +309,7 @@ Em `data/output/decision_platform/maquete_v2/`:
 - `ranked_profiles.json`
 - `ranking_profiles.json`
 - `catalog_summary.json`
+- `engine_comparison.json`
 - `selected_candidate.json`
 - `selected_candidate_routes.json`
 - `selected_candidate_bom.csv`
@@ -278,6 +317,8 @@ Em `data/output/decision_platform/maquete_v2/`:
 - `selected_candidate_render.json`
 - `selected_candidate.svg`
 - `selected_candidate.png`
+- `ui_validation/README.md`
+- `ui_validation/*.png`
 - um diretório por candidato com `solution.json` e `bom.csv`
 
 Os relatórios de rota incluem:

@@ -1,7 +1,12 @@
 from __future__ import annotations
 
+import pytest
+
 from decision_platform.data_io.loader import load_scenario_bundle
 from decision_platform.graph_generation.generator import generate_candidate_topologies, generate_candidate_topology_bundle
+
+
+pytestmark = [pytest.mark.fast]
 
 
 def test_generator_creates_multiple_families_and_mutations() -> None:

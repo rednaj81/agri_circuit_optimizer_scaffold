@@ -1,6 +1,11 @@
 from __future__ import annotations
 
+import pytest
+
 from decision_platform.data_io.loader import load_scenario_bundle
+
+
+pytestmark = [pytest.mark.fast]
 
 
 def test_maquete_v2_loader_reads_full_contract() -> None:

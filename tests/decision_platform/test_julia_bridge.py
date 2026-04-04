@@ -11,6 +11,7 @@ from decision_platform.scenario_engine.installer import build_candidate_payload
 from tests.decision_platform.scenario_utils import cleanup_scenario_copy, prepare_scenario_copy
 
 
+@pytest.mark.fast
 def test_bridge_fails_closed_when_fallback_is_none(monkeypatch) -> None:
     bundle = load_scenario_bundle("data/decision_platform/maquete_v2")
     candidate = generate_candidate_topologies(bundle)[0]
@@ -25,6 +26,7 @@ def test_bridge_fails_closed_when_fallback_is_none(monkeypatch) -> None:
         assert "fallback 'none'" in str(exc)
 
 
+@pytest.mark.fast
 def test_bridge_falls_back_when_python_emulation_is_allowed(monkeypatch) -> None:
     scenario_dir = prepare_scenario_copy(
         "data/decision_platform/maquete_v2",
@@ -45,6 +47,7 @@ def test_bridge_falls_back_when_python_emulation_is_allowed(monkeypatch) -> None
         cleanup_scenario_copy(scenario_dir)
 
 
+@pytest.mark.fast
 def test_bridge_uses_real_julia_when_available(monkeypatch) -> None:
     scenario_dir = prepare_scenario_copy(
         "data/decision_platform/maquete_v2",
