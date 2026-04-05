@@ -53,7 +53,7 @@ A `phase_3` deve avançar em fila/background runs, isolamento por execução, st
 ## Riscos operacionais remanescentes
 
 - o workspace local continua com arquivos modificados ou não rastreados fora desta transição (`AGENTS.md`, `docs/codex_dual_agent_runtime/phase_0_validation_manifest.json`, `.codex/`, `docs/codex_dual_agent_hydraulic_autonomy_bundle/*`, `docs/codex_dual_agent_runtime/supervisor_guidance.json`)
-- o ambiente local ainda emite warnings de `pytest` para `cache_dir` e avisos de permissão para alguns diretórios temporários fora do escopo funcional
+- o ambiente local ainda pode emitir avisos de permissão para alguns diretórios temporários fora do escopo funcional, sem impacto no gate funcional ativo
 
 ## Regra prática para o próximo papel
 

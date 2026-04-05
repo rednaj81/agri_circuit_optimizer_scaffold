@@ -39,7 +39,6 @@ testpaths = ["tests"]
 pythonpath = ["src"]
 norecursedirs = ["tests/_tmp"]
 addopts = "-p no:cacheprovider"
-cache_dir = "tests/_tmp/.pytest_cache"
 markers = [
   "fast: quick tests for local smoke and low-cost validation",
   "requires_julia: integration tests that require the real Julia + WaterModels runtime",

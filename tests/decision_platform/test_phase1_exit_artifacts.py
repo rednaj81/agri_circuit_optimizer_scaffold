@@ -14,6 +14,7 @@ SUPERVISOR_GUIDANCE_PATH = REPO_ROOT / "docs" / "codex_dual_agent_runtime" / "su
 PHASE1_MANIFEST_PATH = REPO_ROOT / "docs" / "codex_dual_agent_runtime" / "phase_0_validation_manifest.json"
 PHASE1_HANDOFF_PATH = REPO_ROOT / "docs" / "2026-04-05_phase1_wave5_exit_handoff.md"
 PHASE3_HANDOFF_PATH = REPO_ROOT / "docs" / "2026-04-05_phase3_wave1_queue_open_handoff.md"
+PYPROJECT_PATH = REPO_ROOT / "pyproject.toml"
 PHASE_PLAN_PATH = (
     REPO_ROOT
     / "docs"
@@ -36,6 +37,7 @@ def test_phase1_exit_artifacts_are_plain_utf8_without_bom() -> None:
         PHASE1_MANIFEST_PATH,
         PHASE1_HANDOFF_PATH,
         PHASE3_HANDOFF_PATH,
+        PYPROJECT_PATH,
         PHASE_PLAN_PATH,
     ):
         _assert_utf8_without_bom(path)
@@ -46,6 +48,7 @@ def test_phase1_exit_artifacts_have_consistent_closed_state() -> None:
     manifest = json.loads(_assert_utf8_without_bom(PHASE1_MANIFEST_PATH))
     handoff_text = _assert_utf8_without_bom(PHASE1_HANDOFF_PATH)
     phase3_handoff_text = _assert_utf8_without_bom(PHASE3_HANDOFF_PATH)
+    pyproject_text = _assert_utf8_without_bom(PYPROJECT_PATH)
     phase_plan = yaml.safe_load(_assert_utf8_without_bom(PHASE_PLAN_PATH))
 
     assert guidance["phase_1_continuation_policy"]["additional_functional_waves_allowed"] is False
@@ -74,6 +77,8 @@ def test_phase1_exit_artifacts_have_consistent_closed_state() -> None:
     assert manifest["phase_3_current_validation"]["status"] == "active"
     assert manifest["phase_3_current_validation"]["active_functional_phase"] is True
     assert manifest["phase_3_current_validation"]["sealed_baselines"] == ["phase_1", "phase_2"]
+    assert "cache_dir =" not in pyproject_text
+    assert 'addopts = "-p no:cacheprovider"' in pyproject_text
 
     assert "Wave 7 is a corrective regression fix only" in handoff_text
     assert "No additional functional wave should be scheduled inside `phase_1`" in handoff_text
