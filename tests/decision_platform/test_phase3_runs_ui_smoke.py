@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from decision_platform.api.run_pipeline import create_run_job, run_next_queued_job
+from decision_platform.api.run_pipeline import create_run_job, rerun_run_job, run_next_queued_job
 from decision_platform.ui_dash.app import build_app
 from tests.decision_platform.scenario_utils import (
     cleanup_scenario_copy,
@@ -44,6 +44,8 @@ def test_runs_tab_reopens_persisted_operational_telemetry() -> None:
                 allow_diagnostic_python_emulation=True,
             )
             completed_job = run_next_queued_job(queue_root=queue_root)
+            rerun_job = rerun_run_job(created_job["run_id"], queue_root=queue_root)
+            rerun_result = run_next_queued_job(queue_root=queue_root)
             app = build_app(scenario_dir, run_queue_root=queue_root)
 
         runs_summary = _find_component_by_id(app.layout, "run-jobs-summary")
@@ -54,27 +56,35 @@ def test_runs_tab_reopens_persisted_operational_telemetry() -> None:
         summary_payload = json.loads(runs_summary.children)
         detail_payload = json.loads(run_detail.children)
         assert completed_job is not None
+        assert rerun_result is not None
         assert summary_payload["queue_state"] == "idle"
-        assert summary_payload["latest_run_id"] == created_job["run_id"]
-        assert summary_payload["runs"][0]["failure_reason"] is None
-        assert detail_payload["selected_run_id"] == created_job["run_id"]
+        assert summary_payload["latest_run_id"] == rerun_job["run_id"]
+        assert len(summary_payload["runs"]) == 2
+        rerun_summary = next(run for run in summary_payload["runs"] if run["run_id"] == rerun_job["run_id"])
+        assert rerun_summary["lineage"]["is_rerun"] is True
+        assert rerun_summary["lineage"]["source_run_id"] == created_job["run_id"]
+        assert rerun_summary["evidence_summary"]["has_summary_json"] is True
+        assert rerun_summary["evidence_summary"]["final_status_recorded"] is True
+        assert detail_payload["selected_run_id"] == rerun_job["run_id"]
+        assert detail_payload["rerun_of_run_id"] == created_job["run_id"]
         assert detail_payload["engine_requested"] == "watermodels_jl"
         assert detail_payload["engine_used"] == "python_emulated_julia"
         assert detail_payload["execution_mode"] == "diagnostic"
         assert detail_payload["policy_mode"] == "diagnostic_override_probe_disabled"
         assert detail_payload["failure_reason"] is None
-        assert detail_payload["source_bundle_reference_path"] == created_job["source_bundle_reference_path"]
-        assert detail_payload["source_bundle_reference"]["run_id"] == created_job["run_id"]
+        assert detail_payload["source_bundle_reference_path"] == rerun_job["source_bundle_reference_path"]
+        assert detail_payload["source_bundle_reference"]["run_id"] == rerun_job["run_id"]
+        assert detail_payload["source_bundle_reference"]["rerun_source"]["source_run_id"] == created_job["run_id"]
         assert detail_payload["source_bundle_reference"]["scenario_provenance"]["bundle_manifest"]
-        assert detail_payload["evidence"]["run_id"] == created_job["run_id"]
+        assert detail_payload["evidence"]["run_id"] == rerun_job["run_id"]
         assert detail_payload["evidence"]["artifact_expectation"] == "summary_artifacts_expected"
         assert detail_payload["evidence"]["has_summary_json"] is True
         assert detail_payload["evidence"]["run_dir_isolated"] is True
         assert detail_payload["evidence"]["final_status_logged"] is True
         assert detail_payload["telemetry"]["duration_s"] == detail_payload["duration_s"]
         assert detail_payload["inspection"]["queue_root"] == str(queue_root.resolve())
-        assert detail_payload["inspection"]["artifacts_dir"] == completed_job["artifacts_dir"]
-        assert detail_payload["inspection"]["source_bundle_reference_path"] == created_job["source_bundle_reference_path"]
+        assert detail_payload["inspection"]["artifacts_dir"] == rerun_result["artifacts_dir"]
+        assert detail_payload["inspection"]["source_bundle_reference_path"] == rerun_job["source_bundle_reference_path"]
     finally:
         cleanup_scenario_copy(queue_root)
         cleanup_scenario_copy(scenario_dir)

@@ -232,6 +232,8 @@ def summarize_run_jobs(queue_root: str | Path = DEFAULT_RUN_QUEUE_ROOT) -> dict[
                 "source_bundle_root": job["source_bundle_root"],
                 "artifacts_dir": job["artifacts_dir"],
                 "rerun_of_run_id": job.get("rerun_of_run_id"),
+                "lineage": _build_run_job_lineage_summary(job),
+                "evidence_summary": _build_run_job_evidence_summary(job),
                 "error": job.get("error"),
                 "failure_reason": job.get("failure_reason"),
             }
@@ -974,6 +976,36 @@ def _build_run_job_evidence(
         "event_count": len(event_statuses),
         "event_statuses": event_statuses,
         "final_status_recorded": bool(event_statuses) and event_statuses[-1] == status,
+    }
+
+
+def _build_run_job_lineage_summary(job: dict[str, Any]) -> dict[str, Any]:
+    rerun_source = dict(job.get("rerun_source") or {})
+    return {
+        "is_rerun": bool(job.get("rerun_of_run_id")),
+        "source_run_id": job.get("rerun_of_run_id"),
+        "source_status": rerun_source.get("source_status"),
+        "source_execution_mode": rerun_source.get("source_execution_mode"),
+        "source_finished_at": rerun_source.get("source_finished_at"),
+    }
+
+
+def _build_run_job_evidence_summary(job: dict[str, Any]) -> dict[str, Any]:
+    log_path = Path(job["log_path"])
+    artifacts_dir = Path(job["artifacts_dir"])
+    events = _read_run_events(Path(job["events_path"]))
+    log_lines = _read_log_lines(log_path)
+    artifacts = job.get("artifacts") or _build_run_artifact_manifest(artifacts_dir)
+    evidence = _build_run_job_evidence(job, events=events, log_path=log_path, log_lines=log_lines, artifacts=artifacts)
+    return {
+        "artifact_expectation": evidence["artifact_expectation"],
+        "artifacts_dir_exists": evidence["artifacts_dir_exists"],
+        "artifact_file_count": evidence["artifact_file_count"],
+        "has_summary_json": evidence["has_summary_json"],
+        "has_selected_candidate_json": evidence["has_selected_candidate_json"],
+        "log_exists": evidence["log_exists"],
+        "final_status_logged": evidence["final_status_logged"],
+        "final_status_recorded": evidence["final_status_recorded"],
     }
 
 

@@ -115,6 +115,8 @@ def test_phase3_queue_acceptance_serial_jobs_are_isolated_and_auditable() -> Non
         assert final_summary["worker_mode"] == "serial"
         assert final_summary["status_counts"]["completed"] == 2
         assert final_summary["status_counts"]["queued"] == 0
+        assert all(run["lineage"]["is_rerun"] is False for run in final_summary["runs"])
+        assert all(run["evidence_summary"]["has_summary_json"] is True for run in final_summary["runs"])
 
         for completed_job in (first_result, second_result):
             run_dir = Path(completed_job["run_dir"])
@@ -430,6 +432,11 @@ def test_phase3_queue_acceptance_reopens_persisted_run_state_for_inspection() ->
         assert reopened_snapshot["summary"]["status_counts"]["completed"] == 1
         assert reopened_snapshot["summary"]["status_counts"]["canceled"] == 1
         assert reopened_snapshot["selected_run_id"] == canceled_job["run_id"]
+        assert reopened_snapshot["selected_run_summary"]["run_id"] == canceled_job["run_id"]
+        assert reopened_snapshot["selected_run_summary"]["lineage"]["source_run_id"] == completed_candidate["run_id"]
+        assert reopened_snapshot["selected_run_summary"]["lineage"]["source_status"] == "completed"
+        assert reopened_snapshot["selected_run_summary"]["evidence_summary"]["artifact_file_count"] == 0
+        assert reopened_snapshot["selected_run_summary"]["evidence_summary"]["final_status_logged"] is True
         assert reopened_snapshot["selected_run_detail"]["status"] == "canceled"
         assert reopened_snapshot["selected_run_detail"]["rerun_of_run_id"] == completed_candidate["run_id"]
         assert reopened_snapshot["selected_run_detail"]["source_bundle_reference_path"] == canceled_job["source_bundle_reference_path"]
@@ -562,6 +569,11 @@ def test_phase3_queue_acceptance_app_can_cancel_and_rerun_via_callbacks() -> Non
         assert rerun_summary["status_counts"]["completed"] == 2
         assert rerun_summary["status_counts"]["canceled"] == 1
         assert json.loads(completed_rerun_from_canceled[3])["rerun_of_run_id"] == canceled_result[2]
+        rerun_summary_entry = next(run for run in rerun_summary["runs"] if run["run_id"] == rerun_result[2])
+        assert rerun_summary_entry["lineage"]["source_run_id"] == completed_result[2]
+        assert rerun_summary_entry["lineage"]["source_status"] == "completed"
+        assert rerun_summary_entry["evidence_summary"]["artifact_expectation"] == "no_execution_artifacts_expected"
+        assert rerun_summary_entry["evidence_summary"]["artifact_file_count"] == 0
         assert rerun_detail["status"] == "queued"
         assert rerun_detail["rerun_of_run_id"] == completed_result[2]
         assert rerun_detail["rerun_source"]["source_run_id"] == completed_result[2]

@@ -2819,10 +2819,12 @@ def build_run_jobs_snapshot(
     selected_run_id = preferred_run_id if preferred_run_id in option_values else (
         options[0]["value"] if options else None
     )
+    selected_run_summary = next((run for run in ordered_runs if run["run_id"] == selected_run_id), None)
     return {
         "summary": summary,
         "options": options,
         "selected_run_id": selected_run_id,
+        "selected_run_summary": selected_run_summary,
         "selected_run_detail": build_run_job_detail_summary(selected_run_id, queue_root=queue_root),
     }
 
