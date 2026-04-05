@@ -26,6 +26,9 @@ from decision_platform.ui_dash.app import (
     filter_catalog_records,
     render_candidate_breakdown_panel,
     render_candidate_summary_panel,
+    render_decision_contrast_panel,
+    render_decision_signal_panel,
+    render_decision_summary_panel,
     render_execution_summary_panel,
     render_run_job_detail_panel,
     render_runs_flow_panel,
@@ -253,6 +256,9 @@ def test_decision_tab_contains_advanced_sections_without_extra_primary_tabs() ->
 
     decision_tab = _find_tab_by_label(app.layout, "Decisão")
     assert decision_tab is not None
+    assert _find_component_by_id(decision_tab, "decision-summary-panel") is not None
+    assert _find_component_by_id(decision_tab, "decision-contrast-panel") is not None
+    assert _find_component_by_id(decision_tab, "decision-signal-panel") is not None
     assert _find_component_by_id(decision_tab, "compare-candidates-dropdown") is not None
     assert _find_component_by_id(decision_tab, "comparison-figure") is not None
     assert _find_component_by_id(decision_tab, "selected-candidate-dropdown") is not None
@@ -342,6 +348,45 @@ def test_primary_runs_panels_hide_raw_backend_keys_in_main_surface() -> None:
 
 
 def test_primary_decision_panels_hide_raw_metric_keys_in_main_surface() -> None:
+    decision_summary_panel = render_decision_summary_panel(
+        {
+            "candidate_id": "cand-01",
+            "decision_status": "technical_tie",
+            "technical_tie": True,
+            "feasible": True,
+            "topology_family": "hybrid_free",
+            "score_final": 91.2,
+            "total_cost": 10.5,
+            "fallback_component_count": 1,
+            "winner_reason_summary": "O candidato oficial manteve melhor equilíbrio global.",
+            "runner_up_candidate_id": "cand-02",
+        }
+    )
+    contrast_panel = render_decision_contrast_panel(
+        {
+            "decision_status": "technical_tie",
+            "technical_tie": True,
+            "runner_up_candidate_id": "cand-02",
+            "runner_up_topology_family": "hybrid_loop",
+            "runner_up_score_final": 91.2,
+            "runner_up_total_cost": 11.0,
+            "total_cost": 10.5,
+            "score_margin_delta": 0.0,
+            "key_factors": [
+                {
+                    "summary": "vencedor e runner-up ficaram empatados nos scores e nas dimensões principais."
+                }
+            ],
+        }
+    )
+    signal_panel = render_decision_signal_panel(
+        {
+            "infeasibility_reason": "mandatory_route_failure",
+            "winner_penalties": ["usa 1 componentes de fallback"],
+            "critical_routes": [{"route_id": "R001", "reason": "slack baixo"}],
+            "fallback_component_count": 1,
+        }
+    )
     selected_panel = render_candidate_summary_panel(
         {
             "candidate_id": "cand-01",
@@ -368,13 +413,23 @@ def test_primary_decision_panels_hide_raw_metric_keys_in_main_surface() -> None:
             "rules_triggered": ["route coverage ok"],
         }
     )
+    decision_text = _collect_text_content(decision_summary_panel)
+    contrast_text = _collect_text_content(contrast_panel)
+    signal_text = _collect_text_content(signal_panel)
     selected_text = _collect_text_content(selected_panel)
     breakdown_text = _collect_text_content(breakdown_panel)
 
+    assert "Technical tie" in decision_text
+    assert "Runner-up e contraste" in contrast_text
+    assert "cand-02" in contrast_text
+    assert "Empate técnico" in contrast_text
+    assert "mandatory_route_failure" in signal_text
+    assert "Rota crítica R001" in signal_text
     assert "engine_used:" not in selected_text
     assert "infeasibility_reason:" not in selected_text
     assert "quality_score_raw:" not in breakdown_text
     assert "resilience_score:" not in breakdown_text
+    assert "winner_penalties" not in signal_text
     assert "Engine de avaliação:" in selected_text
     assert "Qualidade bruta:" in breakdown_text
 

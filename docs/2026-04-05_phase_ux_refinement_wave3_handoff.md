@@ -1,41 +1,42 @@
-# Phase UX Refinement Wave 3 - Studio Business Projection
+# Phase UX Refinement Wave 3 - Decision Hierarchy Cleanup
 
 ## Objective
 
-Finish the Studio cleanup by replacing the partial node filter with an explicit business projection: `zone=internal` and `zone=hub` nodes leave the primary surface, while the main canvas stays readable through projected business routes.
+Make the top of `Decisão` answer the three first operator questions immediately: who is the official winner, who is the runner-up, and whether the situation is a `technical_tie`, while keeping dense technical breakdowns and raw state behind secondary layers.
 
 ## Delivered
 
-- Replaced the partial Studio filter with an explicit metadata-based rule that hides all nodes marked as internal or hub in the primary canvas.
-- Removed `HS`, `HD`, `J1`-`J4`, and `U1`-`U3` from the primary Studio surface and kept only business-facing nodes such as `W`, `P1`-`P4`, `M`, `I`, `S`, and `IR`.
-- Changed the primary Studio edges from raw physical links to route-based business projections built from `route_requirements`, so the canvas remains connected and understandable after collapsing internal structure.
-- Kept the technical structural editors and canonical bundle persistence intact, but moved `from_node` and `to_node` alongside the other contractual fields into progressive disclosure.
-- Updated smoke/UI coverage to protect the full hidden-node set and the existence of projected business routes in the Studio primary surface.
+- Reworked the primary `Decisão` fold so the top row now separates `Escolha oficial` from `Runner-up e contraste`, instead of mixing the winner with catalog state too early.
+- Added a dedicated `Sinais para decisão humana` panel to surface viability, penalties, critical routes, fallback pressure, and adjacent risk signals in product-facing language.
+- Kept `technical_tie` explicit in the primary decision contrast instead of leaving it implicit in deeper comparison areas.
+- Preserved `comparison`, `candidate circuit`, `breakdown`, and raw JSON, but pushed them behind disclosure or lower-priority zones so they no longer compete with the first decision read.
+- Kept ranking, winner selection, runner-up computation, and `technical_tie` logic untouched; this wave only changed the UI hierarchy and wording of the existing decision evidence.
+- Extended smoke coverage to protect the new primary decision panels and to ensure the raw backend keys stay outside the main decision surface.
 
 ## Validation
 
 ```powershell
-$env:PYTHONPATH='src;.'; .\.venv\Scripts\python.exe -m pytest tests/decision_platform/test_ui_smoke.py -q -p no:cacheprovider -k "studio and not slow" --basetemp tests/_tmp/pytest-basetemp-ux-wave3-fast
-$env:PYTHONPATH='src;.'; .\.venv\Scripts\python.exe -m pytest tests/decision_platform/test_ui_smoke.py -q -p no:cacheprovider --basetemp tests/_tmp/pytest-basetemp-ux-wave3
+$env:PYTHONPATH='src;.'; .\.venv\Scripts\python.exe -m pytest tests/decision_platform/test_ui_smoke.py -q -p no:cacheprovider -k "decision_tab_contains_advanced_sections_without_extra_primary_tabs or primary_decision_panels_hide_raw_metric_keys_in_main_surface" --basetemp tests/_tmp/pytest-basetemp-ux-wave3-targeted
+$env:PYTHONPATH='src;.'; .\.venv\Scripts\python.exe -m pytest tests/decision_platform/test_ui_smoke.py -q -p no:cacheprovider --basetemp tests/_tmp/pytest-basetemp-ux-wave3-full
 ```
 
 Result:
 
-- `8 passed, 23 deselected in 1.03s`
-- `31 passed in 379.12s`
+- `2 passed, 36 deselected in 0.57s`
+- `38 passed in 420.80s`
 
 ## Evidence
 
-- Structured Studio projection snapshot: `docs/2026-04-05_phase_ux_refinement_wave3_ui_snapshot.json`
+- Structured decision snapshot: `docs/2026-04-05_phase_ux_refinement_wave3_ui_snapshot.json`
 
 ## Scope Guardrails
 
 - No architecture reopening.
 - No replacement of Dash or Cytoscape.
-- No changes to `docs/05_data_contract.md`.
-- No changes to backend pipeline, hydraulic logic, or the Julia-only official runtime.
-- No changes to the scenario bundle files under `data/decision_platform/maquete_v2/`.
+- No change to ranking, winner selection, runner-up computation, or `technical_tie` semantics.
+- No change to the Julia-only official execution path, fail-closed behavior, or queue/runs contracts.
+- No reintroduction of `html.Pre`, raw JSON, or dense technical grids as primary decision UI.
 
 ## Honest Handoff
 
-This wave closed the remaining Studio projection gap. The primary surface is now intentionally a business view, not a thinly cleaned technical graph: internal junctions and hubs no longer appear as primary editing objects, and the canvas stays understandable because the route projection comes from canonical route metadata rather than ad hoc cosmetic hiding. The full technical structure remains available in the advanced Studio fields and in Auditoria.
+This wave stayed strictly in presentation. The real gain was reducing the cognitive jump from queue execution to human choice: the primary `Decisão` surface now leads with winner, runner-up contrast, and decision signals, while catalog depth, circuit depth, and JSON remain available but secondary. No functional ranking behavior was altered.

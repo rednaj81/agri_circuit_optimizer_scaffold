@@ -864,6 +864,7 @@ def render_decision_summary_panel(summary: dict[str, Any]) -> Any:
         return html.Div([html.H3("Escolha oficial", style={"marginTop": 0}), html.Div("Nenhum resumo decisorio disponivel.")])
     decision_status = str(summary.get("decision_status") or ("technical_tie" if summary.get("technical_tie") else "winner_clear"))
     decision_label = "Technical tie" if decision_status == "technical_tie" else "Winner claro"
+    feasibility_label = "Viável" if summary.get("feasible") else "Inviável"
     return html.Div(
         children=[
             html.H3("Escolha oficial", style={"marginTop": 0}),
@@ -872,14 +873,16 @@ def render_decision_summary_panel(summary: dict[str, Any]) -> Any:
                 children=[
                     html.Div(str(summary.get("candidate_id") or "-"), style={"fontSize": "28px", "fontWeight": 700}),
                     html.Span(decision_label, style=UI_PILL_STYLE),
+                    html.Span(feasibility_label, style=UI_PILL_STYLE),
                 ],
             ),
             html.Div(
                 style=UI_THREE_COLUMN_STYLE,
                 children=[
-                    _metric_card("Runner-up", summary.get("runner_up_candidate_id") or "-"),
-                    _metric_card("Margem", summary.get("score_margin_delta") or summary.get("score_final") or "-"),
+                    _metric_card("Família oficial", summary.get("topology_family") or "-"),
+                    _metric_card("Score final", summary.get("score_final") or "-"),
                     _metric_card("Custo oficial", summary.get("total_cost") or summary.get("winner_total_cost") or "-"),
+                    _metric_card("Fallbacks", summary.get("fallback_component_count") or 0),
                 ],
             ),
             html.Div(
@@ -889,8 +892,90 @@ def render_decision_summary_panel(summary: dict[str, Any]) -> Any:
                 style={"marginTop": "12px", "fontWeight": 700, "lineHeight": "1.5"},
             ),
             html.P(str(summary.get("winner_reason_summary") or "Sem justificativa resumida."), style={"lineHeight": "1.6"}),
-            html.H4("Fatores-chave", style={"marginBottom": "6px"}),
-            _bullet_list([str(item.get("summary")) for item in summary.get("key_factors", []) if item.get("summary")], "Sem fator-chave destacado."),
+            html.H4("Próxima ação", style={"marginBottom": "6px"}),
+            html.Div(
+                "Valide runner-up e sinais de risco antes de oficializar a exportação."
+                if summary.get("runner_up_candidate_id")
+                else "Confirme se já existe contraste suficiente para seguir com a decisão.",
+                style={"lineHeight": "1.6", "fontWeight": 700},
+            ),
+        ]
+    )
+
+
+def render_decision_contrast_panel(summary: dict[str, Any]) -> Any:
+    if not summary:
+        return html.Div([html.H3("Runner-up e contraste", style={"marginTop": 0}), html.Div("Nenhum runner-up disponivel.")])
+    decision_status = str(summary.get("decision_status") or ("technical_tie" if summary.get("technical_tie") else "winner_clear"))
+    runner_up_cost = summary.get("runner_up_total_cost")
+    winner_cost = summary.get("total_cost") or summary.get("winner_total_cost")
+    cost_delta = (
+        round(float(winner_cost) - float(runner_up_cost), 3)
+        if winner_cost not in (None, "") and runner_up_cost not in (None, "")
+        else "-"
+    )
+    difference_lines = [str(item.get("summary")) for item in summary.get("key_factors", []) if item.get("summary")]
+    if summary.get("runner_up_total_cost") not in (None, ""):
+        difference_lines.insert(0, f"Custo oficial vs runner-up: {winner_cost} vs {summary.get('runner_up_total_cost')}.")
+    contrast_summary = (
+        "Winner e runner-up seguem tecnicamente empatados; a escolha final pede leitura humana assistida."
+        if decision_status == "technical_tie"
+        else "O runner-up segue como melhor alternativa comparável, mas abaixo da escolha oficial no ranking."
+    )
+    return html.Div(
+        children=[
+            html.H3("Runner-up e contraste", style={"marginTop": 0}),
+            html.Div(str(summary.get("runner_up_candidate_id") or "-"), style={"fontSize": "24px", "fontWeight": 700}),
+            html.Div(
+                style={"display": "flex", "gap": "8px", "flexWrap": "wrap", "marginTop": "8px"},
+                children=[
+                    html.Span(str(summary.get("runner_up_topology_family") or "-"), style=UI_PILL_STYLE),
+                    html.Span("Empate técnico" if decision_status == "technical_tie" else "Alternativa próxima", style=UI_PILL_STYLE),
+                ],
+            ),
+            html.Div(
+                style=UI_THREE_COLUMN_STYLE,
+                children=[
+                    _metric_card("Margem de score", summary.get("score_margin_delta") or "-"),
+                    _metric_card("Score runner-up", summary.get("runner_up_score_final") or "-"),
+                    _metric_card("Delta de custo", cost_delta),
+                ],
+            ),
+            html.Div(contrast_summary, style={"marginTop": "12px", "fontWeight": 700, "lineHeight": "1.5"}),
+            html.H4("Diferenças relevantes", style={"marginBottom": "6px"}),
+            _bullet_list(difference_lines[:4], "Sem diferença relevante registrada."),
+        ]
+    )
+
+
+def render_decision_signal_panel(summary: dict[str, Any]) -> Any:
+    if not summary:
+        return html.Div([html.H3("Sinais para decisão humana", style={"marginTop": 0}), html.Div("Nenhum sinal disponível.")])
+    signal_lines: list[str] = []
+    infeasibility_reason = str(summary.get("infeasibility_reason") or "").strip()
+    if infeasibility_reason:
+        signal_lines.append(f"A escolha oficial ficou inviável por: {infeasibility_reason}.")
+    else:
+        signal_lines.append("A escolha oficial segue viável na leitura atual do ranking.")
+    for penalty in list(summary.get("winner_penalties", []))[:2]:
+        signal_lines.append(f"Atenção: {penalty}.")
+    for route in list(summary.get("critical_routes", []))[:2]:
+        route_id = str(route.get("route_id") or "-")
+        reason = str(route.get("reason") or "sem motivo registrado")
+        signal_lines.append(f"Rota crítica {route_id}: {reason}.")
+    return html.Div(
+        children=[
+            html.H3("Sinais para decisão humana", style={"marginTop": 0}),
+            html.Div(
+                style=UI_THREE_COLUMN_STYLE,
+                children=[
+                    _metric_card("Rotas críticas", len(summary.get("critical_routes", []) or [])),
+                    _metric_card("Penalidades", len(summary.get("winner_penalties", []) or [])),
+                    _metric_card("Fallbacks", summary.get("fallback_component_count") or 0),
+                ],
+            ),
+            html.H4("Leitura rápida", style={"marginBottom": "6px"}),
+            _bullet_list(signal_lines, "Sem sinal adicional para esta decisão."),
         ]
     )
 
@@ -1306,6 +1391,13 @@ def build_app(
                                 style=UI_TWO_COLUMN_STYLE,
                                 children=[
                                     html.Div(id="decision-summary-panel", children=render_decision_summary_panel(initial_official_summary), style=UI_CARD_STYLE),
+                                    html.Div(id="decision-contrast-panel", children=render_decision_contrast_panel(initial_official_summary), style=UI_MUTED_CARD_STYLE),
+                                ],
+                            ),
+                            html.Div(
+                                style=UI_TWO_COLUMN_STYLE,
+                                children=[
+                                    html.Div(id="decision-signal-panel", children=render_decision_signal_panel(initial_official_summary), style=UI_CARD_STYLE),
                                     html.Div(id="catalog-state-summary-panel", children=render_catalog_state_panel(_safe_json_loads(initial_catalog_summary)), style=UI_MUTED_CARD_STYLE),
                                 ],
                             ),
@@ -2782,6 +2874,8 @@ def build_app(
     @app.callback(
         Output("decision-summary-panel", "children"),
         Output("decision-summary-panel-extended", "children"),
+        Output("decision-contrast-panel", "children"),
+        Output("decision-signal-panel", "children"),
         Output("catalog-state-summary-panel", "children"),
         Output("selected-candidate-summary-panel", "children"),
         Output("candidate-breakdown-panel", "children"),
@@ -2795,11 +2889,13 @@ def build_app(
         catalog_text: str | None,
         candidate_text: str | None,
         breakdown_text: str | None,
-    ) -> tuple[Any, Any, Any, Any, Any]:
+    ) -> tuple[Any, Any, Any, Any, Any, Any, Any]:
         official_payload = _safe_json_loads(official_text)
         return (
             render_decision_summary_panel(official_payload),
             render_decision_summary_panel(official_payload),
+            render_decision_contrast_panel(official_payload),
+            render_decision_signal_panel(official_payload),
             render_catalog_state_panel(_safe_json_loads(catalog_text)),
             render_candidate_summary_panel(_safe_json_loads(candidate_text)),
             render_candidate_breakdown_panel(_safe_json_loads(breakdown_text)),
