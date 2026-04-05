@@ -1,0 +1,28 @@
+max_waves: 10
+consecutive_low_value_stop: 3
+low_value_labels:
+  - low_significance
+  - no_progress
+  - regression
+final_stabilization_wave: true
+commit_every_wave: true
+branch_strategy: keep_current_branch
+required_agents:
+  - architect
+  - developer
+  - auditor
+phases:
+  - phase_id: 0
+    name: runtime_truthfulness
+  - phase_id: 1
+    name: domain_and_persistence
+  - phase_id: 2
+    name: node_edge_studio
+  - phase_id: 3
+    name: background_queue_and_runs
+  - phase_id: 4
+    name: julia_engine_depth
+  - phase_id: 5
+    name: decision_ui_and_explainability
+  - phase_id: 6
+    name: stabilization_and_release

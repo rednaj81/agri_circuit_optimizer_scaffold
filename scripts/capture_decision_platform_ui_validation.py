@@ -1,371 +1,379 @@
 from __future__ import annotations
 
-import ctypes
-import os
-import socket
-import subprocess
-import time
-from contextlib import contextmanager
-from dataclasses import dataclass
+import argparse
+import json
+import shutil
+import sys
 from pathlib import Path
-from typing import Iterable
+from typing import Any, Callable
+from uuid import uuid4
 
-from PIL import ImageGrab
+import yaml
 
 
 ROOT = Path(__file__).resolve().parents[1]
-OUTPUT_DIR = ROOT / "data" / "output" / "decision_platform" / "ui_validation"
-README_PATH = OUTPUT_DIR / "README.md"
-CHROME_PATH = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
-URL = "http://127.0.0.1:8050"
-PYTHON_EXE = ROOT / ".venv" / "Scripts" / "python.exe"
-UI_STDOUT = OUTPUT_DIR / "ui_server_stdout.log"
-UI_STDERR = OUTPUT_DIR / "ui_server_stderr.log"
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+if str(ROOT / "src") not in sys.path:
+    sys.path.insert(0, str(ROOT / "src"))
 
-WM_CLOSE = 0x0010
-SW_RESTORE = 9
-HWND_TOPMOST = -1
-SWP_SHOWWINDOW = 0x0040
-
-MOUSEEVENTF_LEFTDOWN = 0x0002
-MOUSEEVENTF_LEFTUP = 0x0004
-MOUSEEVENTF_WHEEL = 0x0800
-
-KEYEVENTF_KEYUP = 0x0002
-VK_BACK = 0x08
-VK_TAB = 0x09
-VK_RETURN = 0x0D
-VK_SHIFT = 0x10
-VK_CONTROL = 0x11
-VK_HOME = 0x24
-VK_LEFT = 0x25
-VK_UP = 0x26
-VK_RIGHT = 0x27
-VK_DOWN = 0x28
-VK_PRIOR = 0x21
-VK_NEXT = 0x22
-VK_0 = 0x30
-VK_1 = 0x31
-VK_2 = 0x32
-VK_3 = 0x33
-VK_4 = 0x34
-VK_5 = 0x35
-VK_6 = 0x36
-VK_7 = 0x37
-VK_8 = 0x38
-VK_9 = 0x39
-VK_A = 0x41
+from decision_platform.data_io.loader import load_scenario_bundle
+from decision_platform.julia_bridge.bridge import disable_real_julia_probe
+from decision_platform.ui_dash.app import build_app
 
 
-user32 = ctypes.windll.user32
+DEFAULT_ARTIFACT_DIR = ROOT / "data" / "output" / "decision_platform" / "ui_validation"
+DEFAULT_SOURCE_SCENARIO = ROOT / "data" / "decision_platform" / "maquete_v2"
 
 
-class RECT(ctypes.Structure):
-    _fields_ = [("left", ctypes.c_long), ("top", ctypes.c_long), ("right", ctypes.c_long), ("bottom", ctypes.c_long)]
-
-
-@dataclass
-class WindowInfo:
-    hwnd: int
-    title: str
-    left: int
-    top: int
-    right: int
-    bottom: int
-
-    @property
-    def width(self) -> int:
-        return self.right - self.left
-
-    @property
-    def height(self) -> int:
-        return self.bottom - self.top
-
-
-def _enum_windows() -> list[WindowInfo]:
-    enum_windows = user32.EnumWindows
-    is_window_visible = user32.IsWindowVisible
-    get_window_text_length = user32.GetWindowTextLengthW
-    get_window_text = user32.GetWindowTextW
-    get_window_rect = user32.GetWindowRect
-    enum_windows_proc = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
-
-    windows: list[WindowInfo] = []
-
-    def foreach(hwnd: int, _lparam: int) -> bool:
-        if not is_window_visible(hwnd):
-            return True
-        length = get_window_text_length(hwnd)
-        if length == 0:
-            return True
-        buffer = ctypes.create_unicode_buffer(length + 1)
-        get_window_text(hwnd, buffer, length + 1)
-        title = buffer.value
-        rect = RECT()
-        get_window_rect(hwnd, ctypes.byref(rect))
-        windows.append(WindowInfo(hwnd, title, rect.left, rect.top, rect.right, rect.bottom))
-        return True
-
-    enum_windows(enum_windows_proc(foreach), 0)
-    return windows
-
-
-def _dash_windows() -> list[WindowInfo]:
-    accepted_titles = ("Dash", "127.0.0.1", "127.0.0.1:8050")
-    return [window for window in _enum_windows() if any(token in window.title for token in accepted_titles)]
-
-
-def _error_windows() -> list[WindowInfo]:
-    return [window for window in _enum_windows() if "Erro de Aplicativo" in window.title]
-
-
-def close_existing_dash_windows() -> None:
-    for window in _dash_windows():
-        user32.PostMessageW(window.hwnd, WM_CLOSE, 0, 0)
-    for window in _error_windows():
-        user32.PostMessageW(window.hwnd, WM_CLOSE, 0, 0)
-    time.sleep(2)
-
-
-def launch_browser() -> subprocess.Popen[bytes]:
-    return subprocess.Popen(
-        [
-            CHROME_PATH,
-            f"--app={URL}",
-            "--window-position=0,0",
-            "--window-size=1500,1400",
-        ],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Capture reproducible structural Studio validation evidence.")
+    parser.add_argument(
+        "--artifact-dir",
+        default=str(DEFAULT_ARTIFACT_DIR),
+        help="Directory where the validation JSON and README should be written.",
     )
-
-
-def find_dash_window(timeout_seconds: float = 30.0) -> WindowInfo:
-    deadline = time.time() + timeout_seconds
-    last_seen: WindowInfo | None = None
-    while time.time() < deadline:
-        for window in _dash_windows():
-            if window.right > 0 and window.bottom > 0:
-                last_seen = window
-                break
-        if last_seen is not None:
-            return last_seen
-        time.sleep(0.5)
-    raise RuntimeError("Dash window not found.")
-
-
-@contextmanager
-def launch_ui_server() -> Iterable[subprocess.Popen[bytes]]:
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    env = os.environ.copy()
-    env["PYTHONPATH"] = "src"
-    depot_path = ROOT / "julia_depot_runtime"
-    if depot_path.exists():
-        env.setdefault("JULIA_DEPOT_PATH", str(depot_path))
-    with UI_STDOUT.open("w", encoding="utf-8") as stdout_handle, UI_STDERR.open("w", encoding="utf-8") as stderr_handle:
-        process = subprocess.Popen(
-            [str(PYTHON_EXE), "-u", "-m", "decision_platform.ui_dash.app"],
-            cwd=ROOT,
-            env=env,
-            stdout=stdout_handle,
-            stderr=stderr_handle,
-        )
-        try:
-            wait_for_http_ready()
-            yield process
-        finally:
-            process.terminate()
-            try:
-                process.wait(timeout=10)
-            except subprocess.TimeoutExpired:
-                process.kill()
-                process.wait(timeout=10)
-
-
-def wait_for_http_ready(timeout_seconds: float = 420.0) -> None:
-    deadline = time.time() + timeout_seconds
-    while time.time() < deadline:
-        if _port_open("127.0.0.1", 8050):
-            return
-        time.sleep(2)
-    raise RuntimeError(f"Decision Platform UI did not become ready within {timeout_seconds} seconds.")
-
-
-def _port_open(host: str, port: int) -> bool:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
-        probe.settimeout(1.0)
-        return probe.connect_ex((host, port)) == 0
-
-
-def focus_and_resize(window: WindowInfo, *, width: int = 1500, height: int = 1400) -> WindowInfo:
-    user32.ShowWindow(window.hwnd, SW_RESTORE)
-    user32.SetWindowPos(window.hwnd, HWND_TOPMOST, 0, 0, width, height, SWP_SHOWWINDOW)
-    user32.SetForegroundWindow(window.hwnd)
-    time.sleep(2)
-    return find_dash_window(timeout_seconds=5)
-
-
-def _move_mouse(x: int, y: int) -> None:
-    user32.SetCursorPos(x, y)
-    time.sleep(0.15)
-
-
-def click(window: WindowInfo, rel_x: int, rel_y: int, delay: float = 2.0) -> None:
-    x = window.left + rel_x
-    y = window.top + rel_y
-    _move_mouse(x, y)
-    user32.mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0)
-    time.sleep(0.05)
-    user32.mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
-    time.sleep(delay)
-
-
-def wheel(window: WindowInfo, rel_x: int, rel_y: int, delta: int, delay: float = 1.5) -> None:
-    x = window.left + rel_x
-    y = window.top + rel_y
-    _move_mouse(x, y)
-    user32.mouse_event(MOUSEEVENTF_WHEEL, x, y, delta, 0)
-    time.sleep(delay)
-
-
-def key(vk_code: int, delay: float = 0.08) -> None:
-    user32.keybd_event(vk_code, 0, 0, 0)
-    time.sleep(delay)
-    user32.keybd_event(vk_code, 0, KEYEVENTF_KEYUP, 0)
-    time.sleep(delay)
-
-
-def chord(*vk_codes: int, delay: float = 0.08) -> None:
-    for vk_code in vk_codes:
-        user32.keybd_event(vk_code, 0, 0, 0)
-        time.sleep(delay)
-    for vk_code in reversed(vk_codes):
-        user32.keybd_event(vk_code, 0, KEYEVENTF_KEYUP, 0)
-        time.sleep(delay)
-    time.sleep(0.2)
-
-
-def type_digits(text: str) -> None:
-    vk_map = {
-        "0": VK_0,
-        "1": VK_1,
-        "2": VK_2,
-        "3": VK_3,
-        "4": VK_4,
-        "5": VK_5,
-        "6": VK_6,
-        "7": VK_7,
-        "8": VK_8,
-        "9": VK_9,
-    }
-    for char in text:
-        if char not in vk_map:
-            raise ValueError(f"Unsupported typed character: {char!r}")
-        key(vk_map[char])
-
-
-def replace_input(window: WindowInfo, rel_x: int, rel_y: int, value: str, *, settle_seconds: float = 3.0) -> None:
-    click(window, rel_x, rel_y, delay=0.5)
-    chord(VK_CONTROL, VK_A)
-    key(VK_BACK)
-    type_digits(value)
-    key(VK_RETURN)
-    time.sleep(settle_seconds)
-
-
-def select_next_dropdown_option(window: WindowInfo, rel_x: int, rel_y: int, *, steps: int = 1, settle_seconds: float = 3.0) -> None:
-    click(window, rel_x, rel_y, delay=0.5)
-    for _ in range(steps):
-        key(VK_DOWN)
-    key(VK_RETURN)
-    time.sleep(settle_seconds)
-
-
-def capture(window: WindowInfo, filename: str, *, crop_top: int = 0, crop_bottom: int = 0) -> Path:
-    current = find_dash_window(timeout_seconds=5)
-    bbox = (
-        current.left,
-        current.top + crop_top,
-        current.right,
-        current.bottom - crop_bottom,
+    parser.add_argument(
+        "--source-scenario",
+        default=str(DEFAULT_SOURCE_SCENARIO),
+        help="Canonical source scenario to copy before running the UI validation flow.",
     )
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    path = OUTPUT_DIR / filename
-    ImageGrab.grab(bbox=bbox).save(path)
-    return path
+    return parser.parse_args()
 
 
-def _write_readme(entries: Iterable[tuple[str, str]]) -> None:
+def _prepare_tmp_dir(prefix: str) -> Path:
+    target = ROOT / "tests" / "_tmp" / f"{prefix}_{uuid4().hex}"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    return target
+
+
+def _cleanup(path: Path) -> None:
+    if path.exists():
+        shutil.rmtree(path)
+
+
+def _deep_update(target: dict[str, Any], updates: dict[str, Any]) -> None:
+    for key, value in updates.items():
+        if isinstance(value, dict) and isinstance(target.get(key), dict):
+            _deep_update(target[key], value)
+        else:
+            target[key] = value
+
+
+def _prepare_scenario_copy(source_dir: Path) -> Path:
+    target = _prepare_tmp_dir("studio_ui_validation_source")
+    shutil.copytree(source_dir, target)
+    settings_path = target / "scenario_settings.yaml"
+    settings = yaml.safe_load(settings_path.read_text(encoding="utf-8")) or {}
+    _deep_update(
+        settings,
+        {
+            "candidate_generation": {
+                "population_size": 12,
+                "generations": 3,
+                "keep_top_n_per_family": 6,
+            },
+            "hydraulic_engine": {"fallback": "python_emulated_julia"},
+        },
+    )
+    settings_path.write_text(yaml.safe_dump(settings, sort_keys=False, allow_unicode=True), encoding="utf-8")
+    return target
+
+
+def _get_callback(app: object, *, output_prefix: str | None = None, input_id: str | None = None) -> Callable[..., Any]:
+    callback_map = getattr(app, "callback_map", {})
+    for callback_key, metadata in callback_map.items():
+        if output_prefix is not None and not str(callback_key).startswith(output_prefix):
+            continue
+        if input_id is not None and not any(item["id"] == input_id for item in metadata.get("inputs", [])):
+            continue
+        callback = metadata.get("callback")
+        if callback is None:
+            continue
+        return getattr(callback, "__wrapped__", callback)
+    raise KeyError(f"Callback not found for output_prefix={output_prefix!r} input_id={input_id!r}")
+
+
+def _write_readme(artifact_dir: Path, payload: dict[str, Any]) -> None:
     lines = [
-        "# UI Validation",
+        "# Structural Studio UI Validation",
         "",
-        f"- URL validada: `{URL}`",
-        f"- Pasta de saída: `{OUTPUT_DIR.as_posix()}`",
+        "- Evidence generated from the real Dash callback map of the Studio tab.",
+        f"- Source scenario copy: `{payload['scenario_dirs']['source_copy']}`",
+        f"- Created bundle: `{payload['scenario_dirs']['created_bundle']}`",
+        f"- Final bundle: `{payload['scenario_dirs']['final_bundle']}`",
         "",
-        "## Prints",
+        "## Assertions",
         "",
     ]
-    for name, description in entries:
-        lines.append(f"- `{name}`: {description}")
-    README_PATH.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    for key, value in payload["assertions"].items():
+        lines.append(f"- `{key}`: `{value}`")
+    lines.append("")
+    lines.append("## Callback Trace")
+    lines.append("")
+    for trace in payload["callback_trace"]:
+        lines.append(f"- `{trace['step']}`: selected=`{trace.get('selected_id')}` status=`{trace.get('status')}`")
+    (artifact_dir / "README.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def run_validation(*, artifact_dir: Path, source_scenario: Path) -> Path:
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    source_copy_dir = _prepare_scenario_copy(source_scenario)
+    created_bundle_dir = artifact_dir / "bundle_created"
+    final_bundle_dir = artifact_dir / "bundle_final"
+    _cleanup(created_bundle_dir)
+    _cleanup(final_bundle_dir)
+
+    callback_trace: list[dict[str, Any]] = []
+
+    try:
+        with disable_real_julia_probe():
+            app = build_app(source_copy_dir)
+
+            bundle = load_scenario_bundle(source_copy_dir)
+            create_node_callback = _get_callback(app, input_id="node-studio-create-button")
+            duplicate_node_callback = _get_callback(app, input_id="node-studio-duplicate-button")
+            apply_node_callback = _get_callback(app, input_id="node-studio-apply-button")
+            delete_node_callback = _get_callback(app, input_id="node-studio-delete-button")
+            sync_node_callback = _get_callback(app, output_prefix="..node-studio-selected-id.data")
+            create_edge_callback = _get_callback(app, input_id="edge-studio-create-button")
+            apply_edge_callback = _get_callback(app, input_id="edge-studio-apply-button")
+            delete_edge_callback = _get_callback(app, input_id="edge-studio-delete-button")
+            sync_edge_callback = _get_callback(app, output_prefix="..edge-studio-selected-id.data")
+            refresh_studio_callback = _get_callback(app, output_prefix="..node-studio-cytoscape.elements")
+            save_callback = _get_callback(app, input_id="save-reopen-bundle-button")
+
+            nodes_rows = bundle.nodes.to_dict("records")
+            candidate_links_rows = bundle.candidate_links.to_dict("records")
+            edge_component_rules_rows = bundle.edge_component_rules.to_dict("records")
+            route_rows = bundle.route_requirements.to_dict("records")
+            layout_constraints_rows = bundle.layout_constraints.to_dict("records")
+            components_rows = bundle.components.to_dict("records")
+            topology_rules_text = yaml.safe_dump(bundle.topology_rules, sort_keys=False, allow_unicode=True)
+            scenario_settings_text = yaml.safe_dump(bundle.scenario_settings, sort_keys=False, allow_unicode=True)
+
+            nodes_rows, created_node_id, status = create_node_callback(1, nodes_rows, "J4")
+            callback_trace.append({"step": "create_node", "selected_id": created_node_id, "status": status})
+            selected_node_form = sync_node_callback(nodes_rows, {"id": created_node_id}, "J4")
+
+            nodes_rows, created_node_id, status = apply_node_callback(
+                1,
+                nodes_rows,
+                created_node_id,
+                created_node_id,
+                "Studio callback node",
+                "junction",
+                0.81,
+                0.28,
+                ["allow_inbound"],
+                ["allow_outbound"],
+                candidate_links_rows,
+                route_rows,
+            )
+            callback_trace.append({"step": "edit_node", "selected_id": created_node_id, "status": status})
+
+            nodes_rows, duplicated_node_id, status = duplicate_node_callback(1, nodes_rows, created_node_id)
+            callback_trace.append({"step": "duplicate_node", "selected_id": duplicated_node_id, "status": status})
+            duplicated_node_form = sync_node_callback(nodes_rows, {"id": duplicated_node_id}, created_node_id)
+
+            candidate_links_rows, created_link_id, status = create_edge_callback(
+                1,
+                candidate_links_rows,
+                "L013",
+                created_node_id,
+                duplicated_node_id,
+                "vertical_link",
+                0.19,
+                [],
+                "loop,hybrid",
+                nodes_rows,
+                edge_component_rules_rows,
+            )
+            callback_trace.append({"step": "create_edge", "selected_id": created_link_id, "status": status})
+            created_edge_form = sync_edge_callback(candidate_links_rows, {"link_id": created_link_id}, "L013")
+
+            candidate_links_rows, created_link_id, status = apply_edge_callback(
+                1,
+                candidate_links_rows,
+                created_link_id,
+                f"{created_link_id}_EDITED",
+                created_node_id,
+                duplicated_node_id,
+                "upper_bypass_segment",
+                0.27,
+                ["bidirectional"],
+                "loop",
+                nodes_rows,
+                edge_component_rules_rows,
+            )
+            callback_trace.append({"step": "edit_edge", "selected_id": created_link_id, "status": status})
+
+            _, _, node_summary_text, edge_summary_text, studio_status = refresh_studio_callback(
+                nodes_rows,
+                candidate_links_rows,
+                created_node_id,
+                created_link_id,
+                status,
+            )
+            callback_trace.append({"step": "refresh_studio", "selected_id": created_link_id, "status": studio_status})
+
+            created_callback_result = save_callback(
+                1,
+                str(source_copy_dir),
+                str(created_bundle_dir),
+                nodes_rows,
+                components_rows,
+                candidate_links_rows,
+                edge_component_rules_rows,
+                route_rows,
+                layout_constraints_rows,
+                topology_rules_text,
+                scenario_settings_text,
+            )
+            created_bundle_summary = json.loads(created_callback_result[1])
+            created_execution_summary = json.loads(created_callback_result[10])
+            callback_trace.append(
+                {
+                    "step": "save_created_bundle",
+                    "selected_id": created_callback_result[0],
+                    "status": created_execution_summary["error"],
+                }
+            )
+
+            _, _, blocked_delete_status = delete_node_callback(
+                1,
+                created_callback_result[2],
+                created_node_id,
+                created_callback_result[4],
+                created_callback_result[6],
+            )
+            callback_trace.append(
+                {
+                    "step": "delete_node_blocked_while_referenced",
+                    "selected_id": created_node_id,
+                    "status": blocked_delete_status,
+                }
+            )
+
+            candidate_links_rows, next_edge_selected_id, status = delete_edge_callback(
+                1,
+                created_callback_result[4],
+                created_link_id,
+            )
+            callback_trace.append({"step": "delete_edge", "selected_id": next_edge_selected_id, "status": status})
+
+            nodes_rows, next_node_selected_id, status = delete_node_callback(
+                1,
+                created_callback_result[2],
+                duplicated_node_id,
+                candidate_links_rows,
+                created_callback_result[6],
+            )
+            callback_trace.append({"step": "delete_duplicated_node", "selected_id": next_node_selected_id, "status": status})
+
+            nodes_rows, next_node_selected_id, status = delete_node_callback(
+                1,
+                nodes_rows,
+                created_node_id,
+                candidate_links_rows,
+                created_callback_result[6],
+            )
+            callback_trace.append({"step": "delete_created_node", "selected_id": next_node_selected_id, "status": status})
+
+            final_callback_result = save_callback(
+                1,
+                created_callback_result[0],
+                str(final_bundle_dir),
+                nodes_rows,
+                created_callback_result[3],
+                candidate_links_rows,
+                created_callback_result[5],
+                created_callback_result[6],
+                created_callback_result[7],
+                created_callback_result[8],
+                created_callback_result[9],
+            )
+            final_bundle_summary = json.loads(final_callback_result[1])
+            final_execution_summary = json.loads(final_callback_result[10])
+            callback_trace.append(
+                {
+                    "step": "save_final_bundle",
+                    "selected_id": final_callback_result[0],
+                    "status": final_execution_summary["error"],
+                }
+            )
+
+        created_bundle = load_scenario_bundle(created_bundle_dir)
+        final_bundle = load_scenario_bundle(final_bundle_dir)
+
+        payload = {
+            "scenario_dirs": {
+                "source_copy": str(source_copy_dir.resolve()),
+                "created_bundle": str(created_bundle_dir.resolve()),
+                "final_bundle": str(final_bundle_dir.resolve()),
+            },
+            "callback_trace": callback_trace,
+            "selected_forms": {
+                "created_node": {
+                    "selected_node_id": selected_node_form[0],
+                    "node_id": selected_node_form[1],
+                    "label": selected_node_form[2],
+                },
+                "duplicated_node": {
+                    "selected_node_id": duplicated_node_form[0],
+                    "node_id": duplicated_node_form[1],
+                    "label": duplicated_node_form[2],
+                },
+                "created_edge": {
+                    "selected_link_id": created_edge_form[0],
+                    "link_id": created_edge_form[1],
+                    "from_node": created_edge_form[2],
+                    "to_node": created_edge_form[3],
+                },
+            },
+            "summaries": {
+                "node_summary": json.loads(node_summary_text),
+                "edge_summary": json.loads(edge_summary_text),
+                "created_bundle_io_summary": created_bundle_summary,
+                "created_execution_summary": created_execution_summary,
+                "final_bundle_io_summary": final_bundle_summary,
+                "final_execution_summary": final_execution_summary,
+            },
+            "assertions": {
+                "created_bundle_kept_canonical_manifest": created_bundle.bundle_manifest_path is not None,
+                "created_bundle_kept_component_catalog": created_bundle.resolved_files["components.csv"].name == "component_catalog.csv",
+                "created_node_persisted": created_node_id in created_bundle.nodes["node_id"].tolist(),
+                "duplicated_node_persisted": duplicated_node_id in created_bundle.nodes["node_id"].tolist(),
+                "created_edge_persisted": created_link_id in created_bundle.candidate_links["link_id"].tolist(),
+                "delete_node_blocked_when_referenced": "requires explicit reconciliation" in blocked_delete_status,
+                "final_bundle_removed_created_node": created_node_id not in final_bundle.nodes["node_id"].tolist(),
+                "final_bundle_removed_duplicated_node": duplicated_node_id not in final_bundle.nodes["node_id"].tolist(),
+                "final_bundle_removed_created_edge": created_link_id not in final_bundle.candidate_links["link_id"].tolist(),
+                "created_execution_has_no_error": created_execution_summary["error"] is None,
+                "final_execution_has_no_error": final_execution_summary["error"] is None,
+                "created_execution_kept_provenance": (
+                    created_execution_summary["scenario_provenance"]["requested_dir_matches_bundle_root"] is True
+                ),
+                "final_execution_kept_provenance": (
+                    final_execution_summary["scenario_provenance"]["requested_dir_matches_bundle_root"] is True
+                ),
+            },
+        }
+
+        artifact_path = artifact_dir / "studio_structural_validation.json"
+        artifact_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+        _write_readme(artifact_dir, payload)
+        return artifact_path
+    finally:
+        _cleanup(source_copy_dir)
 
 
 def main() -> None:
-    close_existing_dash_windows()
-    with launch_ui_server():
-        browser = launch_browser()
-        try:
-            time.sleep(15)
-
-            window = focus_and_resize(find_dash_window())
-            click(window, 290, 118, delay=4.0)
-            shot_01 = capture(window, "01_home_or_initial_state.png")
-
-            click(window, 430, 118, delay=4.0)
-            shot_02 = capture(window, "02_catalog_with_default_profile.png")
-
-            replace_input(window, 150, 223, "1200", settle_seconds=4.0)
-            replace_input(window, 150, 247, "50", settle_seconds=4.0)
-            shot_03 = capture(window, "03_filters_applied.png")
-
-            replace_input(window, 150, 467, "1", settle_seconds=4.0)
-            replace_input(window, 150, 491, "0", settle_seconds=4.0)
-            shot_04 = capture(window, "04_weights_changed.png")
-
-            select_next_dropdown_option(window, 150, 151, steps=1, settle_seconds=4.0)
-            shot_10 = capture(window, "10_profile_changed.png")
-
-            click(window, 1125, 118, delay=4.0)
-            select_next_dropdown_option(window, 220, 359, steps=1, settle_seconds=5.0)
-            shot_05 = capture(window, "05_selected_candidate_changed.png")
-            shot_09 = capture(window, "09_export_or_final_selection_state.png", crop_bottom=250)
-
-            wheel(window, 700, 1135, -3000, delay=2.0)
-            shot_06 = capture(window, "06_circuit_view_selected_candidate.png", crop_top=350)
-
-            click(window, 1325, 118, delay=4.0)
-            shot_07 = capture(window, "07_score_breakdown_selected_candidate.png")
-
-            click(window, 600, 118, delay=4.0)
-            shot_08 = capture(window, "08_comparison_or_decision_view.png")
-
-            entries = [
-                (shot_01.name, "Tela inicial na aba de execução com candidato inicial e perfil padrão reportados."),
-                (shot_02.name, "Catálogo carregado com o perfil padrão e a visão inicial do ranking."),
-                (shot_03.name, "Catálogo após filtros numéricos aplicados."),
-                (shot_04.name, "Catálogo após alteração manual dos pesos dinâmicos."),
-                (shot_05.name, "Mudança explícita do candidato selecionado na aba de circuito."),
-                (shot_06.name, "Visualização 2D do circuito do candidato selecionado."),
-                (shot_07.name, "Breakdown do score na aba de escolha final."),
-                (shot_08.name, "Visão de comparação entre candidatos."),
-                (shot_09.name, "Estado final com candidato atual e ação de exportação disponível."),
-                (shot_10.name, "Print extra evidenciando mudança de perfil na UI."),
-            ]
-            _write_readme(entries)
-            print(OUTPUT_DIR)
-        finally:
-            browser.terminate()
-            browser.wait(timeout=10)
+    args = _parse_args()
+    artifact_dir = Path(args.artifact_dir).expanduser().resolve()
+    source_scenario = Path(args.source_scenario).expanduser().resolve()
+    artifact_path = run_validation(artifact_dir=artifact_dir, source_scenario=source_scenario)
+    print(artifact_path)
 
 
 if __name__ == "__main__":

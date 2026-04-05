@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any, Callable
 
 import pytest
 import yaml
@@ -45,6 +46,20 @@ def _find_component_by_id(component: object, target_id: str) -> object | None:
         if found is not None:
             return found
     return None
+
+
+def _get_callback(app: object, *, output_prefix: str | None = None, input_id: str | None = None) -> Callable[..., Any]:
+    callback_map = getattr(app, "callback_map", {})
+    for callback_key, metadata in callback_map.items():
+        if output_prefix is not None and not str(callback_key).startswith(output_prefix):
+            continue
+        if input_id is not None and not any(item["id"] == input_id for item in metadata.get("inputs", [])):
+            continue
+        callback = metadata.get("callback")
+        if callback is None:
+            continue
+        return getattr(callback, "__wrapped__", callback)
+    raise KeyError(f"Callback not found for output_prefix={output_prefix!r} input_id={input_id!r}")
 
 
 def test_dash_app_builds_layout_and_callbacks_even_when_fail_closed() -> None:
@@ -311,6 +326,305 @@ def test_ui_rebuilds_from_saved_bundle_after_source_cleanup() -> None:
     finally:
         if scenario_dir is not None and Path(scenario_dir).exists():
             cleanup_scenario_copy(scenario_dir)
+
+
+@pytest.mark.fast
+def test_studio_callbacks_fail_closed_for_invalid_structural_actions() -> None:
+    with diagnostic_runtime_test_mode():
+        app = build_app("data/decision_platform/maquete_v2")
+
+    bundle = load_scenario_bundle("data/decision_platform/maquete_v2")
+    delete_node_callback = _get_callback(app, input_id="node-studio-delete-button")
+    apply_edge_callback = _get_callback(app, input_id="edge-studio-apply-button")
+
+    nodes_rows = bundle.nodes.to_dict("records")
+    candidate_links_rows = bundle.candidate_links.to_dict("records")
+    route_rows = bundle.route_requirements.to_dict("records")
+    edge_component_rules_rows = bundle.edge_component_rules.to_dict("records")
+
+    next_nodes_rows, next_selected_node_id, node_status = delete_node_callback(
+        1,
+        nodes_rows,
+        "P1",
+        candidate_links_rows,
+        route_rows,
+    )
+    assert next_nodes_rows == nodes_rows
+    assert next_selected_node_id == "P1"
+    assert "requires explicit reconciliation" in node_status
+
+    next_links_rows, next_selected_link_id, edge_status = apply_edge_callback(
+        1,
+        candidate_links_rows,
+        "L013",
+        "L013_INVALID",
+        "J1",
+        "UNKNOWN_NODE",
+        "vertical_link",
+        0.33,
+        [],
+        "loop",
+        nodes_rows,
+        edge_component_rules_rows,
+    )
+    assert next_links_rows == candidate_links_rows
+    assert next_selected_link_id == "L013"
+    assert "references unknown nodes" in edge_status
+
+
+@pytest.mark.fast
+def test_ui_save_reopen_callback_rejects_legacy_layout_without_manifest() -> None:
+    scenario_dir = prepare_scenario_copy(
+        "data/decision_platform/maquete_v2",
+        "maquete_v2_ui_callback_legacy_source",
+    )
+    output_dir = prepare_isolated_tmp_dir("maquete_v2_ui_callback_legacy_saved")
+    try:
+        bundle = load_scenario_bundle(scenario_dir)
+        (Path(scenario_dir) / "scenario_bundle.yaml").unlink()
+
+        with diagnostic_runtime_test_mode():
+            app = build_app(scenario_dir)
+
+        save_callback = _get_callback(app, input_id="save-reopen-bundle-button")
+        callback_result = save_callback(
+            1,
+            str(scenario_dir),
+            str(output_dir),
+            bundle.nodes.to_dict("records"),
+            bundle.components.to_dict("records"),
+            bundle.candidate_links.to_dict("records"),
+            bundle.edge_component_rules.to_dict("records"),
+            bundle.route_requirements.to_dict("records"),
+            bundle.layout_constraints.to_dict("records"),
+            yaml.safe_dump(bundle.topology_rules, sort_keys=False, allow_unicode=True),
+            yaml.safe_dump(bundle.scenario_settings, sort_keys=False, allow_unicode=True),
+        )
+        bundle_io_summary = json.loads(callback_result[1])
+        execution_summary = json.loads(callback_result[10])
+
+        assert callback_result[0] == str(scenario_dir)
+        assert bundle_io_summary["status"] == "error"
+        assert "canonical scenario bundle" in bundle_io_summary["error"]
+        assert execution_summary["error"] == bundle_io_summary["error"]
+        assert not output_dir.exists()
+    finally:
+        cleanup_scenario_copy(output_dir)
+        cleanup_scenario_copy(scenario_dir)
+
+
+@pytest.mark.slow
+def test_studio_callbacks_round_trip_structural_edits_through_ui_flow() -> None:
+    scenario_dir = prepare_scenario_copy(
+        "data/decision_platform/maquete_v2",
+        "maquete_v2_ui_callback_structural_source",
+        scenario_overrides={
+            "candidate_generation": {
+                "population_size": 12,
+                "generations": 3,
+                "keep_top_n_per_family": 6,
+            },
+            "hydraulic_engine": {"fallback": "python_emulated_julia"},
+        },
+    )
+    created_output_dir = prepare_isolated_tmp_dir("maquete_v2_ui_callback_structural_created")
+    final_output_dir = prepare_isolated_tmp_dir("maquete_v2_ui_callback_structural_final")
+    try:
+        with diagnostic_runtime_test_mode():
+            app = build_app(scenario_dir)
+
+        bundle = load_scenario_bundle(scenario_dir)
+        create_node_callback = _get_callback(app, input_id="node-studio-create-button")
+        duplicate_node_callback = _get_callback(app, input_id="node-studio-duplicate-button")
+        apply_node_callback = _get_callback(app, input_id="node-studio-apply-button")
+        delete_node_callback = _get_callback(app, input_id="node-studio-delete-button")
+        sync_node_callback = _get_callback(app, output_prefix="..node-studio-selected-id.data")
+        create_edge_callback = _get_callback(app, input_id="edge-studio-create-button")
+        apply_edge_callback = _get_callback(app, input_id="edge-studio-apply-button")
+        delete_edge_callback = _get_callback(app, input_id="edge-studio-delete-button")
+        sync_edge_callback = _get_callback(app, output_prefix="..edge-studio-selected-id.data")
+        refresh_studio_callback = _get_callback(app, output_prefix="..node-studio-cytoscape.elements")
+        save_callback = _get_callback(app, input_id="save-reopen-bundle-button")
+
+        nodes_rows = bundle.nodes.to_dict("records")
+        candidate_links_rows = bundle.candidate_links.to_dict("records")
+        edge_component_rules_rows = bundle.edge_component_rules.to_dict("records")
+        route_rows = bundle.route_requirements.to_dict("records")
+        layout_constraints_rows = bundle.layout_constraints.to_dict("records")
+        components_rows = bundle.components.to_dict("records")
+        topology_rules_text = yaml.safe_dump(bundle.topology_rules, sort_keys=False, allow_unicode=True)
+        scenario_settings_text = yaml.safe_dump(bundle.scenario_settings, sort_keys=False, allow_unicode=True)
+
+        nodes_rows, created_node_id, status = create_node_callback(1, nodes_rows, "J4")
+        assert status == ""
+        synced_created_node = sync_node_callback(nodes_rows, {"id": created_node_id}, "J4")
+        assert synced_created_node[0] == created_node_id
+        assert synced_created_node[1] == created_node_id
+
+        nodes_rows, created_node_id, status = apply_node_callback(
+            1,
+            nodes_rows,
+            created_node_id,
+            created_node_id,
+            "Studio callback node",
+            "junction",
+            0.81,
+            0.28,
+            ["allow_inbound"],
+            ["allow_outbound"],
+            candidate_links_rows,
+            route_rows,
+        )
+        assert status == ""
+
+        nodes_rows, duplicated_node_id, status = duplicate_node_callback(1, nodes_rows, created_node_id)
+        assert status == ""
+        synced_duplicated_node = sync_node_callback(nodes_rows, {"id": duplicated_node_id}, created_node_id)
+        assert synced_duplicated_node[0] == duplicated_node_id
+        assert synced_duplicated_node[2].endswith("copia")
+
+        candidate_links_rows, created_link_id, status = create_edge_callback(
+            1,
+            candidate_links_rows,
+            "L013",
+            created_node_id,
+            duplicated_node_id,
+            "vertical_link",
+            0.19,
+            [],
+            "loop,hybrid",
+            nodes_rows,
+            edge_component_rules_rows,
+        )
+        assert status == ""
+        synced_created_edge = sync_edge_callback(candidate_links_rows, {"link_id": created_link_id}, "L013")
+        assert synced_created_edge[0] == created_link_id
+        assert synced_created_edge[2] == created_node_id
+        assert synced_created_edge[3] == duplicated_node_id
+
+        candidate_links_rows, created_link_id, status = apply_edge_callback(
+            1,
+            candidate_links_rows,
+            created_link_id,
+            f"{created_link_id}_EDITED",
+            created_node_id,
+            duplicated_node_id,
+            "upper_bypass_segment",
+            0.27,
+            ["bidirectional"],
+            "loop",
+            nodes_rows,
+            edge_component_rules_rows,
+        )
+        assert status == ""
+
+        elements, _, node_summary_text, edge_summary_text, studio_status = refresh_studio_callback(
+            nodes_rows,
+            candidate_links_rows,
+            created_node_id,
+            created_link_id,
+            status,
+        )
+        node_summary = json.loads(node_summary_text)
+        edge_summary = json.loads(edge_summary_text)
+        assert studio_status == ""
+        assert node_summary["selected_node_id"] == created_node_id
+        assert edge_summary["selected_link_id"] == created_link_id
+        assert any(element["data"].get("id") == created_node_id for element in elements)
+        assert any(element["data"].get("id") == created_link_id for element in elements)
+
+        created_callback_result = save_callback(
+            1,
+            str(scenario_dir),
+            str(created_output_dir),
+            nodes_rows,
+            components_rows,
+            candidate_links_rows,
+            edge_component_rules_rows,
+            route_rows,
+            layout_constraints_rows,
+            topology_rules_text,
+            scenario_settings_text,
+        )
+        created_bundle_summary = json.loads(created_callback_result[1])
+        created_execution_summary = json.loads(created_callback_result[10])
+        assert created_callback_result[0] == str(created_output_dir.resolve())
+        assert created_bundle_summary["bundle_files"]["components.csv"] == "component_catalog.csv"
+        assert created_bundle_summary["requested_dir_matches_bundle_root"] is True
+        assert created_execution_summary["error"] is None
+        assert created_execution_summary["scenario_bundle_manifest"].endswith("scenario_bundle.yaml")
+        assert created_execution_summary["scenario_provenance"]["requested_dir_matches_bundle_root"] is True
+
+        created_bundle = load_scenario_bundle(created_output_dir)
+        assert created_node_id in created_bundle.nodes["node_id"].tolist()
+        assert duplicated_node_id in created_bundle.nodes["node_id"].tolist()
+        assert created_link_id in created_bundle.candidate_links["link_id"].tolist()
+
+        blocked_delete_rows, blocked_selected_node_id, blocked_delete_status = delete_node_callback(
+            1,
+            created_callback_result[2],
+            created_node_id,
+            created_callback_result[4],
+            created_callback_result[6],
+        )
+        assert blocked_delete_rows == created_callback_result[2]
+        assert blocked_selected_node_id == created_node_id
+        assert "requires explicit reconciliation" in blocked_delete_status
+
+        candidate_links_rows, next_edge_selected_id, status = delete_edge_callback(
+            1,
+            created_callback_result[4],
+            created_link_id,
+        )
+        assert status == ""
+        assert next_edge_selected_id != created_link_id
+        nodes_rows, next_selected_node_id, status = delete_node_callback(
+            1,
+            created_callback_result[2],
+            duplicated_node_id,
+            candidate_links_rows,
+            created_callback_result[6],
+        )
+        assert status == ""
+        assert next_selected_node_id != duplicated_node_id
+        nodes_rows, next_selected_node_id, status = delete_node_callback(
+            1,
+            nodes_rows,
+            created_node_id,
+            candidate_links_rows,
+            created_callback_result[6],
+        )
+        assert status == ""
+        assert next_selected_node_id != created_node_id
+
+        final_callback_result = save_callback(
+            1,
+            created_callback_result[0],
+            str(final_output_dir),
+            nodes_rows,
+            created_callback_result[3],
+            candidate_links_rows,
+            created_callback_result[5],
+            created_callback_result[6],
+            created_callback_result[7],
+            created_callback_result[8],
+            created_callback_result[9],
+        )
+        final_bundle_summary = json.loads(final_callback_result[1])
+        final_execution_summary = json.loads(final_callback_result[10])
+        assert final_callback_result[0] == str(final_output_dir.resolve())
+        assert final_bundle_summary["bundle_files"]["components.csv"] == "component_catalog.csv"
+        assert final_execution_summary["error"] is None
+        assert final_execution_summary["scenario_bundle_root"] == str(final_output_dir.resolve())
+
+        final_bundle = load_scenario_bundle(final_output_dir)
+        assert created_node_id not in final_bundle.nodes["node_id"].tolist()
+        assert duplicated_node_id not in final_bundle.nodes["node_id"].tolist()
+        assert created_link_id not in final_bundle.candidate_links["link_id"].tolist()
+    finally:
+        cleanup_scenario_copy(final_output_dir)
+        cleanup_scenario_copy(created_output_dir)
+        cleanup_scenario_copy(scenario_dir)
 
 
 @pytest.mark.fast

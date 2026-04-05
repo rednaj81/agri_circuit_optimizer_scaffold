@@ -1,0 +1,25 @@
+scenario_id: maquete_pro
+engine:
+  mode: julia_only
+  fallback: none
+search:
+  max_families:
+    - star_manifolds
+    - bus_with_pump_islands
+    - loop_ring
+    - hybrid_free
+  allow_family_hopping: true
+  population_size: 120
+  generations: 40
+  keep_top_n_per_family: 25
+queue:
+  background_runs: true
+  isolated_run_workdirs: true
+  max_parallel_runs: 2
+ui:
+  default_profile_id: balanced
+  show_engine_audit: true
+layout:
+  bend_factor: 1.25
+  connection_margin_m: 0.20
+  hose_total_available_m: 20.0

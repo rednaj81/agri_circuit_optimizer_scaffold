@@ -1,0 +1,16 @@
+route_id,source,sink,mandatory,q_min_delivered_lpm,measurement_required,dose_min_l,dose_error_max_pct,criticality
+R001,W,M,true,20,true,0,0,high
+R002,W,I,true,10,true,0,0,high
+R003,P1,M,true,8,true,2,1.0,medium
+R004,P2,M,true,8,true,2,1.0,medium
+R005,P3,M,true,8,true,2,1.0,medium
+R006,P4,M,true,8,true,2,1.0,medium
+R007,I,M,true,8,true,1,1.0,medium
+R008,I,P1,false,6,true,1,1.0,low
+R009,I,P2,false,6,true,1,1.0,low
+R010,I,P3,false,6,true,1,1.0,low
+R011,I,P4,false,6,true,1,1.0,low
+R012,M,S,true,50,true,0,0,high
+R013,W,S,false,20,true,0,0,medium
+R014,I,S,false,12,true,0,0,low
+R015,I,IR,true,12,false,0,0,service

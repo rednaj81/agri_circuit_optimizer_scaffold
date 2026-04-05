@@ -1,0 +1,16 @@
+edge_id,source,target,edge_type,length_m,topology_family,conflict_group,notes
+E001,W,J1,hose,1.0,bus_with_pump_islands,,Agua para barramento
+E002,P1,J1,hose,1.0,bus_with_pump_islands,CG_P1,Ramal P1
+E003,P2,J2,hose,1.0,bus_with_pump_islands,CG_P2,Ramal P2
+E004,P3,J3,hose,1.0,bus_with_pump_islands,CG_P3,Ramal P3
+E005,P4,J4,hose,1.0,bus_with_pump_islands,CG_P4,Ramal P4
+E006,M,J4,hose,1.0,bus_with_pump_islands,CG_M,Ramal M
+E007,I,J5,hose,1.0,bus_with_pump_islands,CG_I,Ramal I
+E008,J1,J2,bus,1.0,bus_with_pump_islands,,Barramento 1
+E009,J2,J3,bus,1.0,bus_with_pump_islands,,Barramento 2
+E010,J3,J4,bus,1.0,bus_with_pump_islands,,Barramento 3
+E011,J4,J5,bus,1.0,bus_with_pump_islands,,Barramento 4
+E012,J4,S,hose,1.0,bus_with_pump_islands,CG_S,Saida
+E013,I,IR,hose,0.6,bus_with_pump_islands,CG_IR,Recirculacao local
+E014,J2,J5,bypass,1.4,hybrid_free,CG_BP1,Bypass superior
+E015,J1,J4,bypass,1.5,hybrid_free,CG_BP2,Bypass alternativo

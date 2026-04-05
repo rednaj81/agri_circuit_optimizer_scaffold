@@ -1,0 +1,9 @@
+rule_id,enabled,condition,weight_delta,dimension,notes
+Q001,true,pump_active_forward_only,12,quality,Preferência por bomba no sentido correto
+Q002,true,passive_reverse_flow,-35,quality,Penalidade fluxo reverso em bomba desligada
+Q003,true,meter_within_confidence_range,10,quality,Medição dentro da faixa de confiança
+Q004,true,meter_outside_confidence_but_inside_hard,-8,quality,Medição fora da faixa ideal mas ainda válida
+Q005,true,series_pumps,-10,operability,Penalidade por bombas em série
+Q006,true,cleaning_volume_low,8,cleaning,Bônus limpeza pequena
+Q007,true,alternate_path_exists,10,resilience,Resiliência por caminho alternativo
+Q008,true,fallback_component_used,-15,cost,Penalidade por fallback

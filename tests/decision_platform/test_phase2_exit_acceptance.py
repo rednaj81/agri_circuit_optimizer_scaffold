@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import subprocess
+import sys
 
 import pytest
 import yaml
@@ -249,3 +251,49 @@ def test_phase2_exit_entrypoints_still_reject_legacy_layout_without_manifest() -
     finally:
         cleanup_scenario_copy(save_dir)
         cleanup_scenario_copy(scenario_dir)
+
+
+@pytest.mark.slow
+def test_phase2_exit_structural_studio_validation_script_generates_ui_evidence() -> None:
+    artifact_dir = prepare_isolated_tmp_dir("phase2_structural_ui_validation", create=True)
+    script_path = Path("scripts/capture_decision_platform_ui_validation.py")
+    try:
+        completed = subprocess.run(
+            [
+                sys.executable,
+                str(script_path),
+                "--artifact-dir",
+                str(artifact_dir),
+            ],
+            cwd=Path.cwd(),
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        artifact_path = artifact_dir / "studio_structural_validation.json"
+        readme_path = artifact_dir / "README.md"
+        assert artifact_path.exists(), completed.stdout
+        assert readme_path.exists(), completed.stdout
+
+        payload = json.loads(artifact_path.read_text(encoding="utf-8"))
+        assert payload["assertions"]["created_bundle_kept_canonical_manifest"] is True
+        assert payload["assertions"]["created_bundle_kept_component_catalog"] is True
+        assert payload["assertions"]["created_node_persisted"] is True
+        assert payload["assertions"]["duplicated_node_persisted"] is True
+        assert payload["assertions"]["created_edge_persisted"] is True
+        assert payload["assertions"]["delete_node_blocked_when_referenced"] is True
+        assert payload["assertions"]["final_bundle_removed_created_node"] is True
+        assert payload["assertions"]["final_bundle_removed_duplicated_node"] is True
+        assert payload["assertions"]["final_bundle_removed_created_edge"] is True
+        assert payload["assertions"]["created_execution_kept_provenance"] is True
+        assert payload["assertions"]["final_execution_kept_provenance"] is True
+        assert payload["summaries"]["created_bundle_io_summary"]["bundle_files"]["components.csv"] == "component_catalog.csv"
+        assert payload["summaries"]["final_bundle_io_summary"]["bundle_files"]["components.csv"] == "component_catalog.csv"
+        assert payload["summaries"]["created_execution_summary"]["scenario_bundle_manifest"].endswith("scenario_bundle.yaml")
+        assert payload["summaries"]["final_execution_summary"]["scenario_bundle_manifest"].endswith("scenario_bundle.yaml")
+        assert any(item["step"] == "create_node" for item in payload["callback_trace"])
+        assert any(item["step"] == "create_edge" for item in payload["callback_trace"])
+        assert any(item["step"] == "save_final_bundle" for item in payload["callback_trace"])
+    finally:
+        cleanup_scenario_copy(artifact_dir)

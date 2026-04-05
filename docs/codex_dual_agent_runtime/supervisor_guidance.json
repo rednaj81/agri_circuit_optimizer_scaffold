@@ -1,15 +1,15 @@
 {
-    "updated_at":  "2026-04-05T07:19:27.2546324Z",
+    "updated_at":  "2026-04-05T08:25:31.9924171Z",
     "phase_id":  "phase_3",
     "phase_assessment":  "continue_phase",
     "recommended_next_phase":  "phase_3",
     "current_focus":  {
-                          "active_wave_index":  4,
-                          "active_role":  "architect",
-                          "waves_completed":  3,
-                          "last_updated_at":  "2026-04-05T07:18:11.610352+00:00",
+                          "active_wave_index":  14,
+                          "active_role":  "",
+                          "waves_completed":  15,
+                          "last_updated_at":  "2026-04-05T08:13:26.383903+00:00",
                           "health_state":  "phase_3_serial_queue_active",
-                          "latest_commit":  "2c3d7bc03b1c904b48c6d166b2c9fc29a9514d44"
+                          "latest_commit":  "2305da132a18bfbf75ca0d86ec5aef811cc6c006"
                       },
     "recent_wave_objectives":  [
                                    "Open phase_3 with the serial queue MVP.",
@@ -22,14 +22,14 @@
                                  "operational_alignment"
                              ],
     "recent_commit_subjects":  [
-                                   "wave5 preserve phase3 governance provenance",
-                                   "wave4 align phase3 governance evidence",
-                                   "wave3 harden terminal rerun traceability",
-                                   "wave2 add phase3 run telemetry inspection",
-                                   "wave6 record phase1 stop trigger",
-                                   "wave14 add runs ui operations",
-                                   "wave5 close phase1 follow-up track",
-                                   "wave4 finalize phase1 governance redirect"
+                                   "wave13 record phase3 stop freeze",
+                                   "wave12 stabilize phase3 runs bootstrap",
+                                   "wave11 centralize phase3 queue summary refresh",
+                                   "wave10 harden phase3 queue summary consistency",
+                                   "wave9 persist phase3 queue summary",
+                                   "wave8 add phase3 queue lineage summary",
+                                   "wave7 harden phase3 run evidence inspection",
+                                   "wave6 freeze phase3 governance sync"
                                ],
     "directives":  [
                        "Treat phase_1 and phase_2 as closed baselines.",
@@ -43,7 +43,7 @@
     "current_phase_gate":  {
                                "manifest":  "docs/codex_dual_agent_runtime/phase_0_validation_manifest.json",
                                "manifest_block":  "phase_3_current_validation",
-                               "handoff":  "docs/2026-04-05_phase3_wave6_governance_commit_sync_handoff.md",
+                               "handoff":  "docs/2026-04-05_phase3_wave1_queue_open_handoff.md",
                                "phase_plan":  "docs/codex_dual_agent_hydraulic_autonomy_bundle/automation/phase_plan.yaml",
                                "tests":  [
                                              "tests/decision_platform/test_phase3_queue_acceptance.py",
@@ -53,11 +53,8 @@
                                                "run_job local persistence",
                                                "serial worker only",
                                                "queued cancel",
-                                               "terminal rerun",
-                                               "persisted run lineage",
-                                               "individual run inspection",
-                                               "bundle reference inspection",
-                                               "governance provenance preserved"
+                                               "explicit rerun",
+                                               "individual run inspection"
                                            ]
                            },
     "phase_1_exit_evidence":  {

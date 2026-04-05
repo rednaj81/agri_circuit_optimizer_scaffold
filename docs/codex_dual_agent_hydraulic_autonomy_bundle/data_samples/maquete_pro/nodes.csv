@@ -1,0 +1,15 @@
+node_id,label,node_type,x,y,notes
+W,Agua,source_only,0.10,0.75,Tanque de agua
+P1,Produto 1,bidirectional,0.18,0.35,Tanque flexivel
+P2,Produto 2,bidirectional,0.32,0.35,Tanque flexivel
+P3,Produto 3,bidirectional,0.46,0.35,Tanque flexivel
+P4,Produto 4,bidirectional,0.60,0.35,Tanque flexivel
+M,Misturador,bidirectional,0.75,0.55,Tanque misturador
+I,Incorporador,bidirectional,0.88,0.35,Tanque incorporador
+S,Saida,sink_only,0.93,0.78,Saida externa
+IR,Recirculacao I,sink_only,0.92,0.18,Servico de agitacao do incorporador
+J1,Junção 1,junction,0.22,0.55,Ponto de barramento
+J2,Junção 2,junction,0.38,0.55,Ponto de barramento
+J3,Junção 3,junction,0.54,0.55,Ponto de barramento
+J4,Junção 4,junction,0.70,0.55,Ponto de barramento
+J5,Junção 5,junction,0.84,0.55,Ponto de barramento

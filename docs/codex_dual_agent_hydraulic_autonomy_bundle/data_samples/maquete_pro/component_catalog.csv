@@ -1,0 +1,11 @@
+component_id,category,subtype,cost,available_qty,is_fallback,hard_min_lpm,hard_max_lpm,confidence_min_lpm,confidence_max_lpm,forward_loss_factor,reverse_loss_factor,cleaning_hold_up_l,quality_tags,notes
+pump_base_300,bomba,suction,0,3,false,0,300,20,220,0.05,0.60,0.2,preferred;single_cycle,Base
+pump_fallback,bomba,fallback,50,999,true,0,99999,0,99999,0.12,0.80,0.4,fallback,Viabilidade
+meter_small,fluxometro,inline,0,2,false,2,30,5,20,0.03,0.20,0.05,confidence_range,Pequenas dosagens
+meter_mid,fluxometro,inline,0,2,false,10,120,20,90,0.03,0.20,0.05,confidence_range,Faixa média
+meter_high,fluxometro,inline,0,1,false,40,300,60,220,0.04,0.25,0.08,confidence_range,Alta vazão
+meter_fallback,fluxometro,fallback,50,999,true,0,99999,0,99999,0.08,0.30,0.10,fallback,Viabilidade
+solenoid_std,valvula,solenoide,0,20,false,0,99999,0,99999,0.02,0.10,0.01,isolating,Valvula padrão
+check_std,check,antiretorno,0,20,false,0,99999,0,99999,0.01,0.90,0.01,backflow_protection,Check
+tee_std,connector,tee,0,20,false,0,99999,0,99999,0.02,0.02,0.00,junction,Tee
+hose_1m,hose,module_1m,0,50,false,0,99999,0,99999,0.01,0.01,0.02,base_hose,Mangueira de 1m
