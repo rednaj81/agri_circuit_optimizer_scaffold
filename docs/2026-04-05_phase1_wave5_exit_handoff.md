@@ -8,12 +8,15 @@ Wave 7 is a corrective regression fix only: it restores reproducibility of the c
 
 This document remains the active operational handoff for the sealed `phase_1`, and no later session should reinterpret it as an invitation to continue `phase_1` functionally.
 
+The historical redirect in this closeout was consumed by `phase_2`. With `phase_2` also sealed, the current functional continuity now lives in `phase_3`; this document remains canonical only as sealed `phase_1` evidence.
+
 ## Operational Status
 
 - `phase_1` is sealed.
 - the latest reconciled repository HEAD for this sealed reading is `e8b5e19e2aea5176a9b184c17a3e3209269a0880`
-- any new functional continuity must open `phase_2` explicitly
-- this session performs no new functional or corrective work inside `phase_1`; it only preserves the redirect to `phase_2`
+- the historical redirect to `phase_2` has already been consumed and closed
+- the current functional phase is `phase_3`, with `tests/decision_platform/test_phase3_queue_acceptance.py` as the active gate
+- this session performs no new functional or corrective work inside `phase_1`; it only preserves the sealed closeout and its downstream redirect history
 - session-local snapshots such as `supervisor_state.json` and `loop_state.json` are not the phase source of truth
 
 ## Point Of Truth
@@ -53,7 +56,9 @@ $env:PYTHONPATH='src;.'; .\.venv\Scripts\python.exe -m pytest tests/decision_pla
 
 ## Next Functional Continuity
 
-`phase_1` is closed at this point. Any new functional progress should open `phase_2` explicitly and keep structural studio work out of the sealed `phase_1` gate.
+`phase_1` is closed at this point. The historical transition to `phase_2` has already happened and is itself closed.
+
+Any active functional progress now belongs to `phase_3`, using `docs/2026-04-05_phase3_wave1_queue_open_handoff.md` plus `tests/decision_platform/test_phase3_queue_acceptance.py` as the active operational gate.
 
 No additional functional wave should be scheduled inside `phase_1` after this regression correction.
 

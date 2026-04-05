@@ -38,10 +38,11 @@ phase_1:
     - 'Os entrypoints oficiais (`run_decision_pipeline` e `save_and_reopen_local_bundle`) devem continuar falhando fechado para layout legado sem manifesto.'
     - 'As suítes de contrato já endurecidas (`test_loaders.py`, `test_scenario_contract_validation.py`, `test_component_catalog_contract.py`, `test_scenario_settings_contract.py`) permanecem como sustentação da saída, não como tema reaberto.'
     - 'Nenhuma nova wave funcional deve ocorrer dentro da phase_1 após a correção final da regressão operacional de fechamento.'
+    - 'O redirecionamento histórico para `phase_2` já foi consumido; a continuidade funcional ativa agora está em `phase_3`, nunca em uma reabertura de `phase_1`.'
   closure_handoff:
     summary_doc: "docs/2026-04-05_phase1_wave5_exit_handoff.md"
     freeze_rule: "Phase_2 deve consumir o bundle canônico como baseline congelado; não reabrir persistência, catálogo, rotas, settings, topologia ou layout sem novo handoff objetivo."
-    transition_note: "A phase_1 esta encerrada; qualquer continuidade funcional deve migrar para a phase_2 apenas por abertura explicita, e nunca por nova onda funcional dentro da phase_1."
+    transition_note: "A phase_1 esta encerrada como baseline selada; o redirecionamento histórico abriu a phase_2 e a continuidade funcional ativa agora reside na phase_3, nunca em nova onda funcional dentro da phase_1."
 phase_2:
   target: "Entregar studio de nós e arestas"
   status: "closed"
@@ -75,6 +76,7 @@ phase_3:
     - 'Usar `tests/decision_platform/test_phase3_queue_acceptance.py` como aceite funcional atual do corte mínimo da fila serial.'
     - 'Usar `docs/2026-04-05_phase3_wave1_queue_open_handoff.md` como handoff humano único de abertura operacional da phase_3.'
     - 'Tratar `phase_1` e `phase_2` como fechadas; não reabrir persistência canônica nem baseline do Studio enquanto a fila serial evolui.'
+    - 'Referenciar `docs/2026-04-05_phase1_wave5_exit_handoff.md` apenas como baseline histórica selada, não como escopo funcional reaberto.'
   current_scope:
     - "run_job persistido localmente com estados canônicos"
     - "worker serial explícito sem simultaneidade no MVP"

@@ -22,7 +22,7 @@ Realign the administrative source of truth so `phase_3` is the only active funct
 
 ## Closed Phases
 
-- `phase_1` remains sealed and cannot receive additional functional waves
+- `phase_1` remains sealed and cannot receive additional functional waves; `docs/2026-04-05_phase1_wave5_exit_handoff.md` remains its canonical closeout reference
 - `phase_2` remains closed with `tests/decision_platform/test_phase2_exit_acceptance.py` as its frozen exit gate
 
 ## Scope Guard
