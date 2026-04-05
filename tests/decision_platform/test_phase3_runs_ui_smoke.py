@@ -66,8 +66,14 @@ def test_runs_tab_reopens_persisted_operational_telemetry() -> None:
         assert detail_payload["source_bundle_reference_path"] == created_job["source_bundle_reference_path"]
         assert detail_payload["source_bundle_reference"]["run_id"] == created_job["run_id"]
         assert detail_payload["source_bundle_reference"]["scenario_provenance"]["bundle_manifest"]
+        assert detail_payload["evidence"]["run_id"] == created_job["run_id"]
+        assert detail_payload["evidence"]["artifact_expectation"] == "summary_artifacts_expected"
+        assert detail_payload["evidence"]["has_summary_json"] is True
+        assert detail_payload["evidence"]["run_dir_isolated"] is True
+        assert detail_payload["evidence"]["final_status_logged"] is True
         assert detail_payload["telemetry"]["duration_s"] == detail_payload["duration_s"]
         assert detail_payload["inspection"]["queue_root"] == str(queue_root.resolve())
+        assert detail_payload["inspection"]["artifacts_dir"] == completed_job["artifacts_dir"]
         assert detail_payload["inspection"]["source_bundle_reference_path"] == created_job["source_bundle_reference_path"]
     finally:
         cleanup_scenario_copy(queue_root)

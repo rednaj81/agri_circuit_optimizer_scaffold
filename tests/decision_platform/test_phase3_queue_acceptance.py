@@ -65,6 +65,20 @@ def _assert_run_detail_has_telemetry(detail: dict[str, Any]) -> None:
             assert detail[field] == telemetry[field]
 
 
+def _assert_run_evidence(detail: dict[str, Any], *, expected_status: str) -> dict[str, Any]:
+    evidence = detail.get("evidence")
+    assert isinstance(evidence, dict)
+    selected_run_id = detail["selected_run_id"] if "selected_run_id" in detail else detail["run_id"]
+    assert evidence["run_id"] == selected_run_id
+    assert evidence["run_dir_exists"] is True
+    assert evidence["run_dir_isolated"] is True
+    assert evidence["log_exists"] is True
+    assert evidence["final_status_logged"] is True
+    assert evidence["final_status_recorded"] is True
+    assert evidence["event_statuses"][-1] == expected_status
+    return evidence
+
+
 @pytest.mark.slow
 def test_phase3_queue_acceptance_serial_jobs_are_isolated_and_auditable() -> None:
     scenario_dir = prepare_maquete_v2_acceptance_scenario(
@@ -140,6 +154,14 @@ def test_phase3_queue_acceptance_serial_jobs_are_isolated_and_auditable() -> Non
             assert completed_detail["failure_reason"] is None
             assert completed_detail["failure_stacktrace_excerpt"] is None
             assert completed_detail["inspection"]["queue_root"] == str(queue_root.resolve())
+            completed_evidence = _assert_run_evidence(completed_detail, expected_status="completed")
+            assert completed_evidence["artifact_expectation"] == "summary_artifacts_expected"
+            assert completed_evidence["artifacts_dir_exists"] is True
+            assert completed_evidence["artifact_file_count"] > 0
+            assert completed_evidence["has_summary_json"] is True
+            assert completed_evidence["has_catalog_csv"] is True
+            assert completed_evidence["has_selected_candidate_json"] is True
+            assert completed_evidence["log_statuses"] == ["queued", "preparing", "running", "exporting", "completed"]
 
             event_statuses = [
                 json.loads(line)["status"]
@@ -204,6 +226,12 @@ def test_phase3_queue_acceptance_keeps_official_mode_julia_only(monkeypatch) -> 
         assert "official Julia-only gate" in str(failed_detail["policy_message"])
         assert "invalid for the official Julia-only gate" in str(failed_detail["failure_reason"])
         assert "OfficialRuntimeConfigError" in str(failed_detail["failure_stacktrace_excerpt"])
+        failed_evidence = _assert_run_evidence(failed_detail, expected_status="failed")
+        assert failed_evidence["artifact_expectation"] == "execution_log_expected"
+        assert failed_evidence["artifacts_dir_exists"] is True
+        assert failed_evidence["has_summary_json"] is False
+        assert failed_evidence["artifact_file_count"] == 0
+        assert failed_evidence["log_statuses"][-1] == "failed"
 
         assert diagnostic_job["requested_execution_mode"] == "diagnostic"
         assert completed_job is not None
@@ -266,6 +294,12 @@ def test_phase3_queue_acceptance_can_cancel_queued_jobs_without_execution_artifa
         assert inspection["duration_s"] == 0.0
         assert inspection["policy_mode"] == "diagnostic_override_probe_disabled"
         assert inspection["failure_reason"] is None
+        canceled_evidence = _assert_run_evidence(inspection, expected_status="canceled")
+        assert canceled_evidence["artifact_expectation"] == "no_execution_artifacts_expected"
+        assert canceled_evidence["artifacts_dir_exists"] is False
+        assert canceled_evidence["artifact_file_count"] == 0
+        assert canceled_evidence["has_summary_json"] is False
+        assert canceled_evidence["log_statuses"] == ["queued", "canceled"]
         assert completed_job is not None
         assert completed_job["run_id"] == runnable_candidate["run_id"]
         assert completed_job["status"] == "completed"
@@ -401,6 +435,8 @@ def test_phase3_queue_acceptance_reopens_persisted_run_state_for_inspection() ->
         assert reopened_snapshot["selected_run_detail"]["source_bundle_reference_path"] == canceled_job["source_bundle_reference_path"]
         assert reopened_snapshot["selected_run_detail"]["source_bundle_reference"]["rerun_source"]["source_run_id"] == completed_candidate["run_id"]
         _assert_run_detail_has_telemetry(reopened_snapshot["selected_run_detail"])
+        reopened_canceled_evidence = _assert_run_evidence(reopened_snapshot["selected_run_detail"], expected_status="canceled")
+        assert reopened_canceled_evidence["artifact_file_count"] == 0
         assert reopened_snapshot["summary"]["queue_state"] == "idle"
         assert reopened_snapshot["summary"]["queued_run_ids"] == []
         assert reopened_snapshot["summary"]["terminal_run_ids"] == [
@@ -411,6 +447,7 @@ def test_phase3_queue_acceptance_reopens_persisted_run_state_for_inspection() ->
         assert completed_detail["artifacts"]["summary_json"] is not None
         assert completed_detail["events"][-1]["status"] == "completed"
         _assert_run_detail_has_telemetry(completed_detail)
+        assert _assert_run_evidence(completed_detail, expected_status="completed")["has_summary_json"] is True
         assert canceled_detail["status"] == "canceled"
         assert canceled_detail["events"][-1]["status"] == "canceled"
         assert canceled_detail["artifacts"]["summary_json"] is None
@@ -418,6 +455,7 @@ def test_phase3_queue_acceptance_reopens_persisted_run_state_for_inspection() ->
         assert canceled_detail["source_bundle_reference"]["rerun_source"]["source_run_id"] == completed_candidate["run_id"]
         assert canceled_detail["inspection"]["source_bundle_reference_path"] == canceled_job["source_bundle_reference_path"]
         _assert_run_detail_has_telemetry(canceled_detail)
+        assert _assert_run_evidence(canceled_detail, expected_status="canceled")["log_statuses"] == ["queued", "canceled"]
         assert "run-queue-root" in layout_repr
         assert queue_root_store.data == queue_root_str
         assert canceled_job["run_id"] in layout_repr

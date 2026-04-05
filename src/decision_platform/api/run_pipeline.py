@@ -482,6 +482,23 @@ def _read_log_tail(log_path: Path, *, max_chars: int = 4000) -> str:
     return text[-max_chars:]
 
 
+def _read_log_lines(log_path: Path) -> list[str]:
+    if not log_path.exists():
+        return []
+    return [line for line in log_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+
+def _extract_logged_statuses(log_lines: list[str]) -> list[str]:
+    statuses: list[str] = []
+    for line in log_lines:
+        _, _, message = line.partition(" ")
+        status_candidate, separator, _ = message.partition(":")
+        normalized = status_candidate.strip()
+        if separator and normalized in RUN_JOB_STATUSES:
+            statuses.append(normalized)
+    return statuses
+
+
 def _transition_run_job(
     job: dict[str, Any],
     *,
@@ -555,11 +572,15 @@ def _build_run_job_detail(job: dict[str, Any]) -> dict[str, Any]:
     artifacts_dir = Path(job["artifacts_dir"])
     normalized_job = _normalize_run_job(job)
     source_bundle_reference_path = Path(normalized_job["source_bundle_reference_path"])
+    events = _read_run_events(events_path)
+    log_lines = _read_log_lines(log_path)
+    artifacts = normalized_job.get("artifacts") or _build_run_artifact_manifest(artifacts_dir)
     return {
         **normalized_job,
-        "events": _read_run_events(events_path),
+        "events": events,
         "log_tail": _read_log_tail(log_path),
-        "artifacts": normalized_job.get("artifacts") or _build_run_artifact_manifest(artifacts_dir),
+        "artifacts": artifacts,
+        "evidence": _build_run_job_evidence(normalized_job, events=events, log_path=log_path, log_lines=log_lines, artifacts=artifacts),
         "source_bundle_reference": _read_json_if_exists(source_bundle_reference_path),
     }
 
@@ -913,6 +934,47 @@ def _coalesce(*values: Any) -> Any:
         if value is not None:
             return value
     return None
+
+
+def _build_run_job_evidence(
+    job: dict[str, Any],
+    *,
+    events: list[dict[str, Any]],
+    log_path: Path,
+    log_lines: list[str],
+    artifacts: dict[str, Any],
+) -> dict[str, Any]:
+    status = str(job.get("status") or "")
+    event_statuses = [str(event.get("status")) for event in events if event.get("status")]
+    run_dir = Path(job["run_dir"])
+    queue_root = Path(job["queue_root"])
+    artifacts_dir = Path(job["artifacts_dir"])
+    log_statuses = _extract_logged_statuses(log_lines)
+    if status in {"queued", "canceled"}:
+        artifact_expectation = "no_execution_artifacts_expected"
+    elif status == "completed":
+        artifact_expectation = "summary_artifacts_expected"
+    else:
+        artifact_expectation = "execution_log_expected"
+    return {
+        "run_id": job["run_id"],
+        "artifact_expectation": artifact_expectation,
+        "run_dir_exists": run_dir.exists(),
+        "run_dir_isolated": run_dir.parent == queue_root,
+        "artifacts_dir_exists": artifacts_dir.exists(),
+        "artifact_file_count": len(artifacts.get("files") or []),
+        "artifact_files": list(artifacts.get("files") or []),
+        "has_summary_json": bool(artifacts.get("summary_json")),
+        "has_catalog_csv": bool(artifacts.get("catalog_csv")),
+        "has_selected_candidate_json": bool(artifacts.get("selected_candidate_json")),
+        "log_exists": log_path.exists(),
+        "log_line_count": len(log_lines),
+        "log_statuses": log_statuses,
+        "final_status_logged": status in log_statuses,
+        "event_count": len(event_statuses),
+        "event_statuses": event_statuses,
+        "final_status_recorded": bool(event_statuses) and event_statuses[-1] == status,
+    }
 
 
 def _infer_diagnostic_features(job: dict[str, Any]) -> list[str]:
