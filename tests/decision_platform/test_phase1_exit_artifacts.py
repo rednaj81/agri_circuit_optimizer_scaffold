@@ -69,6 +69,8 @@ def test_phase1_exit_artifacts_have_consistent_closed_state() -> None:
     assert manifest["phase_1_additional_operational_waves_allowed"] is False
     assert manifest["phase_1_post_close_exception_policy"] == "critical_evidence_integrity_only"
     assert manifest["phase_1_stop_reason"] == "low_residual_value_redirect_to_phase_3"
+    assert manifest["phase_1_stop_trigger"] == "three_consecutive_low_value_auditor_waves"
+    assert manifest["phase_1_stop_wave_index"] == 6
     assert manifest["final_operational_correction_wave"] == 7
     assert manifest["current_phase_guidance"] == "docs/codex_dual_agent_runtime/supervisor_guidance.json"
     assert manifest["current_phase_exit"] == "phase_3"
@@ -85,6 +87,8 @@ def test_phase1_exit_artifacts_have_consistent_closed_state() -> None:
     assert manifest["phase_1_exit_validation"]["redirect_future_sessions_to_phase"] == "phase_3"
     assert manifest["phase_1_exit_validation"]["post_close_exception_policy"] == "critical_evidence_integrity_only"
     assert manifest["phase_1_exit_validation"]["incremental_track_closed_after_this_wave"] is True
+    assert manifest["phase_1_exit_validation"]["stop_trigger"] == "three_consecutive_low_value_auditor_waves"
+    assert manifest["phase_1_exit_validation"]["stop_wave_index"] == 6
     assert manifest["phase_1_exit_validation"]["no_additional_phase1_functional_waves"] is True
     assert manifest["phase_1_exit_validation"]["phase_1_operational_track_closed"] is True
     assert manifest["phase_1_exit_validation"]["operational_closeout"] == (
@@ -108,12 +112,14 @@ def test_phase1_exit_artifacts_have_consistent_closed_state() -> None:
     assert "historical-reference-only" in handoff_text
     assert "No additional low-value operational correction wave should be scheduled inside `phase_1`" in handoff_text
     assert "the only admissible exception inside `phase_1` is a critical evidence-integrity repair" in handoff_text
+    assert "three consecutive low-value waves according to the Auditor" in handoff_text
     assert "canonical closeout reference" in phase3_handoff_text
     assert "historical-reference-only governance" in phase3_handoff_text
     assert "não abrir novas ondas incrementais de rotina nessa fase" in stop_rules_text
     assert "permitir exceção apenas para correção crítica de integridade de evidências" in stop_rules_text
     assert "`phase_1` e `phase_2` são baselines seladas" in stop_rules_text
     assert "a continuidade funcional ativa deve seguir somente em `phase_3`" in stop_rules_text
+    assert "`phase_1` foi formalmente encerrada após 3 ondas consecutivas de baixo valor segundo o Auditor" in stop_rules_text
 
     phase1_plan = phase_plan["phase_1"]
     phase2_plan = phase_plan["phase_2"]
@@ -125,10 +131,12 @@ def test_phase1_exit_artifacts_have_consistent_closed_state() -> None:
     assert any("continuidade funcional ativa agora está em `phase_3`" in entry for entry in phase1_plan["phase_exit_checklist"])
     assert any("não abrir novas waves, nem mesmo correções operacionais de baixo valor" in entry for entry in phase1_plan["phase_exit_checklist"])
     assert any("qualquer exceção deve se limitar a correção crítica de integridade de evidências" in entry for entry in phase1_plan["phase_exit_checklist"])
+    assert any("3 ondas consecutivas de baixo valor segundo o Auditor" in entry for entry in phase1_plan["phase_exit_checklist"])
     assert phase1_plan["closure_handoff"]["summary_doc"] == "docs/2026-04-05_phase1_wave5_exit_handoff.md"
     assert "continuidade funcional ativa agora reside na phase_3" in phase1_plan["closure_handoff"]["transition_note"]
     assert "nova correção operacional de baixo valor" in phase1_plan["closure_handoff"]["transition_note"]
     assert phase1_plan["closure_handoff"]["post_close_exception_policy"] == "critical_evidence_integrity_only"
+    assert phase1_plan["closure_handoff"]["stop_trigger"] == "three_consecutive_low_value_auditor_waves"
     assert phase2_plan["target"] == "Entregar studio de nós e arestas"
     assert phase2_plan["closure_handoff"]["summary_doc"] == "docs/2026-04-05_phase2_exit.md"
     assert any(

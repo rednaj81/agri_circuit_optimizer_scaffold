@@ -41,11 +41,13 @@ phase_1:
     - 'O redirecionamento histórico para `phase_2` já foi consumido; a continuidade funcional ativa agora está em `phase_3`, nunca em uma reabertura de `phase_1`.'
     - 'Após esta trilha operacional, `phase_1` permanece apenas como baseline histórica selada; não abrir novas waves, nem mesmo correções operacionais de baixo valor, fora de justificativa extraordinária.'
     - 'Após esta onda final de encerramento, qualquer exceção deve se limitar a correção crítica de integridade de evidências; continuidade normal segue apenas em `phase_3`.'
+    - 'A parada desta trilha fica registrada por 3 ondas consecutivas de baixo valor segundo o Auditor; não prolongar `phase_1` além deste ponto.'
   closure_handoff:
     summary_doc: "docs/2026-04-05_phase1_wave5_exit_handoff.md"
     freeze_rule: "Phase_2 deve consumir o bundle canônico como baseline congelado; não reabrir persistência, catálogo, rotas, settings, topologia ou layout sem novo handoff objetivo."
     transition_note: "A phase_1 esta encerrada como baseline selada e referência histórica; o redirecionamento histórico abriu a phase_2 e a continuidade funcional ativa agora reside na phase_3, nunca em nova onda funcional nem em nova correção operacional de baixo valor dentro da phase_1."
     post_close_exception_policy: "critical_evidence_integrity_only"
+    stop_trigger: "three_consecutive_low_value_auditor_waves"
 phase_2:
   target: "Entregar studio de nós e arestas"
   status: "closed"

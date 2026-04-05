@@ -1,6 +1,6 @@
 {
   "phase_id": "phase_0",
-  "generated_at": "2026-04-05T02:06:01.9281433-03:00",
+  "generated_at": "2026-04-05T02:18:07.3015860-03:00",
   "script_path": "C:\\d\\dev\\agri_circuit_optimizer_scaffold\\scripts\\run_decision_platform_runtime_validation.ps1",
   "profiles_path": "C:\\d\\dev\\agri_circuit_optimizer_scaffold\\scripts\\decision_platform_runtime_validation_profiles.json",
   "logs_dir": "C:\\d\\dev\\agri_circuit_optimizer_scaffold\\tests\\_tmp\\runtime_validation_script_logs",
@@ -15,9 +15,9 @@
       "official_gate_complete": false,
       "status": "failed",
       "success": false,
-      "last_report_path": "C:\\d\\dev\\agri_circuit_optimizer_scaffold\\tests\\_tmp\\runtime_validation_script_logs\\decision-platform-runtime-validation_diagnostic_20260405-020601-749.json",
-      "started_at": "2026-04-05T02:06:01.7491186-03:00",
-      "finished_at": "2026-04-05T02:06:01.8375167-03:00",
+      "last_report_path": "C:\\d\\dev\\agri_circuit_optimizer_scaffold\\tests\\_tmp\\runtime_validation_script_logs\\decision-platform-runtime-validation_diagnostic_20260405-021807-071.json",
+      "started_at": "2026-04-05T02:18:07.0713345-03:00",
+      "finished_at": "2026-04-05T02:18:07.1752896-03:00",
       "output_dir": "C:\\d\\dev\\agri_circuit_optimizer_scaffold\\data\\output\\decision_platform\\runtime_validation_diagnostic",
       "runtime_scenario_dir": null,
       "summary_path": null,
@@ -93,6 +93,8 @@
   "phase_1_additional_operational_waves_allowed": false,
   "phase_1_post_close_exception_policy": "critical_evidence_integrity_only",
   "phase_1_stop_reason": "low_residual_value_redirect_to_phase_3",
+  "phase_1_stop_trigger": "three_consecutive_low_value_auditor_waves",
+  "phase_1_stop_wave_index": 6,
   "final_operational_correction_wave": 7,
   "phase_1_exit_validation": {
     "phase_id": "phase_1",
@@ -135,6 +137,8 @@
     "redirect_future_sessions_to_phase": "phase_3",
     "post_close_exception_policy": "critical_evidence_integrity_only",
     "incremental_track_closed_after_this_wave": true,
+    "stop_trigger": "three_consecutive_low_value_auditor_waves",
+    "stop_wave_index": 6,
     "phase_exit_criteria": [
       "cenarios versionaveis",
       "catalogo de componentes persistido"

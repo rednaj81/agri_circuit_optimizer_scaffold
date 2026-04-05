@@ -14,6 +14,8 @@ This handoff is historical-reference-only. Future sessions should use it to audi
 
 After this closeout, the only admissible exception inside `phase_1` is a critical evidence-integrity repair. Any normal continuity, clarification, or follow-up must proceed in `phase_3`.
 
+This stop is now formal: `phase_1` reached the rule-of-stop threshold after three consecutive low-value waves according to the Auditor, so no further incremental follow-up should be scheduled here.
+
 ## Operational Status
 
 - `phase_1` is sealed.

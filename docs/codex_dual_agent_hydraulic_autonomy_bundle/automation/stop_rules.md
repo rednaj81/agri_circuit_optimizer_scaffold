@@ -31,3 +31,4 @@ Aplicação atual:
 - `phase_1` e `phase_2` são baselines seladas
 - a continuidade funcional ativa deve seguir somente em `phase_3`
 - qualquer exceção em `phase_1` deve ser tratada como recuperação extraordinária de evidências, não como nova onda incremental
+- `phase_1` foi formalmente encerrada após 3 ondas consecutivas de baixo valor segundo o Auditor
