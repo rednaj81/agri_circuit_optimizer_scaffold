@@ -100,6 +100,8 @@ def test_phase1_exit_canonical_bundle_flow_is_versionable_and_traceable() -> Non
         assert saved["result"]["scenario_provenance"]["requested_dir_matches_bundle_root"] is True
         assert saved["bundle_io_summary"]["bundle_manifest"].endswith("scenario_bundle.yaml")
         assert saved["bundle_io_summary"]["bundle_files"]["components.csv"] == "component_catalog.csv"
+        assert saved["bundle_io_summary"]["requested_output_dir"] == str(save_dir.resolve())
+        assert saved["bundle_io_summary"]["requested_dir_matches_bundle_root"] is True
         assert saved["bundle_io_summary"]["execution_scenario_provenance"]["scenario_root"] == str(save_dir.resolve())
         assert saved["bundle_io_summary"]["exported_files"]["bundle_manifest"].endswith("scenario_bundle.yaml")
 

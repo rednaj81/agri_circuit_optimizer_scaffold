@@ -177,6 +177,8 @@ def test_ui_save_reopen_flow_persists_bundle_and_refreshes_pipeline() -> None:
         assert saved["result"]["scenario_bundle_files"]["components.csv"] == "component_catalog.csv"
         assert saved["result"]["scenario_provenance"]["requested_dir_matches_bundle_root"] is True
         assert saved["bundle_io_summary"]["canonical_scenario_root"] == str(output_dir.resolve())
+        assert saved["bundle_io_summary"]["requested_output_dir"] == str(output_dir.resolve())
+        assert saved["bundle_io_summary"]["requested_dir_matches_bundle_root"] is True
         assert saved["bundle_io_summary"]["execution_scenario_provenance"]["scenario_root"] == str(output_dir.resolve())
         assert saved["pipeline_error"] is None
     finally:

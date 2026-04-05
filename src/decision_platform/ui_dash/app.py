@@ -63,7 +63,9 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
     initial_bundle_io_summary = json.dumps(
         {
             "source_scenario_dir": str(Path(scenario_dir)),
+            "requested_scenario_dir": str(Path(scenario_dir)),
             "canonical_scenario_root": str(bundle.base_dir),
+            "requested_dir_matches_bundle_root": str(Path(scenario_dir)) == str(bundle.base_dir),
             "bundle_manifest": str(bundle.bundle_manifest_path) if bundle.bundle_manifest_path else None,
             "bundle_version": bundle.bundle_version,
             "bundle_files": {
@@ -1413,6 +1415,8 @@ def save_and_reopen_local_bundle(
         scenario_settings_text=scenario_settings_text,
     )
     result, pipeline_error = _safe_run_pipeline(normalized_output_dir)
+    canonical_scenario_root = str(reloaded_bundle.base_dir.resolve(strict=False))
+    requested_output_dir = str(normalized_output_dir)
     return {
         "scenario_dir": str(normalized_output_dir),
         "bundle": reloaded_bundle,
@@ -1421,8 +1425,11 @@ def save_and_reopen_local_bundle(
         "bundle_io_summary": {
             "status": "saved_and_reopened",
             "source_scenario_dir": str(normalized_source_dir),
+            "requested_scenario_dir": str(normalized_source_dir),
+            "requested_output_dir": requested_output_dir,
             "saved_scenario_dir": str(normalized_output_dir),
-            "canonical_scenario_root": str(reloaded_bundle.base_dir),
+            "canonical_scenario_root": canonical_scenario_root,
+            "requested_dir_matches_bundle_root": requested_output_dir == canonical_scenario_root,
             "bundle_version": reloaded_bundle.bundle_version,
             "bundle_manifest": str(reloaded_bundle.bundle_manifest_path) if reloaded_bundle.bundle_manifest_path else None,
             "bundle_files": {
