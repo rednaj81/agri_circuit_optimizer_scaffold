@@ -30,6 +30,7 @@ documents:
 Regras:
 - o loader aceita o layout legado sem manifesto apenas para compatibilidade
 - quando `scenario_bundle.yaml` existe, ele define a origem canônica de cada arquivo
+- o manifesto canônico deve referenciar exatamente os caminhos acima; aliases como `components.csv`, prefixos como `./` e remapeamentos alternativos devem falhar fechado
 - `bundle_version` não suportado deve falhar fechado com mensagem clara
 - arquivo referenciado pelo manifesto ausente deve falhar fechado com mensagem clara
 

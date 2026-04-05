@@ -119,6 +119,40 @@ def test_loader_rejects_manifest_missing_required_entries() -> None:
         cleanup_scenario_copy(scenario_dir)
 
 
+def test_loader_rejects_manifest_with_noncanonical_component_catalog_entry() -> None:
+    scenario_dir = prepare_scenario_copy(
+        "data/decision_platform/maquete_v2",
+        "maquete_v2_noncanonical_manifest_component_catalog",
+    )
+    try:
+        manifest_path = Path(scenario_dir) / BUNDLE_MANIFEST_FILENAME
+        manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8")) or {}
+        manifest["tables"]["components"] = "components.csv"
+        manifest_path.write_text(yaml.safe_dump(manifest, sort_keys=False), encoding="utf-8")
+
+        with pytest.raises(ValueError, match="must use canonical paths"):
+            load_scenario_bundle(scenario_dir)
+    finally:
+        cleanup_scenario_copy(scenario_dir)
+
+
+def test_loader_rejects_manifest_with_noncanonical_document_entry() -> None:
+    scenario_dir = prepare_scenario_copy(
+        "data/decision_platform/maquete_v2",
+        "maquete_v2_noncanonical_manifest_document",
+    )
+    try:
+        manifest_path = Path(scenario_dir) / BUNDLE_MANIFEST_FILENAME
+        manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8")) or {}
+        manifest["documents"]["scenario_settings"] = "./scenario_settings.yaml"
+        manifest_path.write_text(yaml.safe_dump(manifest, sort_keys=False), encoding="utf-8")
+
+        with pytest.raises(ValueError, match="must use canonical paths"):
+            load_scenario_bundle(scenario_dir)
+    finally:
+        cleanup_scenario_copy(scenario_dir)
+
+
 def test_save_authored_bundle_persists_authoring_changes() -> None:
     source_bundle = load_scenario_bundle("data/decision_platform/maquete_v2")
     output_dir = prepare_isolated_tmp_dir("scenario_persistence_authored")

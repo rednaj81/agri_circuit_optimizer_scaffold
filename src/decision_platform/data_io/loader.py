@@ -45,6 +45,22 @@ MANIFEST_DOCUMENT_KEYS = {
     "scenario_settings": "scenario_settings.yaml",
 }
 
+CANONICAL_MANIFEST_TABLE_PATHS = {
+    "nodes": "nodes.csv",
+    "components": "component_catalog.csv",
+    "candidate_links": "candidate_links.csv",
+    "edge_component_rules": "edge_component_rules.csv",
+    "route_requirements": "route_requirements.csv",
+    "quality_rules": "quality_rules.csv",
+    "weight_profiles": "weight_profiles.csv",
+    "layout_constraints": "layout_constraints.csv",
+}
+
+CANONICAL_MANIFEST_DOCUMENT_PATHS = {
+    "topology_rules": "topology_rules.yaml",
+    "scenario_settings": "scenario_settings.yaml",
+}
+
 DEFAULT_SCENARIO_FILE_ALIASES = {
     "nodes.csv": ("nodes.csv",),
     "components.csv": ("component_catalog.csv", "components.csv"),
@@ -279,11 +295,18 @@ def _resolve_manifest_files(base_dir: Path, manifest: dict[str, Any]) -> dict[st
         raise ValueError(f"Scenario bundle manifest '{BUNDLE_MANIFEST_FILENAME}' must define a 'documents' mapping.")
     resolved: dict[str, Path] = {}
     missing_entries: list[str] = []
+    noncanonical_entries: list[str] = []
     missing_files: list[str] = []
     for key, filename in MANIFEST_TABLE_KEYS.items():
         relative_path = str(tables.get(key, "")).strip()
         if not relative_path:
             missing_entries.append(f"tables.{key}")
+            continue
+        expected_relative_path = CANONICAL_MANIFEST_TABLE_PATHS[key]
+        if relative_path != expected_relative_path:
+            noncanonical_entries.append(
+                f"tables.{key}='{relative_path}' (expected '{expected_relative_path}')"
+            )
             continue
         path = base_dir / relative_path
         if not path.exists():
@@ -294,6 +317,12 @@ def _resolve_manifest_files(base_dir: Path, manifest: dict[str, Any]) -> dict[st
         if not relative_path:
             missing_entries.append(f"documents.{key}")
             continue
+        expected_relative_path = CANONICAL_MANIFEST_DOCUMENT_PATHS[key]
+        if relative_path != expected_relative_path:
+            noncanonical_entries.append(
+                f"documents.{key}='{relative_path}' (expected '{expected_relative_path}')"
+            )
+            continue
         path = base_dir / relative_path
         if not path.exists():
             missing_files.append(relative_path)
@@ -301,6 +330,11 @@ def _resolve_manifest_files(base_dir: Path, manifest: dict[str, Any]) -> dict[st
     if missing_entries:
         raise ValueError(
             f"Scenario bundle manifest '{BUNDLE_MANIFEST_FILENAME}' is missing required entries: {missing_entries}"
+        )
+    if noncanonical_entries:
+        raise ValueError(
+            f"Scenario bundle manifest '{BUNDLE_MANIFEST_FILENAME}' must use canonical paths: "
+            f"{noncanonical_entries}"
         )
     if missing_files:
         raise FileNotFoundError(
