@@ -86,9 +86,21 @@
   "current_phase_status": "active",
   "current_acceptance_target": "tests/decision_platform/test_phase3_queue_acceptance.py",
   "next_functional_phase": "phase_4",
-  "current_phase_handoff": "docs/2026-04-05_phase3_wave4_governance_alignment_handoff.md",
+  "current_phase_handoff": "docs/2026-04-05_phase3_wave5_governance_provenance_redirect_handoff.md",
   "phase_0_runtime_handoff": "docs/codex_dual_agent_runtime/phase_0_exit.md",
   "current_phase_guidance": "docs/codex_dual_agent_runtime/supervisor_guidance.json",
+  "manifest_provenance": {
+    "administrative_refresh_wave": "phase_3_wave_5_governance_provenance_redirect",
+    "administrative_refreshed_at": "2026-04-05T04:13:23.3335196-03:00",
+    "runtime_validation_regenerated_in_this_wave": false,
+    "preserved_runtime_report_profiles": [
+      "diagnostic",
+      "diagnostic_comparison",
+      "official",
+      "official_preflight"
+    ],
+    "note": "This wave updated governance references only. The runtime validation profile timestamps and report paths above were preserved from prior real validation evidence and were not regenerated in this wave."
+  },
   "phase_1_additional_functional_waves_allowed": false,
   "final_operational_correction_wave": 7,
   "phase_1_exit_validation": {
@@ -191,7 +203,8 @@
       "docs/2026-04-05_phase2_to_phase3_handoff.md",
       "docs/2026-04-05_phase3_wave2_run_operations_handoff.md",
       "docs/2026-04-05_phase3_wave3_terminal_rerun_traceability_handoff.md",
-      "docs/2026-04-05_phase3_wave4_governance_alignment_handoff.md"
+      "docs/2026-04-05_phase3_wave4_governance_alignment_handoff.md",
+      "docs/2026-04-05_phase3_wave5_governance_provenance_redirect_handoff.md"
     ],
     "evidence": {
       "run_job_contract": "local_persisted",
@@ -208,6 +221,7 @@
       "docs/2026-04-05_phase3_wave2_run_operations_handoff.md",
       "docs/2026-04-05_phase3_wave3_terminal_rerun_traceability_handoff.md",
       "docs/2026-04-05_phase3_wave4_governance_alignment_handoff.md",
+      "docs/2026-04-05_phase3_wave5_governance_provenance_redirect_handoff.md",
       "tests/decision_platform/test_phase3_queue_acceptance.py",
       "tests/decision_platform/test_phase3_runs_ui_smoke.py"
     ]
