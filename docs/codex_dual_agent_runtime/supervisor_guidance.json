@@ -1,0 +1,63 @@
+{
+  "updated_at": "2026-04-05T02:43:07.4504607Z",
+  "phase_id": "phase_1",
+  "phase_assessment": "phase_closed",
+  "recommended_next_phase": "phase_2",
+  "current_focus": {
+    "active_wave_index": 5,
+    "active_role": "developer",
+    "waves_completed": 4,
+    "last_updated_at": "2026-04-05T02:43:07.4504607Z",
+    "health_state": "phase_1_closed_ready_for_phase_2",
+    "latest_commit": "03bab5f84b1e200b7d887e9a9a2d22ab8cf89b42"
+  },
+  "recent_wave_objectives": [
+    "Seal canonical bundle provenance for save and reopen.",
+    "Protect reference-safe topology edits in authored scenarios.",
+    "Make canonical bundle save atomic with storage normalization.",
+    "Seal a reproducible phase_1 exit gate."
+  ],
+  "recent_wave_verdicts": [
+    "moderate_progress",
+    "significant_progress",
+    "significant_progress",
+    "significant_progress"
+  ],
+  "recent_commit_subjects": [
+    "wave4 seal phase1 exit gate",
+    "wave3 atomize canonical bundle save",
+    "wave2 seal reference-safe topology edits",
+    "wave1 harden bundle provenance signals"
+  ],
+  "directives": [
+    "Treat phase_1 as functionally closed.",
+    "Route new structural studio work to phase_2.",
+    "Keep phase_1 evidence anchored to canonical bundle persistence and official provenance."
+  ],
+  "rationale": [
+    "The exit criteria for phase_1 are already covered by code and tests.",
+    "Further functional waves inside phase_1 would blur the boundary with structural studio scope."
+  ],
+  "phase_exit_evidence": {
+    "manifest": "docs/codex_dual_agent_runtime/phase_0_validation_manifest.json",
+    "manifest_block": "phase_1_exit_validation",
+    "handoff": "docs/2026-04-05_phase1_wave5_exit_handoff.md",
+    "tests": [
+      "tests/decision_platform/test_scenario_settings_contract.py",
+      "tests/decision_platform/test_scenario_persistence.py",
+      "tests/decision_platform/test_phase1_exit_acceptance.py"
+    ],
+    "signals": [
+      "scenario_bundle.yaml",
+      "component_catalog.csv",
+      "scenario_settings.storage canonical mapping",
+      "save -> reopen -> run provenance"
+    ]
+  },
+  "out_of_scope_for_phase_1": [
+    "Structural studio creation, duplication, or deletion flows",
+    "Queue and background execution",
+    "Ranking, scoring, and decision UI expansion",
+    "Julia runtime changes beyond the frozen phase_0 gate"
+  ]
+}

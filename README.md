@@ -99,7 +99,7 @@ Observações:
 - resiliência e parte da exploração topológica continuam heurísticas
 - a UI ainda é orientada a análise local; não há persistência multiusuário nem workflow de aprovação
 - o gate atual da `phase_1` cobre persistência/reopen do bundle canônico, `component_catalog.csv`, normalização de `scenario_settings.storage` e proveniência do fluxo oficial `save -> reopen -> run`
-- o trabalho de studio estrutural permanece explicitamente fora do gate da `phase_1`; qualquer evidência desse escopo deve ser auditada separadamente da saída de cenários versionáveis e catálogo persistido
+- o trabalho de studio estrutural pertence ao próximo corte funcional, como `phase_2`, e não deve ser auditado como continuação implícita da `phase_1`
 
 ### Critério prático de aceite
 
@@ -169,7 +169,7 @@ pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode
 pwsh -NoProfile -File scripts/run_decision_platform_runtime_validation.ps1 -Mode diagnostic -DisableRealJuliaProbe -IncludeEngineComparison
 ```
 
-O script acima é a referência canônica da fase 0 e lê a matriz declarativa em `scripts/decision_platform_runtime_validation_profiles.json`. A rastreabilidade estável desta fase fica em `docs/codex_dual_agent_runtime/phase_0_validation_manifest.json`, gerado pelo próprio validador, e o resumo humano correspondente fica em `docs/codex_dual_agent_runtime/phase_0_exit.md`. Use esses dois artefatos como fonte única para papéis, garantias, limites e evidência aprovada dos perfis; mantenha este README apenas como índice operacional e apoio rápido.
+O script acima é a referência canônica da fase 0 e lê a matriz declarativa em `scripts/decision_platform_runtime_validation_profiles.json`. A rastreabilidade estável desta fase fica em `docs/codex_dual_agent_runtime/phase_0_validation_manifest.json`, gerado pelo próprio validador, e o resumo humano correspondente fica em `docs/codex_dual_agent_runtime/phase_0_exit.md`. O mesmo manifesto também registra o bloco `phase_1_exit_validation`; use `profiles` apenas como evidência Julia-only da `phase_0` e `phase_1_exit_validation` apenas como fechamento operacional da `phase_1`. Mantenha este README apenas como índice operacional e apoio rápido.
 
 A `phase_0` está encerrada. Não há novas ondas funcionais dentro dela; qualquer evolução posterior deve abrir a próxima fase e tratar `docs/codex_dual_agent_runtime/phase_0_exit.md` como handoff congelado do tema Julia-only.
 
@@ -185,10 +185,11 @@ Persistência local introduzida na phase 1:
 - o loader falha fechado para `candidate_links.csv` com `link_id` vazio/duplicado, self-loop, `archetype` sem regra correspondente e `family_hint` fora das famílias conhecidas/habilitadas
 - o `Studio` falha fechado ao tentar renomear ou excluir `node_id` ainda referenciado por `candidate_links.csv` ou `route_requirements.csv`
 - `tests/decision_platform/test_phase1_exit_acceptance.py`, `tests/decision_platform/test_scenario_persistence.py` e `tests/decision_platform/test_scenario_settings_contract.py` são a suíte mínima reproduzível do gate atual da `phase_1`
-- `docs/codex_dual_agent_runtime/phase_0_validation_manifest.json` e `docs/2026-04-05_phase1_wave4_exit_gate_handoff.md` registram a evidência auditável do estado atual do gate da `phase_1`
+- `docs/codex_dual_agent_runtime/phase_0_validation_manifest.json` no bloco `phase_1_exit_validation`, `docs/codex_dual_agent_runtime/supervisor_guidance.json` e `docs/2026-04-05_phase1_wave5_exit_handoff.md` registram o fechamento auditável da `phase_1`
 - `tests/decision_platform/test_studio_structure.py` e helpers de studio estrutural não fazem parte do gate atual de `phase_1`
+- a `phase_1` fica formalmente encerrada neste estado; a próxima continuidade funcional deve abrir a `phase_2`
 
-Execução reproduzida nesta máquina em 2026-04-04 e consolidada pelo manifesto `docs/codex_dual_agent_runtime/phase_0_validation_manifest.json`. O artefato `engine_comparison.json` continua sendo apenas diagnóstico e nunca substitui a validação oficial do profile `official`.
+Execução reproduzida nesta máquina em 2026-04-04 e consolidada pelo manifesto `docs/codex_dual_agent_runtime/phase_0_validation_manifest.json`. O artefato `engine_comparison.json` continua sendo apenas diagnóstico e nunca substitui a validação oficial do profile `official`, e criação/duplicação/exclusão estrutural de nós e arestas segue explicitamente fora do gate da `phase_1`.
 
 Pipeline oficial Julia-only do cenário `maquete_v2`:
 
