@@ -16,6 +16,19 @@ from tests.decision_platform.scenario_utils import (
     prepare_isolated_tmp_dir,
 )
 
+PHASE1_GATE_TEST_FILES = (
+    Path("tests/decision_platform/test_phase1_exit_acceptance.py"),
+    Path("tests/decision_platform/test_scenario_persistence.py"),
+    Path("tests/decision_platform/test_scenario_settings_contract.py"),
+)
+FORBIDDEN_PHASE2_STUDIO_HELPERS = (
+    "create_" "node_" "studio_" "node",
+    "duplicate_" "node_" "studio_" "selection",
+    "delete_" "node_" "studio_" "selection",
+    "create_" "edge_" "studio_" "link",
+    "delete_" "edge_" "studio_" "selection",
+)
+
 
 @pytest.mark.slow
 def test_phase1_exit_canonical_bundle_flow_is_versionable_and_traceable() -> None:
@@ -167,6 +180,14 @@ def test_phase1_exit_official_entrypoints_reject_legacy_layout() -> None:
     finally:
         cleanup_scenario_copy(save_dir)
         cleanup_scenario_copy(scenario_dir)
+
+
+@pytest.mark.fast
+def test_phase1_exit_gate_remains_isolated_from_phase2_structural_helpers() -> None:
+    for path in PHASE1_GATE_TEST_FILES:
+        text = path.read_text(encoding="utf-8")
+        for helper_name in FORBIDDEN_PHASE2_STUDIO_HELPERS:
+            assert helper_name not in text, f"{path} must not depend on {helper_name}"
 
 
 @pytest.mark.fast

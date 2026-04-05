@@ -83,7 +83,6 @@ Observações:
 - o pipeline oficial exporta catálogo, ranking, candidato oficial, explicação do vencedor e agregados de viabilidade.
 - a comparação Julia vs Python existe apenas como trilha diagnóstica explícita.
 - a UI Dash já cobre catálogo, comparação, circuito, candidato oficial e filtros de decisão com persistência simples em sessão.
-- a phase 2 já cobre um studio visual mínimo de nós e arestas no app: seleção, nudge, edição básica e autoria estrutural mínima sobre `nodes.csv` e `candidate_links.csv` no bundle canônico.
 - o cenário `maquete_v2` agora tem save/reopen local versionado via `scenario_bundle.yaml` e `component_catalog.csv`.
 
 ### O que já está validado
@@ -99,7 +98,8 @@ Observações:
 - `DecisionEngine.jl` roda em Julia real e importa `WaterModels`, `JuMP` e `HiGHS`, mas a avaliação hidráulica decisória ainda é lógica própria em Julia, não um solve completo de rede via API do `WaterModels`
 - resiliência e parte da exploração topológica continuam heurísticas
 - a UI ainda é orientada a análise local; não há persistência multiusuário nem workflow de aprovação
-- o studio ainda é mínimo; ele já cria, duplica e exclui nós e cria/exclui arestas no bundle canônico, mas edição visual completa, fila/background runs e workflow completo de decisão humana assistida continuam fora desta onda
+- o gate atual da `phase_1` cobre persistência/reopen do bundle canônico, `component_catalog.csv`, normalização de `scenario_settings.storage` e proveniência do fluxo oficial `save -> reopen -> run`
+- o trabalho de studio estrutural permanece explicitamente fora do gate da `phase_1`; qualquer evidência desse escopo deve ser auditada separadamente da saída de cenários versionáveis e catálogo persistido
 
 ### Critério prático de aceite
 
@@ -181,11 +181,12 @@ Persistência local introduzida na phase 1:
 - `components.csv` permanece apenas como alias legado de compatibilidade
 - `save_scenario_bundle(...)` grava o bundle determinístico e `load_scenario_bundle(...)` reabre tanto o formato novo quanto o layout legado
 - `save_authored_scenario_bundle(...)` persiste as tabelas de autoria (`nodes`, `components`, `candidate_links`, `edge_component_rules`, `route_requirements`, `layout_constraints`) e os documentos `topology_rules.yaml` e `scenario_settings.yaml` no mesmo bundle canônico
-- a aba `Dados` da UI local expõe um fluxo único de `Salvar e reabrir bundle` para gravar e reabrir esse bundle sem depender só do estado de sessão; o `Studio` usa esse mesmo fluxo para autoria estrutural mínima
+- a aba `Dados` da UI local expõe um fluxo único de `Salvar e reabrir bundle` para gravar e reabrir esse bundle sem depender só do estado de sessão
 - o loader falha fechado para `candidate_links.csv` com `link_id` vazio/duplicado, self-loop, `archetype` sem regra correspondente e `family_hint` fora das famílias conhecidas/habilitadas
 - o `Studio` falha fechado ao tentar renomear ou excluir `node_id` ainda referenciado por `candidate_links.csv` ou `route_requirements.csv`
-- `docs/2026-04-04_phase1_exit.md` e `phase_1.phase_exit_checklist` em `docs/codex_dual_agent_hydraulic_autonomy_bundle/automation/phase_plan.yaml` são a fonte única de saída da phase 1
-- a `phase_1` está encerrada; o handoff único para iniciar a `phase_2` está em `docs/2026-04-04_phase1_to_phase2_handoff.md`
+- `tests/decision_platform/test_phase1_exit_acceptance.py`, `tests/decision_platform/test_scenario_persistence.py` e `tests/decision_platform/test_scenario_settings_contract.py` são a suíte mínima reproduzível do gate atual da `phase_1`
+- `docs/codex_dual_agent_runtime/phase_0_validation_manifest.json` e `docs/2026-04-05_phase1_wave4_exit_gate_handoff.md` registram a evidência auditável do estado atual do gate da `phase_1`
+- `tests/decision_platform/test_studio_structure.py` e helpers de studio estrutural não fazem parte do gate atual de `phase_1`
 
 Execução reproduzida nesta máquina em 2026-04-04 e consolidada pelo manifesto `docs/codex_dual_agent_runtime/phase_0_validation_manifest.json`. O artefato `engine_comparison.json` continua sendo apenas diagnóstico e nunca substitui a validação oficial do profile `official`.
 

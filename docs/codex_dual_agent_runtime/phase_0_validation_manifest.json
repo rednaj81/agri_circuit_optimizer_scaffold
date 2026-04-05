@@ -6,6 +6,36 @@
   "logs_dir": "C:\\d\\dev\\agri_circuit_optimizer_scaffold\\scripts\\logs",
   "official_validation_profile": "official",
   "official_validation_sufficiency": "official_evidence",
+  "phase_1_exit_validation": {
+    "phase_id": "phase_1",
+    "generated_at": "2026-04-05T02:28:12.8232649Z",
+    "validation_profile": "phase_1_exit_gate",
+    "validation_sufficiency": "phase_1_exit_evidence",
+    "status": "passed",
+    "success": true,
+    "validation_command": "$env:PYTHONPATH='src;.'; .\\.venv\\Scripts\\python.exe -m pytest tests/decision_platform/test_scenario_settings_contract.py tests/decision_platform/test_scenario_persistence.py tests/decision_platform/test_phase1_exit_acceptance.py -q",
+    "supporting_tests": [
+      "tests/decision_platform/test_scenario_settings_contract.py",
+      "tests/decision_platform/test_scenario_persistence.py",
+      "tests/decision_platform/test_phase1_exit_acceptance.py"
+    ],
+    "forbidden_structural_helpers": [
+      "create_node_studio_node",
+      "duplicate_node_studio_selection",
+      "delete_node_studio_selection",
+      "create_edge_studio_link",
+      "delete_edge_studio_selection"
+    ],
+    "forbidden_helper_dependency_detected": false,
+    "evidence": {
+      "canonical_bundle_manifest": "scenario_bundle.yaml",
+      "canonical_component_catalog": "component_catalog.csv",
+      "storage_bundle_manifest": "scenario_bundle.yaml",
+      "storage_component_catalog": "component_catalog.csv",
+      "save_reopen_run_flow": "covered",
+      "requested_dir_matches_bundle_root": true
+    }
+  },
   "profiles": {
     "diagnostic": {
       "validation_profile": "diagnostic",
