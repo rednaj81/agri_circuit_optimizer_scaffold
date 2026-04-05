@@ -4,7 +4,15 @@
 
 Close `phase_1` formally without adding any new functional scope, leaving a single operational reading for the sealed exit criteria and a clear redirect to `phase_2` for structural studio work.
 
-Wave 7 is a corrective regression fix only: it restores reproducibility of the closure artifacts and does not reopen any functional work inside `phase_1`.
+This document remains the active operational handoff for the sealed `phase_1`.
+The historical closeout regression fix did not reopen any functional work inside `phase_1`, and no later session should reinterpret this handoff as an invitation to continue `phase_1` functionally.
+
+## Operational Status
+
+- `phase_1` is sealed.
+- the latest reconciled repository HEAD for this sealed reading is `9d873ed3f917400ae1f3a626326aaa71c3f8540b`
+- any new functional continuity must open `phase_2` explicitly
+- session-local snapshots such as `supervisor_state.json` and `loop_state.json` are not the phase source of truth
 
 ## Point Of Truth
 
@@ -27,10 +35,11 @@ Wave 7 is a corrective regression fix only: it restores reproducibility of the c
   - `tests/decision_platform/test_scenario_settings_contract.py`
   - `tests/decision_platform/test_scenario_persistence.py`
   - `tests/decision_platform/test_phase1_exit_acceptance.py`
+  - `tests/decision_platform/test_phase1_exit_artifacts.py`
 - Validation command:
 
 ```powershell
-$env:PYTHONPATH='src;.'; .\.venv\Scripts\python.exe -m pytest tests/decision_platform/test_scenario_settings_contract.py tests/decision_platform/test_scenario_persistence.py tests/decision_platform/test_phase1_exit_acceptance.py -q --basetemp tests/_tmp/pytest-basetemp-wave4-exit
+$env:PYTHONPATH='src;.'; .\.venv\Scripts\python.exe -m pytest tests/decision_platform/test_scenario_settings_contract.py tests/decision_platform/test_scenario_persistence.py tests/decision_platform/test_phase1_exit_acceptance.py tests/decision_platform/test_phase1_exit_artifacts.py -q --basetemp tests/_tmp/pytest-basetemp-wave7-exit-artifacts
 ```
 
 ## Explicit Out Of Scope
