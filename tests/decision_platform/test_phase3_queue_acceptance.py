@@ -450,7 +450,11 @@ def test_phase3_queue_acceptance_reopens_persisted_run_state_for_inspection() ->
         completed_detail = build_run_job_detail_summary(completed_job["run_id"], queue_root=queue_root)
         canceled_detail = build_run_job_detail_summary(canceled_job["run_id"], queue_root=queue_root)
         with diagnostic_runtime_test_mode():
-            app = build_app(scenario_dir, run_queue_root=queue_root)
+            app = build_app(
+                scenario_dir,
+                run_queue_root=queue_root,
+                bootstrap_pipeline=False,
+            )
 
         layout_repr = repr(app.layout)
         queue_root_str = str(queue_root.resolve())
@@ -520,7 +524,11 @@ def test_phase3_queue_acceptance_app_can_enqueue_and_run_next_via_callbacks() ->
     queue_root = prepare_isolated_tmp_dir("phase3_queue_ui_enqueue_root")
     try:
         with diagnostic_runtime_test_mode():
-            app = build_app(scenario_dir, run_queue_root=queue_root)
+            app = build_app(
+                scenario_dir,
+                run_queue_root=queue_root,
+                bootstrap_pipeline=False,
+            )
 
         enqueue_callback = _get_callback(app, input_id="run-job-enqueue-button")
         run_next_callback = _get_callback(app, input_id="run-jobs-run-next-button")
@@ -567,7 +575,11 @@ def test_phase3_queue_acceptance_app_can_cancel_and_rerun_via_callbacks() -> Non
     queue_root = prepare_isolated_tmp_dir("phase3_queue_ui_cancel_rerun_root")
     try:
         with diagnostic_runtime_test_mode():
-            app = build_app(scenario_dir, run_queue_root=queue_root)
+            app = build_app(
+                scenario_dir,
+                run_queue_root=queue_root,
+                bootstrap_pipeline=False,
+            )
 
         enqueue_callback = _get_callback(app, input_id="run-job-enqueue-button")
         cancel_callback = _get_callback(app, input_id="run-job-cancel-button")
@@ -632,7 +644,11 @@ def test_phase3_queue_acceptance_app_run_next_keeps_official_mode_fail_closed(mo
     monkeypatch.setenv(bridge.DISABLE_REAL_JULIA_PROBE_ENV, "1")
     queue_root = prepare_isolated_tmp_dir("phase3_queue_ui_official_root")
     try:
-        app = build_app("data/decision_platform/maquete_v2", run_queue_root=queue_root)
+        app = build_app(
+            "data/decision_platform/maquete_v2",
+            run_queue_root=queue_root,
+            bootstrap_pipeline=False,
+        )
         enqueue_callback = _get_callback(app, input_id="run-job-enqueue-button")
         run_next_callback = _get_callback(app, input_id="run-jobs-run-next-button")
 
@@ -656,7 +672,10 @@ def test_phase3_queue_acceptance_app_run_next_keeps_official_mode_fail_closed(mo
 @pytest.mark.fast
 def test_phase3_queue_acceptance_app_exposes_run_inspection() -> None:
     with diagnostic_runtime_test_mode():
-        app = build_app("data/decision_platform/maquete_v2")
+        app = build_app(
+            "data/decision_platform/maquete_v2",
+            bootstrap_pipeline=False,
+        )
 
     layout_repr = repr(app.layout)
     assert "run-job-enqueue-button" in layout_repr

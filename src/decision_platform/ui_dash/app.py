@@ -31,11 +31,15 @@ def build_app(
     scenario_dir: str | Path = "data/decision_platform/maquete_v2",
     *,
     run_queue_root: str | Path = DEFAULT_RUN_QUEUE_ROOT,
+    bootstrap_pipeline: bool = True,
 ) -> Dash:
     scenario_dir = _normalize_scenario_dir(scenario_dir)
     run_queue_root = Path(run_queue_root).expanduser().resolve(strict=False)
     bundle = load_scenario_bundle(scenario_dir)
-    result, pipeline_error = _safe_run_pipeline(scenario_dir)
+    result, pipeline_error = _resolve_initial_pipeline_state(
+        scenario_dir,
+        bootstrap_pipeline=bootstrap_pipeline,
+    )
     authoring_payload = bundle_authoring_payload(bundle)
     initial_execution_summary = _build_execution_summary(result, pipeline_error)
     profile_id = bundle.scenario_settings["ranking"]["default_profile"]
@@ -1952,6 +1956,16 @@ def _safe_run_pipeline(scenario_dir: str | Path) -> tuple[dict[str, Any] | None,
         ), None
     except Exception as exc:  # pragma: no cover
         return None, str(exc)
+
+
+def _resolve_initial_pipeline_state(
+    scenario_dir: str | Path,
+    *,
+    bootstrap_pipeline: bool,
+) -> tuple[dict[str, Any] | None, str | None]:
+    if bootstrap_pipeline:
+        return _safe_run_pipeline(scenario_dir)
+    return None, "Initial pipeline bootstrap skipped for runs-focused UI stabilization."
 
 
 def save_and_reopen_local_bundle(

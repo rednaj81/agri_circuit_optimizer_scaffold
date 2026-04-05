@@ -46,7 +46,11 @@ def test_runs_tab_reopens_persisted_operational_telemetry() -> None:
             completed_job = run_next_queued_job(queue_root=queue_root)
             rerun_job = rerun_run_job(created_job["run_id"], queue_root=queue_root)
             rerun_result = run_next_queued_job(queue_root=queue_root)
-            app = build_app(scenario_dir, run_queue_root=queue_root)
+            app = build_app(
+                scenario_dir,
+                run_queue_root=queue_root,
+                bootstrap_pipeline=False,
+            )
 
         runs_summary = _find_component_by_id(app.layout, "run-jobs-summary")
         run_detail = _find_component_by_id(app.layout, "run-job-detail")
