@@ -24,6 +24,24 @@ from tests.decision_platform.scenario_utils import (
     prepare_isolated_tmp_dir,
 )
 
+RUN_DETAIL_TELEMETRY_FIELDS = (
+    "engine_requested",
+    "engine_used",
+    "engine_mode",
+    "julia_available",
+    "watermodels_available",
+    "real_julia_probe_disabled",
+    "execution_mode",
+    "official_gate_valid",
+    "started_at",
+    "finished_at",
+    "duration_s",
+    "policy_mode",
+    "policy_message",
+    "failure_reason",
+    "failure_stacktrace_excerpt",
+)
+
 
 def _get_callback(app: object, *, input_id: str) -> Callable[..., Any]:
     callback_map = getattr(app, "callback_map", {})
@@ -33,6 +51,18 @@ def _get_callback(app: object, *, input_id: str) -> Callable[..., Any]:
             if callback is not None:
                 return getattr(callback, "__wrapped__", callback)
     raise KeyError(f"Callback not found for input_id={input_id!r}")
+
+
+def _assert_run_detail_has_telemetry(detail: dict[str, Any]) -> None:
+    telemetry = detail.get("telemetry") or {
+        field: detail.get(field)
+        for field in RUN_DETAIL_TELEMETRY_FIELDS
+    }
+    for field in RUN_DETAIL_TELEMETRY_FIELDS:
+        assert field in detail
+        assert field in telemetry
+        if "telemetry" in detail:
+            assert detail[field] == telemetry[field]
 
 
 @pytest.mark.slow
@@ -79,6 +109,7 @@ def test_phase3_queue_acceptance_serial_jobs_are_isolated_and_auditable() -> Non
             events_path = Path(completed_job["events_path"])
             log_path = Path(completed_job["log_path"])
             bundle_reference_path = Path(completed_job["source_bundle_reference_path"])
+            completed_detail = build_run_job_detail_summary(completed_job["run_id"], queue_root=queue_root)
 
             assert run_dir.parent == queue_root.resolve()
             assert run_dir.exists()
@@ -92,6 +123,23 @@ def test_phase3_queue_acceptance_serial_jobs_are_isolated_and_auditable() -> Non
             assert completed_job["execution_mode"] == "diagnostic"
             assert completed_job["official_gate_valid"] is False
             assert completed_job["result_summary_path"].endswith("summary.json")
+            _assert_run_detail_has_telemetry(completed_detail)
+            assert completed_detail["engine_requested"] == "watermodels_jl"
+            assert completed_detail["engine_used"] == "python_emulated_julia"
+            assert completed_detail["engine_mode"] == "fallback_emulated"
+            assert completed_detail["julia_available"] is False
+            assert completed_detail["watermodels_available"] is False
+            assert completed_detail["real_julia_probe_disabled"] is True
+            assert completed_detail["execution_mode"] == "diagnostic"
+            assert completed_detail["official_gate_valid"] is False
+            assert completed_detail["started_at"] is not None
+            assert completed_detail["finished_at"] is not None
+            assert float(completed_detail["duration_s"]) >= 0.0
+            assert completed_detail["policy_mode"] == "diagnostic_override_probe_disabled"
+            assert "disabled the real Julia probe" in str(completed_detail["policy_message"])
+            assert completed_detail["failure_reason"] is None
+            assert completed_detail["failure_stacktrace_excerpt"] is None
+            assert completed_detail["inspection"]["queue_root"] == str(queue_root.resolve())
 
             event_statuses = [
                 json.loads(line)["status"]
@@ -125,6 +173,7 @@ def test_phase3_queue_acceptance_keeps_official_mode_julia_only(monkeypatch) -> 
             queue_root=official_queue_root,
         )
         failed_job = run_next_queued_job(queue_root=official_queue_root)
+        failed_detail = build_run_job_detail_summary(official_job["run_id"], queue_root=official_queue_root)
         diagnostic_job = create_run_job(
             diagnostic_scenario_dir,
             queue_root=diagnostic_queue_root,
@@ -132,12 +181,29 @@ def test_phase3_queue_acceptance_keeps_official_mode_julia_only(monkeypatch) -> 
         )
         with diagnostic_runtime_test_mode():
             completed_job = run_next_queued_job(queue_root=diagnostic_queue_root)
+        completed_detail = build_run_job_detail_summary(diagnostic_job["run_id"], queue_root=diagnostic_queue_root)
 
         assert official_job["requested_execution_mode"] == "official"
         assert failed_job is not None
         assert failed_job["status"] == "failed"
         assert "invalid for the official Julia-only gate" in str(failed_job["error"])
         assert failed_job["artifacts"]["summary_json"] is None
+        _assert_run_detail_has_telemetry(failed_detail)
+        assert failed_detail["engine_requested"] == "watermodels_jl"
+        assert failed_detail["engine_used"] is None
+        assert failed_detail["engine_mode"] is None
+        assert failed_detail["julia_available"] is False
+        assert failed_detail["watermodels_available"] is False
+        assert failed_detail["real_julia_probe_disabled"] is True
+        assert failed_detail["execution_mode"] == "diagnostic"
+        assert failed_detail["official_gate_valid"] is False
+        assert failed_detail["started_at"] is not None
+        assert failed_detail["finished_at"] is not None
+        assert float(failed_detail["duration_s"]) >= 0.0
+        assert failed_detail["policy_mode"] == "diagnostic_override_probe_disabled"
+        assert "official Julia-only gate" in str(failed_detail["policy_message"])
+        assert "invalid for the official Julia-only gate" in str(failed_detail["failure_reason"])
+        assert "OfficialRuntimeConfigError" in str(failed_detail["failure_stacktrace_excerpt"])
 
         assert diagnostic_job["requested_execution_mode"] == "diagnostic"
         assert completed_job is not None
@@ -145,6 +211,9 @@ def test_phase3_queue_acceptance_keeps_official_mode_julia_only(monkeypatch) -> 
         assert completed_job["execution_mode"] == "diagnostic"
         assert completed_job["official_gate_valid"] is False
         assert completed_job["result_summary_path"].endswith("summary.json")
+        _assert_run_detail_has_telemetry(completed_detail)
+        assert completed_detail["engine_used"] == "python_emulated_julia"
+        assert completed_detail["policy_mode"] == "diagnostic_override_probe_disabled"
     finally:
         cleanup_scenario_copy(diagnostic_queue_root)
         cleanup_scenario_copy(official_queue_root)
@@ -183,6 +252,20 @@ def test_phase3_queue_acceptance_can_cancel_queued_jobs_without_execution_artifa
         assert inspection["events"][-1]["status"] == "canceled"
         assert "canceled before execution" in inspection["events"][-1]["message"]
         assert Path(inspection["artifacts_dir"]).exists() is False
+        _assert_run_detail_has_telemetry(inspection)
+        assert inspection["engine_requested"] == "watermodels_jl"
+        assert inspection["engine_used"] is None
+        assert inspection["engine_mode"] is None
+        assert inspection["julia_available"] is False
+        assert inspection["watermodels_available"] is False
+        assert inspection["real_julia_probe_disabled"] is True
+        assert inspection["execution_mode"] == "diagnostic"
+        assert inspection["official_gate_valid"] is False
+        assert inspection["started_at"] is None
+        assert inspection["finished_at"] is not None
+        assert inspection["duration_s"] == 0.0
+        assert inspection["policy_mode"] == "diagnostic_override_probe_disabled"
+        assert inspection["failure_reason"] is None
         assert completed_job is not None
         assert completed_job["run_id"] == runnable_candidate["run_id"]
         assert completed_job["status"] == "completed"
@@ -235,6 +318,9 @@ def test_phase3_queue_acceptance_can_rerun_terminal_runs_with_new_run_id(monkeyp
         assert "invalid for the official Julia-only gate" in str(failed_rerun_result["error"])
         assert failed_rerun_inspection["events"][0]["status"] == "queued"
         assert failed_rerun_inspection["rerun_source"]["source_run_id"] == official_job["run_id"]
+        _assert_run_detail_has_telemetry(failed_rerun_inspection)
+        assert failed_rerun_inspection["failure_reason"] == failed_rerun_result["error"]
+        assert failed_rerun_inspection["policy_mode"] == "diagnostic_override_probe_disabled"
 
         assert completed_job is not None
         assert completed_job["status"] == "completed"
@@ -246,6 +332,9 @@ def test_phase3_queue_acceptance_can_rerun_terminal_runs_with_new_run_id(monkeyp
         assert completed_rerun_result["execution_mode"] == "diagnostic"
         assert completed_rerun_inspection["rerun_source"]["source_run_id"] == diagnostic_job["run_id"]
         assert completed_rerun_inspection["artifacts"]["summary_json"] is not None
+        _assert_run_detail_has_telemetry(completed_rerun_inspection)
+        assert completed_rerun_inspection["engine_used"] == "python_emulated_julia"
+        assert completed_rerun_inspection["failure_reason"] is None
     finally:
         cleanup_scenario_copy(diagnostic_queue_root)
         cleanup_scenario_copy(official_queue_root)
@@ -290,12 +379,21 @@ def test_phase3_queue_acceptance_reopens_persisted_run_state_for_inspection() ->
         assert reopened_snapshot["selected_run_id"] == canceled_job["run_id"]
         assert reopened_snapshot["selected_run_detail"]["status"] == "canceled"
         assert reopened_snapshot["selected_run_detail"]["rerun_of_run_id"] == completed_candidate["run_id"]
+        _assert_run_detail_has_telemetry(reopened_snapshot["selected_run_detail"])
+        assert reopened_snapshot["summary"]["queue_state"] == "idle"
+        assert reopened_snapshot["summary"]["queued_run_ids"] == []
+        assert reopened_snapshot["summary"]["terminal_run_ids"] == [
+            completed_job["run_id"],
+            canceled_job["run_id"],
+        ]
         assert completed_detail["status"] == "completed"
         assert completed_detail["artifacts"]["summary_json"] is not None
         assert completed_detail["events"][-1]["status"] == "completed"
+        _assert_run_detail_has_telemetry(completed_detail)
         assert canceled_detail["status"] == "canceled"
         assert canceled_detail["events"][-1]["status"] == "canceled"
         assert canceled_detail["artifacts"]["summary_json"] is None
+        _assert_run_detail_has_telemetry(canceled_detail)
         assert "run-queue-root" in layout_repr
         assert queue_root_store.data == queue_root_str
         assert canceled_job["run_id"] in layout_repr
@@ -323,8 +421,13 @@ def test_phase3_queue_acceptance_app_can_enqueue_and_run_next_via_callbacks() ->
         queued_detail = json.loads(enqueue_result[3])
 
         assert queued_summary["status_counts"]["queued"] == 1
+        assert queued_summary["queue_state"] == "queued"
+        assert queued_summary["next_queued_run_id"] == enqueue_result[2]
         assert queued_detail["status"] == "queued"
         assert queued_detail["requested_execution_mode"] == "diagnostic"
+        _assert_run_detail_has_telemetry(queued_detail)
+        assert queued_detail["engine_requested"] == "watermodels_jl"
+        assert queued_detail["policy_mode"] == "diagnostic_opt_in"
         assert "enfileirada em modo diagnostic" in enqueue_result[4]
 
         with diagnostic_runtime_test_mode():
@@ -338,6 +441,8 @@ def test_phase3_queue_acceptance_app_can_enqueue_and_run_next_via_callbacks() ->
         assert completed_detail["status"] == "completed"
         assert completed_detail["execution_mode"] == "diagnostic"
         assert completed_detail["artifacts"]["summary_json"] is not None
+        _assert_run_detail_has_telemetry(completed_detail)
+        assert completed_detail["engine_used"] == "python_emulated_julia"
         assert "-> completed" in run_next_result[4]
     finally:
         cleanup_scenario_copy(queue_root)
@@ -368,6 +473,7 @@ def test_phase3_queue_acceptance_app_can_cancel_and_rerun_via_callbacks() -> Non
         assert canceled_summary["status_counts"]["canceled"] == 1
         assert canceled_detail["status"] == "canceled"
         assert canceled_detail["artifacts"]["summary_json"] is None
+        _assert_run_detail_has_telemetry(canceled_detail)
         assert "-> canceled" in canceled_result[4]
 
         second_enqueue = enqueue_callback(2, str(Path(scenario_dir).resolve()), str(queue_root.resolve()))
@@ -383,6 +489,7 @@ def test_phase3_queue_acceptance_app_can_cancel_and_rerun_via_callbacks() -> Non
         assert rerun_detail["status"] == "queued"
         assert rerun_detail["rerun_of_run_id"] == completed_result[2]
         assert rerun_detail["rerun_source"]["source_run_id"] == completed_result[2]
+        _assert_run_detail_has_telemetry(rerun_detail)
         assert "re-run de" in rerun_result[4]
     finally:
         cleanup_scenario_copy(queue_root)
@@ -406,6 +513,9 @@ def test_phase3_queue_acceptance_app_run_next_keeps_official_mode_fail_closed(mo
         assert failed_summary["status_counts"]["failed"] == 1
         assert failed_detail["status"] == "failed"
         assert failed_detail["requested_execution_mode"] == "official"
+        _assert_run_detail_has_telemetry(failed_detail)
+        assert failed_detail["failure_reason"] == failed_detail["error"]
+        assert failed_detail["policy_mode"] == "diagnostic_override_probe_disabled"
         assert "invalid for the official Julia-only gate" in str(failed_detail["error"])
         assert "-> failed" in failed_result[4]
     finally:

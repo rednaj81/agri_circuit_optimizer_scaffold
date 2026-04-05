@@ -2734,6 +2734,23 @@ def build_run_job_detail_summary(
             "status": "error",
             "error": str(exc),
         }
+    telemetry = {
+        "engine_requested": job.get("engine_requested"),
+        "engine_used": job.get("engine_used"),
+        "engine_mode": job.get("engine_mode"),
+        "julia_available": job.get("julia_available"),
+        "watermodels_available": job.get("watermodels_available"),
+        "real_julia_probe_disabled": job.get("real_julia_probe_disabled"),
+        "execution_mode": job.get("execution_mode"),
+        "official_gate_valid": job.get("official_gate_valid"),
+        "started_at": job.get("started_at"),
+        "finished_at": job.get("finished_at"),
+        "duration_s": job.get("duration_s"),
+        "policy_mode": job.get("policy_mode"),
+        "policy_message": job.get("policy_message"),
+        "failure_reason": job.get("failure_reason"),
+        "failure_stacktrace_excerpt": job.get("failure_stacktrace_excerpt"),
+    }
     return {
         "selected_run_id": job["run_id"],
         "status": job["status"],
@@ -2754,9 +2771,28 @@ def build_run_job_detail_summary(
         "source_bundle_files": job.get("source_bundle_files", {}),
         "result_summary_path": job.get("result_summary_path"),
         "error": job.get("error"),
+        "engine_requested": telemetry["engine_requested"],
+        "engine_used": telemetry["engine_used"],
+        "engine_mode": telemetry["engine_mode"],
+        "julia_available": telemetry["julia_available"],
+        "watermodels_available": telemetry["watermodels_available"],
+        "real_julia_probe_disabled": telemetry["real_julia_probe_disabled"],
+        "duration_s": telemetry["duration_s"],
+        "policy_mode": telemetry["policy_mode"],
+        "policy_message": telemetry["policy_message"],
+        "failure_reason": telemetry["failure_reason"],
+        "failure_stacktrace_excerpt": telemetry["failure_stacktrace_excerpt"],
         "artifacts": job.get("artifacts", {}),
         "events": job.get("events", []),
         "log_tail": job.get("log_tail", ""),
+        "telemetry": telemetry,
+        "inspection": {
+            "queue_root": str(Path(queue_root).expanduser().resolve(strict=False)),
+            "run_dir": job.get("run_dir"),
+            "events_path": job.get("events_path"),
+            "log_path": job.get("log_path"),
+            "result_summary_path": job.get("result_summary_path"),
+        },
     }
 
 

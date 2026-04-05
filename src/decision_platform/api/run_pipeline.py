@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import traceback
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -10,7 +11,10 @@ from uuid import uuid4
 from decision_platform.audit import build_engine_comparison_suite
 from decision_platform.catalog.pipeline import build_solution_catalog, export_catalog
 from decision_platform.data_io.loader import BUNDLE_MANIFEST_FILENAME, SCENARIO_BUNDLE_VERSION, ScenarioBundle, load_scenario_bundle
-from decision_platform.julia_bridge.bridge import DISABLE_REAL_JULIA_PROBE_ENV, real_julia_probe_disabled
+from decision_platform.julia_bridge.bridge import (
+    DISABLE_REAL_JULIA_PROBE_ENV,
+    real_julia_probe_disabled,
+)
 
 
 class OfficialRuntimeConfigError(RuntimeError):
@@ -29,6 +33,23 @@ RUN_JOB_STATUSES = (
 )
 ACTIVE_RUN_JOB_STATUSES = {"preparing", "running", "exporting"}
 TERMINAL_RUN_JOB_STATUSES = {"completed", "failed", "canceled"}
+RUN_JOB_TELEMETRY_FIELDS = (
+    "engine_requested",
+    "engine_used",
+    "engine_mode",
+    "julia_available",
+    "watermodels_available",
+    "real_julia_probe_disabled",
+    "execution_mode",
+    "official_gate_valid",
+    "started_at",
+    "finished_at",
+    "duration_s",
+    "policy_mode",
+    "policy_message",
+    "failure_reason",
+    "failure_stacktrace_excerpt",
+)
 
 
 def run_decision_pipeline(
@@ -110,6 +131,11 @@ def create_run_job(
         requested_scenario_dir=normalized_scenario_dir,
         output_dir=artifacts_dir,
     )
+    runtime_policy = _build_runtime_policy(
+        allow_diagnostic_python_emulation=allow_diagnostic_python_emulation,
+        include_engine_comparison=bool(include_engine_comparison),
+    )
+    initial_telemetry = _build_initial_run_job_telemetry(bundle, runtime_policy=runtime_policy)
     bundle_reference = {
         "run_id": run_id,
         "scenario_provenance": scenario_provenance,
@@ -144,7 +170,9 @@ def create_run_job(
         "artifacts": {},
         "error": None,
         "runtime": None,
+        "runtime_policy": runtime_policy,
         "worker_mode": "serial",
+        **initial_telemetry,
     }
     _write_json(job_path, job)
     _append_run_event(job, status="queued", message="Run job queued.")
@@ -174,20 +202,38 @@ def summarize_run_jobs(queue_root: str | Path = DEFAULT_RUN_QUEUE_ROOT) -> dict[
         status = str(job.get("status", "")).strip()
         if status in counts:
             counts[status] += 1
+    latest_job = jobs[-1] if jobs else None
+    active_run_ids = [job["run_id"] for job in jobs if job["status"] in ACTIVE_RUN_JOB_STATUSES]
+    queued_run_ids = [job["run_id"] for job in jobs if job["status"] == "queued"]
+    terminal_run_ids = [job["run_id"] for job in jobs if job["status"] in TERMINAL_RUN_JOB_STATUSES]
     return {
         "queue_root": str(_normalize_path(queue_root)),
         "worker_mode": "serial",
         "run_count": len(jobs),
         "status_counts": counts,
+        "queue_state": "active" if active_run_ids else ("queued" if queued_run_ids else "idle"),
+        "active_run_ids": active_run_ids,
+        "queued_run_ids": queued_run_ids,
+        "terminal_run_ids": terminal_run_ids,
+        "next_queued_run_id": queued_run_ids[0] if queued_run_ids else None,
+        "latest_run_id": latest_job["run_id"] if latest_job is not None else None,
+        "latest_updated_at": latest_job.get("updated_at") if latest_job is not None else None,
         "runs": [
             {
                 "run_id": job["run_id"],
                 "status": job["status"],
                 "requested_execution_mode": job["requested_execution_mode"],
+                "execution_mode": job.get("execution_mode"),
+                "official_gate_valid": job.get("official_gate_valid"),
+                "policy_mode": job.get("policy_mode"),
+                "started_at": job.get("started_at"),
+                "finished_at": job.get("finished_at"),
+                "duration_s": job.get("duration_s"),
                 "source_bundle_root": job["source_bundle_root"],
                 "artifacts_dir": job["artifacts_dir"],
                 "rerun_of_run_id": job.get("rerun_of_run_id"),
                 "error": job.get("error"),
+                "failure_reason": job.get("failure_reason"),
             }
             for job in jobs
         ],
@@ -250,28 +296,43 @@ def execute_run_job(run_id: str, *, queue_root: str | Path = DEFAULT_RUN_QUEUE_R
         _append_run_log(job, f"runtime_policy: {result.get('runtime_policy', {}).get('policy_message', '')}")
         artifacts = _build_run_artifact_manifest(artifacts_dir)
         runtime = result.get("runtime", {})
+        runtime_policy = result.get("runtime_policy", {})
+        summary_payload = _read_json_if_exists(Path(artifacts.get("summary_json"))) if artifacts.get("summary_json") else {}
         return _transition_run_job(
             job,
             status="completed",
             message="Run job completed successfully.",
             runtime=runtime,
+            runtime_policy=runtime_policy,
             error=None,
             artifacts=artifacts,
             selected_candidate_id=result.get("selected_candidate_id"),
             scenario_provenance=result.get("scenario_provenance"),
             result_summary_path=str(artifacts_dir / "summary.json"),
-            execution_mode=runtime.get("execution_mode"),
-            official_gate_valid=runtime.get("official_gate_valid"),
+            **_build_run_job_telemetry_updates(
+                job,
+                runtime=runtime,
+                runtime_policy=runtime_policy,
+                summary_payload=summary_payload,
+            ),
         )
     except Exception as exc:
         artifacts = _build_run_artifact_manifest(artifacts_dir)
+        failure_reason = str(exc)
+        failure_stacktrace_excerpt = traceback.format_exc()[-4000:]
         return _transition_run_job(
             job,
             status="failed",
             message=f"Run job failed: {exc}",
-            error=str(exc),
+            error=failure_reason,
             artifacts=artifacts,
             result_summary_path=str(artifacts_dir / "summary.json") if (artifacts_dir / "summary.json").exists() else None,
+            **_build_run_job_telemetry_updates(
+                job,
+                failure_reason=failure_reason,
+                failure_stacktrace_excerpt=failure_stacktrace_excerpt,
+                summary_payload=_read_json_if_exists(artifacts_dir / "summary.json"),
+            ),
         )
 
 
@@ -374,7 +435,11 @@ def _write_json(path: Path, payload: dict[str, Any]) -> None:
 
 
 def _read_run_job(job_path: Path) -> dict[str, Any]:
-    return json.loads(job_path.read_text(encoding="utf-8"))
+    job = json.loads(job_path.read_text(encoding="utf-8"))
+    normalized_job = _normalize_run_job(job)
+    if normalized_job != job:
+        _write_json(job_path, normalized_job)
+    return normalized_job
 
 
 def _read_run_events(events_path: Path) -> list[dict[str, Any]]:
@@ -429,11 +494,12 @@ def _transition_run_job(
     updated_job = dict(job)
     updated_job["status"] = status
     updated_job["updated_at"] = _utc_now_iso()
+    updated_job.update(updates)
     if status == "running" and updated_job.get("started_at") is None:
         updated_job["started_at"] = updated_job["updated_at"]
-    if status in TERMINAL_RUN_JOB_STATUSES:
+    if status in TERMINAL_RUN_JOB_STATUSES and updated_job.get("finished_at") is None:
         updated_job["finished_at"] = updated_job["updated_at"]
-    updated_job.update(updates)
+    updated_job = _normalize_run_job(updated_job)
     _write_json(Path(updated_job["job_path"]), updated_job)
     _append_run_event(updated_job, status=status, message=message)
     _append_run_log(updated_job, f"{status}: {message}")
@@ -487,11 +553,12 @@ def _build_run_job_detail(job: dict[str, Any]) -> dict[str, Any]:
     events_path = Path(job["events_path"])
     log_path = Path(job["log_path"])
     artifacts_dir = Path(job["artifacts_dir"])
+    normalized_job = _normalize_run_job(job)
     return {
-        **job,
+        **normalized_job,
         "events": _read_run_events(events_path),
         "log_tail": _read_log_tail(log_path),
-        "artifacts": job.get("artifacts") or _build_run_artifact_manifest(artifacts_dir),
+        "artifacts": normalized_job.get("artifacts") or _build_run_artifact_manifest(artifacts_dir),
     }
 
 
@@ -607,6 +674,276 @@ def _build_runtime_metadata(
         "finished_at": finished_at.isoformat().replace("+00:00", "Z"),
         "duration_s": duration_s,
     }
+
+
+def _build_initial_run_job_telemetry(
+    bundle: ScenarioBundle,
+    *,
+    runtime_policy: dict[str, Any],
+) -> dict[str, Any]:
+    probe_disabled = bool(runtime_policy.get("real_julia_probe_disabled"))
+    return {
+        "engine_requested": _read_requested_engine(bundle),
+        "engine_used": None,
+        "engine_mode": None,
+        "julia_available": False if probe_disabled else None,
+        "watermodels_available": False if probe_disabled else None,
+        "real_julia_probe_disabled": probe_disabled,
+        "execution_mode": runtime_policy.get("execution_mode"),
+        "official_gate_valid": runtime_policy.get("official_gate_valid"),
+        "duration_s": None,
+        "policy_mode": runtime_policy.get("policy_mode"),
+        "policy_message": runtime_policy.get("policy_message"),
+        "failure_reason": None,
+        "failure_stacktrace_excerpt": None,
+    }
+
+
+def _build_run_job_telemetry_updates(
+    job: dict[str, Any],
+    *,
+    runtime: dict[str, Any] | None = None,
+    runtime_policy: dict[str, Any] | None = None,
+    summary_payload: dict[str, Any] | None = None,
+    failure_reason: str | None = None,
+    failure_stacktrace_excerpt: str | None = None,
+) -> dict[str, Any]:
+    runtime = runtime or {}
+    runtime_policy = runtime_policy or {}
+    summary_payload = summary_payload or {}
+    return {
+        "engine_requested": _coalesce(
+            summary_payload.get("engine_requested"),
+            job.get("engine_requested"),
+        ),
+        "engine_used": _coalesce(
+            summary_payload.get("engine_used"),
+            job.get("engine_used"),
+        ),
+        "engine_mode": _coalesce(
+            summary_payload.get("engine_mode"),
+            job.get("engine_mode"),
+        ),
+        "julia_available": _coalesce(
+            summary_payload.get("julia_available"),
+            job.get("julia_available"),
+        ),
+        "watermodels_available": _coalesce(
+            summary_payload.get("watermodels_available"),
+            job.get("watermodels_available"),
+        ),
+        "real_julia_probe_disabled": _coalesce(
+            runtime.get("real_julia_probe_disabled"),
+            summary_payload.get("real_julia_probe_disabled"),
+            runtime_policy.get("real_julia_probe_disabled"),
+            job.get("real_julia_probe_disabled"),
+        ),
+        "execution_mode": _coalesce(
+            runtime.get("execution_mode"),
+            summary_payload.get("execution_mode"),
+            runtime_policy.get("execution_mode"),
+            job.get("execution_mode"),
+        ),
+        "official_gate_valid": _coalesce(
+            runtime.get("official_gate_valid"),
+            summary_payload.get("official_gate_valid"),
+            runtime_policy.get("official_gate_valid"),
+            job.get("official_gate_valid"),
+        ),
+        "started_at": _coalesce(
+            runtime.get("started_at"),
+            summary_payload.get("runtime_started_at"),
+            job.get("started_at"),
+        ),
+        "finished_at": _coalesce(
+            runtime.get("finished_at"),
+            summary_payload.get("runtime_finished_at"),
+            job.get("finished_at"),
+        ),
+        "duration_s": _coalesce(
+            runtime.get("duration_s"),
+            summary_payload.get("runtime_duration_s"),
+            job.get("duration_s"),
+        ),
+        "policy_mode": _coalesce(
+            runtime.get("policy_mode"),
+            summary_payload.get("runtime_policy_mode"),
+            runtime_policy.get("policy_mode"),
+            job.get("policy_mode"),
+        ),
+        "policy_message": _coalesce(
+            runtime.get("policy_message"),
+            summary_payload.get("runtime_policy_message"),
+            runtime_policy.get("policy_message"),
+            job.get("policy_message"),
+        ),
+        "failure_reason": _coalesce(
+            failure_reason,
+            job.get("failure_reason"),
+        ),
+        "failure_stacktrace_excerpt": _coalesce(
+            failure_stacktrace_excerpt,
+            job.get("failure_stacktrace_excerpt"),
+        ),
+    }
+
+
+def _normalize_run_job(job: dict[str, Any]) -> dict[str, Any]:
+    normalized_job = dict(job)
+    runtime = dict(normalized_job.get("runtime") or {})
+    runtime_policy = dict(normalized_job.get("runtime_policy") or {})
+    summary_payload = _read_json_if_exists(_result_summary_path_for_job(normalized_job))
+
+    for field, summary_key in (
+        ("engine_requested", "engine_requested"),
+        ("engine_used", "engine_used"),
+        ("engine_mode", "engine_mode"),
+        ("julia_available", "julia_available"),
+        ("watermodels_available", "watermodels_available"),
+        ("execution_mode", "execution_mode"),
+        ("official_gate_valid", "official_gate_valid"),
+        ("policy_mode", "runtime_policy_mode"),
+        ("policy_message", "runtime_policy_message"),
+        ("real_julia_probe_disabled", "real_julia_probe_disabled"),
+    ):
+        normalized_job[field] = _coalesce(
+            normalized_job.get(field),
+            runtime.get(field),
+            runtime_policy.get(field),
+            summary_payload.get(summary_key),
+        )
+
+    normalized_job["runtime_policy"] = {
+        "policy_mode": _coalesce(runtime_policy.get("policy_mode"), normalized_job.get("policy_mode")),
+        "execution_mode": _coalesce(runtime_policy.get("execution_mode"), normalized_job.get("execution_mode")),
+        "official_gate_valid": _coalesce(
+            runtime_policy.get("official_gate_valid"),
+            normalized_job.get("official_gate_valid"),
+        ),
+        "allow_diagnostic_python_emulation": _coalesce(
+            runtime_policy.get("allow_diagnostic_python_emulation"),
+            normalized_job.get("allow_diagnostic_python_emulation"),
+        ),
+        "include_engine_comparison": _coalesce(
+            runtime_policy.get("include_engine_comparison"),
+            normalized_job.get("include_engine_comparison"),
+        ),
+        "real_julia_probe_disabled": _coalesce(
+            runtime_policy.get("real_julia_probe_disabled"),
+            normalized_job.get("real_julia_probe_disabled"),
+        ),
+        "real_julia_probe_disable_env": _coalesce(
+            runtime_policy.get("real_julia_probe_disable_env"),
+            runtime.get("real_julia_probe_disable_env"),
+            DISABLE_REAL_JULIA_PROBE_ENV if normalized_job.get("real_julia_probe_disabled") else None,
+        ),
+        "diagnostic_features": list(runtime_policy.get("diagnostic_features") or []),
+        "policy_message": _coalesce(runtime_policy.get("policy_message"), normalized_job.get("policy_message")),
+    }
+    if not normalized_job["runtime_policy"]["diagnostic_features"]:
+        normalized_job["runtime_policy"]["diagnostic_features"] = _infer_diagnostic_features(normalized_job)
+
+    normalized_job["engine_requested"] = _coalesce(
+        normalized_job.get("engine_requested"),
+        _read_requested_engine_from_job(normalized_job),
+    )
+    normalized_job["started_at"] = _coalesce(
+        normalized_job.get("started_at"),
+        runtime.get("started_at"),
+        summary_payload.get("runtime_started_at"),
+    )
+    normalized_job["finished_at"] = _coalesce(
+        normalized_job.get("finished_at"),
+        runtime.get("finished_at"),
+        summary_payload.get("runtime_finished_at"),
+    )
+    normalized_job["duration_s"] = _coalesce(
+        normalized_job.get("duration_s"),
+        runtime.get("duration_s"),
+        summary_payload.get("runtime_duration_s"),
+        _calculate_duration_seconds(normalized_job.get("started_at"), normalized_job.get("finished_at")),
+    )
+    normalized_job["failure_reason"] = _coalesce(normalized_job.get("failure_reason"), normalized_job.get("error"))
+    normalized_job["failure_stacktrace_excerpt"] = normalized_job.get("failure_stacktrace_excerpt")
+    for field in RUN_JOB_TELEMETRY_FIELDS:
+        normalized_job.setdefault(field, None)
+    return normalized_job
+
+
+def _read_requested_engine(bundle: ScenarioBundle) -> str:
+    return str(bundle.scenario_settings.get("hydraulic_engine", {}).get("primary", "watermodels_jl")).strip()
+
+
+def _read_requested_engine_from_job(job: dict[str, Any]) -> str | None:
+    source_bundle_root = job.get("source_bundle_root")
+    if not source_bundle_root:
+        return None
+    try:
+        bundle = load_scenario_bundle(source_bundle_root)
+    except Exception:
+        return None
+    return _read_requested_engine(bundle)
+
+
+def _result_summary_path_for_job(job: dict[str, Any]) -> Path | None:
+    summary_path = job.get("result_summary_path")
+    if summary_path:
+        return Path(summary_path)
+    artifacts = job.get("artifacts") or {}
+    summary_json = artifacts.get("summary_json")
+    if summary_json:
+        return Path(summary_json)
+    return None
+
+
+def _read_json_if_exists(path: Path | None) -> dict[str, Any]:
+    if path is None or not path.exists():
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _coalesce(*values: Any) -> Any:
+    for value in values:
+        if value is not None:
+            return value
+    return None
+
+
+def _infer_diagnostic_features(job: dict[str, Any]) -> list[str]:
+    features: list[str] = []
+    if job.get("allow_diagnostic_python_emulation"):
+        features.append("python_emulation_opt_in")
+    if job.get("include_engine_comparison"):
+        features.append("engine_comparison_opt_in")
+    if job.get("real_julia_probe_disabled"):
+        features.append("real_julia_probe_disabled")
+    return features
+
+
+def _calculate_duration_seconds(started_at: Any, finished_at: Any) -> float | None:
+    if finished_at in (None, ""):
+        return None
+    started = _parse_iso_timestamp(started_at)
+    finished = _parse_iso_timestamp(finished_at)
+    if finished is None:
+        return None
+    if started is None:
+        return 0.0
+    return round(max((finished - started).total_seconds(), 0.0), 3)
+
+
+def _parse_iso_timestamp(value: Any) -> datetime | None:
+    text = str(value).strip() if value not in (None, "") else ""
+    if not text:
+        return None
+    try:
+        return datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
 
 
 if __name__ == "__main__":
