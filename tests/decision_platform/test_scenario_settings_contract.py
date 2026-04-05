@@ -114,6 +114,25 @@ def test_loader_rejects_noncanonical_storage_mapping() -> None:
         cleanup_scenario_copy(scenario_dir)
 
 
+def test_loader_accepts_missing_storage_mapping_for_authoring_input() -> None:
+    scenario_dir = prepare_scenario_copy(
+        "data/decision_platform/maquete_v2",
+        "maquete_v2_missing_storage_mapping",
+    )
+    try:
+        update_scenario_yaml(
+            scenario_dir,
+            "scenario_settings.yaml",
+            lambda payload: {key: value for key, value in payload.items() if key != "storage"},
+        )
+
+        bundle = load_scenario_bundle(scenario_dir)
+
+        assert "storage" not in bundle.scenario_settings
+    finally:
+        cleanup_scenario_copy(scenario_dir)
+
+
 def test_loader_rejects_topology_rule_with_non_boolean_flag() -> None:
     scenario_dir = prepare_scenario_copy(
         "data/decision_platform/maquete_v2",

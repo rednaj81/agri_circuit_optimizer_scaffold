@@ -176,6 +176,8 @@ def test_ui_save_reopen_flow_persists_bundle_and_refreshes_pipeline() -> None:
         assert float(saved["bundle"].layout_constraints.iloc[0]["value"]) == 1.5
         assert saved["bundle"].topology_rules["families"]["hybrid_free"]["max_active_pumps_per_route"] == 3
         assert saved["bundle"].scenario_settings["ui"]["default_layout_mode"] == "save_reopen_ui"
+        assert saved["bundle"].scenario_settings["storage"]["bundle_manifest"] == "scenario_bundle.yaml"
+        assert saved["bundle"].scenario_settings["storage"]["component_catalog"] == "component_catalog.csv"
         assert saved["result"] is not None
         assert saved["result"]["scenario_bundle_root"] == str(output_dir.resolve())
         assert saved["result"]["scenario_bundle_version"] == saved["bundle"].bundle_version
@@ -221,6 +223,44 @@ def test_ui_save_reopen_rejects_legacy_source_without_manifest() -> None:
 
         assert not output_dir.exists()
     finally:
+        cleanup_scenario_copy(scenario_dir)
+
+
+@pytest.mark.fast
+def test_ui_save_reopen_fails_closed_without_partial_bundle_when_storage_mapping_diverges() -> None:
+    scenario_dir = prepare_scenario_copy(
+        "data/decision_platform/maquete_v2",
+        "maquete_v2_ui_save_reopen_invalid_storage",
+    )
+    output_dir = prepare_isolated_tmp_dir("maquete_v2_ui_save_reopen_invalid_storage_saved")
+    try:
+        bundle = load_scenario_bundle(scenario_dir)
+        scenario_settings = {
+            **bundle.scenario_settings,
+            "storage": {
+                **bundle.scenario_settings["storage"],
+                "component_catalog": "components.csv",
+            },
+        }
+
+        with pytest.raises(ValueError, match="canonical component catalog filename"):
+            save_and_reopen_local_bundle(
+                current_scenario_dir=scenario_dir,
+                output_dir=output_dir,
+                nodes_rows=bundle.nodes.to_dict("records"),
+                components_rows=bundle.components.to_dict("records"),
+                candidate_links_rows=bundle.candidate_links.to_dict("records"),
+                edge_component_rules_rows=bundle.edge_component_rules.to_dict("records"),
+                route_rows=bundle.route_requirements.to_dict("records"),
+                layout_constraints_rows=bundle.layout_constraints.to_dict("records"),
+                topology_rules_text=yaml.safe_dump(bundle.topology_rules, sort_keys=False, allow_unicode=True),
+                scenario_settings_text=yaml.safe_dump(scenario_settings, sort_keys=False, allow_unicode=True),
+            )
+
+        assert not (output_dir / "scenario_bundle.yaml").exists()
+        assert not (output_dir / "component_catalog.csv").exists()
+    finally:
+        cleanup_scenario_copy(output_dir)
         cleanup_scenario_copy(scenario_dir)
 
 

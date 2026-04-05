@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from dataclasses import replace
 from pathlib import Path
+import shutil
 from typing import Any
+from uuid import uuid4
 
 import pandas as pd
 import yaml
@@ -48,6 +50,10 @@ CANONICAL_DOCUMENT_PATHS = {
     "topology_rules.yaml": "topology_rules.yaml",
     "scenario_settings.yaml": "scenario_settings.yaml",
 }
+CANONICAL_STORAGE_MAPPING = {
+    "bundle_manifest": BUNDLE_MANIFEST_FILENAME,
+    "component_catalog": CANONICAL_TABLE_PATHS["components.csv"],
+}
 
 
 def save_scenario_bundle(
@@ -57,38 +63,88 @@ def save_scenario_bundle(
     include_legacy_components_alias: bool = False,
 ) -> dict[str, Path]:
     out_dir = Path(output_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
+    out_dir.parent.mkdir(parents=True, exist_ok=True)
+    staging_dir = out_dir.with_name(f"staging_{out_dir.name}_{uuid4().hex}")
+    staging_dir.mkdir(parents=True, exist_ok=False)
+
+    try:
+        exported_relative_paths = _write_bundle_directory(
+            bundle,
+            staging_dir,
+            include_legacy_components_alias=include_legacy_components_alias,
+        )
+        load_scenario_bundle(staging_dir)
+        return _publish_staged_bundle(
+            staging_dir,
+            out_dir,
+            exported_relative_paths,
+        )
+    except Exception:
+        shutil.rmtree(staging_dir, ignore_errors=True)
+        raise
+
+
+def _write_bundle_directory(
+    bundle: ScenarioBundle,
+    output_dir: Path,
+    *,
+    include_legacy_components_alias: bool = False,
+) -> dict[str, Path]:
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     exported: dict[str, Path] = {}
     for logical_name, relative_path in CANONICAL_TABLE_PATHS.items():
         frame = getattr(bundle, TABLE_ATTRIBUTE_NAMES[logical_name]).copy()
-        destination = out_dir / relative_path
+        destination = output_dir / relative_path
         destination.parent.mkdir(parents=True, exist_ok=True)
         frame.to_csv(destination, index=False, lineterminator="\n")
-        exported[logical_name] = destination
+        exported[logical_name] = Path(relative_path)
 
     if include_legacy_components_alias:
-        legacy_components = out_dir / "components.csv"
+        legacy_components = output_dir / "components.csv"
         bundle.components.copy().to_csv(legacy_components, index=False, lineterminator="\n")
-        exported["components_legacy_alias"] = legacy_components
+        exported["components_legacy_alias"] = Path("components.csv")
 
     for logical_name, relative_path in CANONICAL_DOCUMENT_PATHS.items():
         payload = getattr(bundle, DOCUMENT_ATTRIBUTE_NAMES[logical_name])
-        destination = out_dir / relative_path
+        destination = output_dir / relative_path
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_text(
             yaml.safe_dump(payload, sort_keys=False, allow_unicode=True),
             encoding="utf-8",
         )
-        exported[logical_name] = destination
+        exported[logical_name] = Path(relative_path)
 
-    manifest_path = out_dir / BUNDLE_MANIFEST_FILENAME
+    manifest_path = output_dir / BUNDLE_MANIFEST_FILENAME
     manifest_path.write_text(
         yaml.safe_dump(build_bundle_manifest(), sort_keys=False, allow_unicode=True),
         encoding="utf-8",
     )
-    exported["bundle_manifest"] = manifest_path
+    exported["bundle_manifest"] = Path(BUNDLE_MANIFEST_FILENAME)
     return exported
+
+
+def _publish_staged_bundle(
+    staging_dir: Path,
+    output_dir: Path,
+    exported_relative_paths: dict[str, Path],
+) -> dict[str, Path]:
+    backup_dir = output_dir.with_name(f"backup_{output_dir.name}_{uuid4().hex}")
+    if output_dir.exists():
+        output_dir.replace(backup_dir)
+    try:
+        staging_dir.replace(output_dir)
+    except Exception:
+        if backup_dir.exists() and not output_dir.exists():
+            backup_dir.replace(output_dir)
+        raise
+    else:
+        if backup_dir.exists():
+            shutil.rmtree(backup_dir, ignore_errors=True)
+    return {
+        logical_name: output_dir / relative_path
+        for logical_name, relative_path in exported_relative_paths.items()
+    }
 
 
 def build_bundle_manifest() -> dict[str, object]:
@@ -129,6 +185,7 @@ def update_bundle_from_authoring_payload(
         if not isinstance(parsed, dict):
             raise ValueError("scenario_settings editor content must deserialize to a mapping.")
         scenario_settings = parsed
+    scenario_settings = _normalize_canonical_storage_mapping(scenario_settings)
     return replace(
         bundle,
         nodes=_rows_to_frame(nodes_rows, bundle.nodes),
@@ -200,3 +257,28 @@ def _rows_to_frame(rows: list[dict[str, Any]] | None, template: pd.DataFrame) ->
         if column not in frame.columns:
             frame[column] = ""
     return frame.loc[:, template.columns].copy()
+
+
+def _normalize_canonical_storage_mapping(scenario_settings: dict[str, Any]) -> dict[str, Any]:
+    normalized = dict(scenario_settings)
+    storage = normalized.get("storage")
+    if storage is None:
+        normalized["storage"] = dict(CANONICAL_STORAGE_MAPPING)
+        return normalized
+    if not isinstance(storage, dict):
+        raise ValueError("scenario_settings.yaml storage must be a mapping when present.")
+    bundle_manifest = str(storage.get("bundle_manifest", "")).strip()
+    component_catalog = str(storage.get("component_catalog", "")).strip()
+    if bundle_manifest != CANONICAL_STORAGE_MAPPING["bundle_manifest"]:
+        raise ValueError(
+            "scenario_settings.yaml storage.bundle_manifest must match the canonical bundle manifest filename."
+        )
+    if component_catalog != CANONICAL_STORAGE_MAPPING["component_catalog"]:
+        raise ValueError(
+            "scenario_settings.yaml storage.component_catalog must match the canonical component catalog filename."
+        )
+    normalized["storage"] = {
+        **storage,
+        **CANONICAL_STORAGE_MAPPING,
+    }
+    return normalized

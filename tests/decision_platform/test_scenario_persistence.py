@@ -167,6 +167,33 @@ def test_save_authored_bundle_persists_authoring_changes() -> None:
         assert float(reloaded.layout_constraints.iloc[0]["value"]) == 1.5
         assert reloaded.topology_rules["families"]["hybrid_free"]["max_active_pumps_per_route"] == 3
         assert reloaded.scenario_settings["ui"]["default_layout_mode"] == "edited_layout"
+        assert reloaded.scenario_settings["storage"]["bundle_manifest"] == BUNDLE_MANIFEST_FILENAME
+        assert reloaded.scenario_settings["storage"]["component_catalog"] == "component_catalog.csv"
+    finally:
+        if output_dir.exists():
+            shutil.rmtree(output_dir)
+
+
+def test_save_authored_bundle_repopulates_missing_storage_mapping() -> None:
+    source_bundle = load_scenario_bundle("data/decision_platform/maquete_v2")
+    output_dir = prepare_isolated_tmp_dir("scenario_persistence_missing_storage_mapping")
+    try:
+        scenario_settings = {
+            key: value
+            for key, value in source_bundle.scenario_settings.items()
+            if key != "storage"
+        }
+
+        reloaded, exported = save_authored_scenario_bundle(
+            "data/decision_platform/maquete_v2",
+            output_dir,
+            scenario_settings_text=yaml.safe_dump(scenario_settings, sort_keys=False, allow_unicode=True),
+        )
+
+        assert exported["bundle_manifest"].name == BUNDLE_MANIFEST_FILENAME
+        assert reloaded.scenario_settings["storage"]["bundle_manifest"] == BUNDLE_MANIFEST_FILENAME
+        assert reloaded.scenario_settings["storage"]["component_catalog"] == "component_catalog.csv"
+        assert reloaded.resolved_files["components.csv"].name == "component_catalog.csv"
     finally:
         if output_dir.exists():
             shutil.rmtree(output_dir)
@@ -238,6 +265,67 @@ def test_save_authored_bundle_fails_closed_for_invalid_route_contract() -> None:
                     allow_unicode=True,
                 ),
             )
+    finally:
+        if output_dir.exists():
+            shutil.rmtree(output_dir)
+
+
+def test_save_authored_bundle_fails_closed_for_divergent_storage_mapping_without_publishing_bundle() -> None:
+    source_bundle = load_scenario_bundle("data/decision_platform/maquete_v2")
+    output_dir = prepare_isolated_tmp_dir("scenario_persistence_invalid_storage_mapping")
+    try:
+        scenario_settings = {
+            **source_bundle.scenario_settings,
+            "storage": {
+                **source_bundle.scenario_settings["storage"],
+                "component_catalog": "components.csv",
+            },
+        }
+
+        with pytest.raises(ValueError, match="canonical component catalog filename"):
+            save_authored_scenario_bundle(
+                "data/decision_platform/maquete_v2",
+                output_dir,
+                scenario_settings_text=yaml.safe_dump(scenario_settings, sort_keys=False, allow_unicode=True),
+            )
+
+        assert not (output_dir / BUNDLE_MANIFEST_FILENAME).exists()
+        assert not (output_dir / "component_catalog.csv").exists()
+    finally:
+        if output_dir.exists():
+            shutil.rmtree(output_dir)
+
+
+def test_save_authored_bundle_preserves_existing_valid_output_on_invalid_rewrite() -> None:
+    source_bundle = load_scenario_bundle("data/decision_platform/maquete_v2")
+    output_dir = prepare_isolated_tmp_dir("scenario_persistence_preserve_existing_on_failure")
+    try:
+        initial_reloaded, _ = save_authored_scenario_bundle(
+            "data/decision_platform/maquete_v2",
+            output_dir,
+        )
+        initial_manifest = (output_dir / BUNDLE_MANIFEST_FILENAME).read_text(encoding="utf-8")
+        initial_component_catalog = (output_dir / "component_catalog.csv").read_text(encoding="utf-8")
+
+        scenario_settings = {
+            **source_bundle.scenario_settings,
+            "storage": {
+                **source_bundle.scenario_settings["storage"],
+                "bundle_manifest": "bundle.yaml",
+            },
+        }
+
+        with pytest.raises(ValueError, match="canonical bundle manifest filename"):
+            save_authored_scenario_bundle(
+                "data/decision_platform/maquete_v2",
+                output_dir,
+                scenario_settings_text=yaml.safe_dump(scenario_settings, sort_keys=False, allow_unicode=True),
+            )
+
+        reloaded_after_failure = load_scenario_bundle(output_dir)
+        assert reloaded_after_failure.scenario_settings["storage"] == initial_reloaded.scenario_settings["storage"]
+        assert (output_dir / BUNDLE_MANIFEST_FILENAME).read_text(encoding="utf-8") == initial_manifest
+        assert (output_dir / "component_catalog.csv").read_text(encoding="utf-8") == initial_component_catalog
     finally:
         if output_dir.exists():
             shutil.rmtree(output_dir)
