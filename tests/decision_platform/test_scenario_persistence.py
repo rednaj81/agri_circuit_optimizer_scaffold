@@ -365,6 +365,114 @@ def test_save_authored_bundle_preserves_existing_valid_output_on_invalid_rewrite
             shutil.rmtree(output_dir)
 
 
+def test_save_authored_bundle_round_trip_preserves_structural_create_and_delete() -> None:
+    source_bundle = load_scenario_bundle("data/decision_platform/maquete_v2")
+    created_output_dir = prepare_isolated_tmp_dir("scenario_persistence_structural_created")
+    deleted_output_dir = prepare_isolated_tmp_dir("scenario_persistence_structural_deleted")
+    try:
+        nodes_rows = source_bundle.nodes.to_dict("records")
+        template_node = next(row for row in nodes_rows if str(row.get("node_id", "")).strip() == "J4")
+        created_node_id = "NEW_NODE_A"
+        duplicated_node_id = f"{created_node_id}_copy1"
+        nodes_rows = [
+            *nodes_rows,
+            {
+                **template_node,
+                "node_id": created_node_id,
+                "label": "Studio structural node",
+                "node_type": "junction",
+                "x_m": 0.83,
+                "y_m": 0.31,
+                "allow_inbound": True,
+                "allow_outbound": True,
+                "notes": "Criado para round-trip estrutural",
+            },
+            {
+                **template_node,
+                "node_id": duplicated_node_id,
+                "label": "Studio structural node copy",
+                "node_type": "junction",
+                "x_m": 0.86,
+                "y_m": 0.34,
+                "allow_inbound": True,
+                "allow_outbound": True,
+                "notes": "Duplicado para round-trip estrutural",
+            },
+        ]
+        link_rows = source_bundle.candidate_links.to_dict("records")
+        template_link = next(row for row in link_rows if str(row.get("link_id", "")).strip() == "L013")
+        created_link_id = "L013_structural_roundtrip"
+        candidate_links_rows = [
+            *link_rows,
+            {
+                **template_link,
+                "link_id": created_link_id,
+                "from_node": created_node_id,
+                "to_node": duplicated_node_id,
+                "archetype": "vertical_link",
+                "length_m": 0.18,
+                "bidirectional": False,
+                "family_hint": "loop,hybrid",
+                "group_id": "l013_structural_roundtrip",
+                "notes": "Criada para round-trip estrutural",
+            },
+        ]
+
+        created_bundle, created_exported = save_authored_scenario_bundle(
+            "data/decision_platform/maquete_v2",
+            created_output_dir,
+            nodes_rows=nodes_rows,
+            components_rows=source_bundle.components.to_dict("records"),
+            candidate_links_rows=candidate_links_rows,
+            edge_component_rules_rows=source_bundle.edge_component_rules.to_dict("records"),
+            route_rows=source_bundle.route_requirements.to_dict("records"),
+            layout_constraints_rows=source_bundle.layout_constraints.to_dict("records"),
+            topology_rules_text=yaml.safe_dump(source_bundle.topology_rules, sort_keys=False, allow_unicode=True),
+            scenario_settings_text=yaml.safe_dump(source_bundle.scenario_settings, sort_keys=False, allow_unicode=True),
+        )
+
+        assert created_exported["bundle_manifest"].name == BUNDLE_MANIFEST_FILENAME
+        assert created_bundle.resolved_files["components.csv"].name == "component_catalog.csv"
+        assert created_node_id in created_bundle.nodes["node_id"].tolist()
+        assert duplicated_node_id in created_bundle.nodes["node_id"].tolist()
+        assert created_link_id in created_bundle.candidate_links["link_id"].tolist()
+
+        created_nodes_rows = [
+            row
+            for row in created_bundle.nodes.to_dict("records")
+            if str(row.get("node_id", "")).strip() not in {created_node_id, duplicated_node_id}
+        ]
+        created_links_rows = [
+            row
+            for row in created_bundle.candidate_links.to_dict("records")
+            if str(row.get("link_id", "")).strip() != created_link_id
+        ]
+
+        deleted_bundle, deleted_exported = save_authored_scenario_bundle(
+            created_output_dir,
+            deleted_output_dir,
+            nodes_rows=created_nodes_rows,
+            components_rows=created_bundle.components.to_dict("records"),
+            candidate_links_rows=created_links_rows,
+            edge_component_rules_rows=created_bundle.edge_component_rules.to_dict("records"),
+            route_rows=created_bundle.route_requirements.to_dict("records"),
+            layout_constraints_rows=created_bundle.layout_constraints.to_dict("records"),
+            topology_rules_text=yaml.safe_dump(created_bundle.topology_rules, sort_keys=False, allow_unicode=True),
+            scenario_settings_text=yaml.safe_dump(created_bundle.scenario_settings, sort_keys=False, allow_unicode=True),
+        )
+
+        assert deleted_exported["bundle_manifest"].name == BUNDLE_MANIFEST_FILENAME
+        assert created_node_id not in deleted_bundle.nodes["node_id"].tolist()
+        assert duplicated_node_id not in deleted_bundle.nodes["node_id"].tolist()
+        assert created_link_id not in deleted_bundle.candidate_links["link_id"].tolist()
+        assert deleted_bundle.resolved_files["components.csv"].name == "component_catalog.csv"
+    finally:
+        if deleted_output_dir.exists():
+            shutil.rmtree(deleted_output_dir)
+        if created_output_dir.exists():
+            shutil.rmtree(created_output_dir)
+
+
 def test_save_authored_bundle_fails_closed_for_invalid_node_contract() -> None:
     source_bundle = load_scenario_bundle("data/decision_platform/maquete_v2")
     output_dir = prepare_isolated_tmp_dir("scenario_persistence_invalid_node")
