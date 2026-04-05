@@ -99,7 +99,7 @@ Observações:
 - resiliência e parte da exploração topológica continuam heurísticas
 - a UI ainda é orientada a análise local; não há persistência multiusuário nem workflow de aprovação
 - o gate atual da `phase_1` cobre persistência/reopen do bundle canônico, `component_catalog.csv`, normalização de `scenario_settings.storage` e proveniência do fluxo oficial `save -> reopen -> run`
-- o trabalho de studio estrutural pertence ao próximo corte funcional, como `phase_2`, e não deve ser auditado como continuação implícita da `phase_1`
+- a `phase_2` está encerrada com gate próprio do `Studio`, e a `phase_3` abriu com fila serial local mínima de `run_job`; nenhum desses temas deve ser reinterpretado como continuação implícita da `phase_1`
 
 ### Critério prático de aceite
 
@@ -188,6 +188,17 @@ Persistência local introduzida na phase 1:
 - `docs/codex_dual_agent_runtime/phase_0_validation_manifest.json` no bloco `phase_1_exit_validation`, `docs/codex_dual_agent_runtime/supervisor_guidance.json` e `docs/2026-04-05_phase1_wave5_exit_handoff.md` registram o fechamento auditável da `phase_1`
 - `tests/decision_platform/test_studio_structure.py` e helpers de studio estrutural não fazem parte do gate atual de `phase_1`
 - a `phase_1` fica formalmente encerrada neste estado; a próxima continuidade funcional deve abrir a `phase_2`
+
+Saída do Studio na phase 2:
+- `tests/decision_platform/test_phase2_exit_acceptance.py` é o gate único da `phase_2`
+- `docs/2026-04-05_phase2_exit.md` é a fonte única de saída operacional da `phase_2`
+- `docs/2026-04-05_phase2_to_phase3_handoff.md` congela a baseline do `Studio` e abre a transição para fila/background runs
+
+Abertura mínima da phase 3:
+- `tests/decision_platform/test_phase3_queue_acceptance.py` valida o corte mínimo atual de fila serial
+- cada `run_job` usa diretório próprio com `job.json`, `events.jsonl`, `run.log`, `source_bundle_reference.json` e `artifacts/`
+- o worker da fase é serial e previsível: múltiplos jobs podem existir, mas apenas um é executado por vez
+- o modo oficial continua Julia-only quando solicitado; qualquer trilha diagnóstica da fila segue opt-in explícito e não oficial
 
 Execução reproduzida nesta máquina em 2026-04-04 e consolidada pelo manifesto `docs/codex_dual_agent_runtime/phase_0_validation_manifest.json`. O artefato `engine_comparison.json` continua sendo apenas diagnóstico e nunca substitui a validação oficial do profile `official`, e criação/duplicação/exclusão estrutural de nós e arestas segue explicitamente fora do gate da `phase_1`.
 

@@ -53,6 +53,13 @@ phase_2:
     - "salvar/reabrir cenário"
 phase_3:
   target: "Fila e background runs"
+  status: "in_progress"
+  opening_mode: "serial_queue_mvp"
+  current_acceptance_target: "tests/decision_platform/test_phase3_queue_acceptance.py"
+  current_scope:
+    - "run_job persistido localmente com estados canônicos"
+    - "worker serial explícito sem simultaneidade no MVP"
+    - "diretório isolado por run com log, eventos e artefatos próprios"
   exit_criteria:
     - "jobs isolados"
     - "status por run"

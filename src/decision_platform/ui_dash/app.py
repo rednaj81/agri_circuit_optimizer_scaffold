@@ -7,7 +7,12 @@ from typing import Any
 import pandas as pd
 import yaml
 
-from decision_platform.api.run_pipeline import OfficialRuntimeConfigError, run_decision_pipeline
+from decision_platform.api.run_pipeline import (
+    DEFAULT_RUN_QUEUE_ROOT,
+    OfficialRuntimeConfigError,
+    run_decision_pipeline,
+    summarize_run_jobs,
+)
 from decision_platform.catalog.explanation import build_selected_candidate_explanation
 from decision_platform.catalog.pipeline import resolve_selected_candidate
 from decision_platform.data_io.loader import BUNDLE_MANIFEST_FILENAME, SCENARIO_BUNDLE_VERSION, load_scenario_bundle
@@ -69,6 +74,11 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
     initial_edge_studio_form = _edge_studio_form_values(
         authoring_payload["candidate_links_rows"],
         initial_edge_studio_selected_id,
+    )
+    initial_run_jobs_summary = json.dumps(
+        build_run_jobs_summary(),
+        indent=2,
+        ensure_ascii=False,
     )
     initial_bundle_output_dir = str(Path(scenario_dir).parent / f"{Path(scenario_dir).name}_saved")
     initial_bundle_io_summary = json.dumps(
@@ -287,6 +297,15 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
                                 persistence=True,
                                 persistence_type="session",
                             ),
+                        ],
+                    ),
+                    dcc.Tab(
+                        label="Runs",
+                        children=[
+                            html.H2("Runs seriais"),
+                            html.P("Inspeção mínima da fila serial local de run jobs."),
+                            html.Button("Atualizar runs", id="run-jobs-refresh-button"),
+                            html.Pre(initial_run_jobs_summary, id="run-jobs-summary"),
                         ],
                     ),
                     dcc.Tab(
@@ -935,6 +954,15 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
             selected_link_id=selected_link_id,
         )
         return updated_rows, next_selected_link_id, ""
+
+    @app.callback(
+        Output("run-jobs-summary", "children"),
+        Input("run-jobs-refresh-button", "n_clicks"),
+    )
+    def _refresh_run_jobs_summary(n_clicks: Any) -> str:
+        if not n_clicks:
+            return initial_run_jobs_summary
+        return json.dumps(build_run_jobs_summary(), indent=2, ensure_ascii=False)
 
     @app.callback(
         Output("profile-dropdown", "options"),
@@ -2462,6 +2490,19 @@ def _coerce_node_coordinate(value: Any, default: Any) -> float:
 def _coerce_edge_length(value: Any, default: Any) -> float:
     candidate = default if value in (None, "") else value
     return float(candidate)
+
+
+def build_run_jobs_summary(queue_root: str | Path = DEFAULT_RUN_QUEUE_ROOT) -> dict[str, Any]:
+    try:
+        return summarize_run_jobs(queue_root)
+    except Exception as exc:  # pragma: no cover
+        return {
+            "queue_root": str(Path(queue_root).expanduser()),
+            "worker_mode": "serial",
+            "status": "error",
+            "error": str(exc),
+            "runs": [],
+        }
 
 
 def _requires_diagnostic_python_emulation(bundle: Any) -> bool:

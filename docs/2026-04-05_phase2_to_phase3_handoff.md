@@ -5,7 +5,7 @@
 - `phase_2` está encerrada.
 - o gate único de saída da fase é `tests/decision_platform/test_phase2_exit_acceptance.py`.
 - o gate foi reproduzido no codebase local atual sem reabrir o caminho oficial Julia-only.
-- a próxima fase deve tratar fila/background runs como novo tema explícito.
+- a `phase_3` abriu sobre esta baseline com `tests/decision_platform/test_phase3_queue_acceptance.py` como aceite atual do corte mínimo de fila serial.
 
 ## Baseline obrigatória
 
@@ -30,6 +30,13 @@ Qualquer reabertura desses pontos exige justificativa objetiva e novo handoff ex
 ## Foco esperado da phase 3
 
 A `phase_3` deve avançar em fila/background runs, isolamento por execução, status por run, logs e artefatos. Esse tema começa sobre a baseline do `Studio` já congelada, e não como continuação implícita do save/reopen local.
+
+## Corte mínimo já aberto na phase 3
+
+- `run_job` persistido localmente com estados `queued`, `preparing`, `running`, `exporting`, `completed`, `failed` e `canceled`
+- worker serial explícito: um job por vez, sem simultaneidade no MVP
+- diretório isolado por run com `job.json`, `events.jsonl`, `run.log`, `source_bundle_reference.json` e `artifacts/`
+- trilha diagnóstica continua opt-in explícito; modo oficial continua Julia-only quando solicitado
 
 ## Riscos operacionais remanescentes
 
