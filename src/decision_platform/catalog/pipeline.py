@@ -406,9 +406,11 @@ def _build_decision_summary(
     summary = dict(result.get("summary", {}))
     runtime = dict(result.get("runtime", {}))
     summary["scenario_id"] = result.get("scenario_id")
+    summary["scenario_bundle_root"] = result.get("scenario_bundle_root")
     summary["scenario_bundle_version"] = result.get("scenario_bundle_version")
     summary["scenario_bundle_manifest"] = result.get("scenario_bundle_manifest")
     summary["scenario_bundle_files"] = result.get("scenario_bundle_files", {})
+    summary["scenario_provenance"] = result.get("scenario_provenance", {})
     summary["default_profile_id"] = selected_profile_id
     summary["best_profile"] = selected_profile_id
     if selected_candidate is None:

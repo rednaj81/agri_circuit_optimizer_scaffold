@@ -7,6 +7,7 @@ import pandas as pd
 import pytest
 import yaml
 
+from decision_platform.api.run_pipeline import run_decision_pipeline
 from decision_platform.data_io.loader import BUNDLE_MANIFEST_FILENAME, load_scenario_bundle
 from decision_platform.data_io.storage import save_authored_scenario_bundle, save_scenario_bundle
 from tests.decision_platform.scenario_utils import cleanup_scenario_copy, prepare_isolated_tmp_dir, prepare_scenario_copy
@@ -164,6 +165,46 @@ def test_save_authored_bundle_persists_authoring_changes() -> None:
     finally:
         if output_dir.exists():
             shutil.rmtree(output_dir)
+
+
+@pytest.mark.slow
+def test_saved_bundle_runs_with_canonical_execution_provenance() -> None:
+    scenario_dir = prepare_scenario_copy(
+        "data/decision_platform/maquete_v2",
+        "maquete_v2_persistence_run_provenance",
+        scenario_overrides={"hydraulic_engine": {"fallback": "python_emulated_julia"}},
+    )
+    output_dir = prepare_isolated_tmp_dir("scenario_persistence_run_provenance")
+    try:
+        reloaded, _ = save_authored_scenario_bundle(
+            scenario_dir,
+            output_dir,
+            topology_rules_text=yaml.safe_dump(
+                load_scenario_bundle(scenario_dir).topology_rules,
+                sort_keys=False,
+                allow_unicode=True,
+            ),
+            scenario_settings_text=yaml.safe_dump(
+                load_scenario_bundle(scenario_dir).scenario_settings,
+                sort_keys=False,
+                allow_unicode=True,
+            ),
+        )
+        result = run_decision_pipeline(
+            output_dir,
+            allow_diagnostic_python_emulation=True,
+        )
+
+        assert reloaded.bundle_manifest_path is not None
+        assert result["scenario_bundle_root"] == str(output_dir.resolve())
+        assert result["scenario_provenance"]["requested_dir_matches_bundle_root"] is True
+        assert result["runtime"]["scenario_provenance"]["scenario_root"] == str(output_dir.resolve())
+        assert result["runtime"]["scenario_provenance"]["bundle_manifest"].endswith("scenario_bundle.yaml")
+        assert result["runtime"]["scenario_provenance"]["bundle_files"]["components.csv"] == "component_catalog.csv"
+    finally:
+        if output_dir.exists():
+            shutil.rmtree(output_dir)
+        cleanup_scenario_copy(scenario_dir)
 
 
 def test_save_authored_bundle_fails_closed_for_invalid_route_contract() -> None:

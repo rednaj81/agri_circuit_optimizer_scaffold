@@ -23,13 +23,15 @@ def run_decision_pipeline(
     include_engine_comparison: bool | None = None,
     allow_diagnostic_python_emulation: bool = False,
 ) -> dict[str, Any]:
+    normalized_scenario_dir = _normalize_path(scenario_dir)
+    normalized_output_dir = _normalize_path(output_dir) if output_dir is not None else None
     started_at = datetime.now(UTC)
     try:
         bundle = _require_canonical_scenario_bundle(
-            load_scenario_bundle(scenario_dir),
+            load_scenario_bundle(normalized_scenario_dir),
             consumer="Official decision_platform pipeline",
         )
-    except ValueError as exc:
+    except (ValueError, FileNotFoundError) as exc:
         raise OfficialRuntimeConfigError(str(exc)) from exc
     should_build_engine_comparison = False if include_engine_comparison is None else include_engine_comparison
     _validate_runtime_policy(
@@ -37,11 +39,18 @@ def run_decision_pipeline(
         allow_diagnostic_python_emulation=allow_diagnostic_python_emulation,
         include_engine_comparison=should_build_engine_comparison,
     )
+    scenario_provenance = _build_scenario_provenance(
+        bundle,
+        requested_scenario_dir=normalized_scenario_dir,
+        output_dir=normalized_output_dir,
+    )
     runtime_policy = _build_runtime_policy(
         allow_diagnostic_python_emulation=allow_diagnostic_python_emulation,
         include_engine_comparison=should_build_engine_comparison,
     )
     result = build_solution_catalog(bundle)
+    result["scenario_bundle_root"] = scenario_provenance["scenario_root"]
+    result["scenario_provenance"] = scenario_provenance
     result["runtime_policy"] = runtime_policy
     if should_build_engine_comparison:
         result["engine_comparison"] = build_engine_comparison_suite(bundle, julia_result=result)
@@ -49,11 +58,12 @@ def run_decision_pipeline(
     result["runtime"] = _build_runtime_metadata(
         started_at=started_at,
         runtime_policy=runtime_policy,
+        scenario_provenance=scenario_provenance,
     )
     if "engine_comparison" in result:
         result["engine_comparison"]["runtime"] = result["runtime"]
-    if output_dir is not None:
-        export_catalog(result, output_dir)
+    if normalized_output_dir is not None:
+        export_catalog(result, normalized_output_dir)
     return result
 
 
@@ -100,9 +110,11 @@ def main() -> None:
         "scenario_id": result["scenario_id"],
         "candidate_count": len(result["catalog"]),
         "feasible_count": sum(1 for item in result["catalog"] if bool(item["metrics"]["feasible"])),
+        "scenario_bundle_root": result.get("scenario_bundle_root"),
         "scenario_bundle_version": result.get("scenario_bundle_version"),
         "scenario_bundle_manifest": result.get("scenario_bundle_manifest"),
         "scenario_bundle_files": result.get("scenario_bundle_files", {}),
+        "scenario_provenance": result.get("scenario_provenance", {}),
         "default_profile_id": result.get("default_profile_id"),
         "best_profile": result.get("default_profile_id"),
         "selected_candidate_id": result.get("selected_candidate_id"),
@@ -114,6 +126,32 @@ def main() -> None:
         "duration_s": result.get("runtime", {}).get("duration_s"),
     }
     print(json.dumps(summary, indent=2, ensure_ascii=False))
+
+
+def _normalize_path(path: str | Path) -> Path:
+    return Path(path).expanduser().resolve(strict=False)
+
+
+def _build_scenario_provenance(
+    bundle: ScenarioBundle,
+    *,
+    requested_scenario_dir: Path,
+    output_dir: Path | None,
+) -> dict[str, Any]:
+    scenario_root = bundle.base_dir.expanduser().resolve(strict=False)
+    manifest_path = bundle.bundle_manifest_path.expanduser().resolve(strict=False) if bundle.bundle_manifest_path else None
+    return {
+        "requested_scenario_dir": str(requested_scenario_dir),
+        "scenario_root": str(scenario_root),
+        "requested_dir_matches_bundle_root": requested_scenario_dir == scenario_root,
+        "bundle_version": bundle.bundle_version,
+        "bundle_manifest": str(manifest_path) if manifest_path else None,
+        "bundle_files": {
+            logical_name: str(path.relative_to(bundle.base_dir))
+            for logical_name, path in bundle.resolved_files.items()
+        },
+        "output_dir": str(output_dir) if output_dir is not None else None,
+    }
 
 
 def _validate_runtime_policy(
@@ -195,11 +233,13 @@ def _build_runtime_metadata(
     *,
     started_at: datetime,
     runtime_policy: dict[str, Any],
+    scenario_provenance: dict[str, Any],
 ) -> dict[str, Any]:
     finished_at = datetime.now(UTC)
     duration_s = round((finished_at - started_at).total_seconds(), 3)
     return {
         **runtime_policy,
+        "scenario_provenance": scenario_provenance,
         "started_at": started_at.isoformat().replace("+00:00", "Z"),
         "finished_at": finished_at.isoformat().replace("+00:00", "Z"),
         "duration_s": duration_s,

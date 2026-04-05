@@ -96,19 +96,27 @@ def test_phase1_exit_canonical_bundle_flow_is_versionable_and_traceable() -> Non
         assert saved["bundle"].scenario_settings["ui"]["default_layout_mode"] == "phase1_exit"
         assert saved["result"] is not None
         assert saved["pipeline_error"] is None
+        assert saved["result"]["scenario_bundle_root"] == str(save_dir.resolve())
+        assert saved["result"]["scenario_provenance"]["requested_dir_matches_bundle_root"] is True
         assert saved["bundle_io_summary"]["bundle_manifest"].endswith("scenario_bundle.yaml")
         assert saved["bundle_io_summary"]["bundle_files"]["components.csv"] == "component_catalog.csv"
+        assert saved["bundle_io_summary"]["execution_scenario_provenance"]["scenario_root"] == str(save_dir.resolve())
         assert saved["bundle_io_summary"]["exported_files"]["bundle_manifest"].endswith("scenario_bundle.yaml")
 
+        assert result["scenario_bundle_root"] == str(save_dir.resolve())
         assert result["scenario_bundle_manifest"].endswith("scenario_bundle.yaml")
         assert result["scenario_bundle_files"]["components.csv"] == "component_catalog.csv"
+        assert result["runtime"]["scenario_provenance"]["requested_dir_matches_bundle_root"] is True
+        assert result["runtime"]["scenario_provenance"]["scenario_root"] == str(save_dir.resolve())
         assert result["runtime"]["execution_mode"] == "diagnostic"
         assert result["runtime"]["official_gate_valid"] is False
         assert (export_dir / "catalog.csv").exists()
         assert (export_dir / "summary.json").exists()
         assert (export_dir / "selected_candidate.json").exists()
+        assert summary["scenario_bundle_root"] == str(save_dir.resolve())
         assert summary["scenario_bundle_manifest"].endswith("scenario_bundle.yaml")
         assert summary["scenario_bundle_files"]["components.csv"] == "component_catalog.csv"
+        assert summary["runtime"]["scenario_provenance"]["scenario_root"] == str(save_dir.resolve())
         assert summary["selected_candidate_id"] == result["selected_candidate_id"]
     finally:
         cleanup_scenario_copy(save_dir)
@@ -152,6 +160,42 @@ def test_phase1_exit_official_entrypoints_reject_legacy_layout() -> None:
             )
 
         assert not save_dir.exists()
+    finally:
+        cleanup_scenario_copy(save_dir)
+        cleanup_scenario_copy(scenario_dir)
+
+
+@pytest.mark.fast
+def test_phase1_exit_official_run_rejects_saved_bundle_with_invalid_manifest_version() -> None:
+    scenario_dir = prepare_maquete_v2_acceptance_scenario(
+        "maquete_v2_phase1_exit_invalid_manifest",
+        scenario_overrides={"hydraulic_engine": {"fallback": "python_emulated_julia"}},
+    )
+    save_dir = prepare_isolated_tmp_dir("maquete_v2_phase1_exit_invalid_manifest_saved")
+    try:
+        bundle = load_scenario_bundle(scenario_dir)
+        save_and_reopen_local_bundle(
+            current_scenario_dir=scenario_dir,
+            output_dir=save_dir,
+            nodes_rows=bundle.nodes.to_dict("records"),
+            components_rows=bundle.components.to_dict("records"),
+            candidate_links_rows=bundle.candidate_links.to_dict("records"),
+            edge_component_rules_rows=bundle.edge_component_rules.to_dict("records"),
+            route_rows=bundle.route_requirements.to_dict("records"),
+            layout_constraints_rows=bundle.layout_constraints.to_dict("records"),
+            topology_rules_text=yaml.safe_dump(bundle.topology_rules, sort_keys=False, allow_unicode=True),
+            scenario_settings_text=yaml.safe_dump(bundle.scenario_settings, sort_keys=False, allow_unicode=True),
+        )
+        manifest_path = save_dir / "scenario_bundle.yaml"
+        manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8")) or {}
+        manifest["bundle_version"] = "decision_platform_scenario_bundle/v999"
+        manifest_path.write_text(yaml.safe_dump(manifest, sort_keys=False, allow_unicode=True), encoding="utf-8")
+
+        with pytest.raises(OfficialRuntimeConfigError, match="unsupported bundle_version"):
+            run_decision_pipeline(
+                save_dir,
+                allow_diagnostic_python_emulation=True,
+            )
     finally:
         cleanup_scenario_copy(save_dir)
         cleanup_scenario_copy(scenario_dir)

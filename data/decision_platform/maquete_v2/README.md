@@ -20,3 +20,4 @@ Este cenário é uma base para a nova arquitetura.
 - o contrato do catálogo/regras também é fail-closed: categorias do catálogo e de `edge_component_rules.csv` precisam permanecer canônicas, componentes de medição precisam ser legíveis e regras não podem declarar categorias fora do domínio ou fora de `allowed_categories`.
 - settings, topologia e layout também são validados de forma fail-closed: `scenario_settings.yaml`, `topology_rules.yaml` e `layout_constraints.csv` precisam manter ids, famílias, perfis e limites estruturais explícitos e coerentes.
 - o caminho oficial de execução local e de save/reopen da UI aceita apenas bundles canônicos com `scenario_bundle.yaml`; layout legado fica restrito a uso explícito de baixo nível para migração/testes.
+- a execução oficial do bundle deve registrar a proveniência mínima consumida: raiz canônica do cenário, `bundle_version`, manifesto e arquivos obrigatórios referenciados.

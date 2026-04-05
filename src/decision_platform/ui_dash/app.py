@@ -52,8 +52,13 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
     initial_bundle_io_summary = json.dumps(
         {
             "source_scenario_dir": str(Path(scenario_dir)),
+            "canonical_scenario_root": str(bundle.base_dir),
             "bundle_manifest": str(bundle.bundle_manifest_path) if bundle.bundle_manifest_path else None,
             "bundle_version": bundle.bundle_version,
+            "bundle_files": {
+                logical_name: str(path.relative_to(bundle.base_dir))
+                for logical_name, path in bundle.resolved_files.items()
+            },
             "status": "idle",
         },
         indent=2,
@@ -1198,6 +1203,7 @@ def save_and_reopen_local_bundle(
             "status": "saved_and_reopened",
             "source_scenario_dir": str(normalized_source_dir),
             "saved_scenario_dir": str(normalized_output_dir),
+            "canonical_scenario_root": str(reloaded_bundle.base_dir),
             "bundle_version": reloaded_bundle.bundle_version,
             "bundle_manifest": str(reloaded_bundle.bundle_manifest_path) if reloaded_bundle.bundle_manifest_path else None,
             "bundle_files": {
@@ -1208,9 +1214,10 @@ def save_and_reopen_local_bundle(
                 logical_name: str(path)
                 for logical_name, path in exported_files.items()
             },
+            "execution_scenario_provenance": result.get("scenario_provenance") if result else None,
             "pipeline_error": pipeline_error,
         },
-}
+    }
 
 
 def _normalize_scenario_dir(path: str | Path) -> Path:
@@ -1234,9 +1241,11 @@ def _build_execution_summary(result: dict[str, Any] | None, error: str | None) -
             "feasible_count": sum(1 for item in result["catalog"] if item["metrics"]["feasible"]) if result else 0,
             "default_profile_id": result.get("default_profile_id") if result else None,
             "selected_candidate_id": result.get("selected_candidate_id") if result else None,
+            "scenario_bundle_root": result.get("scenario_bundle_root") if result else None,
             "scenario_bundle_version": result.get("scenario_bundle_version") if result else None,
             "scenario_bundle_manifest": result.get("scenario_bundle_manifest") if result else None,
             "scenario_bundle_files": result.get("scenario_bundle_files") if result else None,
+            "scenario_provenance": result.get("scenario_provenance") if result else None,
             "error": error,
         },
         indent=2,

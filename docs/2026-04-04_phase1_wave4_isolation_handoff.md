@@ -10,11 +10,13 @@ Estabilizar o gate de saída da phase 1 removendo acoplamento de estado entre fi
 - `src/decision_platform/ui_dash/app.py` normaliza `scenario_dir` e `output_dir` para paths absolutos e determinísticos no build do app, no rerun local da pipeline e no save/reopen.
 - Os testes de persistência, UI e CLI que ainda usavam diretórios fixos passaram a usar paths únicos por execução.
 - Foi adicionado um teste de regressão que reconstrói a UI a partir de um bundle salvo depois da limpeza do cenário-fonte, provando que o app não depende de arquivos já removidos.
+- O estado consolidado da phase 1 também expõe a proveniência mínima do bundle (`scenario_bundle_root` e `scenario_provenance`) em runtime, CLI, UI e `summary.json`, fechando a rastreabilidade entre save/reopen e execução oficial do bundle.
 
 ## Validations
 
 - `.\.venv\Scripts\python.exe -m pytest tests\decision_platform\test_scenario_persistence.py tests\decision_platform\test_scenario_contract_validation.py tests\decision_platform\test_ui_smoke.py tests\decision_platform\test_run_pipeline_cli.py -q -p no:cacheprovider`
 - O mesmo comando acima foi executado uma segunda vez, novamente verde.
+- `.\.venv\Scripts\python.exe -m pytest tests\decision_platform\test_phase1_exit_acceptance.py tests\decision_platform\test_scenario_persistence.py tests\decision_platform\test_scenario_contract_validation.py tests\decision_platform\test_ui_smoke.py tests\decision_platform\test_run_pipeline_cli.py -q -p no:cacheprovider`
 - `.\.venv\Scripts\python.exe -m pytest tests\decision_platform -m fast -q -p no:cacheprovider`
 
 ## Notes

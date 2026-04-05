@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -26,6 +27,20 @@ from tests.decision_platform.scenario_utils import (
 )
 
 pytestmark = [pytest.mark.requires_dash, pytest.mark.ui]
+
+
+def _find_component_by_id(component: object, target_id: str) -> object | None:
+    if getattr(component, "id", None) == target_id:
+        return component
+    children = getattr(component, "children", None)
+    if children is None:
+        return None
+    child_items = children if isinstance(children, (list, tuple)) else [children]
+    for child in child_items:
+        found = _find_component_by_id(child, target_id)
+        if found is not None:
+            return found
+    return None
 
 
 def test_dash_app_builds_layout_and_callbacks_even_when_fail_closed() -> None:
@@ -150,8 +165,12 @@ def test_ui_save_reopen_flow_persists_bundle_and_refreshes_pipeline() -> None:
         assert saved["bundle"].topology_rules["families"]["hybrid_free"]["max_active_pumps_per_route"] == 3
         assert saved["bundle"].scenario_settings["ui"]["default_layout_mode"] == "save_reopen_ui"
         assert saved["result"] is not None
+        assert saved["result"]["scenario_bundle_root"] == str(output_dir.resolve())
         assert saved["result"]["scenario_bundle_version"] == saved["bundle"].bundle_version
         assert saved["result"]["scenario_bundle_files"]["components.csv"] == "component_catalog.csv"
+        assert saved["result"]["scenario_provenance"]["requested_dir_matches_bundle_root"] is True
+        assert saved["bundle_io_summary"]["canonical_scenario_root"] == str(output_dir.resolve())
+        assert saved["bundle_io_summary"]["execution_scenario_provenance"]["scenario_root"] == str(output_dir.resolve())
         assert saved["pipeline_error"] is None
     finally:
         cleanup_scenario_copy(scenario_dir)
@@ -230,9 +249,41 @@ def test_ui_rebuilds_from_saved_bundle_after_source_cleanup() -> None:
         assert app.layout is not None
         assert saved["scenario_dir"] == str(output_dir.resolve())
         assert load_scenario_bundle(saved["scenario_dir"]).bundle_manifest_path is not None
+        execution_summary = _find_component_by_id(app.layout, "execution-summary")
+        assert execution_summary is not None
+        summary_payload = json.loads(execution_summary.children)
+        assert summary_payload["scenario_bundle_root"] == str(output_dir.resolve())
+        assert summary_payload["scenario_provenance"]["requested_dir_matches_bundle_root"] is True
     finally:
         if scenario_dir is not None and Path(scenario_dir).exists():
             cleanup_scenario_copy(scenario_dir)
+
+
+@pytest.mark.fast
+def test_ui_save_reopen_reports_fail_closed_probe_override_on_official_bundle(monkeypatch) -> None:
+    monkeypatch.setenv("DECISION_PLATFORM_DISABLE_REAL_JULIA_PROBE", "1")
+    source_bundle = load_scenario_bundle("data/decision_platform/maquete_v2")
+    output_dir = prepare_isolated_tmp_dir("maquete_v2_ui_probe_override_saved")
+    try:
+        saved = save_and_reopen_local_bundle(
+            current_scenario_dir="data/decision_platform/maquete_v2",
+            output_dir=output_dir,
+            nodes_rows=source_bundle.nodes.to_dict("records"),
+            components_rows=source_bundle.components.to_dict("records"),
+            candidate_links_rows=source_bundle.candidate_links.to_dict("records"),
+            edge_component_rules_rows=source_bundle.edge_component_rules.to_dict("records"),
+            route_rows=source_bundle.route_requirements.to_dict("records"),
+            layout_constraints_rows=source_bundle.layout_constraints.to_dict("records"),
+            topology_rules_text=yaml.safe_dump(source_bundle.topology_rules, sort_keys=False, allow_unicode=True),
+            scenario_settings_text=yaml.safe_dump(source_bundle.scenario_settings, sort_keys=False, allow_unicode=True),
+        )
+
+        assert saved["result"] is None
+        assert "invalid for the official Julia-only gate" in saved["pipeline_error"]
+        assert saved["bundle_io_summary"]["canonical_scenario_root"] == str(output_dir.resolve())
+        assert saved["bundle_io_summary"]["execution_scenario_provenance"] is None
+    finally:
+        cleanup_scenario_copy(output_dir)
 
 
 @pytest.mark.slow

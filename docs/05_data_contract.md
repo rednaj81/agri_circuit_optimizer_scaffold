@@ -33,6 +33,22 @@ Regras:
 - `bundle_version` não suportado deve falhar fechado com mensagem clara
 - arquivo referenciado pelo manifesto ausente deve falhar fechado com mensagem clara
 
+## Proveniência mínima de execução
+
+No caminho oficial `save -> reopen -> run`, a execução deve expor de forma consistente:
+
+- `scenario_root`: raiz canônica resolvida do cenário executado
+- `requested_scenario_dir`: diretório solicitado para a run
+- `requested_dir_matches_bundle_root`: sinal explícito de divergência entre diretório pedido e bundle efetivamente carregado
+- `bundle_version`: versão lida de `scenario_bundle.yaml`
+- `bundle_manifest`: caminho resolvido do manifesto consumido
+- `bundle_files`: mapa lógico -> arquivo relativo consumido do manifesto
+
+Esses campos devem aparecer sem nova camada de orquestração em:
+- `runtime.scenario_provenance` do resultado da run
+- resumo exportado (`summary.json`) da execução local
+- sinais visíveis da UI/CLI do fluxo oficial
+
 ## `nodes.csv`
 
 Colunas mínimas:

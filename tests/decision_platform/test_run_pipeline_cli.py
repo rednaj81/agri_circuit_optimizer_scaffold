@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import shutil
+from pathlib import Path
 
 import pytest
+import yaml
 
 from decision_platform.api import run_pipeline
 from decision_platform.api.run_pipeline import OfficialRuntimeConfigError, run_decision_pipeline
@@ -51,6 +52,24 @@ def test_cli_rejects_legacy_layout_without_manifest() -> None:
 
 
 @pytest.mark.fast
+def test_cli_rejects_unsupported_bundle_version_in_official_flow() -> None:
+    scenario_dir = prepare_scenario_copy(
+        "data/decision_platform/maquete_v2",
+        "maquete_v2_cli_invalid_bundle_version",
+    )
+    try:
+        manifest_path = Path(scenario_dir) / "scenario_bundle.yaml"
+        manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8")) or {}
+        manifest["bundle_version"] = "decision_platform_scenario_bundle/v999"
+        manifest_path.write_text(yaml.safe_dump(manifest, sort_keys=False), encoding="utf-8")
+
+        with pytest.raises(OfficialRuntimeConfigError, match="unsupported bundle_version"):
+            run_decision_pipeline(scenario_dir)
+    finally:
+        cleanup_scenario_copy(scenario_dir)
+
+
+@pytest.mark.fast
 def test_cli_rejects_engine_comparison_without_explicit_diagnostic_opt_in() -> None:
     with pytest.raises(OfficialRuntimeConfigError) as exc:
         run_decision_pipeline(
@@ -84,9 +103,13 @@ def test_cli_accepts_canonical_bundle_and_preserves_manifest(monkeypatch) -> Non
 
     result = run_pipeline.run_decision_pipeline(bundle.base_dir)
 
+    assert result["scenario_bundle_root"] == str(Path(bundle.base_dir).resolve())
     assert result["scenario_bundle_version"] == bundle.bundle_version
     assert result["scenario_bundle_manifest"].endswith("scenario_bundle.yaml")
     assert result["scenario_bundle_files"]["components.csv"] == "component_catalog.csv"
+    assert result["scenario_provenance"]["requested_dir_matches_bundle_root"] is True
+    assert result["scenario_provenance"]["scenario_root"] == str(Path(bundle.base_dir).resolve())
+    assert result["runtime"]["scenario_provenance"]["bundle_manifest"].endswith("scenario_bundle.yaml")
     assert result["runtime"]["execution_mode"] == "official"
     assert result["runtime"]["official_gate_valid"] is True
 
@@ -103,9 +126,19 @@ def test_run_decision_pipeline_skips_engine_comparison_by_default(monkeypatch) -
         "build_solution_catalog",
         lambda loaded_bundle: {
             "scenario_id": "maquete_v2",
+            "scenario_bundle_root": str(Path(loaded_bundle.base_dir).resolve()),
             "scenario_bundle_version": "decision_platform_scenario_bundle/v1",
             "scenario_bundle_manifest": "dummy-scenario/scenario_bundle.yaml",
             "scenario_bundle_files": {"components.csv": "component_catalog.csv"},
+            "scenario_provenance": {
+                "requested_scenario_dir": str(Path("dummy-scenario").resolve(strict=False)),
+                "scenario_root": str(Path(loaded_bundle.base_dir).resolve()),
+                "requested_dir_matches_bundle_root": False,
+                "bundle_version": "decision_platform_scenario_bundle/v1",
+                "bundle_manifest": "dummy-scenario/scenario_bundle.yaml",
+                "bundle_files": {"components.csv": "component_catalog.csv"},
+                "output_dir": str(Path("dummy-output").resolve(strict=False)),
+            },
             "catalog": [{"metrics": {"feasible": True}}],
             "default_profile_id": "balanced",
             "selected_candidate_id": "candidate-001",
@@ -125,15 +158,20 @@ def test_run_decision_pipeline_skips_engine_comparison_by_default(monkeypatch) -
     result = run_pipeline.run_decision_pipeline("dummy-scenario", "dummy-output")
 
     assert "engine_comparison" not in result
+    assert result["scenario_bundle_root"] == str(Path(bundle.base_dir).resolve())
     assert result["scenario_bundle_version"] == "decision_platform_scenario_bundle/v1"
     assert result["scenario_bundle_manifest"] == "dummy-scenario/scenario_bundle.yaml"
     assert result["scenario_bundle_files"]["components.csv"] == "component_catalog.csv"
+    assert result["scenario_provenance"]["requested_scenario_dir"] == str(Path("dummy-scenario").resolve(strict=False))
+    assert result["scenario_provenance"]["scenario_root"] == str(Path(bundle.base_dir).resolve())
+    assert result["scenario_provenance"]["requested_dir_matches_bundle_root"] is False
+    assert result["runtime"]["scenario_provenance"]["output_dir"] == str(Path("dummy-output").resolve(strict=False))
     assert result["runtime"]["execution_mode"] == "official"
     assert result["runtime"]["official_gate_valid"] is True
     assert result["runtime"]["started_at"]
     assert result["runtime"]["finished_at"]
     assert isinstance(result["runtime"]["duration_s"], float)
-    assert captured["output_dir"] == "dummy-output"
+    assert captured["output_dir"] == Path("dummy-output").resolve(strict=False)
     assert "engine_comparison" not in captured["result"]
 
 
@@ -162,15 +200,34 @@ def test_cli_uses_default_profile_and_selected_candidate_with_explicit_diagnosti
                 (Path(output_dir_arg) / "engine_comparison.json").write_text("{}", encoding="utf-8")
             return {
                 "scenario_id": "maquete_v2",
+                "scenario_bundle_root": str(Path("data/decision_platform/maquete_v2").resolve()),
                 "scenario_bundle_version": "decision_platform_scenario_bundle/v1",
                 "scenario_bundle_manifest": "data/decision_platform/maquete_v2/scenario_bundle.yaml",
                 "scenario_bundle_files": {"components.csv": "component_catalog.csv"},
+                "scenario_provenance": {
+                    "requested_scenario_dir": str(Path("data/decision_platform/maquete_v2").resolve()),
+                    "scenario_root": str(Path("data/decision_platform/maquete_v2").resolve()),
+                    "requested_dir_matches_bundle_root": True,
+                    "bundle_version": "decision_platform_scenario_bundle/v1",
+                    "bundle_manifest": str(Path("data/decision_platform/maquete_v2/scenario_bundle.yaml").resolve()),
+                    "bundle_files": {"components.csv": "component_catalog.csv"},
+                    "output_dir": str(output_dir.resolve()),
+                },
                 "catalog": [{"metrics": {"feasible": True}}],
                 "default_profile_id": "balanced",
                 "selected_candidate_id": "candidate-001",
                 "runtime": {
                     "execution_mode": "diagnostic",
                     "official_gate_valid": False,
+                    "scenario_provenance": {
+                        "requested_scenario_dir": str(Path("data/decision_platform/maquete_v2").resolve()),
+                        "scenario_root": str(Path("data/decision_platform/maquete_v2").resolve()),
+                        "requested_dir_matches_bundle_root": True,
+                        "bundle_version": "decision_platform_scenario_bundle/v1",
+                        "bundle_manifest": str(Path("data/decision_platform/maquete_v2/scenario_bundle.yaml").resolve()),
+                        "bundle_files": {"components.csv": "component_catalog.csv"},
+                        "output_dir": str(output_dir.resolve()),
+                    },
                     "started_at": "2026-04-04T00:00:00Z",
                     "finished_at": "2026-04-04T00:00:01Z",
                     "duration_s": 1.0,
@@ -197,9 +254,12 @@ def test_cli_uses_default_profile_and_selected_candidate_with_explicit_diagnosti
         assert captured["include_engine_comparison"] is True
         assert captured["allow_diagnostic_python_emulation"] is True
         assert summary["default_profile_id"] == "balanced"
+        assert summary["scenario_bundle_root"] == str(Path("data/decision_platform/maquete_v2").resolve())
         assert summary["scenario_bundle_version"] == "decision_platform_scenario_bundle/v1"
         assert summary["scenario_bundle_manifest"].endswith("scenario_bundle.yaml")
         assert summary["scenario_bundle_files"]["components.csv"] == "component_catalog.csv"
+        assert summary["scenario_provenance"]["requested_dir_matches_bundle_root"] is True
+        assert summary["scenario_provenance"]["output_dir"] == str(output_dir.resolve())
         assert summary["selected_candidate_id"] == "candidate-001"
         assert summary["top_candidate"] == "candidate-001"
         assert summary["best_profile"] == "balanced"
