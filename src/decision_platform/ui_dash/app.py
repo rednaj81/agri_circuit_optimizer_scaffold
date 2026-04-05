@@ -229,6 +229,13 @@ def _coerce_truthy(value: Any) -> bool:
     return normalized in {"1", "true", "yes", "y"}
 
 
+def _timestamp_or_zero(value: Any) -> int:
+    try:
+        return int(value or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
 def _primary_tab_from_search(search: str | None, default: str = "studio") -> str:
     if not search:
         return default
@@ -423,6 +430,11 @@ def build_studio_readiness_summary(
     visible_business_nodes = _visible_studio_nodes(nodes_rows)
     projected_business_routes = _primary_route_projection_rows(nodes_rows, route_rows)
     status = "ready" if not blockers and node_ids and candidate_links_rows and mandatory_routes else "needs_attention"
+    readiness_headline = (
+        "Cenário pronto para seguir para Runs."
+        if status == "ready"
+        else "Ainda há bloqueios ou avisos a revisar antes de enfileirar."
+    )
     return {
         "status": status,
         "node_count": len(node_ids),
@@ -432,6 +444,9 @@ def build_studio_readiness_summary(
         "hidden_internal_node_count": max(len(nodes_rows) - len(visible_business_nodes), 0),
         "mandatory_route_count": len(mandatory_routes),
         "measurement_route_count": sum(1 for row in route_rows if _coerce_truthy(row.get("measurement_required"))),
+        "blocker_count": len(list(dict.fromkeys(blockers))),
+        "warning_count": len(list(dict.fromkeys(warnings))),
+        "readiness_headline": readiness_headline,
         "blockers": list(dict.fromkeys(blockers)),
         "warnings": list(dict.fromkeys(warnings)),
         "next_steps": [
@@ -447,7 +462,7 @@ def render_studio_readiness_panel(summary: dict[str, Any]) -> Any:
     return html.Div(
         children=[
             html.Div("Readiness do cenário", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
-            html.Div(style={"display": "flex", "alignItems": "center", "gap": "10px", "margin": "8px 0 14px"}, children=[html.Span(str(status).replace("_", " "), style={"padding": "6px 10px", "borderRadius": "999px", "background": background, "color": color, "fontWeight": 700}), html.Span("Pronto para rodar" if status == "ready" else "Ainda exige atencao estrutural", style={"fontWeight": 700})]),
+            html.Div(style={"display": "flex", "alignItems": "center", "gap": "10px", "margin": "8px 0 14px", "flexWrap": "wrap"}, children=[html.Span(str(status).replace("_", " "), style={"padding": "6px 10px", "borderRadius": "999px", "background": background, "color": color, "fontWeight": 700}), html.Span(str(summary.get("readiness_headline") or ("Pronto para rodar" if status == "ready" else "Ainda exige atencao estrutural")), style={"fontWeight": 700, "lineHeight": "1.5"})]),
             html.Div(
                 style=UI_THREE_COLUMN_STYLE,
                 children=[
@@ -455,6 +470,24 @@ def render_studio_readiness_panel(summary: dict[str, Any]) -> Any:
                     _metric_card("Fluxos projetados", summary.get("business_edge_count", 0), "Leitura primária do circuito de negócio."),
                     _metric_card("Internos ocultos", summary.get("hidden_internal_node_count", 0), "Hubs e nós técnicos fora do canvas principal."),
                     _metric_card("Rotas obrigatorias", summary.get("mandatory_route_count", 0)),
+                    _metric_card("Bloqueios", summary.get("blocker_count", 0), "Impedem seguir direto para Runs."),
+                    _metric_card("Avisos", summary.get("warning_count", 0), "Podem pedir revisão antes do enfileiramento."),
+                ],
+            ),
+            html.H4("Passagem para Runs", style={"marginBottom": "6px"}),
+            html.Div(
+                style={**UI_MUTED_CARD_STYLE, "padding": "12px"},
+                children=[
+                    html.Div(
+                        "Quando o cenário estiver `ready`, siga para Runs para enfileirar ou revisar a fila. Se ainda houver bloqueios, fique no Studio até fechar as regras obrigatórias.",
+                        style={"lineHeight": "1.6"},
+                    ),
+                    html.Div(
+                        style=UI_ACTION_ROW_STYLE,
+                        children=[
+                            html.Button("Ir para Runs", id="studio-open-runs-button", style=UI_BUTTON_STYLE),
+                        ],
+                    ),
                 ],
             ),
             html.H4("Bloqueios", style={"marginBottom": "6px"}),
@@ -648,6 +681,44 @@ def render_run_jobs_overview_panel(summary: dict[str, Any]) -> Any:
             html.Ul(
                 [html.Li(f"{status}: {count}") for status, count in status_counts.items()],
                 style={"margin": "8px 0 0 18px", "lineHeight": "1.6"},
+            ),
+        ]
+    )
+
+
+def render_runs_flow_panel(studio_summary: dict[str, Any], run_summary: dict[str, Any]) -> Any:
+    studio_status = str(studio_summary.get("status") or "needs_attention")
+    run_count = int(run_summary.get("run_count", 0) or 0) if isinstance(run_summary, dict) else 0
+    next_queued_run_id = run_summary.get("next_queued_run_id") if isinstance(run_summary, dict) else None
+    if studio_status == "ready":
+        readiness_note = "O cenário já passou pelo gate principal de prontidão do Studio."
+        next_action = (
+            f"Há uma run pronta na fila ({next_queued_run_id}). Revise a run em foco ou execute o próximo job."
+            if next_queued_run_id
+            else "Enfileire o cenário atual ou revise a última execução antes de avançar para Decisão."
+        )
+    else:
+        readiness_note = "O Studio ainda sinaliza bloqueios ou avisos relevantes para o enfileiramento."
+        next_action = "Volte ao Studio para corrigir conectividade, regras obrigatórias e medição direta antes de abrir uma nova run."
+    return html.Div(
+        children=[
+            html.H3("Passagem Studio -> Runs", style={"marginTop": 0}),
+            html.Div(
+                style=UI_THREE_COLUMN_STYLE,
+                children=[
+                    _metric_card("Readiness", studio_status, readiness_note),
+                    _metric_card("Bloqueios", studio_summary.get("blocker_count", 0)),
+                    _metric_card("Avisos", studio_summary.get("warning_count", 0)),
+                    _metric_card("Runs locais", run_count),
+                    _metric_card("Próxima run", next_queued_run_id or "-"),
+                ],
+            ),
+            html.Div(str(studio_summary.get("readiness_headline") or ""), style={"marginTop": "10px", "fontWeight": 700, "lineHeight": "1.5"}),
+            html.H4("Próxima ação", style={"marginBottom": "6px", "marginTop": "14px"}),
+            html.Div(next_action, style={"lineHeight": "1.6", "fontWeight": 700}),
+            html.Div(
+                style=UI_ACTION_ROW_STYLE,
+                children=[html.Button("Voltar ao Studio", id="runs-open-studio-button", style=UI_BUTTON_STYLE)],
             ),
         ]
     )
@@ -1178,10 +1249,16 @@ def build_app(
                                 style=UI_TWO_COLUMN_STYLE,
                                 children=[
                                     html.Div(id="run-jobs-overview-panel", children=render_run_jobs_overview_panel(initial_run_jobs_snapshot["summary"]), style=UI_CARD_STYLE),
-                                    html.Div(id="execution-summary-panel", children=render_execution_summary_panel(_safe_json_loads(initial_execution_summary)), style=UI_MUTED_CARD_STYLE),
+                                    html.Div(id="runs-flow-panel", children=render_runs_flow_panel(initial_studio_readiness, initial_run_jobs_snapshot["summary"]), style=UI_MUTED_CARD_STYLE),
                                 ],
                             ),
-                            html.Div(id="run-jobs-status-banner", children=render_status_banner(""), style=UI_CARD_STYLE),
+                            html.Div(
+                                style=UI_TWO_COLUMN_STYLE,
+                                children=[
+                                    html.Div(id="execution-summary-panel", children=render_execution_summary_panel(_safe_json_loads(initial_execution_summary)), style=UI_MUTED_CARD_STYLE),
+                                    html.Div(id="run-jobs-status-banner", children=render_status_banner(""), style=UI_CARD_STYLE),
+                                ],
+                            ),
                             html.Div(
                                 style=UI_TWO_COLUMN_STYLE,
                                 children=[
@@ -2597,12 +2674,14 @@ def build_app(
     @app.callback(
         Output("studio-readiness-panel", "children"),
         Output("studio-projection-coverage-panel", "children"),
+        Output("runs-flow-panel", "children"),
         Output("node-studio-summary-panel", "children"),
         Output("edge-studio-summary-panel", "children"),
         Output("studio-status-banner", "children"),
         Input("nodes-grid", "rowData"),
         Input("candidate-links-grid", "rowData"),
         Input("routes-grid", "rowData"),
+        Input("run-jobs-summary", "children"),
         Input("node-studio-summary", "children"),
         Input("edge-studio-summary", "children"),
         Input("studio-status", "children"),
@@ -2611,17 +2690,18 @@ def build_app(
         nodes_rows: list[dict[str, Any]] | None,
         candidate_links_rows: list[dict[str, Any]] | None,
         route_rows: list[dict[str, Any]] | None,
+        run_jobs_summary_text: str | None,
         node_summary_text: str | None,
         edge_summary_text: str | None,
         studio_status_text: str | None,
-    ) -> tuple[Any, Any, Any, Any, Any]:
+    ) -> tuple[Any, Any, Any, Any, Any, Any]:
+        studio_readiness = build_studio_readiness_summary(nodes_rows or [], candidate_links_rows or [], route_rows or [])
         return (
-            render_studio_readiness_panel(
-                build_studio_readiness_summary(nodes_rows or [], candidate_links_rows or [], route_rows or [])
-            ),
+            render_studio_readiness_panel(studio_readiness),
             render_studio_projection_panel(
                 build_studio_projection_summary(nodes_rows or [], candidate_links_rows or [], route_rows or [])
             ),
+            render_runs_flow_panel(studio_readiness, _safe_json_loads(run_jobs_summary_text)),
             render_studio_selection_panel(_safe_json_loads(node_summary_text), "node"),
             render_studio_selection_panel(_safe_json_loads(edge_summary_text), "edge"),
             render_status_banner(studio_status_text),
@@ -2641,13 +2721,29 @@ def build_app(
     @app.callback(
         Output("primary-navigation-tabs", "value"),
         Input("ui-location", "search"),
-        Input("studio-open-audit-button", "n_clicks"),
+        Input("studio-open-audit-button", "n_clicks_timestamp"),
+        Input("studio-open-runs-button", "n_clicks_timestamp"),
+        Input("runs-open-studio-button", "n_clicks_timestamp"),
         State("primary-navigation-tabs", "value"),
         prevent_initial_call=True,
     )
-    def _open_audit_from_studio(search: str | None, n_clicks: Any, current_tab: str | None) -> str:
-        if n_clicks:
-            return "audit"
+    def _open_audit_from_studio(
+        search: str | None,
+        open_audit_ts: Any,
+        open_runs_ts: Any,
+        open_studio_ts: Any,
+        current_tab: str | None,
+    ) -> str:
+        latest_click = max(
+            [
+                (_timestamp_or_zero(open_audit_ts), "audit"),
+                (_timestamp_or_zero(open_runs_ts), "runs"),
+                (_timestamp_or_zero(open_studio_ts), "studio"),
+            ],
+            key=lambda item: item[0],
+        )
+        if latest_click[0] > 0:
+            return latest_click[1]
         if search:
             return _primary_tab_from_search(search, default=str(current_tab or "studio"))
         return str(current_tab or "studio")

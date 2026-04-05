@@ -14,6 +14,7 @@ from decision_platform.ui_dash.app import (
     _primary_tab_from_search,
     apply_edge_studio_edit,
     apply_node_studio_edit,
+    build_studio_readiness_summary,
     build_app,
     build_node_studio_elements,
     build_primary_node_studio_elements,
@@ -27,6 +28,8 @@ from decision_platform.ui_dash.app import (
     render_candidate_summary_panel,
     render_execution_summary_panel,
     render_run_job_detail_panel,
+    render_runs_flow_panel,
+    render_studio_readiness_panel,
     move_node_studio_selection,
     rerank_catalog,
     save_and_reopen_local_bundle,
@@ -185,6 +188,7 @@ def test_studio_tab_surfaces_readiness_and_selection_context() -> None:
     assert _find_component_by_id(studio_tab, "studio-technical-guide") is not None
     assert _find_component_by_id(studio_tab, "studio-open-technical-guide-button") is not None
     assert _find_component_by_id(studio_tab, "studio-open-audit-button") is not None
+    assert _find_component_by_id(studio_tab, "studio-open-runs-button") is not None
 
 
 def test_studio_primary_canvas_hides_internal_and_hub_nodes() -> None:
@@ -226,11 +230,13 @@ def test_studio_discovery_callbacks_open_guide_and_audit_tab() -> None:
         app = build_app("data/decision_platform/maquete_v2")
 
     open_guide_callback = _get_callback(app, input_id="studio-open-technical-guide-button")
-    open_audit_callback = _get_callback(app, input_id="studio-open-audit-button")
+    open_navigation_callback = _get_callback(app, input_id="studio-open-audit-button")
 
     assert open_guide_callback(1, False) is True
-    assert open_audit_callback("?tab=runs", 1, "studio") == "audit"
-    assert open_audit_callback("?tab=decision", 0, "studio") == "decision"
+    assert open_navigation_callback("?tab=runs", 30, 20, 10, "studio") == "audit"
+    assert open_navigation_callback("?tab=decision", 0, 40, 0, "studio") == "runs"
+    assert open_navigation_callback("?tab=decision", 0, 40, 50, "runs") == "studio"
+    assert open_navigation_callback("?tab=decision", 0, 0, 0, "studio") == "decision"
 
 
 def test_primary_tab_from_search_accepts_known_main_spaces() -> None:
@@ -260,8 +266,45 @@ def test_runs_tab_combines_queue_and_execution_summary() -> None:
     runs_tab = _find_tab_by_label(app.layout, "Runs")
     assert runs_tab is not None
     assert _find_component_by_id(runs_tab, "run-jobs-overview-panel") is not None
+    assert _find_component_by_id(runs_tab, "runs-flow-panel") is not None
     assert _find_component_by_id(runs_tab, "execution-summary-panel") is not None
+    assert _find_component_by_id(runs_tab, "runs-open-studio-button") is not None
     assert _find_component_by_id(runs_tab, "run-button") is not None
+
+
+def test_studio_readiness_panel_surfaces_runs_transition_with_real_readiness() -> None:
+    summary = build_studio_readiness_summary(
+        nodes_rows=[{"node_id": "W"}, {"node_id": "P1"}],
+        candidate_links_rows=[],
+        route_rows=[{"route_id": "R001", "source": "W", "sink": "P1", "mandatory": True}],
+    )
+    panel = render_studio_readiness_panel(summary)
+    panel_text = _collect_text_content(panel)
+
+    assert "Passagem para Runs" in panel_text
+    assert "bloqueios ou avisos" in panel_text.lower()
+    assert _find_component_by_id(panel, "studio-open-runs-button") is not None
+
+
+def test_runs_flow_panel_reflects_studio_gate_and_queue_state() -> None:
+    panel = render_runs_flow_panel(
+        {
+            "status": "needs_attention",
+            "blocker_count": 2,
+            "warning_count": 1,
+            "readiness_headline": "Ainda há bloqueios ou avisos a revisar antes de enfileirar.",
+        },
+        {
+            "run_count": 3,
+            "next_queued_run_id": "run-003",
+        },
+    )
+    panel_text = _collect_text_content(panel)
+
+    assert "Passagem Studio -> Runs" in panel_text
+    assert "Voltar ao Studio" in panel_text
+    assert "run-003" in panel_text
+    assert "conectividade" in panel_text.lower()
 
 
 def test_primary_runs_panels_hide_raw_backend_keys_in_main_surface() -> None:
