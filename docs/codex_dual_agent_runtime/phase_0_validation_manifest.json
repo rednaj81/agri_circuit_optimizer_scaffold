@@ -1,6 +1,6 @@
 {
   "phase_id": "phase_0",
-  "generated_at": "2026-04-05T01:56:53.4312026-03:00",
+  "generated_at": "2026-04-05T02:06:01.9281433-03:00",
   "script_path": "C:\\d\\dev\\agri_circuit_optimizer_scaffold\\scripts\\run_decision_platform_runtime_validation.ps1",
   "profiles_path": "C:\\d\\dev\\agri_circuit_optimizer_scaffold\\scripts\\decision_platform_runtime_validation_profiles.json",
   "logs_dir": "C:\\d\\dev\\agri_circuit_optimizer_scaffold\\tests\\_tmp\\runtime_validation_script_logs",
@@ -15,9 +15,9 @@
       "official_gate_complete": false,
       "status": "failed",
       "success": false,
-      "last_report_path": "C:\\d\\dev\\agri_circuit_optimizer_scaffold\\tests\\_tmp\\runtime_validation_script_logs\\decision-platform-runtime-validation_diagnostic_20260405-015653-206.json",
-      "started_at": "2026-04-05T01:56:53.2065879-03:00",
-      "finished_at": "2026-04-05T01:56:53.3015916-03:00",
+      "last_report_path": "C:\\d\\dev\\agri_circuit_optimizer_scaffold\\tests\\_tmp\\runtime_validation_script_logs\\decision-platform-runtime-validation_diagnostic_20260405-020601-749.json",
+      "started_at": "2026-04-05T02:06:01.7491186-03:00",
+      "finished_at": "2026-04-05T02:06:01.8375167-03:00",
       "output_dir": "C:\\d\\dev\\agri_circuit_optimizer_scaffold\\data\\output\\decision_platform\\runtime_validation_diagnostic",
       "runtime_scenario_dir": null,
       "summary_path": null,
@@ -98,6 +98,7 @@
     "validation_sufficiency": "phase_1_exit_evidence",
     "status": "sealed",
     "sealed_baseline_only": true,
+    "historical_reference_only": true,
     "success": true,
     "validation_command": "$env:PYTHONPATH='src;.'; .\\.venv\\Scripts\\python.exe -m pytest tests/decision_platform/test_scenario_settings_contract.py tests/decision_platform/test_scenario_persistence.py tests/decision_platform/test_phase1_exit_acceptance.py tests/decision_platform/test_phase1_exit_artifacts.py -q --basetemp tests/_tmp/pytest-basetemp-wave7-exit-artifacts",
     "supporting_tests": [
@@ -126,6 +127,9 @@
     "closure_handoff": "docs/2026-04-05_phase1_wave5_exit_handoff.md",
     "historical_redirect_phase": "phase_2",
     "active_functional_phase": "phase_3",
+    "future_operational_updates_allowed": false,
+    "future_functional_updates_allowed": false,
+    "redirect_future_sessions_to_phase": "phase_3",
     "phase_exit_criteria": [
       "cenarios versionaveis",
       "catalogo de componentes persistido"
@@ -144,7 +148,8 @@
       "ranking, scoring, and decision UI expansion"
     ],
     "operational_closeout": "wave_7_regression_fix_only_no_new_functional_scope",
-    "no_additional_phase1_functional_waves": true
+    "no_additional_phase1_functional_waves": true,
+    "phase_1_operational_track_closed": true
   },
   "phase_2_exit_validation": {
     "phase_id": "phase_2",

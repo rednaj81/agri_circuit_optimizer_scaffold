@@ -39,10 +39,11 @@ phase_1:
     - 'As suítes de contrato já endurecidas (`test_loaders.py`, `test_scenario_contract_validation.py`, `test_component_catalog_contract.py`, `test_scenario_settings_contract.py`) permanecem como sustentação da saída, não como tema reaberto.'
     - 'Nenhuma nova wave funcional deve ocorrer dentro da phase_1 após a correção final da regressão operacional de fechamento.'
     - 'O redirecionamento histórico para `phase_2` já foi consumido; a continuidade funcional ativa agora está em `phase_3`, nunca em uma reabertura de `phase_1`.'
+    - 'Após esta trilha operacional, `phase_1` permanece apenas como baseline histórica selada; não abrir novas waves, nem mesmo correções operacionais de baixo valor, fora de justificativa extraordinária.'
   closure_handoff:
     summary_doc: "docs/2026-04-05_phase1_wave5_exit_handoff.md"
     freeze_rule: "Phase_2 deve consumir o bundle canônico como baseline congelado; não reabrir persistência, catálogo, rotas, settings, topologia ou layout sem novo handoff objetivo."
-    transition_note: "A phase_1 esta encerrada como baseline selada; o redirecionamento histórico abriu a phase_2 e a continuidade funcional ativa agora reside na phase_3, nunca em nova onda funcional dentro da phase_1."
+    transition_note: "A phase_1 esta encerrada como baseline selada e referência histórica; o redirecionamento histórico abriu a phase_2 e a continuidade funcional ativa agora reside na phase_3, nunca em nova onda funcional nem em nova correção operacional de baixo valor dentro da phase_1."
 phase_2:
   target: "Entregar studio de nós e arestas"
   status: "closed"
@@ -77,6 +78,7 @@ phase_3:
     - 'Usar `docs/2026-04-05_phase3_wave1_queue_open_handoff.md` como handoff humano único de abertura operacional da phase_3.'
     - 'Tratar `phase_1` e `phase_2` como fechadas; não reabrir persistência canônica nem baseline do Studio enquanto a fila serial evolui.'
     - 'Referenciar `docs/2026-04-05_phase1_wave5_exit_handoff.md` apenas como baseline histórica selada, não como escopo funcional reaberto.'
+    - 'Qualquer continuidade futura deve seguir somente na phase_3; não abrir novas waves de phase_1 como mecanismo de manutenção rotineira.'
   current_scope:
     - "run_job persistido localmente com estados canônicos"
     - "worker serial explícito sem simultaneidade no MVP"

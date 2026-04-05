@@ -10,6 +10,8 @@ This document remains the active operational handoff for the sealed `phase_1`, a
 
 The historical redirect in this closeout was consumed by `phase_2`. With `phase_2` also sealed, the current functional continuity now lives in `phase_3`; this document remains canonical only as sealed `phase_1` evidence.
 
+This handoff is historical-reference-only. Future sessions should use it to audit the sealed baseline, not to justify any new `phase_1` wave, including low-value operational corrections.
+
 ## Operational Status
 
 - `phase_1` is sealed.
@@ -17,6 +19,7 @@ The historical redirect in this closeout was consumed by `phase_2`. With `phase_
 - the historical redirect to `phase_2` has already been consumed and closed
 - the current functional phase is `phase_3`, with `tests/decision_platform/test_phase3_queue_acceptance.py` as the active gate
 - this session performs no new functional or corrective work inside `phase_1`; it only preserves the sealed closeout and its downstream redirect history
+- no additional `phase_1` wave should be scheduled after this historical sealing, except for extraordinary repository recovery with explicit justification
 - session-local snapshots such as `supervisor_state.json` and `loop_state.json` are not the phase source of truth
 
 ## Point Of Truth
@@ -61,6 +64,8 @@ $env:PYTHONPATH='src;.'; .\.venv\Scripts\python.exe -m pytest tests/decision_pla
 Any active functional progress now belongs to `phase_3`, using `docs/2026-04-05_phase3_wave1_queue_open_handoff.md` plus `tests/decision_platform/test_phase3_queue_acceptance.py` as the active operational gate.
 
 No additional functional wave should be scheduled inside `phase_1` after this regression correction.
+
+No additional low-value operational correction wave should be scheduled inside `phase_1`; ordinary continuity, clarification, and validation now belong to `phase_3` governance only.
 
 ## Honest Handoff
 
