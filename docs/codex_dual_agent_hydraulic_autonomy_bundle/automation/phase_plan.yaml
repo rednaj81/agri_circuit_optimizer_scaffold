@@ -82,6 +82,7 @@ phase_3:
     - "cancelamento explícito de jobs queued sem artefatos de execução"
     - "re-run explícito de runs terminals com novo run_id e rastreabilidade da origem"
     - "inspeção individual de run com status, eventos, log e artefatos"
+    - "reabertura da UI e reinspeção lendo a fila persistida localmente"
   exit_criteria:
     - "jobs isolados"
     - "status por run"

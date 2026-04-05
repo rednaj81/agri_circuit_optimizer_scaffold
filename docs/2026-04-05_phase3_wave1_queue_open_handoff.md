@@ -17,6 +17,7 @@ Realign the administrative source of truth so `phase_3` is the only active funct
 - queued-job cancellation without execution artifacts
 - explicit re-run of `completed` or `failed` runs through a new `run_id`
 - individual run inspection with status, events, log, and artifacts
+- queue inspection can be reopened from persisted local state, including isolated UI sessions bound to a specific queue root
 - official mode remains Julia-only when requested; diagnostic mode remains explicit and non-official
 
 ## Closed Phases
@@ -30,3 +31,7 @@ Realign the administrative source of truth so `phase_3` is the only active funct
 - no parallel orchestration or new queue capability is opened by this handoff
 - the `Studio` baseline from `phase_2` remains frozen
 - canonical bundle persistence and the official Julia-only runtime path remain unchanged
+
+## Audit Note
+
+- `tests/decision_platform/test_phase3_queue_acceptance.py` now covers reopen-style inspection after execution, rerun, and cancel by rebuilding the queue snapshot and `Runs` UI from the persisted local queue root

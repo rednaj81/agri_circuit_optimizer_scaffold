@@ -15,7 +15,7 @@ from decision_platform.api.run_pipeline import (
     summarize_run_jobs,
 )
 from decision_platform.julia_bridge import bridge
-from decision_platform.ui_dash.app import build_app
+from decision_platform.ui_dash.app import build_app, build_run_job_detail_summary, build_run_jobs_snapshot
 from tests.decision_platform.scenario_utils import (
     cleanup_scenario_copy,
     diagnostic_runtime_test_mode,
@@ -239,6 +239,58 @@ def test_phase3_queue_acceptance_can_rerun_terminal_runs_with_new_run_id(monkeyp
         cleanup_scenario_copy(diagnostic_queue_root)
         cleanup_scenario_copy(official_queue_root)
         cleanup_scenario_copy(diagnostic_scenario_dir)
+
+
+@pytest.mark.fast
+def test_phase3_queue_acceptance_reopens_persisted_run_state_for_inspection() -> None:
+    scenario_dir = prepare_maquete_v2_acceptance_scenario(
+        "maquete_v2_phase3_reopen_source",
+        scenario_overrides={"hydraulic_engine": {"fallback": "python_emulated_julia"}},
+    )
+    queue_root = prepare_isolated_tmp_dir("phase3_queue_reopen_root")
+    try:
+        with diagnostic_runtime_test_mode():
+            completed_candidate = create_run_job(
+                scenario_dir,
+                queue_root=queue_root,
+                allow_diagnostic_python_emulation=True,
+            )
+            completed_job = run_next_queued_job(queue_root=queue_root)
+            rerun_candidate = rerun_run_job(completed_candidate["run_id"], queue_root=queue_root)
+            canceled_job = cancel_run_job(rerun_candidate["run_id"], queue_root=queue_root)
+
+        reopened_snapshot = build_run_jobs_snapshot(queue_root, preferred_run_id=canceled_job["run_id"])
+        completed_detail = build_run_job_detail_summary(completed_job["run_id"], queue_root=queue_root)
+        canceled_detail = build_run_job_detail_summary(canceled_job["run_id"], queue_root=queue_root)
+        with diagnostic_runtime_test_mode():
+            app = build_app(scenario_dir, run_queue_root=queue_root)
+
+        layout_repr = repr(app.layout)
+        queue_root_str = str(queue_root.resolve())
+        queue_root_store = next(
+            child for child in app.layout.children if getattr(child, "id", None) == "run-queue-root"
+        )
+
+        assert completed_job is not None
+        assert completed_job["status"] == "completed"
+        assert reopened_snapshot["summary"]["queue_root"] == queue_root_str
+        assert reopened_snapshot["summary"]["status_counts"]["completed"] == 1
+        assert reopened_snapshot["summary"]["status_counts"]["canceled"] == 1
+        assert reopened_snapshot["selected_run_id"] == canceled_job["run_id"]
+        assert reopened_snapshot["selected_run_detail"]["status"] == "canceled"
+        assert reopened_snapshot["selected_run_detail"]["rerun_of_run_id"] == completed_candidate["run_id"]
+        assert completed_detail["status"] == "completed"
+        assert completed_detail["artifacts"]["summary_json"] is not None
+        assert completed_detail["events"][-1]["status"] == "completed"
+        assert canceled_detail["status"] == "canceled"
+        assert canceled_detail["events"][-1]["status"] == "canceled"
+        assert canceled_detail["artifacts"]["summary_json"] is None
+        assert "run-queue-root" in layout_repr
+        assert queue_root_store.data == queue_root_str
+        assert canceled_job["run_id"] in layout_repr
+    finally:
+        cleanup_scenario_copy(queue_root)
+        cleanup_scenario_copy(scenario_dir)
 
 
 @pytest.mark.fast

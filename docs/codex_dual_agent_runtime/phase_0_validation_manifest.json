@@ -1,6 +1,6 @@
 {
   "phase_id": "phase_0",
-  "generated_at": "2026-04-05T01:45:19.3053187-03:00",
+  "generated_at": "2026-04-05T01:47:59.8865293-03:00",
   "script_path": "C:\\d\\dev\\agri_circuit_optimizer_scaffold\\scripts\\run_decision_platform_runtime_validation.ps1",
   "profiles_path": "C:\\d\\dev\\agri_circuit_optimizer_scaffold\\scripts\\decision_platform_runtime_validation_profiles.json",
   "logs_dir": "C:\\d\\dev\\agri_circuit_optimizer_scaffold\\tests\\_tmp\\runtime_validation_script_logs",
@@ -15,9 +15,9 @@
       "official_gate_complete": false,
       "status": "failed",
       "success": false,
-      "last_report_path": "C:\\d\\dev\\agri_circuit_optimizer_scaffold\\tests\\_tmp\\runtime_validation_script_logs\\decision-platform-runtime-validation_diagnostic_20260405-014519-111.json",
-      "started_at": "2026-04-05T01:45:19.1114041-03:00",
-      "finished_at": "2026-04-05T01:45:19.1898647-03:00",
+      "last_report_path": "C:\\d\\dev\\agri_circuit_optimizer_scaffold\\tests\\_tmp\\runtime_validation_script_logs\\decision-platform-runtime-validation_diagnostic_20260405-014759-634.json",
+      "started_at": "2026-04-05T01:47:59.6342029-03:00",
+      "finished_at": "2026-04-05T01:47:59.7436729-03:00",
       "output_dir": "C:\\d\\dev\\agri_circuit_optimizer_scaffold\\data\\output\\decision_platform\\runtime_validation_diagnostic",
       "runtime_scenario_dir": null,
       "summary_path": null,
@@ -177,6 +177,7 @@
       "queued_cancel": "covered",
       "rerun": "covered",
       "individual_run_inspection": "covered",
+      "reopen_persisted_inspection": "covered",
       "official_runtime_policy": "julia_only_when_requested"
     },
     "evidence_files": [

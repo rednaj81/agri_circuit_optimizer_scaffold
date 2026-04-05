@@ -25,8 +25,13 @@ from decision_platform.rendering.circuit import build_solution_comparison_figure
 from decision_platform.ui_dash._compat import DASH_AVAILABLE, Dash, Input, Output, State, cyto, dag, dcc, html
 
 
-def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") -> Dash:
+def build_app(
+    scenario_dir: str | Path = "data/decision_platform/maquete_v2",
+    *,
+    run_queue_root: str | Path = DEFAULT_RUN_QUEUE_ROOT,
+) -> Dash:
     scenario_dir = _normalize_scenario_dir(scenario_dir)
+    run_queue_root = Path(run_queue_root).expanduser().resolve(strict=False)
     bundle = load_scenario_bundle(scenario_dir)
     result, pipeline_error = _safe_run_pipeline(scenario_dir)
     authoring_payload = bundle_authoring_payload(bundle)
@@ -78,7 +83,7 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
         authoring_payload["candidate_links_rows"],
         initial_edge_studio_selected_id,
     )
-    initial_run_jobs_snapshot = build_run_jobs_snapshot()
+    initial_run_jobs_snapshot = build_run_jobs_snapshot(run_queue_root)
     initial_run_jobs_summary = _serialize_json(initial_run_jobs_snapshot["summary"])
     initial_run_job_options = initial_run_jobs_snapshot["options"]
     initial_run_job_selected_id = initial_run_jobs_snapshot["selected_run_id"]
@@ -107,6 +112,7 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
         children=[
             html.H1("Decision Platform - Circuitos Hidráulicos"),
             dcc.Store(id="scenario-dir", data=str(Path(scenario_dir))),
+            dcc.Store(id="run-queue-root", data=str(run_queue_root)),
             dcc.Store(id="node-studio-selected-id", data=initial_node_studio_selected_id),
             dcc.Store(id="edge-studio-selected-id", data=initial_edge_studio_selected_id),
             dcc.Store(id="studio-status-message", data=""),
@@ -977,10 +983,12 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
         Output("run-jobs-status", "children"),
         Input("run-jobs-refresh-button", "n_clicks"),
         State("run-job-selected-id", "value"),
+        State("run-queue-root", "data"),
     )
     def _refresh_run_jobs_summary(
         n_clicks: Any,
         selected_run_id: str | None,
+        current_run_queue_root: str,
     ) -> tuple[str, list[dict[str, str]], str | None, str, str]:
         if not n_clicks:
             return (
@@ -990,7 +998,7 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
                 initial_run_job_detail,
                 "",
             )
-        snapshot = build_run_jobs_snapshot(preferred_run_id=selected_run_id)
+        snapshot = build_run_jobs_snapshot(current_run_queue_root, preferred_run_id=selected_run_id)
         return (
             _serialize_json(snapshot["summary"]),
             snapshot["options"],
@@ -1007,11 +1015,13 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
         Output("run-jobs-status", "children", allow_duplicate=True),
         Input("run-job-cancel-button", "n_clicks"),
         State("run-job-selected-id", "value"),
+        State("run-queue-root", "data"),
         prevent_initial_call=True,
     )
     def _cancel_selected_run_job(
         n_clicks: Any,
         selected_run_id: str | None,
+        current_run_queue_root: str,
     ) -> tuple[str, list[dict[str, str]], str | None, str, str]:
         status_message = ""
         preferred_run_id = selected_run_id
@@ -1020,12 +1030,12 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
                 status_message = "Nenhuma run selecionada para cancelamento."
             else:
                 try:
-                    job = cancel_run_job(selected_run_id)
+                    job = cancel_run_job(selected_run_id, queue_root=current_run_queue_root)
                     preferred_run_id = job["run_id"]
                     status_message = f"run_job {job['run_id']} -> {job['status']}"
                 except Exception as exc:
                     status_message = str(exc)
-        snapshot = build_run_jobs_snapshot(preferred_run_id=preferred_run_id)
+        snapshot = build_run_jobs_snapshot(current_run_queue_root, preferred_run_id=preferred_run_id)
         return (
             _serialize_json(snapshot["summary"]),
             snapshot["options"],
@@ -1042,11 +1052,13 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
         Output("run-jobs-status", "children", allow_duplicate=True),
         Input("run-job-rerun-button", "n_clicks"),
         State("run-job-selected-id", "value"),
+        State("run-queue-root", "data"),
         prevent_initial_call=True,
     )
     def _rerun_selected_run_job(
         n_clicks: Any,
         selected_run_id: str | None,
+        current_run_queue_root: str,
     ) -> tuple[str, list[dict[str, str]], str | None, str, str]:
         status_message = ""
         preferred_run_id = selected_run_id
@@ -1055,14 +1067,14 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
                 status_message = "Nenhuma run selecionada para reexecução."
             else:
                 try:
-                    rerun_job = rerun_run_job(selected_run_id)
+                    rerun_job = rerun_run_job(selected_run_id, queue_root=current_run_queue_root)
                     preferred_run_id = rerun_job["run_id"]
                     status_message = (
                         f"run_job {rerun_job['run_id']} enfileirada como re-run de {selected_run_id}"
                     )
                 except Exception as exc:
                     status_message = str(exc)
-        snapshot = build_run_jobs_snapshot(preferred_run_id=preferred_run_id)
+        snapshot = build_run_jobs_snapshot(current_run_queue_root, preferred_run_id=preferred_run_id)
         return (
             _serialize_json(snapshot["summary"]),
             snapshot["options"],
@@ -1074,10 +1086,11 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
     @app.callback(
         Output("run-job-detail", "children", allow_duplicate=True),
         Input("run-job-selected-id", "value"),
+        State("run-queue-root", "data"),
         prevent_initial_call=True,
     )
-    def _refresh_selected_run_job_detail(selected_run_id: str | None) -> str:
-        return _serialize_json(build_run_job_detail_summary(selected_run_id))
+    def _refresh_selected_run_job_detail(selected_run_id: str | None, current_run_queue_root: str) -> str:
+        return _serialize_json(build_run_job_detail_summary(selected_run_id, queue_root=current_run_queue_root))
 
     @app.callback(
         Output("profile-dropdown", "options"),
