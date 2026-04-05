@@ -302,6 +302,39 @@ def test_save_authored_bundle_fails_closed_for_invalid_node_direction_contract()
             shutil.rmtree(output_dir)
 
 
+def test_save_authored_bundle_fails_closed_for_node_rename_with_broken_references() -> None:
+    source_bundle = load_scenario_bundle("data/decision_platform/maquete_v2")
+    output_dir = prepare_isolated_tmp_dir("scenario_persistence_invalid_node_rename_references")
+    try:
+        nodes_rows = source_bundle.nodes.to_dict("records")
+        for row in nodes_rows:
+            if row["node_id"] == "P1":
+                row["node_id"] = "P1_RENAMED"
+                break
+
+        with pytest.raises(ValueError, match="references unknown nodes"):
+            save_authored_scenario_bundle(
+                "data/decision_platform/maquete_v2",
+                output_dir,
+                nodes_rows=nodes_rows,
+                candidate_links_rows=source_bundle.candidate_links.to_dict("records"),
+                route_rows=source_bundle.route_requirements.to_dict("records"),
+                topology_rules_text=yaml.safe_dump(
+                    source_bundle.topology_rules,
+                    sort_keys=False,
+                    allow_unicode=True,
+                ),
+                scenario_settings_text=yaml.safe_dump(
+                    source_bundle.scenario_settings,
+                    sort_keys=False,
+                    allow_unicode=True,
+                ),
+            )
+    finally:
+        if output_dir.exists():
+            shutil.rmtree(output_dir)
+
+
 def test_save_authored_bundle_supports_explicit_legacy_source_layout() -> None:
     scenario_dir = prepare_scenario_copy(
         "data/decision_platform/maquete_v2",

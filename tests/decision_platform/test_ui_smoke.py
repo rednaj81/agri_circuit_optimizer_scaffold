@@ -10,6 +10,7 @@ from decision_platform.api.run_pipeline import OfficialRuntimeConfigError
 from decision_platform.data_io.loader import load_scenario_bundle
 from decision_platform.ui_dash._compat import DASH_AVAILABLE
 from decision_platform.ui_dash.app import (
+    apply_edge_studio_edit,
     apply_node_studio_edit,
     build_app,
     build_node_studio_elements,
@@ -69,6 +70,10 @@ def test_dash_app_exposes_authoring_save_reopen_controls() -> None:
     assert "node-studio-cytoscape" in layout_repr
     assert "node-studio-apply-button" in layout_repr
     assert "node-studio-move-button" in layout_repr
+    assert "edge-studio-apply-button" in layout_repr
+    assert "edge-studio-link-id" in layout_repr
+    assert "edge-studio-from-node" in layout_repr
+    assert "edge-studio-to-node" in layout_repr
     assert "save-reopen-bundle-button" in layout_repr
     assert "candidate-links-grid" in layout_repr
     assert "edge-component-rules-grid" in layout_repr
@@ -303,6 +308,56 @@ def test_node_studio_helpers_update_layout_and_properties() -> None:
     assert selected_node["position"]["y"] == 198.0
 
 
+@pytest.mark.fast
+def test_node_studio_rejects_node_rename_with_unreconciled_references() -> None:
+    bundle = load_scenario_bundle("data/decision_platform/maquete_v2")
+
+    with pytest.raises(ValueError, match="requires explicit reconciliation"):
+        apply_node_studio_edit(
+            bundle.nodes.to_dict("records"),
+            selected_node_id="P1",
+            node_id="P1_RENAMED",
+            label="Produto 1 renomeado",
+            node_type="product_tank",
+            x_m=0.15,
+            y_m=0.08,
+            allow_inbound=True,
+            allow_outbound=True,
+            candidate_links_rows=bundle.candidate_links.to_dict("records"),
+            route_rows=bundle.route_requirements.to_dict("records"),
+        )
+
+
+@pytest.mark.fast
+def test_edge_studio_helpers_update_link_properties() -> None:
+    bundle = load_scenario_bundle("data/decision_platform/maquete_v2")
+    edited_links, selected_link_id = apply_edge_studio_edit(
+        bundle.candidate_links.to_dict("records"),
+        selected_link_id="L013",
+        link_id="L013_STUDIO",
+        from_node="J1",
+        to_node="J2",
+        archetype="upper_bypass_segment",
+        length_m=0.44,
+        bidirectional=False,
+        family_hint="loop",
+        nodes_rows=bundle.nodes.to_dict("records"),
+        edge_component_rules_rows=bundle.edge_component_rules.to_dict("records"),
+    )
+    elements = build_node_studio_elements(bundle.nodes.to_dict("records"), edited_links)
+
+    selected_edge = next(row for row in edited_links if row["link_id"] == "L013_STUDIO")
+    selected_element = next(element for element in elements if element["data"].get("id") == "L013_STUDIO")
+    assert selected_link_id == "L013_STUDIO"
+    assert selected_edge["archetype"] == "upper_bypass_segment"
+    assert float(selected_edge["length_m"]) == 0.44
+    assert bool(selected_edge["bidirectional"]) is False
+    assert selected_edge["family_hint"] == "loop"
+    assert selected_element["data"]["source"] == "J1"
+    assert selected_element["data"]["target"] == "J2"
+    assert selected_element["data"]["label"] == "L013_STUDIO: upper_bypass_segment"
+
+
 @pytest.mark.slow
 def test_node_studio_round_trip_persists_visual_node_edits() -> None:
     scenario_dir = prepare_scenario_copy(
@@ -350,6 +405,59 @@ def test_node_studio_round_trip_persists_visual_node_edits() -> None:
         assert float(saved_row["x_m"]) == 0.21
         assert float(saved_row["y_m"]) == 0.17
         assert bool(saved_row["allow_outbound"]) is True
+        assert saved["pipeline_error"] is None
+    finally:
+        cleanup_scenario_copy(output_dir)
+        cleanup_scenario_copy(scenario_dir)
+
+
+@pytest.mark.slow
+def test_edge_studio_round_trip_persists_visual_edge_edits() -> None:
+    scenario_dir = prepare_scenario_copy(
+        "data/decision_platform/maquete_v2",
+        "maquete_v2_edge_studio_round_trip",
+        scenario_overrides={"hydraulic_engine": {"fallback": "python_emulated_julia"}},
+    )
+    output_dir = prepare_isolated_tmp_dir("maquete_v2_edge_studio_saved")
+    try:
+        bundle = load_scenario_bundle(scenario_dir)
+        candidate_links_rows, selected_link_id = apply_edge_studio_edit(
+            bundle.candidate_links.to_dict("records"),
+            selected_link_id="L013",
+            link_id="L013_STUDIO",
+            from_node="J1",
+            to_node="U1",
+            archetype="vertical_link",
+            length_m=0.41,
+            bidirectional=False,
+            family_hint="loop,hybrid",
+            nodes_rows=bundle.nodes.to_dict("records"),
+            edge_component_rules_rows=bundle.edge_component_rules.to_dict("records"),
+        )
+
+        with diagnostic_runtime_test_mode():
+            saved = save_and_reopen_local_bundle(
+                current_scenario_dir=scenario_dir,
+                output_dir=output_dir,
+                nodes_rows=bundle.nodes.to_dict("records"),
+                components_rows=bundle.components.to_dict("records"),
+                candidate_links_rows=candidate_links_rows,
+                edge_component_rules_rows=bundle.edge_component_rules.to_dict("records"),
+                route_rows=bundle.route_requirements.to_dict("records"),
+                layout_constraints_rows=bundle.layout_constraints.to_dict("records"),
+                topology_rules_text=yaml.safe_dump(bundle.topology_rules, sort_keys=False, allow_unicode=True),
+                scenario_settings_text=yaml.safe_dump(bundle.scenario_settings, sort_keys=False, allow_unicode=True),
+            )
+
+        saved_row = saved["bundle"].candidate_links.loc[saved["bundle"].candidate_links["link_id"] == "L013_STUDIO"].iloc[0]
+        assert selected_link_id == "L013_STUDIO"
+        assert saved["scenario_dir"] == str(output_dir.resolve())
+        assert saved_row["from_node"] == "J1"
+        assert saved_row["to_node"] == "U1"
+        assert saved_row["archetype"] == "vertical_link"
+        assert float(saved_row["length_m"]) == 0.41
+        assert bool(saved_row["bidirectional"]) is False
+        assert saved_row["family_hint"] == "loop,hybrid"
         assert saved["pipeline_error"] is None
     finally:
         cleanup_scenario_copy(output_dir)

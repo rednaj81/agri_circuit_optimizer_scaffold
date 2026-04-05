@@ -170,6 +170,24 @@ def test_loader_rejects_self_loop_candidate_link() -> None:
         cleanup_scenario_copy(scenario_dir)
 
 
+def test_loader_rejects_candidate_link_with_unknown_endpoint() -> None:
+    scenario_dir = prepare_scenario_copy(
+        "data/decision_platform/maquete_v2",
+        "maquete_v2_unknown_link_endpoint",
+    )
+    try:
+        update_scenario_table(
+            scenario_dir,
+            "candidate_links.csv",
+            lambda frame: frame.assign(from_node=frame["from_node"].where(frame["link_id"] != "L013", "MISSING_NODE")),
+        )
+
+        with pytest.raises(ValueError, match="candidate_links.csv references unknown nodes"):
+            load_scenario_bundle(scenario_dir)
+    finally:
+        cleanup_scenario_copy(scenario_dir)
+
+
 def test_loader_rejects_candidate_link_with_missing_archetype_rule() -> None:
     scenario_dir = prepare_scenario_copy(
         "data/decision_platform/maquete_v2",
@@ -183,6 +201,24 @@ def test_loader_rejects_candidate_link_with_missing_archetype_rule() -> None:
         )
 
         with pytest.raises(ValueError, match="without matching edge_component_rules"):
+            load_scenario_bundle(scenario_dir)
+    finally:
+        cleanup_scenario_copy(scenario_dir)
+
+
+def test_loader_rejects_route_requirement_with_unknown_endpoint() -> None:
+    scenario_dir = prepare_scenario_copy(
+        "data/decision_platform/maquete_v2",
+        "maquete_v2_unknown_route_endpoint",
+    )
+    try:
+        update_scenario_table(
+            scenario_dir,
+            "route_requirements.csv",
+            lambda frame: frame.assign(source=frame["source"].where(frame["route_id"] != "R004", "MISSING_NODE")),
+        )
+
+        with pytest.raises(ValueError, match="route_requirements.csv references unknown nodes"):
             load_scenario_bundle(scenario_dir)
     finally:
         cleanup_scenario_copy(scenario_dir)
