@@ -4,14 +4,16 @@
 
 Close `phase_1` formally without adding any new functional scope, leaving a single operational reading for the sealed exit criteria and a clear redirect to `phase_2` for structural studio work.
 
-This document remains the active operational handoff for the sealed `phase_1`.
-The historical closeout regression fix did not reopen any functional work inside `phase_1`, and no later session should reinterpret this handoff as an invitation to continue `phase_1` functionally.
+Wave 7 is a corrective regression fix only: it restores reproducibility of the closure artifacts and does not reopen any functional work inside `phase_1`.
+
+This document remains the active operational handoff for the sealed `phase_1`, and no later session should reinterpret it as an invitation to continue `phase_1` functionally.
 
 ## Operational Status
 
 - `phase_1` is sealed.
-- the latest reconciled repository HEAD for this sealed reading is `9d873ed3f917400ae1f3a626326aaa71c3f8540b`
+- the latest reconciled repository HEAD for this sealed reading is `e8b5e19e2aea5176a9b184c17a3e3209269a0880`
 - any new functional continuity must open `phase_2` explicitly
+- this session performs no new functional or corrective work inside `phase_1`; it only preserves the redirect to `phase_2`
 - session-local snapshots such as `supervisor_state.json` and `loop_state.json` are not the phase source of truth
 
 ## Point Of Truth
