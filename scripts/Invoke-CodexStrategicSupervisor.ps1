@@ -95,6 +95,123 @@ function New-Guidance {
 
     if (
         $phase1Manifest -and
+        [string]$phase1Manifest.current_phase_exit -eq "phase_3" -and
+        [string]$phase1Manifest.current_phase_status -eq "active"
+    ) {
+        $phase3Validation = $phase1Manifest.phase_3_current_validation
+        $phase1Validation = $phase1Manifest.phase_1_exit_validation
+
+        $phase3Tests = @()
+        if ($phase3Validation -and $phase3Validation.supporting_tests) {
+            $phase3Tests = @($phase3Validation.supporting_tests)
+        }
+        if ($phase3Tests.Count -eq 0 -and $phase1Manifest.current_acceptance_target) {
+            $phase3Tests = @([string]$phase1Manifest.current_acceptance_target)
+        }
+        if ($phase3Tests.Count -eq 0) {
+            $phase3Tests = @("tests/decision_platform/test_phase3_queue_acceptance.py")
+        }
+
+        $phase1Tests = @()
+        if ($phase1Validation -and $phase1Validation.supporting_tests) {
+            $phase1Tests = @($phase1Validation.supporting_tests)
+        }
+        if ($phase1Tests.Count -eq 0) {
+            $phase1Tests = @(
+                "tests/decision_platform/test_scenario_settings_contract.py",
+                "tests/decision_platform/test_scenario_persistence.py",
+                "tests/decision_platform/test_phase1_exit_acceptance.py",
+                "tests/decision_platform/test_phase1_exit_artifacts.py"
+            )
+        }
+
+        return [ordered]@{
+            updated_at = (Get-Date).ToUniversalTime().ToString("o")
+            phase_id = "phase_3"
+            phase_assessment = "continue_phase"
+            recommended_next_phase = "phase_3"
+            current_focus = [ordered]@{
+                active_wave_index = $State.supervisor_state.active_wave_index
+                active_role = $State.supervisor_state.active_role
+                waves_completed = [int]($State.supervisor_state.waves_completed)
+                last_updated_at = $State.supervisor_state.last_updated_at
+                health_state = "phase_3_serial_queue_active"
+                latest_commit = Get-LatestCommit
+            }
+            recent_wave_objectives = @(
+                "Open phase_3 with the serial queue MVP.",
+                "Add queued-job cancel, explicit rerun, and individual run inspection.",
+                "Realign governance so phase_3 is the only active functional phase."
+            )
+            recent_wave_verdicts = @(
+                "significant_progress",
+                "significant_progress",
+                "operational_alignment"
+            )
+            recent_commit_subjects = $recentCommitSubjects
+            directives = @(
+                "Treat phase_1 and phase_2 as closed baselines.",
+                "Use tests/decision_platform/test_phase3_queue_acceptance.py as the current functional acceptance gate.",
+                "Keep the worker serial and avoid opening parallel orchestration in this wave."
+            )
+            rationale = @(
+                "The codebase already opened the minimum serial queue slice of phase_3.",
+                "Governance must reflect the active functional phase to keep gates and continuity auditable."
+            )
+            current_phase_gate = [ordered]@{
+                manifest = "docs/codex_dual_agent_runtime/phase_0_validation_manifest.json"
+                manifest_block = "phase_3_current_validation"
+                handoff = "docs/2026-04-05_phase3_wave1_queue_open_handoff.md"
+                phase_plan = "docs/codex_dual_agent_hydraulic_autonomy_bundle/automation/phase_plan.yaml"
+                tests = $phase3Tests
+                signals = @(
+                    "run_job local persistence",
+                    "serial worker only",
+                    "queued cancel",
+                    "explicit rerun",
+                    "individual run inspection"
+                )
+            }
+            phase_1_exit_evidence = [ordered]@{
+                manifest = "docs/codex_dual_agent_runtime/phase_0_validation_manifest.json"
+                manifest_block = "phase_1_exit_validation"
+                handoff = "docs/2026-04-05_phase1_wave5_exit_handoff.md"
+                phase_plan = "docs/codex_dual_agent_hydraulic_autonomy_bundle/automation/phase_plan.yaml"
+                tests = $phase1Tests
+                signals = @(
+                    "scenario_bundle.yaml",
+                    "component_catalog.csv",
+                    "scenario_settings.storage canonical mapping",
+                    "save -> reopen -> run provenance"
+                )
+            }
+            phase_1_continuation_policy = [ordered]@{
+                additional_functional_waves_allowed = $false
+                final_operational_correction_wave = [int]$phase1Manifest.final_operational_correction_wave
+                next_functional_phase = "phase_2"
+            }
+            closed_phases = [ordered]@{
+                phase_1 = [ordered]@{
+                    status = "closed"
+                    handoff = "docs/2026-04-05_phase1_wave5_exit_handoff.md"
+                }
+                phase_2 = [ordered]@{
+                    status = "closed"
+                    handoff = "docs/2026-04-05_phase2_exit.md"
+                    acceptance_target = "tests/decision_platform/test_phase2_exit_acceptance.py"
+                }
+            }
+            out_of_scope_for_phase_1 = @(
+                "tests/decision_platform/test_studio_structure.py",
+                "structural node or edge creation, duplication, or deletion",
+                "queue and background runs",
+                "ranking, scoring, and decision UI expansion"
+            )
+        }
+    }
+
+    if (
+        $phase1Manifest -and
         [string]$phase1Manifest.current_phase_exit -eq "phase_1" -and
         [string]$phase1Manifest.current_phase_status -eq "sealed" -and
         -not [bool]$phase1Manifest.phase_1_additional_functional_waves_allowed

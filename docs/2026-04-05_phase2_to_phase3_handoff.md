@@ -6,6 +6,7 @@
 - o gate único de saída da fase é `tests/decision_platform/test_phase2_exit_acceptance.py`.
 - o gate foi reproduzido no codebase local atual sem reabrir o caminho oficial Julia-only.
 - a `phase_3` abriu sobre esta baseline com `tests/decision_platform/test_phase3_queue_acceptance.py` como aceite atual do corte mínimo de fila serial.
+- o handoff operacional único da fase ativa agora é `docs/2026-04-05_phase3_wave1_queue_open_handoff.md`.
 
 ## Baseline obrigatória
 
@@ -40,6 +41,14 @@ A `phase_3` deve avançar em fila/background runs, isolamento por execução, st
 - re-run explícito de runs `completed` ou `failed`, sempre por criação de novo `run_id` com referência à run de origem
 - inspeção individual de run na UI local com status, eventos, log e diretório de artefatos
 - trilha diagnóstica continua opt-in explícito; modo oficial continua Julia-only quando solicitado
+
+## Fonte única para a fase ativa
+
+- `docs/codex_dual_agent_hydraulic_autonomy_bundle/automation/phase_plan.yaml` em `phase_3`
+- `docs/codex_dual_agent_runtime/supervisor_guidance.json`
+- `docs/codex_dual_agent_runtime/phase_0_validation_manifest.json` no bloco `phase_3_current_validation`
+- `docs/2026-04-05_phase3_wave1_queue_open_handoff.md`
+- `tests/decision_platform/test_phase3_queue_acceptance.py`
 
 ## Riscos operacionais remanescentes
 

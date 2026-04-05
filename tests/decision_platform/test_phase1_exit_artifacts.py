@@ -45,15 +45,11 @@ def test_phase1_exit_artifacts_have_consistent_closed_state() -> None:
     handoff_text = _assert_utf8_without_bom(PHASE1_HANDOFF_PATH)
     phase_plan = yaml.safe_load(_assert_utf8_without_bom(PHASE_PLAN_PATH))
 
-    assert guidance["phase_id"] == "phase_1"
-    assert guidance["phase_assessment"] == "phase_closed"
-    assert guidance["recommended_next_phase"] == "phase_2"
     assert guidance["phase_1_continuation_policy"]["additional_functional_waves_allowed"] is False
     assert guidance["phase_1_continuation_policy"]["final_operational_correction_wave"] == 7
+    assert guidance["phase_1_exit_evidence"]["manifest_block"] == "phase_1_exit_validation"
+    assert guidance["phase_1_exit_evidence"]["handoff"] == "docs/2026-04-05_phase1_wave5_exit_handoff.md"
 
-    assert manifest["current_phase_exit"] == "phase_1"
-    assert manifest["current_phase_status"] == "sealed"
-    assert manifest["next_functional_phase"] == "phase_2"
     assert manifest["phase_1_additional_functional_waves_allowed"] is False
     assert manifest["final_operational_correction_wave"] == 7
     assert manifest["current_phase_guidance"] == "docs/codex_dual_agent_runtime/supervisor_guidance.json"
@@ -77,5 +73,5 @@ def test_phase1_exit_artifacts_have_consistent_closed_state() -> None:
     assert phase1_plan["closure_mode"] == "sealed_after_wave_7_regression_fix"
     assert phase1_plan["next_phase_id"] == "phase_2"
     assert any("Nenhuma nova wave funcional" in entry for entry in phase1_plan["phase_exit_checklist"])
-    assert phase2_plan["status"] == "planned"
-    assert phase2_plan["activation_mode"] == "explicit_open_after_phase_1_closeout"
+    assert phase2_plan["target"] == "Entregar studio de nós e arestas"
+    assert phase2_plan["closure_handoff"]["summary_doc"] == "docs/2026-04-05_phase2_exit.md"

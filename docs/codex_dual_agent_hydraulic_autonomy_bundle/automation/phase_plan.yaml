@@ -44,18 +44,37 @@ phase_1:
     transition_note: "A phase_1 esta encerrada; qualquer continuidade funcional deve migrar para a phase_2 apenas por abertura explicita, e nunca por nova onda funcional dentro da phase_1."
 phase_2:
   target: "Entregar studio de nós e arestas"
-  status: "planned"
+  status: "closed"
+  closure_mode: "sealed_after_wave_5_exit_gate"
+  next_phase_id: "phase_3"
   activation_mode: "explicit_open_after_phase_1_closeout"
   activation_note: "Studio estrutural pertence à phase_2 e não deve voltar a contaminar o gate congelado da phase_1."
+  canonical_acceptance_target: "tests/decision_platform/test_phase2_exit_acceptance.py"
   exit_criteria:
     - "nós editáveis"
     - "arestas editáveis"
     - "salvar/reabrir cenário"
+  phase_exit_checklist:
+    - 'Executar `tests/decision_platform/test_phase2_exit_acceptance.py` como gate único da baseline congelada do Studio.'
+    - 'Usar `docs/2026-04-05_phase2_exit.md` e `docs/2026-04-05_phase2_to_phase3_handoff.md` como fechamento e transição explícita da phase_2.'
+    - 'Não reabrir autoria estrutural, save/reopen canônico ou contratos referenciais de nós/arestas sem novo handoff objetivo.'
+  closure_handoff:
+    summary_doc: "docs/2026-04-05_phase2_exit.md"
+    freeze_rule: "A phase_3 deve consumir o Studio atual como baseline fechada e não como UI em expansão implícita."
+    transition_note: "A continuidade funcional segue em phase_3 com fila serial e runs isoladas."
 phase_3:
   target: "Fila e background runs"
   status: "in_progress"
   opening_mode: "serial_queue_mvp"
   current_acceptance_target: "tests/decision_platform/test_phase3_queue_acceptance.py"
+  current_handoff: "docs/2026-04-05_phase3_wave1_queue_open_handoff.md"
+  supporting_handoffs:
+    - "docs/2026-04-05_phase2_to_phase3_handoff.md"
+    - "docs/2026-04-05_phase3_wave2_run_operations_handoff.md"
+  phase_entry_checklist:
+    - 'Usar `tests/decision_platform/test_phase3_queue_acceptance.py` como aceite funcional atual do corte mínimo da fila serial.'
+    - 'Usar `docs/2026-04-05_phase3_wave1_queue_open_handoff.md` como handoff humano único de abertura operacional da phase_3.'
+    - 'Tratar `phase_1` e `phase_2` como fechadas; não reabrir persistência canônica nem baseline do Studio enquanto a fila serial evolui.'
   current_scope:
     - "run_job persistido localmente com estados canônicos"
     - "worker serial explícito sem simultaneidade no MVP"

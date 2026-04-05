@@ -1,6 +1,6 @@
 {
   "phase_id": "phase_0",
-  "generated_at": "2026-04-05T00:53:00.0696717-03:00",
+  "generated_at": "2026-04-05T01:45:19.3053187-03:00",
   "script_path": "C:\\d\\dev\\agri_circuit_optimizer_scaffold\\scripts\\run_decision_platform_runtime_validation.ps1",
   "profiles_path": "C:\\d\\dev\\agri_circuit_optimizer_scaffold\\scripts\\decision_platform_runtime_validation_profiles.json",
   "logs_dir": "C:\\d\\dev\\agri_circuit_optimizer_scaffold\\tests\\_tmp\\runtime_validation_script_logs",
@@ -15,9 +15,9 @@
       "official_gate_complete": false,
       "status": "failed",
       "success": false,
-      "last_report_path": "C:\\d\\dev\\agri_circuit_optimizer_scaffold\\tests\\_tmp\\runtime_validation_script_logs\\decision-platform-runtime-validation_diagnostic_20260405-005259-884.json",
-      "started_at": "2026-04-05T00:52:59.8845798-03:00",
-      "finished_at": "2026-04-05T00:52:59.9687476-03:00",
+      "last_report_path": "C:\\d\\dev\\agri_circuit_optimizer_scaffold\\tests\\_tmp\\runtime_validation_script_logs\\decision-platform-runtime-validation_diagnostic_20260405-014519-111.json",
+      "started_at": "2026-04-05T01:45:19.1114041-03:00",
+      "finished_at": "2026-04-05T01:45:19.1898647-03:00",
       "output_dir": "C:\\d\\dev\\agri_circuit_optimizer_scaffold\\data\\output\\decision_platform\\runtime_validation_diagnostic",
       "runtime_scenario_dir": null,
       "summary_path": null,
@@ -82,10 +82,11 @@
     }
   },
   "artifact_scope": "phase_runtime_validation",
-  "current_phase_exit": "phase_1",
-  "current_phase_status": "sealed",
-  "next_functional_phase": "phase_2",
-  "current_phase_handoff": "docs/2026-04-05_phase1_wave5_exit_handoff.md",
+  "current_phase_exit": "phase_3",
+  "current_phase_status": "active",
+  "current_acceptance_target": "tests/decision_platform/test_phase3_queue_acceptance.py",
+  "next_functional_phase": "phase_4",
+  "current_phase_handoff": "docs/2026-04-05_phase3_wave1_queue_open_handoff.md",
   "phase_0_runtime_handoff": "docs/codex_dual_agent_runtime/phase_0_exit.md",
   "current_phase_guidance": "docs/codex_dual_agent_runtime/supervisor_guidance.json",
   "phase_1_additional_functional_waves_allowed": false,
@@ -140,5 +141,48 @@
     ],
     "operational_closeout": "wave_7_regression_fix_only_no_new_functional_scope",
     "no_additional_phase1_functional_waves": true
+  },
+  "phase_2_exit_validation": {
+    "phase_id": "phase_2",
+    "status": "sealed",
+    "acceptance_target": "tests/decision_platform/test_phase2_exit_acceptance.py",
+    "handoff": "docs/2026-04-05_phase2_exit.md",
+    "transition_handoff": "docs/2026-04-05_phase2_to_phase3_handoff.md",
+    "studio_baseline_closed": true,
+    "evidence_files": [
+      "docs/2026-04-05_phase2_exit.md",
+      "docs/2026-04-05_phase2_to_phase3_handoff.md",
+      "tests/decision_platform/test_phase2_exit_acceptance.py"
+    ]
+  },
+  "phase_3_current_validation": {
+    "phase_id": "phase_3",
+    "status": "active",
+    "validation_profile": "phase_3_serial_queue_gate",
+    "validation_sufficiency": "phase_3_current_evidence",
+    "acceptance_target": "tests/decision_platform/test_phase3_queue_acceptance.py",
+    "validation_command": "$env:PYTHONPATH='src'; .\\.venv\\Scripts\\python.exe -m pytest tests/decision_platform/test_phase3_queue_acceptance.py -q -p no:cacheprovider",
+    "supporting_tests": [
+      "tests/decision_platform/test_phase3_queue_acceptance.py"
+    ],
+    "worker_mode": "serial",
+    "no_parallelism": true,
+    "phase_entry_handoff": "docs/2026-04-05_phase3_wave1_queue_open_handoff.md",
+    "supporting_handoffs": [
+      "docs/2026-04-05_phase2_to_phase3_handoff.md",
+      "docs/2026-04-05_phase3_wave2_run_operations_handoff.md"
+    ],
+    "evidence": {
+      "run_job_contract": "local_persisted",
+      "queued_cancel": "covered",
+      "rerun": "covered",
+      "individual_run_inspection": "covered",
+      "official_runtime_policy": "julia_only_when_requested"
+    },
+    "evidence_files": [
+      "docs/2026-04-05_phase3_wave1_queue_open_handoff.md",
+      "docs/2026-04-05_phase3_wave2_run_operations_handoff.md",
+      "tests/decision_platform/test_phase3_queue_acceptance.py"
+    ]
   }
 }

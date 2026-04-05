@@ -301,13 +301,16 @@ function Save-Phase0ValidationManifest {
                 "artifact_scope",
                 "current_phase_exit",
                 "current_phase_status",
+                "current_acceptance_target",
                 "next_functional_phase",
                 "current_phase_handoff",
                 "phase_0_runtime_handoff",
                 "current_phase_guidance",
                 "phase_1_additional_functional_waves_allowed",
                 "final_operational_correction_wave",
-                "phase_1_exit_validation"
+                "phase_1_exit_validation",
+                "phase_2_exit_validation",
+                "phase_3_current_validation"
             )) {
             if ($existingManifest.ContainsKey($fieldName)) {
                 $manifest[$fieldName] = $existingManifest[$fieldName]
