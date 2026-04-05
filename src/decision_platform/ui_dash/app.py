@@ -251,6 +251,9 @@ def _studio_edge_role_label(row: dict[str, Any] | None) -> str:
 def _is_internal_studio_node(row: dict[str, Any] | None) -> bool:
     if not row:
         return False
+    zone = str(row.get("zone", "")).strip().lower()
+    if zone in {"internal", "hub"}:
+        return True
     if bool(row.get("is_candidate_hub")):
         return True
     labels = " ".join(
@@ -284,6 +287,39 @@ def _visible_studio_edges(
         if source in visible_node_ids and target in visible_node_ids:
             visible_edges.append(dict(row))
     return visible_edges
+
+
+def _primary_route_projection_rows(
+    nodes_rows: list[dict[str, Any]],
+    route_rows: list[dict[str, Any]] | None,
+) -> list[dict[str, Any]]:
+    node_lookup = {
+        str(row.get("node_id", "")).strip(): dict(row)
+        for row in _visible_studio_nodes(nodes_rows)
+        if str(row.get("node_id", "")).strip()
+    }
+    projected_rows: list[dict[str, Any]] = []
+    for route in route_rows or []:
+        source = str(route.get("source", "")).strip()
+        sink = str(route.get("sink", "")).strip()
+        route_id = str(route.get("route_id", "")).strip()
+        if not route_id or source not in node_lookup or sink not in node_lookup or source == sink:
+            continue
+        projected_rows.append(
+            {
+                "projection_id": f"route:{route_id}",
+                "route_id": route_id,
+                "source": source,
+                "target": sink,
+                "label": str(route.get("notes", "")).strip() or f"{_studio_node_business_label(node_lookup[source])} -> {_studio_node_business_label(node_lookup[sink])}",
+                "route_group": str(route.get("route_group", "")).strip() or "core",
+                "mandatory": bool(route.get("mandatory")),
+                "measurement_required": _coerce_truthy(route.get("measurement_required")),
+                "q_min_delivered_lpm": float(route.get("q_min_delivered_lpm") or 0.0),
+                "notes": str(route.get("notes", "")).strip(),
+            }
+        )
+    return projected_rows
 
 
 def _studio_edge_business_label(
@@ -353,14 +389,14 @@ def build_studio_readiness_summary(
     if orphan_nodes:
         warnings.append("Nos sem conexao no grafo visivel: " + ", ".join(orphan_nodes[:6]))
     visible_business_nodes = _visible_studio_nodes(nodes_rows)
-    visible_business_edges = _visible_studio_edges(nodes_rows, candidate_links_rows)
+    projected_business_routes = _primary_route_projection_rows(nodes_rows, route_rows)
     status = "ready" if not blockers and node_ids and candidate_links_rows and mandatory_routes else "needs_attention"
     return {
         "status": status,
         "node_count": len(node_ids),
         "edge_count": len(candidate_links_rows),
         "business_node_count": len(visible_business_nodes),
-        "business_edge_count": len(visible_business_edges),
+        "business_edge_count": len(projected_business_routes) or len(_visible_studio_edges(nodes_rows, candidate_links_rows)),
         "hidden_internal_node_count": max(len(nodes_rows) - len(visible_business_nodes), 0),
         "mandatory_route_count": len(mandatory_routes),
         "measurement_route_count": sum(1 for row in route_rows if _coerce_truthy(row.get("measurement_required"))),
@@ -384,7 +420,7 @@ def render_studio_readiness_panel(summary: dict[str, Any]) -> Any:
                 style=UI_THREE_COLUMN_STYLE,
                 children=[
                     _metric_card("Entidades visíveis", summary.get("business_node_count", 0)),
-                    _metric_card("Conexões visíveis", summary.get("business_edge_count", 0)),
+                    _metric_card("Fluxos projetados", summary.get("business_edge_count", 0), "Leitura primária do circuito de negócio."),
                     _metric_card("Internos ocultos", summary.get("hidden_internal_node_count", 0), "Hubs e nós técnicos fora do canvas principal."),
                     _metric_card("Rotas obrigatorias", summary.get("mandatory_route_count", 0)),
                 ],
@@ -667,6 +703,7 @@ def build_app(
     initial_node_studio_elements = build_primary_node_studio_elements(
         authoring_payload["nodes_rows"],
         authoring_payload["candidate_links_rows"],
+        authoring_payload["route_rows"],
     )
     initial_edge_studio_selected_id = _default_primary_edge_studio_selection(
         authoring_payload["nodes_rows"],
@@ -847,11 +884,9 @@ def build_app(
                                         children=[
                                             html.H3("Conexão do cenário", style={"marginTop": 0}),
                                             html.P(
-                                                "Mantenha a edição principal focada no fluxo entre entidades de negócio. IDs e archetype ficam em campos avançados.",
+                                                "Mantenha a edição principal focada na leitura do fluxo. Origem, destino e contratos técnicos ficam em campos avançados.",
                                                 style={"marginTop": 0, "lineHeight": "1.6"},
                                             ),
-                                            _field_block("Origem do fluxo", dcc.Input(id="edge-studio-from-node", type="text", value=initial_edge_studio_form["from_node"], persistence=True, persistence_type="session", style={"width": "100%"})),
-                                            _field_block("Destino do fluxo", dcc.Input(id="edge-studio-to-node", type="text", value=initial_edge_studio_form["to_node"], persistence=True, persistence_type="session", style={"width": "100%"})),
                                             _field_block("Comprimento (m)", dcc.Input(id="edge-studio-length-m", type="number", value=initial_edge_studio_form["length_m"], persistence=True, persistence_type="session", style={"width": "100%"})),
                                             _field_block("Famílias sugeridas", dcc.Input(id="edge-studio-family-hint", type="text", value=initial_edge_studio_form["family_hint"], persistence=True, persistence_type="session", style={"width": "100%"})),
                                             html.Div(style=UI_ACTION_ROW_STYLE, children=[html.Button("Aplicar propriedades da aresta", id="edge-studio-apply-button", style=UI_BUTTON_STYLE), html.Button("Criar aresta", id="edge-studio-create-button", style=UI_BUTTON_STYLE), html.Button("Excluir aresta selecionada", id="edge-studio-delete-button", style=UI_BUTTON_STYLE)]),
@@ -860,6 +895,8 @@ def build_app(
                                                 children=[
                                                     html.Summary("Campos técnicos da conexão"),
                                                     _field_block("Link ID contratual", dcc.Input(id="edge-studio-link-id", type="text", value=initial_edge_studio_form["link_id"], persistence=True, persistence_type="session", style={"width": "100%"})),
+                                                    _field_block("Origem técnica", dcc.Input(id="edge-studio-from-node", type="text", value=initial_edge_studio_form["from_node"], persistence=True, persistence_type="session", style={"width": "100%"})),
+                                                    _field_block("Destino técnico", dcc.Input(id="edge-studio-to-node", type="text", value=initial_edge_studio_form["to_node"], persistence=True, persistence_type="session", style={"width": "100%"})),
                                                     _field_block("Archetype técnico", dcc.Input(id="edge-studio-archetype", type="text", value=initial_edge_studio_form["archetype"], persistence=True, persistence_type="session", style={"width": "100%"})),
                                                     _field_block("Bidirecional", dcc.Checklist(id="edge-studio-bidirectional", options=[{"label": "bidirectional", "value": "bidirectional"}], value=initial_edge_studio_form["bidirectional"], persistence=True, persistence_type="session")),
                                                 ],
@@ -1307,6 +1344,7 @@ def build_app(
         Output("studio-status", "children"),
         Input("nodes-grid", "rowData"),
         Input("candidate-links-grid", "rowData"),
+        Input("routes-grid", "rowData"),
         Input("node-studio-selected-id", "data"),
         Input("edge-studio-selected-id", "data"),
         Input("studio-status-message", "data"),
@@ -1314,12 +1352,14 @@ def build_app(
     def _refresh_node_studio(
         nodes_rows: list[dict[str, Any]] | None,
         candidate_links_rows: list[dict[str, Any]] | None,
+        route_rows: list[dict[str, Any]] | None,
         selected_node_id: str | None,
         selected_edge_id: str | None,
         studio_status_message: str | None,
     ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], str, str, str]:
         normalized_nodes = nodes_rows or []
         normalized_links = candidate_links_rows or []
+        normalized_routes = route_rows or []
         selected_id = _default_primary_node_studio_selection(
             normalized_nodes,
             normalized_links,
@@ -1331,7 +1371,7 @@ def build_app(
             preferred_link_id=selected_edge_id,
         )
         return (
-            build_primary_node_studio_elements(normalized_nodes, normalized_links),
+            build_primary_node_studio_elements(normalized_nodes, normalized_links, normalized_routes),
             _build_node_studio_stylesheet(selected_id, selected_link_id),
             json.dumps(_build_node_studio_summary(normalized_nodes, selected_id), indent=2, ensure_ascii=False),
             json.dumps(
@@ -1551,7 +1591,9 @@ def build_app(
     ) -> tuple[str | None, str, str, str, str, float | None, list[str], str]:
         selected_link_id = current_selected_link_id
         if tap_edge_data:
-            selected_link_id = str(tap_edge_data.get("link_id") or tap_edge_data.get("id") or "").strip() or current_selected_link_id
+            projected_link_id = str(tap_edge_data.get("link_id") or "").strip()
+            if projected_link_id:
+                selected_link_id = projected_link_id
         selected_link_id = _default_edge_studio_selection(
             candidate_links_rows or [],
             preferred_link_id=selected_link_id,
@@ -3261,6 +3303,7 @@ def build_node_studio_elements(
 def build_primary_node_studio_elements(
     nodes_rows: list[dict[str, Any]],
     candidate_links_rows: list[dict[str, Any]],
+    route_rows: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     visible_nodes = _visible_studio_nodes(nodes_rows)
     node_lookup = {
@@ -3268,7 +3311,7 @@ def build_primary_node_studio_elements(
         for row in visible_nodes
         if str(row.get("node_id", "")).strip()
     }
-    visible_edges = _visible_studio_edges(nodes_rows, candidate_links_rows)
+    projected_routes = _primary_route_projection_rows(nodes_rows, route_rows)
     elements: list[dict[str, Any]] = []
     for row in visible_nodes:
         node_id = str(row.get("node_id", "")).strip()
@@ -3286,6 +3329,36 @@ def build_primary_node_studio_elements(
                 "classes": _node_studio_classes(row),
             }
         )
+    if projected_routes:
+        for route in projected_routes:
+            elements.append(
+                {
+                    "data": {
+                        "id": str(route["projection_id"]),
+                        "route_id": str(route["route_id"]),
+                        "source": str(route["source"]),
+                        "target": str(route["target"]),
+                        "label": str(route["label"]),
+                        "route_group": str(route["route_group"]),
+                        "mandatory": bool(route["mandatory"]),
+                        "measurement_required": bool(route["measurement_required"]),
+                        "q_min_delivered_lpm": float(route["q_min_delivered_lpm"]),
+                        "notes": str(route["notes"]),
+                    },
+                    "classes": " ".join(
+                        item
+                        for item in [
+                            "route-projection",
+                            str(route["route_group"]),
+                            "mandatory" if bool(route["mandatory"]) else "optional",
+                            "measurement-required" if bool(route["measurement_required"]) else "",
+                        ]
+                        if item
+                    ),
+                }
+            )
+        return elements
+    visible_edges = _visible_studio_edges(nodes_rows, candidate_links_rows)
     for row in visible_edges:
         source = str(row.get("from_node", "")).strip()
         target = str(row.get("to_node", "")).strip()
@@ -3592,6 +3665,9 @@ def _build_node_studio_stylesheet(
                 "label": "data(label)",
             },
         },
+        {"selector": ".route-projection", "style": {"width": 4, "line-color": "#0f766e", "target-arrow-color": "#0f766e"}},
+        {"selector": ".optional", "style": {"line-style": "dashed", "opacity": 0.82}},
+        {"selector": ".service", "style": {"line-style": "dotted", "line-color": "#475569", "target-arrow-color": "#475569"}},
         {"selector": ".candidate-hub", "style": {"background-color": "#f59e0b", "shape": "diamond"}},
         {"selector": ".block-inbound", "style": {"border-color": "#dc2626"}},
         {"selector": ".block-outbound", "style": {"border-style": "dashed"}},

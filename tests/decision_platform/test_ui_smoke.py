@@ -160,7 +160,7 @@ def test_studio_tab_surfaces_readiness_and_selection_context() -> None:
     assert _find_component_by_id(studio_tab, "edge-studio-business-editor") is not None
 
 
-def test_studio_primary_canvas_hides_internal_hubs() -> None:
+def test_studio_primary_canvas_hides_internal_and_hub_nodes() -> None:
     with diagnostic_runtime_test_mode():
         app = build_app("data/decision_platform/maquete_v2")
 
@@ -169,15 +169,10 @@ def test_studio_primary_canvas_hides_internal_hubs() -> None:
     assert cytoscape is not None
     elements = getattr(cytoscape, "elements", [])
     node_ids = {element["data"]["id"] for element in elements if "source" not in element["data"]}
-    edge_pairs = {
-        (element["data"]["source"], element["data"]["target"])
-        for element in elements
-        if "source" in element["data"]
-    }
-    assert "HS" not in node_ids
-    assert "HD" not in node_ids
-    assert ("W", "J1") in edge_pairs
-    assert all("HS" not in pair and "HD" not in pair for pair in edge_pairs)
+    edge_ids = {element["data"]["id"] for element in elements if "source" in element["data"]}
+    assert node_ids.isdisjoint({"HS", "HD", "J1", "J2", "J3", "J4", "U1", "U2", "U3"})
+    assert "route:R001" in edge_ids
+    assert "route:R009" in edge_ids
 
 
 def test_studio_primary_editors_push_technical_fields_into_disclosure() -> None:
@@ -191,6 +186,8 @@ def test_studio_primary_editors_push_technical_fields_into_disclosure() -> None:
         "node-studio-allow-inbound",
         "node-studio-allow-outbound",
         "edge-studio-link-id",
+        "edge-studio-from-node",
+        "edge-studio-to-node",
         "edge-studio-archetype",
         "edge-studio-bidirectional",
     ]:
@@ -674,6 +671,7 @@ def test_studio_callbacks_round_trip_structural_edits_through_ui_flow() -> None:
         elements, _, node_summary_text, edge_summary_text, studio_status = refresh_studio_callback(
             nodes_rows,
             candidate_links_rows,
+            route_rows,
             created_node_id,
             created_link_id,
             status,
@@ -681,10 +679,12 @@ def test_studio_callbacks_round_trip_structural_edits_through_ui_flow() -> None:
         node_summary = json.loads(node_summary_text)
         edge_summary = json.loads(edge_summary_text)
         assert studio_status == ""
-        assert node_summary["selected_node_id"] == created_node_id
+        visible_primary_node_ids = {element["data"].get("id") for element in elements if "source" not in element["data"]}
+        assert created_node_id not in visible_primary_node_ids
+        assert duplicated_node_id not in visible_primary_node_ids
+        assert node_summary["selected_node_id"] != created_node_id
         assert edge_summary["selected_link_id"] == created_link_id
-        assert any(element["data"].get("id") == created_node_id for element in elements)
-        assert any(element["data"].get("id") == created_link_id for element in elements)
+        assert any(str(element["data"].get("id", "")).startswith("route:") for element in elements if "source" in element["data"])
 
         created_callback_result = save_callback(
             1,
@@ -786,19 +786,22 @@ def test_primary_node_studio_elements_use_business_labels_and_hide_internal_node
     elements = build_primary_node_studio_elements(
         bundle.nodes.to_dict("records"),
         bundle.candidate_links.to_dict("records"),
+        bundle.route_requirements.to_dict("records"),
     )
 
     node_ids = {element["data"]["id"] for element in elements if "source" not in element["data"]}
+    route_ids = {element["data"]["id"] for element in elements if "source" in element["data"]}
     water_node = next(element for element in elements if element["data"].get("id") == "W")
-    supply_edge = next(element for element in elements if element["data"].get("id") == "L009")
+    supply_route = next(element for element in elements if element["data"].get("id") == "route:R001")
 
-    assert "HS" not in node_ids
-    assert "HD" not in node_ids
+    assert node_ids.isdisjoint({"HS", "HD", "J1", "J2", "J3", "J4", "U1", "U2", "U3"})
     assert water_node["data"]["label"] == "Tanque de água"
     assert ":" not in water_node["data"]["label"]
-    assert supply_edge["data"]["label"] == "Água para barramento inferior"
-    assert supply_edge["data"]["source"] == "W"
-    assert supply_edge["data"]["target"] == "J1"
+    assert "route:R001" in route_ids
+    assert "route:R009" in route_ids
+    assert supply_route["data"]["label"] == "Água para misturador"
+    assert supply_route["data"]["source"] == "W"
+    assert supply_route["data"]["target"] == "M"
 
 
 @pytest.mark.fast

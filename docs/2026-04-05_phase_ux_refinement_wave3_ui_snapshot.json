@@ -1,0 +1,108 @@
+{
+  "wave": "ux_phase_1_wave_3",
+  "primary_nodes": [
+    "W",
+    "P1",
+    "P2",
+    "P3",
+    "P4",
+    "M",
+    "I",
+    "S",
+    "IR"
+  ],
+  "hidden_internal_nodes_confirmed": [
+    "HS",
+    "HD",
+    "J1",
+    "J2",
+    "J3",
+    "J4",
+    "U1",
+    "U2",
+    "U3"
+  ],
+  "projected_routes": [
+    {
+      "id": "route:R001",
+      "route_id": "R001",
+      "source": "W",
+      "target": "M",
+      "label": "Água para misturador",
+      "route_group": "core",
+      "mandatory": true
+    },
+    {
+      "id": "route:R002",
+      "route_id": "R002",
+      "source": "W",
+      "target": "I",
+      "label": "Água para incorporador",
+      "route_group": "core",
+      "mandatory": true
+    },
+    {
+      "id": "route:R003",
+      "route_id": "R003",
+      "source": "W",
+      "target": "S",
+      "label": "Água para saída",
+      "route_group": "core",
+      "mandatory": true
+    },
+    {
+      "id": "route:R004",
+      "route_id": "R004",
+      "source": "P1",
+      "target": "M",
+      "label": "Produto 1 para misturador",
+      "route_group": "core",
+      "mandatory": true
+    },
+    {
+      "id": "route:R005",
+      "route_id": "R005",
+      "source": "P2",
+      "target": "M",
+      "label": "Produto 2 para misturador",
+      "route_group": "core",
+      "mandatory": true
+    },
+    {
+      "id": "route:R006",
+      "route_id": "R006",
+      "source": "P3",
+      "target": "M",
+      "label": "Produto 3 para misturador",
+      "route_group": "core",
+      "mandatory": true
+    },
+    {
+      "id": "route:R007",
+      "route_id": "R007",
+      "source": "P4",
+      "target": "M",
+      "label": "Produto 4 para misturador",
+      "route_group": "core",
+      "mandatory": true
+    },
+    {
+      "id": "route:R008",
+      "route_id": "R008",
+      "source": "I",
+      "target": "M",
+      "label": "Incorporador para misturador",
+      "route_group": "core",
+      "mandatory": true
+    }
+  ],
+  "route_projection_count": 18,
+  "technical_fields_in_details": {
+    "edge-studio-from-node": true,
+    "edge-studio-to-node": true,
+    "edge-studio-link-id": true,
+    "edge-studio-archetype": true,
+    "node-studio-node-id": true,
+    "node-studio-node-type": true
+  }
+}
