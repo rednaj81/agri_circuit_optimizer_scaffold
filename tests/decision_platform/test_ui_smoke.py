@@ -11,6 +11,7 @@ from decision_platform.api.run_pipeline import OfficialRuntimeConfigError
 from decision_platform.data_io.loader import load_scenario_bundle
 from decision_platform.ui_dash._compat import DASH_AVAILABLE
 from decision_platform.ui_dash.app import (
+    _primary_tab_from_search,
     apply_edge_studio_edit,
     apply_node_studio_edit,
     build_app,
@@ -22,6 +23,10 @@ from decision_platform.ui_dash.app import (
     build_official_candidate_summary,
     build_catalog_view_state,
     filter_catalog_records,
+    render_candidate_breakdown_panel,
+    render_candidate_summary_panel,
+    render_execution_summary_panel,
+    render_run_job_detail_panel,
     move_node_studio_selection,
     rerank_catalog,
     save_and_reopen_local_bundle,
@@ -88,6 +93,23 @@ def _component_id_is_inside_details(component: object, target_id: str) -> bool:
         if _find_component_by_id(details, target_id) is not None:
             return True
     return False
+
+
+def _collect_text_content(component: object) -> str:
+    if component is None:
+        return ""
+    if isinstance(component, str):
+        return component
+    if isinstance(component, (int, float, bool)):
+        return str(component)
+    children = getattr(component, "children", None)
+    text = ""
+    if children is None:
+        return text
+    child_items = children if isinstance(children, (list, tuple)) else [children]
+    for child in child_items:
+        text += _collect_text_content(child)
+    return text
 
 
 def _get_callback(app: object, *, output_prefix: str | None = None, input_id: str | None = None) -> Callable[..., Any]:
@@ -207,7 +229,16 @@ def test_studio_discovery_callbacks_open_guide_and_audit_tab() -> None:
     open_audit_callback = _get_callback(app, input_id="studio-open-audit-button")
 
     assert open_guide_callback(1, False) is True
-    assert open_audit_callback(1, "studio") == "audit"
+    assert open_audit_callback("?tab=runs", 1, "studio") == "audit"
+    assert open_audit_callback("?tab=decision", 0, "studio") == "decision"
+
+
+def test_primary_tab_from_search_accepts_known_main_spaces() -> None:
+    assert _primary_tab_from_search("?tab=studio") == "studio"
+    assert _primary_tab_from_search("?tab=runs") == "runs"
+    assert _primary_tab_from_search("?tab=decision") == "decision"
+    assert _primary_tab_from_search("?tab=audit") == "audit"
+    assert _primary_tab_from_search("?tab=unknown") == "studio"
 
 
 def test_decision_tab_contains_advanced_sections_without_extra_primary_tabs() -> None:
@@ -231,6 +262,78 @@ def test_runs_tab_combines_queue_and_execution_summary() -> None:
     assert _find_component_by_id(runs_tab, "run-jobs-overview-panel") is not None
     assert _find_component_by_id(runs_tab, "execution-summary-panel") is not None
     assert _find_component_by_id(runs_tab, "run-button") is not None
+
+
+def test_primary_runs_panels_hide_raw_backend_keys_in_main_surface() -> None:
+    detail_panel = render_run_job_detail_panel(
+        {
+            "selected_run_id": "run-001",
+            "status": "completed",
+            "requested_execution_mode": "official",
+            "official_gate_valid": True,
+            "duration_s": 12.5,
+            "source_bundle_root": "data/decision_platform/maquete_v2",
+            "policy_mode": "julia_only",
+            "engine_used": "julia",
+        }
+    )
+    execution_panel = render_execution_summary_panel(
+        {
+            "candidate_count": 8,
+            "feasible_count": 3,
+            "selected_candidate_id": "cand-01",
+            "default_profile_id": "balanced",
+            "scenario_bundle_root": "data/decision_platform/maquete_v2",
+            "error": None,
+        }
+    )
+    detail_text = _collect_text_content(detail_panel)
+    execution_text = _collect_text_content(execution_panel)
+
+    assert "official_gate_valid:" not in detail_text
+    assert "policy_mode:" not in detail_text
+    assert "duracao_s:" not in detail_text
+    assert "Erro operacional:" in execution_text
+    assert "Próxima ação" in detail_text
+    assert "Próxima ação" in execution_text
+
+
+def test_primary_decision_panels_hide_raw_metric_keys_in_main_surface() -> None:
+    selected_panel = render_candidate_summary_panel(
+        {
+            "candidate_id": "cand-01",
+            "topology_family": "hybrid_free",
+            "feasible": True,
+            "install_cost": 10.0,
+            "fallback_cost": 0.5,
+            "score_final": 91.2,
+            "fallback_component_count": 1,
+            "engine_used": "julia",
+            "infeasibility_reason": None,
+        }
+    )
+    breakdown_panel = render_candidate_breakdown_panel(
+        {
+            "candidate_id": "cand-01",
+            "install_cost": 10.0,
+            "constraint_failure_count": 0,
+            "fallback_component_count": 1,
+            "quality_score_raw": 88.0,
+            "resilience_score": 92.0,
+            "operability_score": 86.0,
+            "cleaning_score": 83.0,
+            "rules_triggered": ["route coverage ok"],
+        }
+    )
+    selected_text = _collect_text_content(selected_panel)
+    breakdown_text = _collect_text_content(breakdown_panel)
+
+    assert "engine_used:" not in selected_text
+    assert "infeasibility_reason:" not in selected_text
+    assert "quality_score_raw:" not in breakdown_text
+    assert "resilience_score:" not in breakdown_text
+    assert "Engine de avaliação:" in selected_text
+    assert "Qualidade bruta:" in breakdown_text
 
 
 def test_audit_tab_holds_bundle_editors_and_technical_surfaces() -> None:

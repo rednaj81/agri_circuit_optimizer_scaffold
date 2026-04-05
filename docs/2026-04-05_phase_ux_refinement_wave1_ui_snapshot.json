@@ -2,6 +2,10 @@
   "wave": "ux_phase_1_wave_1",
   "scenario_dir": "data/decision_platform/maquete_v2",
   "hero_headline": "Studio, runs e decisão numa jornada única",
+  "validation": {
+    "command": "$env:PYTHONPATH='src;.'; .\\.venv\\Scripts\\python.exe -m pytest tests/decision_platform/test_ui_smoke.py -q -p no:cacheprovider --basetemp tests/_tmp/pytest-basetemp-ux-wave1-full",
+    "result": "36 passed in 411.60s"
+  },
   "visible_tabs": [
     {
       "label": "Studio",
@@ -38,6 +42,12 @@
             "execution-summary"
           ]
         }
+      ],
+      "primary_copy_markers": [
+        "Resumo executivo",
+        "Gate oficial",
+        "Erro operacional",
+        "Próxima ação"
       ]
     },
     {
@@ -90,6 +100,12 @@
             "catalog-state-summary"
           ]
         }
+      ],
+      "primary_copy_markers": [
+        "Engine de avaliação",
+        "Motivo de inviabilidade",
+        "Qualidade bruta",
+        "Próxima ação"
       ]
     },
     {
@@ -114,5 +130,18 @@
     "Decisão",
     "Auditoria"
   ],
-  "details_component_count": 10
+  "details_component_count": 10,
+  "navigation_overlay": {
+    "deep_link_tabs_supported": [
+      "studio",
+      "runs",
+      "decision",
+      "audit"
+    ],
+    "studio_navigation_markers": [
+      "Onde está a trilha técnica",
+      "Abrir orientação técnica",
+      "Ir para Auditoria"
+    ]
+  }
 }

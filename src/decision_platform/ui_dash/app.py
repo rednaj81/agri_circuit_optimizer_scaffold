@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from typing import Any
+from urllib.parse import parse_qs
 
 import pandas as pd
 import yaml
@@ -140,13 +141,27 @@ def _journey_step_card(step: str, title: str, description: str) -> Any:
     )
 
 
-def _section_intro(title: str, description: str) -> Any:
+def _section_intro(title: str, description: str, *, state_hint: str | None = None, action_hint: str | None = None) -> Any:
+    hint_children = []
+    for label, text in [("Estado atual", state_hint), ("Próxima ação", action_hint)]:
+        if not text:
+            continue
+        hint_children.append(
+            html.Div(
+                style={**UI_MUTED_CARD_STYLE, "padding": "12px"},
+                children=[
+                    html.Div(label, style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+                    html.Div(text, style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"}),
+                ],
+            )
+        )
     return html.Div(
         style=UI_CARD_STYLE,
         children=[
             html.Div(title, style={"fontSize": "12px", "letterSpacing": "0.12em", "textTransform": "uppercase", "color": "#47665d"}),
             html.H2(title, style={"margin": "8px 0 8px"}),
             html.P(description, style={"margin": 0, "lineHeight": "1.6"}),
+            html.Div(style={**UI_TWO_COLUMN_STYLE, "marginTop": "14px"}, children=hint_children) if hint_children else html.Span(),
         ],
     )
 
@@ -200,11 +215,28 @@ def _bullet_list(items: list[str], empty_label: str) -> Any:
     return html.Ul([html.Li(str(item)) for item in items], style={"margin": "8px 0 0 18px", "lineHeight": "1.6"})
 
 
+def _label_value_list(items: list[tuple[str, Any]]) -> Any:
+    return html.Ul(
+        [html.Li([html.Span(f"{label}: ", style={"fontWeight": 700}), str(value or "-")]) for label, value in items],
+        style={"margin": "8px 0 0 18px", "lineHeight": "1.6"},
+    )
+
+
 def _coerce_truthy(value: Any) -> bool:
     if isinstance(value, bool):
         return value
     normalized = str(value).strip().lower()
     return normalized in {"1", "true", "yes", "y"}
+
+
+def _primary_tab_from_search(search: str | None, default: str = "studio") -> str:
+    if not search:
+        return default
+    params = parse_qs(str(search).lstrip("?"))
+    candidate = str((params.get("tab") or [default])[0]).strip().lower()
+    if candidate in {"studio", "runs", "decision", "audit"}:
+        return candidate
+    return default
 
 
 NODE_TYPE_LABELS = {
@@ -624,30 +656,83 @@ def render_run_jobs_overview_panel(summary: dict[str, Any]) -> Any:
 def render_run_job_detail_panel(detail: dict[str, Any]) -> Any:
     if not detail or not detail.get("selected_run_id"):
         return html.Div([html.H3("Run em foco", style={"marginTop": 0}), html.Div("Nenhuma run selecionada.")])
+    status = str(detail.get("status") or "unknown")
+    gate_valid = detail.get("official_gate_valid")
+    if gate_valid is True:
+        gate_label = "Julia oficial validado"
+    elif gate_valid is False:
+        gate_label = "Julia oficial bloqueado"
+    else:
+        gate_label = "Gate oficial não informado"
+    if status == "queued":
+        next_action = "Execute o próximo job quando o cenário estiver pronto, ou cancele a fila se a preparação ainda estiver incompleta."
+    elif status == "running":
+        next_action = "Acompanhe a execução em foco e evite abrir uma nova run até este job concluir."
+    elif status == "completed":
+        next_action = "Leia o resumo executivo e siga para Decisão se a run já gerou um candidato oficial confiável."
+    elif status in {"failed", "canceled"}:
+        next_action = "Revise o bundle e o status técnico antes de reexecutar esta run."
+    else:
+        next_action = "Confirme o estado desta run antes de decidir entre executar, cancelar ou reprocessar."
     return html.Div(
         children=[
             html.H3("Run em foco", style={"marginTop": 0}),
             html.Div(str(detail.get("selected_run_id")), style={"fontSize": "22px", "fontWeight": 700}),
-            html.Div(style={"display": "flex", "gap": "8px", "flexWrap": "wrap", "marginTop": "8px"}, children=[html.Span(str(detail.get("status")), style=UI_PILL_STYLE), html.Span(str(detail.get("requested_execution_mode") or detail.get("execution_mode") or "n/a"), style=UI_PILL_STYLE)]),
-            html.Ul(
-                [
-                    html.Li(f"official_gate_valid: {detail.get('official_gate_valid')}"),
-                    html.Li(f"duracao_s: {detail.get('duration_s')}"),
-                    html.Li(f"bundle: {detail.get('source_bundle_root')}"),
-                    html.Li(f"policy_mode: {detail.get('policy_mode')}"),
+            html.Div(
+                style={"display": "flex", "gap": "8px", "flexWrap": "wrap", "marginTop": "8px"},
+                children=[
+                    html.Span(status, style=UI_PILL_STYLE),
+                    html.Span(str(detail.get("requested_execution_mode") or detail.get("execution_mode") or "n/a"), style=UI_PILL_STYLE),
                 ],
-                style={"margin": "10px 0 0 18px", "lineHeight": "1.6"},
             ),
+            html.Div(
+                style=UI_THREE_COLUMN_STYLE,
+                children=[
+                    _metric_card("Gate oficial", gate_label),
+                    _metric_card("Duração (s)", detail.get("duration_s") or "-"),
+                    _metric_card("Política", detail.get("policy_mode") or "-"),
+                ],
+            ),
+            html.H4("Leitura operacional", style={"marginBottom": "6px"}),
+            _label_value_list(
+                [
+                    ("Bundle de origem", detail.get("source_bundle_root")),
+                    ("Engine utilizado", detail.get("engine_used")),
+                    ("Execução pedida", detail.get("requested_execution_mode") or detail.get("execution_mode")),
+                ]
+            ),
+            html.H4("Próxima ação", style={"marginBottom": "6px", "marginTop": "14px"}),
+            html.Div(next_action, style={"lineHeight": "1.6", "fontWeight": 700}),
         ]
     )
 
 
 def render_execution_summary_panel(summary: dict[str, Any]) -> Any:
+    error = str(summary.get("error") or "").strip()
+    has_selected_candidate = bool(summary.get("selected_candidate_id"))
+    if error:
+        headline = "Última execução exige revisão"
+        next_action = "Corrija o bloqueio operacional antes de confiar em qualquer leitura de ranking ou candidato oficial."
+    elif has_selected_candidate:
+        headline = "Última execução disponível para decisão"
+        next_action = "Revise o candidato oficial e siga para a comparação lado a lado quando precisar confirmar a escolha."
+    else:
+        headline = "Ainda sem candidato oficial"
+        next_action = "Reexecute o pipeline quando o cenário estiver pronto para gerar uma leitura comparável."
     return html.Div(
         children=[
-            html.Div(style=UI_THREE_COLUMN_STYLE, children=[_metric_card("Candidatos", summary.get("candidate_count", 0)), _metric_card("Viaveis", summary.get("feasible_count", 0)), _metric_card("Selecionado", summary.get("selected_candidate_id") or "-", str(summary.get("default_profile_id") or ""))]),
-            html.Div(f"Bundle: {summary.get('scenario_bundle_root') or '-'}", style={"marginTop": "10px"}),
-            html.Div(f"Erro: {summary.get('error') or 'nenhum'}", style={"marginTop": "6px", "fontWeight": 700 if summary.get('error') else 400}),
+            html.H3("Resumo executivo", style={"marginTop": 0}),
+            html.Div(headline, style={"fontWeight": 700, "lineHeight": "1.5", "marginBottom": "10px"}),
+            html.Div(style=UI_THREE_COLUMN_STYLE, children=[_metric_card("Candidatos", summary.get("candidate_count", 0)), _metric_card("Viáveis", summary.get("feasible_count", 0)), _metric_card("Selecionado", summary.get("selected_candidate_id") or "-", str(summary.get("default_profile_id") or ""))]),
+            _label_value_list(
+                [
+                    ("Bundle analisado", summary.get("scenario_bundle_root")),
+                    ("Perfil padrão", summary.get("default_profile_id")),
+                    ("Erro operacional", error or "nenhum"),
+                ]
+            ),
+            html.H4("Próxima ação", style={"marginBottom": "6px", "marginTop": "14px"}),
+            html.Div(next_action, style={"lineHeight": "1.6", "fontWeight": 700}),
         ]
     )
 
@@ -678,11 +763,12 @@ def render_candidate_summary_panel(summary: dict[str, Any]) -> Any:
     if not summary:
         return html.Div([html.H3("Candidato em foco", style={"marginTop": 0}), html.Div("Nenhum candidato disponivel.")])
     total_cost = round(float(summary.get("install_cost") or 0.0) + float(summary.get("fallback_cost") or 0.0), 3)
+    feasibility_label = "Viável" if summary.get("feasible") else "Inviável"
     return html.Div(
         children=[
             html.H3("Candidato em foco", style={"marginTop": 0}),
             html.Div(str(summary.get("candidate_id") or "-"), style={"fontSize": "22px", "fontWeight": 700}),
-            html.Div(style={"display": "flex", "gap": "8px", "flexWrap": "wrap", "marginTop": "8px"}, children=[html.Span(str(summary.get("topology_family") or "-"), style=UI_PILL_STYLE), html.Span("viavel" if summary.get("feasible") else "inviavel", style=UI_PILL_STYLE)]),
+            html.Div(style={"display": "flex", "gap": "8px", "flexWrap": "wrap", "marginTop": "8px"}, children=[html.Span(str(summary.get("topology_family") or "-"), style=UI_PILL_STYLE), html.Span(feasibility_label, style=UI_PILL_STYLE)]),
             html.Div(
                 style=UI_THREE_COLUMN_STYLE,
                 children=[
@@ -691,12 +777,12 @@ def render_candidate_summary_panel(summary: dict[str, Any]) -> Any:
                     _metric_card("Fallbacks", summary.get("fallback_component_count") or 0),
                 ],
             ),
-            html.Ul(
+            html.H4("Leitura operacional", style={"marginBottom": "6px"}),
+            _label_value_list(
                 [
-                    html.Li(f"engine_used: {summary.get('engine_used')}"),
-                    html.Li(f"infeasibility_reason: {summary.get('infeasibility_reason') or '-'}"),
-                ],
-                style={"margin": "10px 0 0 18px", "lineHeight": "1.6"},
+                    ("Engine de avaliação", summary.get("engine_used")),
+                    ("Motivo de inviabilidade", summary.get("infeasibility_reason") or "nenhum"),
+                ]
             ),
         ]
     )
@@ -742,6 +828,12 @@ def render_candidate_breakdown_panel(summary: dict[str, Any]) -> Any:
     if not summary:
         return html.Div([html.H3("Justificativa detalhada", style={"marginTop": 0}), html.Div("Nenhum breakdown disponivel.")])
     total_cost = round(float(summary.get("install_cost") or 0.0), 3)
+    if (summary.get("constraint_failure_count") or 0) > 0:
+        next_action = "Há falhas de restrição. Releia as regras disparadas antes de confirmar este candidato."
+    elif (summary.get("fallback_component_count") or 0) > 0:
+        next_action = "O candidato depende de fallback. Compare com o runner-up antes de oficializar a escolha."
+    else:
+        next_action = "O breakdown está limpo. Use a comparação e o circuito para confirmar a decisão final."
     return html.Div(
         children=[
             html.H3("Justificativa detalhada", style={"marginTop": 0}),
@@ -754,19 +846,19 @@ def render_candidate_breakdown_panel(summary: dict[str, Any]) -> Any:
                     _metric_card("Fallbacks", summary.get("fallback_component_count") or 0),
                 ],
             ),
-            html.Ul(
+            html.H4("Leitura de qualidade", style={"marginBottom": "6px"}),
+            _label_value_list(
                 [
-                    html.Li(f"quality_score_raw: {summary.get('quality_score_raw')}"),
-                    html.Li(f"resilience_score: {summary.get('resilience_score')}"),
-                    html.Li(f"operability_score: {summary.get('operability_score')}"),
-                    html.Li(f"cleaning_score: {summary.get('cleaning_score')}"),
-                    html.Li(f"fallback_component_count: {summary.get('fallback_component_count')}"),
-                    html.Li(f"constraint_failure_count: {summary.get('constraint_failure_count')}"),
-                ],
-                style={"margin": "10px 0 0 18px", "lineHeight": "1.6"},
+                    ("Qualidade bruta", summary.get("quality_score_raw")),
+                    ("Resiliência", summary.get("resilience_score")),
+                    ("Operabilidade", summary.get("operability_score")),
+                    ("Cleaning", summary.get("cleaning_score")),
+                ]
             ),
             html.H4("Regras e flags", style={"marginBottom": "6px"}),
             _bullet_list([str(item) for item in summary.get("rules_triggered", [])], "Sem regra destacada."),
+            html.H4("Próxima ação", style={"marginBottom": "6px", "marginTop": "14px"}),
+            html.Div(next_action, style={"lineHeight": "1.6", "fontWeight": 700}),
         ]
     )
 
@@ -883,6 +975,7 @@ def build_app(
     app.layout = html.Div(
         style=UI_PAGE_STYLE,
         children=[
+            dcc.Location(id="ui-location", refresh=False),
             dcc.Store(id="scenario-dir", data=str(Path(scenario_dir))),
             dcc.Store(id="run-queue-root", data=str(run_queue_root)),
             dcc.Store(id="node-studio-selected-id", data=initial_node_studio_selected_id),
@@ -923,6 +1016,8 @@ def build_app(
                             _section_intro(
                                 "Studio",
                                 "O Studio principal agora mostra apenas o grafo de negócio editável. Hubs internos e contratos crus continuam preservados, mas saem da superfície principal e aparecem apenas em campos avançados ou na Auditoria.",
+                                state_hint="Camada principal: projeção de negócio e readiness do cenário.",
+                                action_hint="Priorize cobertura da projeção, depois ajuste o cenário e só então aprofunde a trilha técnica.",
                             ),
                             html.Div(
                                 style=UI_TWO_COLUMN_STYLE,
@@ -1076,6 +1171,8 @@ def build_app(
                             _section_intro(
                                 "Runs",
                                 "A fila serial continua igual no backend, mas a leitura principal agora resume fila, run em foco e último estado executivo antes de abrir detalhes técnicos.",
+                                state_hint="Camada principal: fila local, run em foco e último resumo executivo.",
+                                action_hint="Escolha a próxima run, revise o estado atual e execute apenas o próximo passo necessário.",
                             ),
                             html.Div(
                                 style=UI_TWO_COLUMN_STYLE,
@@ -1125,6 +1222,8 @@ def build_app(
                             _section_intro(
                                 "Decisão",
                                 "A área principal agora reúne winner, runner-up, filtros, comparação aprofundada e o circuito do candidato em um único espaço de decisão humana assistida.",
+                                state_hint="Camada principal: escolha oficial, comparação e circuito do candidato.",
+                                action_hint="Confirme winner versus runner-up, leia o technical tie quando houver e só depois aprofunde o racional técnico.",
                             ),
                             html.Div(
                                 style=UI_TWO_COLUMN_STYLE,
@@ -1294,6 +1393,8 @@ def build_app(
                             _section_intro(
                                 "Auditoria",
                                 "Persistência do bundle, textos canônicos e tabelas completas continuam disponíveis, mas permanecem fora da superfície primária de edição, execução e decisão.",
+                                state_hint="Camada principal: bundle canônico, YAMLs e tabelas completas.",
+                                action_hint="Use esta área quando precisar reconciliar contrato, persistência ou estrutura técnica fora do fluxo principal.",
                             ),
                             html.Div(
                                 style=UI_TWO_COLUMN_STYLE,
@@ -2539,14 +2640,17 @@ def build_app(
 
     @app.callback(
         Output("primary-navigation-tabs", "value"),
+        Input("ui-location", "search"),
         Input("studio-open-audit-button", "n_clicks"),
         State("primary-navigation-tabs", "value"),
         prevent_initial_call=True,
     )
-    def _open_audit_from_studio(n_clicks: Any, current_tab: str | None) -> str:
-        if not n_clicks:
-            return str(current_tab or "studio")
-        return "audit"
+    def _open_audit_from_studio(search: str | None, n_clicks: Any, current_tab: str | None) -> str:
+        if n_clicks:
+            return "audit"
+        if search:
+            return _primary_tab_from_search(search, default=str(current_tab or "studio"))
+        return str(current_tab or "studio")
 
     @app.callback(
         Output("run-jobs-overview-panel", "children"),
