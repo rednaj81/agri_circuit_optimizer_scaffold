@@ -12,6 +12,8 @@ The historical redirect in this closeout was consumed by `phase_2`. With `phase_
 
 This handoff is historical-reference-only. Future sessions should use it to audit the sealed baseline, not to justify any new `phase_1` wave, including low-value operational corrections.
 
+After this closeout, the only admissible exception inside `phase_1` is a critical evidence-integrity repair. Any normal continuity, clarification, or follow-up must proceed in `phase_3`.
+
 ## Operational Status
 
 - `phase_1` is sealed.

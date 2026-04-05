@@ -90,6 +90,9 @@
   "phase_0_runtime_handoff": "docs/codex_dual_agent_runtime/phase_0_exit.md",
   "current_phase_guidance": "docs/codex_dual_agent_runtime/supervisor_guidance.json",
   "phase_1_additional_functional_waves_allowed": false,
+  "phase_1_additional_operational_waves_allowed": false,
+  "phase_1_post_close_exception_policy": "critical_evidence_integrity_only",
+  "phase_1_stop_reason": "low_residual_value_redirect_to_phase_3",
   "final_operational_correction_wave": 7,
   "phase_1_exit_validation": {
     "phase_id": "phase_1",
@@ -130,6 +133,8 @@
     "future_operational_updates_allowed": false,
     "future_functional_updates_allowed": false,
     "redirect_future_sessions_to_phase": "phase_3",
+    "post_close_exception_policy": "critical_evidence_integrity_only",
+    "incremental_track_closed_after_this_wave": true,
     "phase_exit_criteria": [
       "cenarios versionaveis",
       "catalogo de componentes persistido"
