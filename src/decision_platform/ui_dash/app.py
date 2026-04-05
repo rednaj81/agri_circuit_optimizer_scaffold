@@ -435,6 +435,122 @@ def render_studio_readiness_panel(summary: dict[str, Any]) -> Any:
     )
 
 
+def build_studio_projection_summary(
+    nodes_rows: list[dict[str, Any]],
+    candidate_links_rows: list[dict[str, Any]],
+    route_rows: list[dict[str, Any]],
+) -> dict[str, Any]:
+    visible_nodes = _visible_studio_nodes(nodes_rows)
+    node_lookup = {
+        str(row.get("node_id", "")).strip(): dict(row)
+        for row in visible_nodes
+        if str(row.get("node_id", "")).strip()
+    }
+    projected_routes = _primary_route_projection_rows(nodes_rows, route_rows)
+    invalid_routes: list[str] = []
+    for route in route_rows:
+        route_id = str(route.get("route_id", "")).strip() or "ROUTE"
+        source = str(route.get("source", "")).strip()
+        sink = str(route.get("sink", "")).strip()
+        reasons: list[str] = []
+        if source not in node_lookup:
+            reasons.append(f"source {source or '-'} fora da camada principal")
+        if sink not in node_lookup:
+            reasons.append(f"sink {sink or '-'} fora da camada principal")
+        if reasons:
+            invalid_routes.append(f"{route_id}: " + "; ".join(reasons))
+    covered_node_ids = {
+        node_id
+        for route in projected_routes
+        for node_id in [str(route.get("source", "")).strip(), str(route.get("target", "")).strip()]
+        if node_id
+    }
+    uncovered_nodes = sorted(
+        _studio_node_business_label(node_lookup[node_id])
+        for node_id in node_lookup
+        if node_id not in covered_node_ids
+    )
+    if not route_rows or not projected_routes:
+        status = "degraded"
+        headline = "Projeção de negócio degradada"
+        guidance = [
+            "A camada principal manteve apenas as entidades de negócio.",
+            "Abra a trilha técnica para revisar campos avançados ou a aba Auditoria enquanto os metadados de rota são completados.",
+        ]
+    elif invalid_routes or uncovered_nodes:
+        status = "partial"
+        headline = "Projeção de negócio parcial"
+        guidance = [
+            "A visualização principal cobre parte do cenário e esconde a malha interna por design.",
+            "Use a trilha técnica apenas para entender as lacunas de metadata ou revisar a estrutura canônica.",
+        ]
+    else:
+        status = "complete"
+        headline = "Projeção de negócio completa"
+        guidance = [
+            "A camada principal já cobre o cenário com rotas legíveis de negócio.",
+            "A trilha técnica permanece disponível apenas para aprofundamento ou edição estrutural avançada.",
+        ]
+    return {
+        "status": status,
+        "headline": headline,
+        "projected_route_count": len(projected_routes),
+        "route_metadata_count": len(route_rows),
+        "business_node_count": len(visible_nodes),
+        "covered_node_count": len(covered_node_ids),
+        "uncovered_nodes": uncovered_nodes,
+        "invalid_routes": invalid_routes,
+        "guidance": guidance,
+        "technical_trail_message": "Campos avançados do Studio e Auditoria guardam a estrutura técnica completa sem recolocar nós internos na superfície principal.",
+    }
+
+
+def render_studio_projection_panel(summary: dict[str, Any]) -> Any:
+    status = str(summary.get("status") or "partial")
+    background, color = _status_tone(
+        "ready" if status == "complete" else ("needs_attention" if status == "partial" else "blocked")
+    )
+    return html.Div(
+        id="studio-projection-coverage-panel",
+        children=[
+            html.Div("Cobertura da projeção", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+            html.Div(
+                style={"display": "flex", "alignItems": "center", "gap": "10px", "margin": "8px 0 14px", "flexWrap": "wrap"},
+                children=[
+                    html.Span(str(summary.get("headline") or "-"), style={"padding": "6px 10px", "borderRadius": "999px", "background": background, "color": color, "fontWeight": 700}),
+                    html.Span(str(summary.get("technical_trail_message") or ""), style={"lineHeight": "1.5"}),
+                ],
+            ),
+            html.Div(
+                style=UI_THREE_COLUMN_STYLE,
+                children=[
+                    _metric_card("Rotas projetadas", summary.get("projected_route_count", 0)),
+                    _metric_card("Metadados de rota", summary.get("route_metadata_count", 0)),
+                    _metric_card("Entidades cobertas", f"{summary.get('covered_node_count', 0)}/{summary.get('business_node_count', 0)}"),
+                ],
+            ),
+            html.H4("Leitura desta camada", style={"marginBottom": "6px"}),
+            _bullet_list([str(item) for item in summary.get("guidance", [])], "Sem orientação registrada."),
+            html.H4("Lacunas visíveis", style={"marginBottom": "6px", "marginTop": "14px"}),
+            _bullet_list(
+                (
+                    [f"Entidades sem rota projetada: {', '.join(summary.get('uncovered_nodes', []))}"] if summary.get("uncovered_nodes") else []
+                )
+                + list(summary.get("invalid_routes", []))[:4],
+                "Nenhuma lacuna relevante na projeção principal.",
+            ),
+            html.H4("Próximo passo", style={"marginBottom": "6px", "marginTop": "14px"}),
+            html.Div(
+                style=UI_ACTION_ROW_STYLE,
+                children=[
+                    html.Button("Abrir orientação técnica", id="studio-open-technical-guide-button", style=UI_BUTTON_STYLE),
+                    html.Button("Ir para Auditoria", id="studio-open-audit-button", style=UI_BUTTON_STYLE),
+                ],
+            ),
+        ],
+    )
+
+
 def render_studio_selection_panel(summary: dict[str, Any], selection_type: str) -> Any:
     key = "selected_node" if selection_type == "node" else "selected_edge"
     selected = summary.get(key) or {}
@@ -757,6 +873,11 @@ def build_app(
         authoring_payload["candidate_links_rows"],
         authoring_payload["route_rows"],
     )
+    initial_studio_projection = build_studio_projection_summary(
+        authoring_payload["nodes_rows"],
+        authoring_payload["candidate_links_rows"],
+        authoring_payload["route_rows"],
+    )
 
     app = Dash(__name__)
     app.layout = html.Div(
@@ -807,12 +928,37 @@ def build_app(
                                 style=UI_TWO_COLUMN_STYLE,
                                 children=[
                                     html.Div(id="studio-readiness-panel", children=render_studio_readiness_panel(initial_studio_readiness), style=UI_CARD_STYLE),
+                                    html.Div(children=render_studio_projection_panel(initial_studio_projection), style=UI_CARD_STYLE),
+                                ],
+                            ),
+                            html.Div(
+                                style=UI_TWO_COLUMN_STYLE,
+                                children=[
                                     html.Div(
                                         style={**UI_MUTED_CARD_STYLE, "display": "grid", "gap": "12px"},
                                         children=[
                                             html.Div(id="studio-status-banner", children=render_status_banner("")),
                                             html.Div(id="node-studio-summary-panel", children=render_studio_selection_panel(_safe_json_loads(initial_node_studio_summary), "node")),
                                             html.Div(id="edge-studio-summary-panel", children=render_studio_selection_panel(_safe_json_loads(initial_edge_studio_summary), "edge")),
+                                        ],
+                                    ),
+                                    html.Details(
+                                        id="studio-technical-guide",
+                                        style=UI_MUTED_CARD_STYLE,
+                                        children=[
+                                            html.Summary("Onde está a trilha técnica"),
+                                            html.P(
+                                                "A projeção principal mantém apenas entidades e fluxos de negócio. Campos contratuais, IDs e estrutura detalhada continuam disponíveis nos campos avançados do Studio e na aba Auditoria.",
+                                                style={"lineHeight": "1.6"},
+                                            ),
+                                            html.Ul(
+                                                [
+                                                    html.Li("Abra os campos técnicos do nó ou da conexão quando precisar editar o bundle estrutural."),
+                                                    html.Li("Use a aba Auditoria para revisar tabelas canônicas, textos YAML e o bundle salvo."),
+                                                    html.Li("Nós internos e hubs continuam ocultos por design na camada principal."),
+                                                ],
+                                                style={"margin": "8px 0 0 18px", "lineHeight": "1.6"},
+                                            ),
                                         ],
                                     ),
                                 ],
@@ -2349,6 +2495,7 @@ def build_app(
 
     @app.callback(
         Output("studio-readiness-panel", "children"),
+        Output("studio-projection-coverage-panel", "children"),
         Output("node-studio-summary-panel", "children"),
         Output("edge-studio-summary-panel", "children"),
         Output("studio-status-banner", "children"),
@@ -2366,15 +2513,40 @@ def build_app(
         node_summary_text: str | None,
         edge_summary_text: str | None,
         studio_status_text: str | None,
-    ) -> tuple[Any, Any, Any, Any]:
+    ) -> tuple[Any, Any, Any, Any, Any]:
         return (
             render_studio_readiness_panel(
                 build_studio_readiness_summary(nodes_rows or [], candidate_links_rows or [], route_rows or [])
+            ),
+            render_studio_projection_panel(
+                build_studio_projection_summary(nodes_rows or [], candidate_links_rows or [], route_rows or [])
             ),
             render_studio_selection_panel(_safe_json_loads(node_summary_text), "node"),
             render_studio_selection_panel(_safe_json_loads(edge_summary_text), "edge"),
             render_status_banner(studio_status_text),
         )
+
+    @app.callback(
+        Output("studio-technical-guide", "open"),
+        Input("studio-open-technical-guide-button", "n_clicks"),
+        State("studio-technical-guide", "open"),
+        prevent_initial_call=True,
+    )
+    def _open_studio_technical_guide(n_clicks: Any, is_open: bool | None) -> bool:
+        if not n_clicks:
+            return bool(is_open)
+        return True
+
+    @app.callback(
+        Output("primary-navigation-tabs", "value"),
+        Input("studio-open-audit-button", "n_clicks"),
+        State("primary-navigation-tabs", "value"),
+        prevent_initial_call=True,
+    )
+    def _open_audit_from_studio(n_clicks: Any, current_tab: str | None) -> str:
+        if not n_clicks:
+            return str(current_tab or "studio")
+        return "audit"
 
     @app.callback(
         Output("run-jobs-overview-panel", "children"),

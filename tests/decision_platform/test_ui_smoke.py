@@ -16,6 +16,7 @@ from decision_platform.ui_dash.app import (
     build_app,
     build_node_studio_elements,
     build_primary_node_studio_elements,
+    build_studio_projection_summary,
     build_candidate_detail,
     build_comparison_records,
     build_official_candidate_summary,
@@ -154,10 +155,14 @@ def test_studio_tab_surfaces_readiness_and_selection_context() -> None:
     assert studio_tab is not None
     assert _find_component_by_id(studio_tab, "studio-readiness-panel") is not None
     assert _find_component_by_id(studio_tab, "studio-status-banner") is not None
+    assert _find_component_by_id(studio_tab, "studio-projection-coverage-panel") is not None
     assert _find_component_by_id(studio_tab, "node-studio-summary-panel") is not None
     assert _find_component_by_id(studio_tab, "edge-studio-summary-panel") is not None
     assert _find_component_by_id(studio_tab, "node-studio-business-editor") is not None
     assert _find_component_by_id(studio_tab, "edge-studio-business-editor") is not None
+    assert _find_component_by_id(studio_tab, "studio-technical-guide") is not None
+    assert _find_component_by_id(studio_tab, "studio-open-technical-guide-button") is not None
+    assert _find_component_by_id(studio_tab, "studio-open-audit-button") is not None
 
 
 def test_studio_primary_canvas_hides_internal_and_hub_nodes() -> None:
@@ -192,6 +197,17 @@ def test_studio_primary_editors_push_technical_fields_into_disclosure() -> None:
         "edge-studio-bidirectional",
     ]:
         assert _component_id_is_inside_details(studio_tab, component_id) is True
+
+
+def test_studio_discovery_callbacks_open_guide_and_audit_tab() -> None:
+    with diagnostic_runtime_test_mode():
+        app = build_app("data/decision_platform/maquete_v2")
+
+    open_guide_callback = _get_callback(app, input_id="studio-open-technical-guide-button")
+    open_audit_callback = _get_callback(app, input_id="studio-open-audit-button")
+
+    assert open_guide_callback(1, False) is True
+    assert open_audit_callback(1, "studio") == "audit"
 
 
 def test_decision_tab_contains_advanced_sections_without_extra_primary_tabs() -> None:
@@ -802,6 +818,30 @@ def test_primary_node_studio_elements_use_business_labels_and_hide_internal_node
     assert supply_route["data"]["label"] == "Água para misturador"
     assert supply_route["data"]["source"] == "W"
     assert supply_route["data"]["target"] == "M"
+
+
+@pytest.mark.fast
+def test_studio_projection_summary_reports_complete_partial_and_degraded_states() -> None:
+    bundle = load_scenario_bundle("data/decision_platform/maquete_v2")
+    nodes_rows = bundle.nodes.to_dict("records")
+    candidate_links_rows = bundle.candidate_links.to_dict("records")
+    route_rows = bundle.route_requirements.to_dict("records")
+
+    complete = build_studio_projection_summary(nodes_rows, candidate_links_rows, route_rows)
+    partial = build_studio_projection_summary(
+        nodes_rows,
+        candidate_links_rows,
+        [row for row in route_rows if str(row["route_id"]) not in {"R001", "R002", "R003", "R009"}],
+    )
+    degraded = build_studio_projection_summary(nodes_rows, candidate_links_rows, [])
+
+    assert complete["status"] == "complete"
+    assert complete["projected_route_count"] == len(route_rows)
+    assert partial["status"] == "partial"
+    assert "Tanque de água" in partial["uncovered_nodes"]
+    assert degraded["status"] == "degraded"
+    assert degraded["projected_route_count"] == 0
+    assert "Auditoria" in degraded["technical_trail_message"]
 
 
 @pytest.mark.fast
