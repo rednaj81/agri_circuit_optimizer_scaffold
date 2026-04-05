@@ -10,6 +10,7 @@ from decision_platform.api.run_pipeline import (
     cancel_run_job,
     create_run_job,
     inspect_run_job,
+    load_run_job,
     list_run_jobs,
     rerun_run_job,
     run_next_queued_job,
@@ -117,6 +118,7 @@ def test_phase3_queue_acceptance_serial_jobs_are_isolated_and_auditable() -> Non
         assert final_summary["status_counts"]["queued"] == 0
         assert all(run["lineage"]["is_rerun"] is False for run in final_summary["runs"])
         assert all(run["evidence_summary"]["has_summary_json"] is True for run in final_summary["runs"])
+        assert all(run["summary_source"] == "persisted_queue_summary" for run in final_summary["runs"])
 
         for completed_job in (first_result, second_result):
             run_dir = Path(completed_job["run_dir"])
@@ -432,11 +434,17 @@ def test_phase3_queue_acceptance_reopens_persisted_run_state_for_inspection() ->
         assert reopened_snapshot["summary"]["status_counts"]["completed"] == 1
         assert reopened_snapshot["summary"]["status_counts"]["canceled"] == 1
         assert reopened_snapshot["selected_run_id"] == canceled_job["run_id"]
+        persisted_canceled_job = load_run_job(canceled_job["run_id"], queue_root=queue_root)
+        assert persisted_canceled_job["queue_summary"]["source"] == "persisted_queue_summary"
+        assert persisted_canceled_job["queue_summary"]["lineage"]["source_run_id"] == completed_candidate["run_id"]
+        assert persisted_canceled_job["queue_summary"]["evidence_summary"]["artifact_file_count"] == 0
         assert reopened_snapshot["selected_run_summary"]["run_id"] == canceled_job["run_id"]
         assert reopened_snapshot["selected_run_summary"]["lineage"]["source_run_id"] == completed_candidate["run_id"]
         assert reopened_snapshot["selected_run_summary"]["lineage"]["source_status"] == "completed"
         assert reopened_snapshot["selected_run_summary"]["evidence_summary"]["artifact_file_count"] == 0
         assert reopened_snapshot["selected_run_summary"]["evidence_summary"]["final_status_logged"] is True
+        assert reopened_snapshot["selected_run_summary"]["summary_source"] == "persisted_queue_summary"
+        assert reopened_snapshot["selected_run_summary"]["evidence_summary"] == persisted_canceled_job["queue_summary"]["evidence_summary"]
         assert reopened_snapshot["selected_run_detail"]["status"] == "canceled"
         assert reopened_snapshot["selected_run_detail"]["rerun_of_run_id"] == completed_candidate["run_id"]
         assert reopened_snapshot["selected_run_detail"]["source_bundle_reference_path"] == canceled_job["source_bundle_reference_path"]
@@ -574,6 +582,7 @@ def test_phase3_queue_acceptance_app_can_cancel_and_rerun_via_callbacks() -> Non
         assert rerun_summary_entry["lineage"]["source_status"] == "completed"
         assert rerun_summary_entry["evidence_summary"]["artifact_expectation"] == "no_execution_artifacts_expected"
         assert rerun_summary_entry["evidence_summary"]["artifact_file_count"] == 0
+        assert rerun_summary_entry["summary_source"] == "persisted_queue_summary"
         assert rerun_detail["status"] == "queued"
         assert rerun_detail["rerun_of_run_id"] == completed_result[2]
         assert rerun_detail["rerun_source"]["source_run_id"] == completed_result[2]

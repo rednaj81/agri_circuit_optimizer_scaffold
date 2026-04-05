@@ -172,12 +172,13 @@ def create_run_job(
         "runtime": None,
         "runtime_policy": runtime_policy,
         "worker_mode": "serial",
+        "queue_summary": None,
         **initial_telemetry,
     }
     _write_json(job_path, job)
     _append_run_event(job, status="queued", message="Run job queued.")
     _append_run_log(job, "queued: run job queued and awaiting serial worker.")
-    return _read_run_job(job_path)
+    return _refresh_persisted_run_job_summary(_read_run_job(job_path))
 
 
 def load_run_job(run_id: str, *, queue_root: str | Path = DEFAULT_RUN_QUEUE_ROOT) -> dict[str, Any]:
@@ -232,8 +233,9 @@ def summarize_run_jobs(queue_root: str | Path = DEFAULT_RUN_QUEUE_ROOT) -> dict[
                 "source_bundle_root": job["source_bundle_root"],
                 "artifacts_dir": job["artifacts_dir"],
                 "rerun_of_run_id": job.get("rerun_of_run_id"),
-                "lineage": _build_run_job_lineage_summary(job),
-                "evidence_summary": _build_run_job_evidence_summary(job),
+                "lineage": dict((job.get("queue_summary") or {}).get("lineage") or _build_run_job_lineage_summary(job)),
+                "evidence_summary": dict((job.get("queue_summary") or {}).get("evidence_summary") or _build_run_job_evidence_summary(job)),
+                "summary_source": str((job.get("queue_summary") or {}).get("source") or "derived_on_read"),
                 "error": job.get("error"),
                 "failure_reason": job.get("failure_reason"),
             }
@@ -522,7 +524,7 @@ def _transition_run_job(
     _write_json(Path(updated_job["job_path"]), updated_job)
     _append_run_event(updated_job, status=status, message=message)
     _append_run_log(updated_job, f"{status}: {message}")
-    return updated_job
+    return _refresh_persisted_run_job_summary(updated_job)
 
 
 def _build_run_artifact_manifest(artifacts_dir: Path) -> dict[str, Any]:
@@ -890,6 +892,14 @@ def _normalize_run_job(job: dict[str, Any]) -> dict[str, Any]:
     )
     normalized_job["failure_reason"] = _coalesce(normalized_job.get("failure_reason"), normalized_job.get("error"))
     normalized_job["failure_stacktrace_excerpt"] = normalized_job.get("failure_stacktrace_excerpt")
+    queue_summary = dict(normalized_job.get("queue_summary") or {})
+    if (
+        queue_summary.get("status") != normalized_job.get("status")
+        or queue_summary.get("updated_at") != normalized_job.get("updated_at")
+        or "lineage" not in queue_summary
+        or "evidence_summary" not in queue_summary
+    ):
+        normalized_job["queue_summary"] = _build_persisted_run_job_queue_summary(normalized_job)
     for field in RUN_JOB_TELEMETRY_FIELDS:
         normalized_job.setdefault(field, None)
     return normalized_job
@@ -988,6 +998,23 @@ def _build_run_job_lineage_summary(job: dict[str, Any]) -> dict[str, Any]:
         "source_execution_mode": rerun_source.get("source_execution_mode"),
         "source_finished_at": rerun_source.get("source_finished_at"),
     }
+
+
+def _build_persisted_run_job_queue_summary(job: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "source": "persisted_queue_summary",
+        "status": job.get("status"),
+        "updated_at": job.get("updated_at"),
+        "lineage": _build_run_job_lineage_summary(job),
+        "evidence_summary": _build_run_job_evidence_summary(job),
+    }
+
+
+def _refresh_persisted_run_job_summary(job: dict[str, Any]) -> dict[str, Any]:
+    refreshed_job = dict(job)
+    refreshed_job["queue_summary"] = _build_persisted_run_job_queue_summary(refreshed_job)
+    _write_json(Path(refreshed_job["job_path"]), refreshed_job)
+    return refreshed_job
 
 
 def _build_run_job_evidence_summary(job: dict[str, Any]) -> dict[str, Any]:

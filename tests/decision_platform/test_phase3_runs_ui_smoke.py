@@ -63,6 +63,7 @@ def test_runs_tab_reopens_persisted_operational_telemetry() -> None:
         rerun_summary = next(run for run in summary_payload["runs"] if run["run_id"] == rerun_job["run_id"])
         assert rerun_summary["lineage"]["is_rerun"] is True
         assert rerun_summary["lineage"]["source_run_id"] == created_job["run_id"]
+        assert rerun_summary["summary_source"] == "persisted_queue_summary"
         assert rerun_summary["evidence_summary"]["has_summary_json"] is True
         assert rerun_summary["evidence_summary"]["final_status_recorded"] is True
         assert detail_payload["selected_run_id"] == rerun_job["run_id"]
