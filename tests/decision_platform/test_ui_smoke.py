@@ -48,6 +48,46 @@ def _find_component_by_id(component: object, target_id: str) -> object | None:
     return None
 
 
+def _collect_components_by_class_name(component: object, class_name: str) -> list[object]:
+    matches: list[object] = []
+    if getattr(component, "__class__", None).__name__ == class_name:
+        matches.append(component)
+    children = getattr(component, "children", None)
+    if children is None:
+        return matches
+    child_items = children if isinstance(children, (list, tuple)) else [children]
+    for child in child_items:
+        matches.extend(_collect_components_by_class_name(child, class_name))
+    return matches
+
+
+def _visible_tab_labels(component: object) -> list[str]:
+    labels: list[str] = []
+    for tab in _collect_components_by_class_name(component, "Tab"):
+        style = getattr(tab, "style", {}) or {}
+        if style.get("display") == "none":
+            continue
+        labels.append(str(getattr(tab, "label", "")))
+    return labels
+
+
+def _find_tab_by_label(component: object, label: str) -> object | None:
+    for tab in _collect_components_by_class_name(component, "Tab"):
+        style = getattr(tab, "style", {}) or {}
+        if style.get("display") == "none":
+            continue
+        if str(getattr(tab, "label", "")) == label:
+            return tab
+    return None
+
+
+def _component_id_is_inside_details(component: object, target_id: str) -> bool:
+    for details in _collect_components_by_class_name(component, "Details"):
+        if _find_component_by_id(details, target_id) is not None:
+            return True
+    return False
+
+
 def _get_callback(app: object, *, output_prefix: str | None = None, input_id: str | None = None) -> Callable[..., Any]:
     callback_map = getattr(app, "callback_map", {})
     for callback_key, metadata in callback_map.items():
@@ -96,6 +136,79 @@ def test_dash_app_exposes_authoring_save_reopen_controls() -> None:
     assert "topology-rules-editor" in layout_repr
     assert "scenario-settings-editor" in layout_repr
     assert "bundle-output-dir-input" in layout_repr
+
+
+def test_dash_app_surfaces_only_four_primary_product_spaces() -> None:
+    with diagnostic_runtime_test_mode():
+        app = build_app("data/decision_platform/maquete_v2")
+
+    assert _visible_tab_labels(app.layout) == ["Studio", "Runs", "Decisão", "Auditoria"]
+
+
+def test_studio_tab_surfaces_readiness_and_selection_context() -> None:
+    with diagnostic_runtime_test_mode():
+        app = build_app("data/decision_platform/maquete_v2")
+
+    studio_tab = _find_tab_by_label(app.layout, "Studio")
+    assert studio_tab is not None
+    assert _find_component_by_id(studio_tab, "studio-readiness-panel") is not None
+    assert _find_component_by_id(studio_tab, "studio-status-banner") is not None
+    assert _find_component_by_id(studio_tab, "node-studio-summary-panel") is not None
+    assert _find_component_by_id(studio_tab, "edge-studio-summary-panel") is not None
+
+
+def test_decision_tab_contains_advanced_sections_without_extra_primary_tabs() -> None:
+    with diagnostic_runtime_test_mode():
+        app = build_app("data/decision_platform/maquete_v2")
+
+    decision_tab = _find_tab_by_label(app.layout, "Decisão")
+    assert decision_tab is not None
+    assert _find_component_by_id(decision_tab, "compare-candidates-dropdown") is not None
+    assert _find_component_by_id(decision_tab, "comparison-figure") is not None
+    assert _find_component_by_id(decision_tab, "selected-candidate-dropdown") is not None
+    assert _find_component_by_id(decision_tab, "candidate-breakdown-panel") is not None
+
+
+def test_runs_tab_combines_queue_and_execution_summary() -> None:
+    with diagnostic_runtime_test_mode():
+        app = build_app("data/decision_platform/maquete_v2")
+
+    runs_tab = _find_tab_by_label(app.layout, "Runs")
+    assert runs_tab is not None
+    assert _find_component_by_id(runs_tab, "run-jobs-overview-panel") is not None
+    assert _find_component_by_id(runs_tab, "execution-summary-panel") is not None
+    assert _find_component_by_id(runs_tab, "run-button") is not None
+
+
+def test_audit_tab_holds_bundle_editors_and_technical_surfaces() -> None:
+    with diagnostic_runtime_test_mode():
+        app = build_app("data/decision_platform/maquete_v2")
+
+    audit_tab = _find_tab_by_label(app.layout, "Auditoria")
+    assert audit_tab is not None
+    assert _find_component_by_id(audit_tab, "bundle-io-summary-panel") is not None
+    assert _find_component_by_id(audit_tab, "topology-rules-editor") is not None
+    assert _find_component_by_id(audit_tab, "scenario-settings-editor") is not None
+    assert _find_component_by_id(audit_tab, "nodes-grid") is not None
+
+
+def test_primary_tabs_keep_debug_json_in_progressive_disclosure() -> None:
+    with diagnostic_runtime_test_mode():
+        app = build_app("data/decision_platform/maquete_v2")
+
+    for component_id in [
+        "node-studio-summary",
+        "edge-studio-summary",
+        "run-jobs-summary",
+        "run-job-detail",
+        "execution-summary",
+        "selected-candidate-summary",
+        "official-candidate-summary",
+        "candidate-breakdown",
+        "catalog-state-summary",
+        "bundle-io-summary",
+    ]:
+        assert _component_id_is_inside_details(app.layout, component_id) is True
 
 
 @pytest.mark.slow

@@ -27,6 +27,474 @@ from decision_platform.rendering.circuit import build_solution_comparison_figure
 from decision_platform.ui_dash._compat import DASH_AVAILABLE, Dash, Input, Output, State, cyto, dag, dcc, html
 
 
+UI_FONT_STACK = '"IBM Plex Sans", "Segoe UI", sans-serif'
+UI_PAGE_STYLE = {
+    "minHeight": "100vh",
+    "padding": "24px",
+    "background": "linear-gradient(180deg, #f4efe6 0%, #eef4f1 48%, #f8fafb 100%)",
+    "color": "#18322c",
+    "fontFamily": UI_FONT_STACK,
+}
+UI_SHELL_STYLE = {
+    "maxWidth": "1500px",
+    "margin": "0 auto",
+}
+UI_HERO_STYLE = {
+    "padding": "28px",
+    "borderRadius": "28px",
+    "background": "linear-gradient(135deg, #103b35 0%, #1f5c51 58%, #d7e5c1 100%)",
+    "color": "#f5f3ee",
+    "boxShadow": "0 22px 56px rgba(16, 59, 53, 0.18)",
+    "marginBottom": "20px",
+}
+UI_CARD_STYLE = {
+    "background": "rgba(255, 255, 255, 0.92)",
+    "border": "1px solid rgba(16, 59, 53, 0.12)",
+    "borderRadius": "20px",
+    "padding": "18px",
+    "boxShadow": "0 14px 36px rgba(27, 45, 39, 0.08)",
+}
+UI_MUTED_CARD_STYLE = {
+    **UI_CARD_STYLE,
+    "background": "rgba(248, 250, 247, 0.96)",
+}
+UI_SECTION_STYLE = {
+    "display": "grid",
+    "gap": "16px",
+    "marginTop": "18px",
+}
+UI_TWO_COLUMN_STYLE = {
+    "display": "grid",
+    "gridTemplateColumns": "repeat(auto-fit, minmax(320px, 1fr))",
+    "gap": "16px",
+}
+UI_THREE_COLUMN_STYLE = {
+    "display": "grid",
+    "gridTemplateColumns": "repeat(auto-fit, minmax(220px, 1fr))",
+    "gap": "12px",
+}
+UI_FIELD_BLOCK_STYLE = {
+    "display": "grid",
+    "gap": "6px",
+    "marginBottom": "10px",
+}
+UI_ACTION_ROW_STYLE = {
+    "display": "flex",
+    "flexWrap": "wrap",
+    "gap": "10px",
+    "marginTop": "12px",
+}
+UI_BUTTON_STYLE = {
+    "padding": "10px 14px",
+    "borderRadius": "12px",
+    "border": "1px solid rgba(16, 59, 53, 0.18)",
+    "background": "#f5f8f4",
+    "cursor": "pointer",
+}
+UI_PILL_STYLE = {
+    "display": "inline-flex",
+    "alignItems": "center",
+    "padding": "6px 10px",
+    "borderRadius": "999px",
+    "fontSize": "12px",
+    "fontWeight": 700,
+    "background": "#dfeee7",
+    "color": "#104338",
+}
+UI_DEBUG_PRE_STYLE = {
+    "whiteSpace": "pre-wrap",
+    "background": "#10231e",
+    "color": "#eaf1ee",
+    "padding": "14px",
+    "borderRadius": "14px",
+    "overflowX": "auto",
+    "fontSize": "12px",
+}
+
+
+def _safe_json_loads(text: Any) -> dict[str, Any]:
+    if isinstance(text, dict):
+        return text
+    if not isinstance(text, str) or not text.strip():
+        return {}
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError:
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _journey_step_card(step: str, title: str, description: str) -> Any:
+    return html.Div(
+        style={
+            "padding": "14px 16px",
+            "borderRadius": "18px",
+            "background": "rgba(255, 255, 255, 0.15)",
+            "border": "1px solid rgba(255, 255, 255, 0.18)",
+        },
+        children=[
+            html.Div(step, style={"fontSize": "12px", "fontWeight": 700, "letterSpacing": "0.12em", "opacity": 0.8}),
+            html.Div(title, style={"fontSize": "20px", "fontWeight": 700, "marginTop": "6px"}),
+            html.Div(description, style={"fontSize": "14px", "lineHeight": "1.5", "marginTop": "6px"}),
+        ],
+    )
+
+
+def _section_intro(title: str, description: str) -> Any:
+    return html.Div(
+        style=UI_CARD_STYLE,
+        children=[
+            html.Div(title, style={"fontSize": "12px", "letterSpacing": "0.12em", "textTransform": "uppercase", "color": "#47665d"}),
+            html.H2(title, style={"margin": "8px 0 8px"}),
+            html.P(description, style={"margin": 0, "lineHeight": "1.6"}),
+        ],
+    )
+
+
+def _field_block(label: str, field: Any) -> Any:
+    return html.Div(
+        style=UI_FIELD_BLOCK_STYLE,
+        children=[
+            html.Label(label, style={"fontSize": "13px", "fontWeight": 700}) if label else html.Span(),
+            field,
+        ],
+    )
+
+
+def _status_tone(status: str | None) -> tuple[str, str]:
+    normalized = str(status or "").strip().lower()
+    if normalized in {"completed", "ready", "idle", "winner_clear"}:
+        return "#dff2e8", "#0f5132"
+    if normalized in {"queued", "running", "active", "needs_attention", "technical_tie"}:
+        return "#fff1cc", "#7a5a00"
+    if normalized in {"failed", "error", "blocked", "canceled"}:
+        return "#f9d8d4", "#8c2f1e"
+    return "#e5ece9", "#24453c"
+
+
+def render_status_banner(message: Any) -> Any:
+    text = str(message or "").strip()
+    if not text:
+        text = "Sem alerta operacional no momento."
+    background, color = _status_tone("ok" if "sem alerta" in text.lower() else ("error" if "error" in text.lower() else "needs_attention"))
+    return html.Div(
+        style={"padding": "12px 14px", "borderRadius": "14px", "background": background, "color": color, "fontWeight": 700},
+        children=text,
+    )
+
+
+def _metric_card(label: str, value: Any, note: str | None = None) -> Any:
+    return html.Div(
+        style={**UI_MUTED_CARD_STYLE, "padding": "14px"},
+        children=[
+            html.Div(label, style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.08em", "color": "#5b756d"}),
+            html.Div(str(value), style={"fontSize": "24px", "fontWeight": 700, "marginTop": "6px"}),
+            html.Div(note or "", style={"fontSize": "13px", "lineHeight": "1.5", "marginTop": "4px", "color": "#496158"}),
+        ],
+    )
+
+
+def _bullet_list(items: list[str], empty_label: str) -> Any:
+    if not items:
+        return html.Div(empty_label, style={"color": "#496158"})
+    return html.Ul([html.Li(str(item)) for item in items], style={"margin": "8px 0 0 18px", "lineHeight": "1.6"})
+
+
+def _coerce_truthy(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    normalized = str(value).strip().lower()
+    return normalized in {"1", "true", "yes", "y"}
+
+
+def build_studio_readiness_summary(
+    nodes_rows: list[dict[str, Any]],
+    candidate_links_rows: list[dict[str, Any]],
+    route_rows: list[dict[str, Any]],
+) -> dict[str, Any]:
+    node_ids = {str(row.get("node_id", "")).strip() for row in nodes_rows if str(row.get("node_id", "")).strip()}
+    inbound_by_node = {node_id: 0 for node_id in node_ids}
+    outbound_by_node = {node_id: 0 for node_id in node_ids}
+    blockers: list[str] = []
+    warnings: list[str] = []
+    dosing_without_measurement: list[str] = []
+    for row in candidate_links_rows:
+        source = str(row.get("from_node", "")).strip()
+        target = str(row.get("to_node", "")).strip()
+        if source:
+            outbound_by_node[source] = outbound_by_node.get(source, 0) + 1
+        if target:
+            inbound_by_node[target] = inbound_by_node.get(target, 0) + 1
+        if target == "W":
+            blockers.append(f"{row.get('link_id')} entra em W")
+        if source == "S":
+            blockers.append(f"{row.get('link_id')} sai de S")
+    mandatory_routes = [row for row in route_rows if _coerce_truthy(row.get("mandatory"))]
+    for route in route_rows:
+        route_id = str(route.get("route_id", "")).strip() or "ROUTE"
+        source = str(route.get("source", "")).strip()
+        sink = str(route.get("sink", "")).strip()
+        if source and source not in node_ids:
+            blockers.append(f"{route_id} referencia source inexistente: {source}")
+        if sink and sink not in node_ids:
+            blockers.append(f"{route_id} referencia sink inexistente: {sink}")
+        if source and outbound_by_node.get(source, 0) == 0:
+            warnings.append(f"{route_id} ainda nao tem saida conectada a partir de {source}")
+        if sink and inbound_by_node.get(sink, 0) == 0:
+            warnings.append(f"{route_id} ainda nao tem entrada conectada em {sink}")
+        dose_min = float(route.get("dose_min_l") or 0.0)
+        if dose_min > 0 and not _coerce_truthy(route.get("measurement_required")):
+            dosing_without_measurement.append(route_id)
+    if dosing_without_measurement:
+        blockers.append("Rotas com dosagem sem medicao direta: " + ", ".join(sorted(dosing_without_measurement)))
+    orphan_nodes = sorted(
+        node_id
+        for node_id in node_ids
+        if inbound_by_node.get(node_id, 0) == 0 and outbound_by_node.get(node_id, 0) == 0
+    )
+    if orphan_nodes:
+        warnings.append("Nos sem conexao no grafo visivel: " + ", ".join(orphan_nodes[:6]))
+    status = "ready" if not blockers and node_ids and candidate_links_rows and mandatory_routes else "needs_attention"
+    return {
+        "status": status,
+        "node_count": len(node_ids),
+        "edge_count": len(candidate_links_rows),
+        "mandatory_route_count": len(mandatory_routes),
+        "measurement_route_count": sum(1 for row in route_rows if _coerce_truthy(row.get("measurement_required"))),
+        "blockers": list(dict.fromkeys(blockers)),
+        "warnings": list(dict.fromkeys(warnings)),
+        "next_steps": [
+            "Corrigir bloqueios estruturais antes de enfileirar uma nova run." if blockers else "Revisar avisos de conectividade e seguir para Runs.",
+            "Salvar e reabrir o bundle canonico quando a revisao estiver pronta.",
+        ],
+    }
+
+
+def render_studio_readiness_panel(summary: dict[str, Any]) -> Any:
+    status = str(summary.get("status") or "needs_attention")
+    background, color = _status_tone(status)
+    return html.Div(
+        children=[
+            html.Div("Readiness do cenário", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+            html.Div(style={"display": "flex", "alignItems": "center", "gap": "10px", "margin": "8px 0 14px"}, children=[html.Span(str(status).replace("_", " "), style={"padding": "6px 10px", "borderRadius": "999px", "background": background, "color": color, "fontWeight": 700}), html.Span("Pronto para rodar" if status == "ready" else "Ainda exige atencao estrutural", style={"fontWeight": 700})]),
+            html.Div(
+                style=UI_THREE_COLUMN_STYLE,
+                children=[
+                    _metric_card("Nos", summary.get("node_count", 0)),
+                    _metric_card("Arestas", summary.get("edge_count", 0)),
+                    _metric_card("Rotas obrigatorias", summary.get("mandatory_route_count", 0)),
+                ],
+            ),
+            html.H4("Bloqueios", style={"marginBottom": "6px"}),
+            _bullet_list(list(summary.get("blockers", [])), "Nenhum bloqueio estrutural detectado."),
+            html.H4("Avisos", style={"marginBottom": "6px", "marginTop": "14px"}),
+            _bullet_list(list(summary.get("warnings", [])), "Sem aviso relevante neste momento."),
+            html.H4("Proximos passos", style={"marginBottom": "6px", "marginTop": "14px"}),
+            _bullet_list(list(summary.get("next_steps", [])), "Sem proximo passo registrado."),
+        ],
+    )
+
+
+def render_studio_selection_panel(summary: dict[str, Any], selection_type: str) -> Any:
+    key = "selected_node" if selection_type == "node" else "selected_edge"
+    selected = summary.get(key) or {}
+    selected_id = summary.get("selected_node_id") if selection_type == "node" else summary.get("selected_link_id")
+    if not selected:
+        return html.Div([html.H4("Selecao ativa"), html.Div(f"Nenhum {selection_type} selecionado.")])
+    preview = []
+    for field_name in ["label", "node_type", "from_node", "to_node", "archetype", "family_hint", "length_m"]:
+        if field_name in selected and selected.get(field_name) not in (None, ""):
+            preview.append(html.Li(f"{field_name}: {selected.get(field_name)}"))
+    return html.Div(
+        children=[
+            html.H4(f"{selection_type.title()} ativo", style={"margin": 0}),
+            html.Div(str(selected_id), style={"fontSize": "22px", "fontWeight": 700, "marginTop": "6px"}),
+            html.Ul(preview[:5], style={"margin": "10px 0 0 18px", "lineHeight": "1.5"}) if preview else html.Div("Sem detalhes adicionais."),
+        ]
+    )
+
+
+def render_run_jobs_overview_panel(summary: dict[str, Any]) -> Any:
+    status_counts = summary.get("status_counts", {}) if isinstance(summary, dict) else {}
+    run_count = int(summary.get("run_count", 0) or 0) if isinstance(summary, dict) else 0
+    next_queued_run_id = summary.get("next_queued_run_id") if isinstance(summary, dict) else None
+    if next_queued_run_id:
+        queue_guidance = f"Ha uma run pronta na fila: {next_queued_run_id}. Revise a run em foco ou execute o proximo job."
+    elif run_count:
+        queue_guidance = "A fila esta sem pendencias no momento. Use a run em foco para revisar o ultimo estado antes de decidir o proximo passo."
+    else:
+        queue_guidance = "Nenhuma run registrada ainda. Enfileire o cenario atual para iniciar a trilha operacional."
+    return html.Div(
+        children=[
+            html.H3("Resumo da fila", style={"marginTop": 0}),
+            html.Div(
+                style=UI_THREE_COLUMN_STYLE,
+                children=[
+                    _metric_card("Runs", summary.get("run_count", 0), "Total observavel na fila local."),
+                    _metric_card("Estado", summary.get("queue_state", "idle"), "serial local"),
+                    _metric_card("Proxima run", summary.get("next_queued_run_id") or "-", "Entrada seguinte da fila"),
+                ],
+            ),
+            html.Div(queue_guidance, style={"marginTop": "12px", "fontWeight": 700, "lineHeight": "1.5"}),
+            html.H4("Status por quantidade", style={"marginBottom": "6px"}),
+            html.Ul(
+                [html.Li(f"{status}: {count}") for status, count in status_counts.items()],
+                style={"margin": "8px 0 0 18px", "lineHeight": "1.6"},
+            ),
+        ]
+    )
+
+
+def render_run_job_detail_panel(detail: dict[str, Any]) -> Any:
+    if not detail or not detail.get("selected_run_id"):
+        return html.Div([html.H3("Run em foco", style={"marginTop": 0}), html.Div("Nenhuma run selecionada.")])
+    return html.Div(
+        children=[
+            html.H3("Run em foco", style={"marginTop": 0}),
+            html.Div(str(detail.get("selected_run_id")), style={"fontSize": "22px", "fontWeight": 700}),
+            html.Div(style={"display": "flex", "gap": "8px", "flexWrap": "wrap", "marginTop": "8px"}, children=[html.Span(str(detail.get("status")), style=UI_PILL_STYLE), html.Span(str(detail.get("requested_execution_mode") or detail.get("execution_mode") or "n/a"), style=UI_PILL_STYLE)]),
+            html.Ul(
+                [
+                    html.Li(f"official_gate_valid: {detail.get('official_gate_valid')}"),
+                    html.Li(f"duracao_s: {detail.get('duration_s')}"),
+                    html.Li(f"bundle: {detail.get('source_bundle_root')}"),
+                    html.Li(f"policy_mode: {detail.get('policy_mode')}"),
+                ],
+                style={"margin": "10px 0 0 18px", "lineHeight": "1.6"},
+            ),
+        ]
+    )
+
+
+def render_execution_summary_panel(summary: dict[str, Any]) -> Any:
+    return html.Div(
+        children=[
+            html.Div(style=UI_THREE_COLUMN_STYLE, children=[_metric_card("Candidatos", summary.get("candidate_count", 0)), _metric_card("Viaveis", summary.get("feasible_count", 0)), _metric_card("Selecionado", summary.get("selected_candidate_id") or "-", str(summary.get("default_profile_id") or ""))]),
+            html.Div(f"Bundle: {summary.get('scenario_bundle_root') or '-'}", style={"marginTop": "10px"}),
+            html.Div(f"Erro: {summary.get('error') or 'nenhum'}", style={"marginTop": "6px", "fontWeight": 700 if summary.get('error') else 400}),
+        ]
+    )
+
+
+def render_bundle_io_panel(summary: dict[str, Any]) -> Any:
+    return html.Div(
+        children=[
+            html.Div(style={"display": "flex", "gap": "8px", "flexWrap": "wrap", "marginBottom": "8px"}, children=[html.Span(str(summary.get("status") or "idle"), style=UI_PILL_STYLE), html.Span(str(summary.get("bundle_version") or "-"), style=UI_PILL_STYLE)]),
+            html.Div(f"Raiz canonica: {summary.get('canonical_scenario_root') or '-'}", style={"lineHeight": "1.6"}),
+            html.Div(f"Manifesto: {summary.get('bundle_manifest') or '-'}", style={"lineHeight": "1.6"}),
+        ]
+    )
+
+
+def render_catalog_state_panel(summary: dict[str, Any]) -> Any:
+    visible_family_summary = summary.get("visible_family_summary") or []
+    top_family = visible_family_summary[0]["topology_family"] if visible_family_summary else "-"
+    return html.Div(
+        children=[
+            html.H3("Leitura atual da decisão", style={"marginTop": 0}),
+            html.Div(style=UI_THREE_COLUMN_STYLE, children=[_metric_card("Visiveis", summary.get("visible_candidate_count", 0)), _metric_card("Selecionado", summary.get("selected_candidate_id") or "-"), _metric_card("Familia lider", top_family)]),
+            html.Div(f"Topo visivel: {summary.get('top_visible_candidate_id') or '-'}", style={"marginTop": "10px"}),
+        ]
+    )
+
+
+def render_candidate_summary_panel(summary: dict[str, Any]) -> Any:
+    if not summary:
+        return html.Div([html.H3("Candidato em foco", style={"marginTop": 0}), html.Div("Nenhum candidato disponivel.")])
+    total_cost = round(float(summary.get("install_cost") or 0.0) + float(summary.get("fallback_cost") or 0.0), 3)
+    return html.Div(
+        children=[
+            html.H3("Candidato em foco", style={"marginTop": 0}),
+            html.Div(str(summary.get("candidate_id") or "-"), style={"fontSize": "22px", "fontWeight": 700}),
+            html.Div(style={"display": "flex", "gap": "8px", "flexWrap": "wrap", "marginTop": "8px"}, children=[html.Span(str(summary.get("topology_family") or "-"), style=UI_PILL_STYLE), html.Span("viavel" if summary.get("feasible") else "inviavel", style=UI_PILL_STYLE)]),
+            html.Div(
+                style=UI_THREE_COLUMN_STYLE,
+                children=[
+                    _metric_card("Custo total", total_cost),
+                    _metric_card("Score", summary.get("score_final") or "-"),
+                    _metric_card("Fallbacks", summary.get("fallback_component_count") or 0),
+                ],
+            ),
+            html.Ul(
+                [
+                    html.Li(f"engine_used: {summary.get('engine_used')}"),
+                    html.Li(f"infeasibility_reason: {summary.get('infeasibility_reason') or '-'}"),
+                ],
+                style={"margin": "10px 0 0 18px", "lineHeight": "1.6"},
+            ),
+        ]
+    )
+
+
+def render_decision_summary_panel(summary: dict[str, Any]) -> Any:
+    if not summary:
+        return html.Div([html.H3("Escolha oficial", style={"marginTop": 0}), html.Div("Nenhum resumo decisorio disponivel.")])
+    decision_status = str(summary.get("decision_status") or ("technical_tie" if summary.get("technical_tie") else "winner_clear"))
+    decision_label = "Technical tie" if decision_status == "technical_tie" else "Winner claro"
+    return html.Div(
+        children=[
+            html.H3("Escolha oficial", style={"marginTop": 0}),
+            html.Div(
+                style={"display": "flex", "alignItems": "center", "gap": "10px", "flexWrap": "wrap"},
+                children=[
+                    html.Div(str(summary.get("candidate_id") or "-"), style={"fontSize": "28px", "fontWeight": 700}),
+                    html.Span(decision_label, style=UI_PILL_STYLE),
+                ],
+            ),
+            html.Div(
+                style=UI_THREE_COLUMN_STYLE,
+                children=[
+                    _metric_card("Runner-up", summary.get("runner_up_candidate_id") or "-"),
+                    _metric_card("Margem", summary.get("score_margin_delta") or summary.get("score_final") or "-"),
+                    _metric_card("Custo oficial", summary.get("total_cost") or summary.get("winner_total_cost") or "-"),
+                ],
+            ),
+            html.Div(
+                "Empate técnico detectado: mantenha a comparação lado a lado visível para suportar a decisão humana."
+                if decision_status == "technical_tie"
+                else "O candidato oficial abriu vantagem suficiente para aparecer como winner na leitura principal.",
+                style={"marginTop": "12px", "fontWeight": 700, "lineHeight": "1.5"},
+            ),
+            html.P(str(summary.get("winner_reason_summary") or "Sem justificativa resumida."), style={"lineHeight": "1.6"}),
+            html.H4("Fatores-chave", style={"marginBottom": "6px"}),
+            _bullet_list([str(item.get("summary")) for item in summary.get("key_factors", []) if item.get("summary")], "Sem fator-chave destacado."),
+        ]
+    )
+
+
+def render_candidate_breakdown_panel(summary: dict[str, Any]) -> Any:
+    if not summary:
+        return html.Div([html.H3("Justificativa detalhada", style={"marginTop": 0}), html.Div("Nenhum breakdown disponivel.")])
+    total_cost = round(float(summary.get("install_cost") or 0.0), 3)
+    return html.Div(
+        children=[
+            html.H3("Justificativa detalhada", style={"marginTop": 0}),
+            html.Div(f"Candidato: {summary.get('candidate_id') or '-'}", style={"fontWeight": 700}),
+            html.Div(
+                style=UI_THREE_COLUMN_STYLE,
+                children=[
+                    _metric_card("Custo instalado", total_cost),
+                    _metric_card("Falhas de restrição", summary.get("constraint_failure_count") or 0),
+                    _metric_card("Fallbacks", summary.get("fallback_component_count") or 0),
+                ],
+            ),
+            html.Ul(
+                [
+                    html.Li(f"quality_score_raw: {summary.get('quality_score_raw')}"),
+                    html.Li(f"resilience_score: {summary.get('resilience_score')}"),
+                    html.Li(f"operability_score: {summary.get('operability_score')}"),
+                    html.Li(f"cleaning_score: {summary.get('cleaning_score')}"),
+                    html.Li(f"fallback_component_count: {summary.get('fallback_component_count')}"),
+                    html.Li(f"constraint_failure_count: {summary.get('constraint_failure_count')}"),
+                ],
+                style={"margin": "10px 0 0 18px", "lineHeight": "1.6"},
+            ),
+            html.H4("Regras e flags", style={"marginBottom": "6px"}),
+            _bullet_list([str(item) for item in summary.get("rules_triggered", [])], "Sem regra destacada."),
+        ]
+    )
+
+
 def build_app(
     scenario_dir: str | Path = "data/decision_platform/maquete_v2",
     *,
@@ -113,372 +581,440 @@ def build_app(
         ensure_ascii=False,
     )
 
+    initial_studio_readiness = build_studio_readiness_summary(
+        authoring_payload["nodes_rows"],
+        authoring_payload["candidate_links_rows"],
+        authoring_payload["route_rows"],
+    )
+
     app = Dash(__name__)
     app.layout = html.Div(
+        style=UI_PAGE_STYLE,
         children=[
-            html.H1("Decision Platform - Circuitos Hidráulicos"),
             dcc.Store(id="scenario-dir", data=str(Path(scenario_dir))),
             dcc.Store(id="run-queue-root", data=str(run_queue_root)),
             dcc.Store(id="node-studio-selected-id", data=initial_node_studio_selected_id),
             dcc.Store(id="edge-studio-selected-id", data=initial_edge_studio_selected_id),
             dcc.Store(id="studio-status-message", data=""),
-            dcc.Tabs(
+            html.Div(
+                style=UI_SHELL_STYLE,
                 children=[
+                    html.Div(
+                        style=UI_HERO_STYLE,
+                        children=[
+                            html.Div("Decision Platform", style={"fontSize": "13px", "letterSpacing": "0.14em", "textTransform": "uppercase", "opacity": 0.78}),
+                            html.H1("Studio, runs e decisão numa jornada única", style={"margin": "8px 0 10px", "fontSize": "40px", "lineHeight": "1.05"}),
+                            html.P(
+                                "A interface principal foi reorganizada para deixar explícito quando editar o cenário, quando acompanhar a fila, quando decidir entre alternativas e quando abrir a trilha técnica.",
+                                style={"maxWidth": "760px", "fontSize": "16px", "lineHeight": "1.6", "margin": "0 0 18px"},
+                            ),
+                            html.Div(
+                                style=UI_TWO_COLUMN_STYLE,
+                                children=[
+                                    _journey_step_card("1", "Studio", "Preparar o cenário com readiness e menos ruído."),
+                                    _journey_step_card("2", "Runs", "Ler fila e status sem depender de logs."),
+                                    _journey_step_card("3", "Decisão", "Comparar winner, runner-up e technical tie."),
+                                    _journey_step_card("4", "Auditoria", "Abrir a trilha técnica apenas quando precisar aprofundar."),
+                                ],
+                            ),
+                        ],
+                    ),
+                    dcc.Tabs(
+                        id="primary-navigation-tabs",
+                        value="studio",
+                        colors={"border": "transparent", "primary": "#103b35", "background": "transparent"},
+                        children=[
                     dcc.Tab(
                         label="Studio",
+                        value="studio",
                         children=[
-                            html.H2("Studio de Nós e Arestas"),
-                            html.P("Edição visual mínima de nodes.csv e candidate_links.csv sobre o bundle canônico."),
-                            cyto.Cytoscape(
-                                id="node-studio-cytoscape",
-                                elements=initial_node_studio_elements,
-                                layout={"name": "preset"},
-                                style={"width": "100%", "height": "520px"},
-                                stylesheet=_build_node_studio_stylesheet(
-                                    initial_node_studio_selected_id,
-                                    initial_edge_studio_selected_id,
-                                ),
+                            _section_intro(
+                                "Studio",
+                                "O canvas segue como superfície principal. Readiness, seleção ativa e mensagens críticas aparecem acima; JSON cru ficou em auditoria secundária.",
                             ),
-                            html.Pre("", id="studio-status"),
-                            html.Pre(initial_node_studio_summary, id="node-studio-summary"),
-                            dcc.Input(
-                                id="node-studio-node-id",
-                                type="text",
-                                value=initial_node_studio_form["node_id"],
-                                persistence=True,
-                                persistence_type="session",
-                            ),
-                            dcc.Input(
-                                id="node-studio-label",
-                                type="text",
-                                value=initial_node_studio_form["label"],
-                                persistence=True,
-                                persistence_type="session",
-                            ),
-                            dcc.Input(
-                                id="node-studio-node-type",
-                                type="text",
-                                value=initial_node_studio_form["node_type"],
-                                persistence=True,
-                                persistence_type="session",
-                            ),
-                            dcc.Input(
-                                id="node-studio-x-m",
-                                type="number",
-                                value=initial_node_studio_form["x_m"],
-                                persistence=True,
-                                persistence_type="session",
-                            ),
-                            dcc.Input(
-                                id="node-studio-y-m",
-                                type="number",
-                                value=initial_node_studio_form["y_m"],
-                                persistence=True,
-                                persistence_type="session",
-                            ),
-                            dcc.Checklist(
-                                id="node-studio-allow-inbound",
-                                options=[{"label": "allow_inbound", "value": "allow_inbound"}],
-                                value=initial_node_studio_form["allow_inbound"],
-                                persistence=True,
-                                persistence_type="session",
-                            ),
-                            dcc.Checklist(
-                                id="node-studio-allow-outbound",
-                                options=[{"label": "allow_outbound", "value": "allow_outbound"}],
-                                value=initial_node_studio_form["allow_outbound"],
-                                persistence=True,
-                                persistence_type="session",
-                            ),
-                            html.Button("Aplicar propriedades do nó", id="node-studio-apply-button"),
-                            html.Button("Criar nó", id="node-studio-create-button"),
-                            html.Button("Duplicar nó", id="node-studio-duplicate-button"),
-                            html.Button("Excluir nó selecionado", id="node-studio-delete-button"),
-                            dcc.Dropdown(
-                                id="node-studio-move-direction",
-                                options=[
-                                    {"label": "Esquerda", "value": "left"},
-                                    {"label": "Direita", "value": "right"},
-                                    {"label": "Cima", "value": "up"},
-                                    {"label": "Baixo", "value": "down"},
+                            html.Div(
+                                style=UI_TWO_COLUMN_STYLE,
+                                children=[
+                                    html.Div(id="studio-readiness-panel", children=render_studio_readiness_panel(initial_studio_readiness), style=UI_CARD_STYLE),
+                                    html.Div(
+                                        style={**UI_MUTED_CARD_STYLE, "display": "grid", "gap": "12px"},
+                                        children=[
+                                            html.Div(id="studio-status-banner", children=render_status_banner("")),
+                                            html.Div(id="node-studio-summary-panel", children=render_studio_selection_panel(_safe_json_loads(initial_node_studio_summary), "node")),
+                                            html.Div(id="edge-studio-summary-panel", children=render_studio_selection_panel(_safe_json_loads(initial_edge_studio_summary), "edge")),
+                                        ],
+                                    ),
                                 ],
-                                value="right",
-                                persistence=True,
-                                persistence_type="session",
                             ),
-                            dcc.Input(
-                                id="node-studio-move-step",
-                                type="number",
-                                value=0.02,
-                                persistence=True,
-                                persistence_type="session",
+                            html.Div(
+                                style=UI_CARD_STYLE,
+                                children=[
+                                    html.H3("Grafo de negócio", style={"marginTop": 0}),
+                                    cyto.Cytoscape(
+                                        id="node-studio-cytoscape",
+                                        elements=initial_node_studio_elements,
+                                        layout={"name": "preset"},
+                                        style={"width": "100%", "height": "560px"},
+                                        stylesheet=_build_node_studio_stylesheet(
+                                            initial_node_studio_selected_id,
+                                            initial_edge_studio_selected_id,
+                                        ),
+                                    ),
+                                ],
                             ),
-                            html.Button("Mover nó", id="node-studio-move-button"),
-                            html.H3("Aresta selecionada"),
-                            html.Pre(initial_edge_studio_summary, id="edge-studio-summary"),
-                            dcc.Input(
-                                id="edge-studio-link-id",
-                                type="text",
-                                value=initial_edge_studio_form["link_id"],
-                                persistence=True,
-                                persistence_type="session",
+                            html.Div(
+                                style=UI_TWO_COLUMN_STYLE,
+                                children=[
+                                    html.Div(
+                                        style=UI_CARD_STYLE,
+                                        children=[
+                                            html.H3("Nó selecionado", style={"marginTop": 0}),
+                                            _field_block("Node ID", dcc.Input(id="node-studio-node-id", type="text", value=initial_node_studio_form["node_id"], persistence=True, persistence_type="session", style={"width": "100%"})),
+                                            _field_block("Rótulo", dcc.Input(id="node-studio-label", type="text", value=initial_node_studio_form["label"], persistence=True, persistence_type="session", style={"width": "100%"})),
+                                            _field_block("Tipo", dcc.Input(id="node-studio-node-type", type="text", value=initial_node_studio_form["node_type"], persistence=True, persistence_type="session", style={"width": "100%"})),
+                                            html.Div(
+                                                style=UI_TWO_COLUMN_STYLE,
+                                                children=[
+                                                    _field_block("X (m)", dcc.Input(id="node-studio-x-m", type="number", value=initial_node_studio_form["x_m"], persistence=True, persistence_type="session", style={"width": "100%"})),
+                                                    _field_block("Y (m)", dcc.Input(id="node-studio-y-m", type="number", value=initial_node_studio_form["y_m"], persistence=True, persistence_type="session", style={"width": "100%"})),
+                                                ],
+                                            ),
+                                            _field_block("Permitir entrada", dcc.Checklist(id="node-studio-allow-inbound", options=[{"label": "allow_inbound", "value": "allow_inbound"}], value=initial_node_studio_form["allow_inbound"], persistence=True, persistence_type="session")),
+                                            _field_block("Permitir saída", dcc.Checklist(id="node-studio-allow-outbound", options=[{"label": "allow_outbound", "value": "allow_outbound"}], value=initial_node_studio_form["allow_outbound"], persistence=True, persistence_type="session")),
+                                            html.Div(style=UI_ACTION_ROW_STYLE, children=[html.Button("Aplicar propriedades do nó", id="node-studio-apply-button", style=UI_BUTTON_STYLE), html.Button("Criar nó", id="node-studio-create-button", style=UI_BUTTON_STYLE), html.Button("Duplicar nó", id="node-studio-duplicate-button", style=UI_BUTTON_STYLE), html.Button("Excluir nó selecionado", id="node-studio-delete-button", style=UI_BUTTON_STYLE)]),
+                                            html.Div(
+                                                style=UI_TWO_COLUMN_STYLE,
+                                                children=[
+                                                    _field_block("Mover", dcc.Dropdown(id="node-studio-move-direction", options=[{"label": "Esquerda", "value": "left"}, {"label": "Direita", "value": "right"}, {"label": "Cima", "value": "up"}, {"label": "Baixo", "value": "down"}], value="right", persistence=True, persistence_type="session")),
+                                                    _field_block("Passo", dcc.Input(id="node-studio-move-step", type="number", value=0.02, persistence=True, persistence_type="session", style={"width": "100%"})),
+                                                ],
+                                            ),
+                                            html.Button("Mover nó", id="node-studio-move-button", style=UI_BUTTON_STYLE),
+                                        ],
+                                    ),
+                                    html.Div(
+                                        style=UI_CARD_STYLE,
+                                        children=[
+                                            html.H3("Aresta selecionada", style={"marginTop": 0}),
+                                            _field_block("Link ID", dcc.Input(id="edge-studio-link-id", type="text", value=initial_edge_studio_form["link_id"], persistence=True, persistence_type="session", style={"width": "100%"})),
+                                            _field_block("Origem", dcc.Input(id="edge-studio-from-node", type="text", value=initial_edge_studio_form["from_node"], persistence=True, persistence_type="session", style={"width": "100%"})),
+                                            _field_block("Destino", dcc.Input(id="edge-studio-to-node", type="text", value=initial_edge_studio_form["to_node"], persistence=True, persistence_type="session", style={"width": "100%"})),
+                                            _field_block("Archetype", dcc.Input(id="edge-studio-archetype", type="text", value=initial_edge_studio_form["archetype"], persistence=True, persistence_type="session", style={"width": "100%"})),
+                                            _field_block("Comprimento (m)", dcc.Input(id="edge-studio-length-m", type="number", value=initial_edge_studio_form["length_m"], persistence=True, persistence_type="session", style={"width": "100%"})),
+                                            _field_block("Bidirecional", dcc.Checklist(id="edge-studio-bidirectional", options=[{"label": "bidirectional", "value": "bidirectional"}], value=initial_edge_studio_form["bidirectional"], persistence=True, persistence_type="session")),
+                                            _field_block("Famílias sugeridas", dcc.Input(id="edge-studio-family-hint", type="text", value=initial_edge_studio_form["family_hint"], persistence=True, persistence_type="session", style={"width": "100%"})),
+                                            html.Div(style=UI_ACTION_ROW_STYLE, children=[html.Button("Aplicar propriedades da aresta", id="edge-studio-apply-button", style=UI_BUTTON_STYLE), html.Button("Criar aresta", id="edge-studio-create-button", style=UI_BUTTON_STYLE), html.Button("Excluir aresta selecionada", id="edge-studio-delete-button", style=UI_BUTTON_STYLE)]),
+                                        ],
+                                    ),
+                                ],
                             ),
-                            dcc.Input(
-                                id="edge-studio-from-node",
-                                type="text",
-                                value=initial_edge_studio_form["from_node"],
-                                persistence=True,
-                                persistence_type="session",
+                            html.Details(
+                                style=UI_MUTED_CARD_STYLE,
+                                children=[
+                                    html.Summary("Auditoria técnica do Studio"),
+                                    html.Div(id="studio-status", style={"marginTop": "10px", "fontWeight": 600}),
+                                    html.Pre(initial_node_studio_summary, id="node-studio-summary", style=UI_DEBUG_PRE_STYLE),
+                                    html.Pre(initial_edge_studio_summary, id="edge-studio-summary", style=UI_DEBUG_PRE_STYLE),
+                                ],
                             ),
-                            dcc.Input(
-                                id="edge-studio-to-node",
-                                type="text",
-                                value=initial_edge_studio_form["to_node"],
-                                persistence=True,
-                                persistence_type="session",
-                            ),
-                            dcc.Input(
-                                id="edge-studio-archetype",
-                                type="text",
-                                value=initial_edge_studio_form["archetype"],
-                                persistence=True,
-                                persistence_type="session",
-                            ),
-                            dcc.Input(
-                                id="edge-studio-length-m",
-                                type="number",
-                                value=initial_edge_studio_form["length_m"],
-                                persistence=True,
-                                persistence_type="session",
-                            ),
-                            dcc.Checklist(
-                                id="edge-studio-bidirectional",
-                                options=[{"label": "bidirectional", "value": "bidirectional"}],
-                                value=initial_edge_studio_form["bidirectional"],
-                                persistence=True,
-                                persistence_type="session",
-                            ),
-                            dcc.Input(
-                                id="edge-studio-family-hint",
-                                type="text",
-                                value=initial_edge_studio_form["family_hint"],
-                                persistence=True,
-                                persistence_type="session",
-                            ),
-                            html.Button("Aplicar propriedades da aresta", id="edge-studio-apply-button"),
-                            html.Button("Criar aresta", id="edge-studio-create-button"),
-                            html.Button("Excluir aresta selecionada", id="edge-studio-delete-button"),
                         ],
                     ),
                     dcc.Tab(
-                        label="Dados",
-                        children=[
-                            html.H2("Tabelas"),
-                            html.P("Diretório do bundle salvo"),
-                            dcc.Input(
-                                id="bundle-output-dir-input",
-                                type="text",
-                                value=initial_bundle_output_dir,
-                                persistence=True,
-                                persistence_type="session",
-                            ),
-                            html.Button("Salvar e reabrir bundle", id="save-reopen-bundle-button"),
-                            html.Pre(initial_bundle_io_summary, id="bundle-io-summary"),
-                            html.H3("nodes.csv"),
-                            _table("nodes-grid", bundle.nodes, editable=True),
-                            html.H3("component_catalog.csv"),
-                            _table("components-grid", bundle.components, editable=True),
-                            html.H3("candidate_links.csv"),
-                            _table("candidate-links-grid", bundle.candidate_links, editable=True),
-                            html.H3("edge_component_rules.csv"),
-                            _table("edge-component-rules-grid", bundle.edge_component_rules, editable=True),
-                            html.H3("route_requirements.csv"),
-                            _table("routes-grid", bundle.route_requirements, editable=True),
-                            html.H3("layout_constraints.csv"),
-                            _table("layout-constraints-grid", bundle.layout_constraints, editable=True),
-                            html.H3("topology_rules.yaml"),
-                            dcc.Textarea(
-                                id="topology-rules-editor",
-                                value=authoring_payload["topology_rules_text"],
-                                style={"width": "100%", "height": "260px"},
-                                persistence=True,
-                                persistence_type="session",
-                            ),
-                            html.H3("scenario_settings.yaml"),
-                            dcc.Textarea(
-                                id="scenario-settings-editor",
-                                value=authoring_payload["scenario_settings_text"],
-                                style={"width": "100%", "height": "260px"},
-                                persistence=True,
-                                persistence_type="session",
-                            ),
-                        ],
+                        label="Auditoria",
+                        value="audit-hidden",
+                        style={"display": "none"},
+                        selected_style={"display": "none"},
+                        children=[],
                     ),
                     dcc.Tab(
                         label="Runs",
+                        value="runs",
                         children=[
-                            html.H2("Runs seriais"),
-                            html.P("Operação mínima da fila serial local de run jobs."),
-                            html.Button("Enfileirar cenário atual", id="run-job-enqueue-button"),
-                            html.Button("Executar próximo job", id="run-jobs-run-next-button"),
-                            html.Button("Atualizar runs", id="run-jobs-refresh-button"),
-                            dcc.Dropdown(
-                                id="run-job-selected-id",
-                                options=initial_run_job_options,
-                                value=initial_run_job_selected_id,
-                                persistence=True,
-                                persistence_type="session",
+                            _section_intro(
+                                "Runs",
+                                "A fila serial continua igual no backend, mas a leitura principal agora resume fila, run em foco e último estado executivo antes de abrir detalhes técnicos.",
                             ),
-                            html.Button("Cancelar run selecionada", id="run-job-cancel-button"),
-                            html.Button("Reexecutar run selecionada", id="run-job-rerun-button"),
-                            html.Pre("", id="run-jobs-status"),
-                            html.Pre(initial_run_jobs_summary, id="run-jobs-summary"),
-                            html.Pre(initial_run_job_detail, id="run-job-detail"),
-                        ],
-                    ),
-                    dcc.Tab(
-                        label="Execução",
-                        children=[
-                            html.H2("Execução"),
-                            html.Button("Reexecutar pipeline", id="run-button"),
-                            html.Pre(initial_execution_summary, id="execution-summary"),
-                        ],
-                    ),
-                    dcc.Tab(
-                        label="Catálogo",
-                        children=[
-                            html.H2("Soluções"),
-                            dcc.Dropdown(
-                                id="profile-dropdown",
-                                options=_profile_dropdown_options(bundle),
-                                value=profile_id,
-                                persistence=True,
-                                persistence_type="session",
-                            ),
-                            dcc.Dropdown(
-                                id="family-dropdown",
-                                options=family_options,
-                                value="ALL",
-                                persistence=True,
-                                persistence_type="session",
-                            ),
-                            dcc.Checklist(
-                                id="feasible-only-checklist",
-                                options=[{"label": "Apenas viáveis", "value": "feasible_only"}],
-                                value=["feasible_only"] if bundle.scenario_settings["ranking"].get("keep_only_feasible", True) else [],
-                                persistence=True,
-                                persistence_type="session",
-                            ),
-                            dcc.Input(id="max-cost-input", type="number", value=None, persistence=True, persistence_type="session"),
-                            dcc.Input(id="min-quality-input", type="number", value=None, persistence=True, persistence_type="session"),
-                            dcc.Input(id="min-flow-input", type="number", value=None, persistence=True, persistence_type="session"),
-                            dcc.Input(id="min-resilience-input", type="number", value=None, persistence=True, persistence_type="session"),
-                            dcc.Input(id="min-cleaning-input", type="number", value=None, persistence=True, persistence_type="session"),
-                            dcc.Input(id="min-operability-input", type="number", value=None, persistence=True, persistence_type="session"),
-                            dcc.Input(id="top-n-family-input", type="number", value=None, persistence=True, persistence_type="session"),
-                            dcc.Dropdown(
-                                id="fallback-filter-dropdown",
-                                options=[
-                                    {"label": "Todos", "value": "ALL"},
-                                    {"label": "Sem fallback", "value": "NO_FALLBACK"},
-                                    {"label": "Com fallback", "value": "WITH_FALLBACK"},
+                            html.Div(
+                                style=UI_TWO_COLUMN_STYLE,
+                                children=[
+                                    html.Div(id="run-jobs-overview-panel", children=render_run_jobs_overview_panel(initial_run_jobs_snapshot["summary"]), style=UI_CARD_STYLE),
+                                    html.Div(id="execution-summary-panel", children=render_execution_summary_panel(_safe_json_loads(initial_execution_summary)), style=UI_MUTED_CARD_STYLE),
                                 ],
-                                value="ALL",
-                                persistence=True,
-                                persistence_type="session",
                             ),
-                            dcc.Dropdown(
-                                id="infeasibility-reason-dropdown",
-                                options=_infeasibility_reason_options(result),
-                                value="ALL",
-                                persistence=True,
-                                persistence_type="session",
+                            html.Div(id="run-jobs-status-banner", children=render_status_banner(""), style=UI_CARD_STYLE),
+                            html.Div(
+                                style=UI_TWO_COLUMN_STYLE,
+                                children=[
+                                    html.Div(
+                                        style=UI_CARD_STYLE,
+                                        children=[
+                                            html.H3("Operações da fila", style={"marginTop": 0}),
+                                            html.Div(style=UI_ACTION_ROW_STYLE, children=[html.Button("Enfileirar cenário atual", id="run-job-enqueue-button", style=UI_BUTTON_STYLE), html.Button("Executar próximo job", id="run-jobs-run-next-button", style=UI_BUTTON_STYLE), html.Button("Atualizar runs", id="run-jobs-refresh-button", style=UI_BUTTON_STYLE), html.Button("Cancelar run selecionada", id="run-job-cancel-button", style=UI_BUTTON_STYLE), html.Button("Reexecutar run selecionada", id="run-job-rerun-button", style=UI_BUTTON_STYLE), html.Button("Reexecutar pipeline", id="run-button", style=UI_BUTTON_STYLE)]),
+                                            _field_block("Run selecionada", dcc.Dropdown(id="run-job-selected-id", options=initial_run_job_options, value=initial_run_job_selected_id, persistence=True, persistence_type="session")),
+                                        ],
+                                    ),
+                                    html.Div(id="run-job-detail-panel", children=render_run_job_detail_panel(initial_run_jobs_snapshot["selected_run_detail"]), style=UI_MUTED_CARD_STYLE),
+                                ],
                             ),
-                            _weight_inputs(bundle),
-                            html.Pre(initial_catalog_summary, id="catalog-state-summary"),
-                            _catalog_grid(initial_state["ranked_records"]),
-                            html.H3("Resumo por família"),
-                            _family_summary_grid(initial_state.get("family_summary_records", [])),
-                            html.Button("Exportar catálogo ranqueado", id="export-catalog-button"),
-                            dcc.Download(id="catalog-download"),
+                            html.Details(
+                                style=UI_MUTED_CARD_STYLE,
+                                children=[
+                                    html.Summary("Auditoria técnica de runs"),
+                                    html.Pre("", id="run-jobs-status", style=UI_DEBUG_PRE_STYLE),
+                                    html.Pre(initial_run_jobs_summary, id="run-jobs-summary", style=UI_DEBUG_PRE_STYLE),
+                                    html.Pre(initial_run_job_detail, id="run-job-detail", style=UI_DEBUG_PRE_STYLE),
+                                    html.Pre(initial_execution_summary, id="execution-summary", style=UI_DEBUG_PRE_STYLE),
+                                ],
+                            ),
                         ],
                     ),
                     dcc.Tab(
-                        label="Comparação",
+                        label="Pipeline",
+                        value="pipeline-hidden",
+                        style={"display": "none"},
+                        selected_style={"display": "none"},
+                        children=[],
+                    ),
+                    dcc.Tab(
+                        label="Decisão",
+                        value="decision",
                         children=[
-                            html.H2("Comparação"),
-                            dcc.Dropdown(
-                                id="compare-candidates-dropdown",
-                                options=initial_state["comparison_options"],
-                                value=initial_state["comparison_ids"],
-                                multi=True,
-                                persistence=True,
-                                persistence_type="session",
+                            _section_intro(
+                                "Decisão",
+                                "A área principal agora reúne winner, runner-up, filtros, comparação aprofundada e o circuito do candidato em um único espaço de decisão humana assistida.",
                             ),
-                            dcc.Graph(
-                                id="comparison-figure",
-                                figure=build_solution_comparison_figure(_lookup_candidates(result, initial_state["comparison_ids"]))
-                                if result
-                                else build_solution_comparison_figure([]),
+                            html.Div(
+                                style=UI_TWO_COLUMN_STYLE,
+                                children=[
+                                    html.Div(id="decision-summary-panel", children=render_decision_summary_panel(initial_official_summary), style=UI_CARD_STYLE),
+                                    html.Div(id="catalog-state-summary-panel", children=render_catalog_state_panel(_safe_json_loads(initial_catalog_summary)), style=UI_MUTED_CARD_STYLE),
+                                ],
                             ),
-                            _comparison_grid(initial_comparison_records),
-                            html.Button("Exportar comparação", id="export-comparison-button"),
-                            dcc.Download(id="comparison-download"),
-                            html.Button("Exportar comparação JSON", id="export-comparison-json-button"),
-                            dcc.Download(id="comparison-json-download"),
+                            html.Div(
+                                style=UI_CARD_STYLE,
+                                children=[
+                                    html.H3("Filtros e ranking", style={"marginTop": 0}),
+                                    html.Div(
+                                        style=UI_THREE_COLUMN_STYLE,
+                                        children=[
+                                            _field_block("Perfil", dcc.Dropdown(id="profile-dropdown", options=_profile_dropdown_options(bundle), value=profile_id, persistence=True, persistence_type="session")),
+                                            _field_block("Família", dcc.Dropdown(id="family-dropdown", options=family_options, value="ALL", persistence=True, persistence_type="session")),
+                                            _field_block("Fallback", dcc.Dropdown(id="fallback-filter-dropdown", options=[{"label": "Todos", "value": "ALL"}, {"label": "Sem fallback", "value": "NO_FALLBACK"}, {"label": "Com fallback", "value": "WITH_FALLBACK"}], value="ALL", persistence=True, persistence_type="session")),
+                                            _field_block("Motivo de inviabilidade", dcc.Dropdown(id="infeasibility-reason-dropdown", options=_infeasibility_reason_options(result), value="ALL", persistence=True, persistence_type="session")),
+                                            _field_block("Status", dcc.Checklist(id="feasible-only-checklist", options=[{"label": "Apenas viáveis", "value": "feasible_only"}], value=["feasible_only"] if bundle.scenario_settings["ranking"].get("keep_only_feasible", True) else [], persistence=True, persistence_type="session")),
+                                            _field_block("Top por família", dcc.Input(id="top-n-family-input", type="number", value=None, persistence=True, persistence_type="session", style={"width": "100%"})),
+                                        ],
+                                    ),
+                                    html.Div(
+                                        style=UI_THREE_COLUMN_STYLE,
+                                        children=[
+                                            _field_block("Custo máximo", dcc.Input(id="max-cost-input", type="number", value=None, persistence=True, persistence_type="session", style={"width": "100%"})),
+                                            _field_block("Qualidade mínima", dcc.Input(id="min-quality-input", type="number", value=None, persistence=True, persistence_type="session", style={"width": "100%"})),
+                                            _field_block("Vazão mínima", dcc.Input(id="min-flow-input", type="number", value=None, persistence=True, persistence_type="session", style={"width": "100%"})),
+                                            _field_block("Resiliência mínima", dcc.Input(id="min-resilience-input", type="number", value=None, persistence=True, persistence_type="session", style={"width": "100%"})),
+                                            _field_block("Cleaning mínimo", dcc.Input(id="min-cleaning-input", type="number", value=None, persistence=True, persistence_type="session", style={"width": "100%"})),
+                                            _field_block("Operabilidade mínima", dcc.Input(id="min-operability-input", type="number", value=None, persistence=True, persistence_type="session", style={"width": "100%"})),
+                                        ],
+                                    ),
+                                    html.Details(
+                                        style={**UI_MUTED_CARD_STYLE, "marginTop": "12px"},
+                                        children=[
+                                            html.Summary("Ajustar pesos dinâmicos"),
+                                            _weight_inputs(bundle),
+                                        ],
+                                    ),
+                                ],
+                            ),
+                            html.Div(
+                                style=UI_CARD_STYLE,
+                                children=[
+                                    html.H3("Catálogo visível", style={"marginTop": 0}),
+                                    _catalog_grid(initial_state["ranked_records"]),
+                                    html.H3("Resumo por família"),
+                                    _family_summary_grid(initial_state.get("family_summary_records", [])),
+                                    html.Button("Exportar catálogo ranqueado", id="export-catalog-button", style=UI_BUTTON_STYLE),
+                                    dcc.Download(id="catalog-download"),
+                                ],
+                            ),
+                            html.Details(
+                                style=UI_MUTED_CARD_STYLE,
+                                children=[
+                                    html.Summary("Comparação aprofundada"),
+                                    _field_block("Comparar candidatos", dcc.Dropdown(id="compare-candidates-dropdown", options=initial_state["comparison_options"], value=initial_state["comparison_ids"], multi=True, persistence=True, persistence_type="session")),
+                                    dcc.Graph(
+                                        id="comparison-figure",
+                                        figure=build_solution_comparison_figure(_lookup_candidates(result, initial_state["comparison_ids"]))
+                                        if result
+                                        else build_solution_comparison_figure([]),
+                                    ),
+                                    _comparison_grid(initial_comparison_records),
+                                    html.Div(style=UI_ACTION_ROW_STYLE, children=[html.Button("Exportar comparação", id="export-comparison-button", style=UI_BUTTON_STYLE), dcc.Download(id="comparison-download"), html.Button("Exportar comparação JSON", id="export-comparison-json-button", style=UI_BUTTON_STYLE), dcc.Download(id="comparison-json-download")]),
+                                ],
+                            ),
+                            html.Details(
+                                style=UI_MUTED_CARD_STYLE,
+                                children=[
+                                    html.Summary("Circuito do candidato em foco"),
+                                    html.Div(
+                                        style=UI_TWO_COLUMN_STYLE,
+                                        children=[
+                                            _field_block("Candidato", dcc.Dropdown(id="selected-candidate-dropdown", options=initial_state["selected_options"], value=initial_state["selected_candidate_id"], persistence=True, persistence_type="session")),
+                                            _field_block("Rota destacada", dcc.Dropdown(id="route-highlight-dropdown", options=_route_dropdown_options(candidate_details.get("route_rows", [])), value=_default_route_highlight(candidate_details.get("route_rows", [])), persistence=True, persistence_type="session")),
+                                        ],
+                                    ),
+                                    html.Div(id="selected-candidate-summary-panel", children=render_candidate_summary_panel(candidate_details.get("summary", {})), style=UI_CARD_STYLE),
+                                    html.Button("Exportar candidato selecionado", id="export-selected-button", style=UI_BUTTON_STYLE),
+                                    dcc.Download(id="selected-candidate-download"),
+                                    cyto.Cytoscape(
+                                        id="circuit-cytoscape",
+                                        elements=candidate_details.get("cytoscape_elements", []),
+                                        layout={"name": "preset"},
+                                        style={"width": "100%", "height": "520px"},
+                                        stylesheet=_build_cytoscape_stylesheet(
+                                            candidate_details.get("route_highlights", {}),
+                                            _default_route_highlight(candidate_details.get("route_rows", [])),
+                                            candidate_details.get("critical_component_ids", []),
+                                        ),
+                                    ),
+                                    _route_grid(candidate_details.get("route_rows", [])),
+                                    html.Details(
+                                        style={**UI_MUTED_CARD_STYLE, "marginTop": "12px"},
+                                        children=[
+                                            html.Summary("Resumo técnico do candidato"),
+                                            html.Pre(
+                                                json.dumps(candidate_details.get("summary", {}), indent=2, ensure_ascii=False),
+                                                id="selected-candidate-summary",
+                                                style=UI_DEBUG_PRE_STYLE,
+                                            ),
+                                        ],
+                                    ),
+                                ],
+                            ),
+                            html.Details(
+                                style=UI_MUTED_CARD_STYLE,
+                                children=[
+                                    html.Summary("Justificativa detalhada"),
+                                    html.Div(id="decision-summary-panel-extended", children=render_decision_summary_panel(initial_official_summary), style=UI_CARD_STYLE),
+                                    html.Div(id="candidate-breakdown-panel", children=render_candidate_breakdown_panel(candidate_details.get("breakdown", {})), style={**UI_MUTED_CARD_STYLE, "marginTop": "12px"}),
+                                    html.Details(
+                                        style={**UI_MUTED_CARD_STYLE, "marginTop": "12px"},
+                                        children=[
+                                            html.Summary("JSON técnico da justificativa"),
+                                            html.Pre(
+                                                json.dumps(initial_official_summary, indent=2, ensure_ascii=False),
+                                                id="official-candidate-summary",
+                                                style=UI_DEBUG_PRE_STYLE,
+                                            ),
+                                            html.Pre(
+                                                json.dumps(candidate_details.get("breakdown", {}), indent=2, ensure_ascii=False),
+                                                id="candidate-breakdown",
+                                                style=UI_DEBUG_PRE_STYLE,
+                                            ),
+                                        ],
+                                    ),
+                                ],
+                            ),
+                            html.Details(
+                                style=UI_MUTED_CARD_STYLE,
+                                children=[
+                                    html.Summary("Resumo técnico do estado de decisão"),
+                                    html.Pre(initial_catalog_summary, id="catalog-state-summary", style=UI_DEBUG_PRE_STYLE),
+                                ],
+                            ),
                         ],
                     ),
                     dcc.Tab(
-                        label="Circuito",
-                        children=[
-                            html.H2("Renderização 2D"),
-                            dcc.Dropdown(
-                                id="selected-candidate-dropdown",
-                                options=initial_state["selected_options"],
-                                value=initial_state["selected_candidate_id"],
-                                persistence=True,
-                                persistence_type="session",
-                            ),
-                            dcc.Dropdown(
-                                id="route-highlight-dropdown",
-                                options=_route_dropdown_options(candidate_details.get("route_rows", [])),
-                                value=_default_route_highlight(candidate_details.get("route_rows", [])),
-                                persistence=True,
-                                persistence_type="session",
-                            ),
-                            html.Pre(
-                                json.dumps(candidate_details.get("summary", {}), indent=2, ensure_ascii=False),
-                                id="selected-candidate-summary",
-                            ),
-                            html.Button("Exportar candidato selecionado", id="export-selected-button"),
-                            dcc.Download(id="selected-candidate-download"),
-                            cyto.Cytoscape(
-                                id="circuit-cytoscape",
-                                elements=candidate_details.get("cytoscape_elements", []),
-                                layout={"name": "preset"},
-                                style={"width": "100%", "height": "520px"},
-                                stylesheet=_build_cytoscape_stylesheet(
-                                    candidate_details.get("route_highlights", {}),
-                                    _default_route_highlight(candidate_details.get("route_rows", [])),
-                                    candidate_details.get("critical_component_ids", []),
-                                ),
-                            ),
-                            _route_grid(candidate_details.get("route_rows", [])),
-                        ],
+                        label="Comparação avançada",
+                        value="comparison-hidden",
+                        style={"display": "none"},
+                        selected_style={"display": "none"},
+                        children=[],
                     ),
                     dcc.Tab(
-                        label="Escolha final",
+                        label="Circuito candidato",
+                        value="candidate-hidden",
+                        style={"display": "none"},
+                        selected_style={"display": "none"},
+                        children=[],
+                    ),
+                    dcc.Tab(
+                        label="Justificativa",
+                        value="justification-hidden",
+                        style={"display": "none"},
+                        selected_style={"display": "none"},
+                        children=[],
+                    ),
+                    dcc.Tab(
+                        label="Auditoria",
+                        value="audit",
                         children=[
-                            html.H2("Candidato oficial"),
-                            html.Pre(
-                                json.dumps(initial_official_summary, indent=2, ensure_ascii=False),
-                                id="official-candidate-summary",
+                            _section_intro(
+                                "Auditoria",
+                                "Persistência do bundle, textos canônicos e tabelas completas continuam disponíveis, mas permanecem fora da superfície primária de edição, execução e decisão.",
                             ),
-                            html.H2("Justificativa"),
-                            html.Pre(
-                                json.dumps(candidate_details.get("breakdown", {}), indent=2, ensure_ascii=False),
-                                id="candidate-breakdown",
+                            html.Div(
+                                style=UI_TWO_COLUMN_STYLE,
+                                children=[
+                                    html.Div(
+                                        style=UI_CARD_STYLE,
+                                        children=[
+                                            html.H3("Bundle salvo e reabertura", style={"marginTop": 0}),
+                                            html.Div(id="bundle-io-summary-panel", children=render_bundle_io_panel(_safe_json_loads(initial_bundle_io_summary))),
+                                            _field_block("Diretório do bundle salvo", dcc.Input(id="bundle-output-dir-input", type="text", value=initial_bundle_output_dir, persistence=True, persistence_type="session", style={"width": "100%"})),
+                                            html.Button("Salvar e reabrir bundle", id="save-reopen-bundle-button", style=UI_BUTTON_STYLE),
+                                        ],
+                                    ),
+                                    html.Div(
+                                        style=UI_MUTED_CARD_STYLE,
+                                        children=[
+                                            html.H3("Textos canônicos", style={"marginTop": 0}),
+                                            html.H4("topology_rules.yaml"),
+                                            dcc.Textarea(
+                                                id="topology-rules-editor",
+                                                value=authoring_payload["topology_rules_text"],
+                                                style={"width": "100%", "height": "240px"},
+                                                persistence=True,
+                                                persistence_type="session",
+                                            ),
+                                            html.H4("scenario_settings.yaml"),
+                                            dcc.Textarea(
+                                                id="scenario-settings-editor",
+                                                value=authoring_payload["scenario_settings_text"],
+                                                style={"width": "100%", "height": "240px"},
+                                                persistence=True,
+                                                persistence_type="session",
+                                            ),
+                                        ],
+                                    ),
+                                ],
                             ),
+                            html.Div(
+                                style=UI_CARD_STYLE,
+                                children=[
+                                    html.H3("Tabelas do bundle", style={"marginTop": 0}),
+                                    html.H4("nodes.csv"),
+                                    _table("nodes-grid", bundle.nodes, editable=True),
+                                    html.H4("component_catalog.csv"),
+                                    _table("components-grid", bundle.components, editable=True),
+                                    html.H4("candidate_links.csv"),
+                                    _table("candidate-links-grid", bundle.candidate_links, editable=True),
+                                    html.H4("edge_component_rules.csv"),
+                                    _table("edge-component-rules-grid", bundle.edge_component_rules, editable=True),
+                                    html.H4("route_requirements.csv"),
+                                    _table("routes-grid", bundle.route_requirements, editable=True),
+                                    html.H4("layout_constraints.csv"),
+                                    _table("layout-constraints-grid", bundle.layout_constraints, editable=True),
+                                ],
+                            ),
+                            html.Details(
+                                style=UI_MUTED_CARD_STYLE,
+                                children=[
+                                    html.Summary("JSON técnico do bundle"),
+                                    html.Pre(initial_bundle_io_summary, id="bundle-io-summary", style=UI_DEBUG_PRE_STYLE),
+                                ],
+                            ),
+                        ],
+                    ),
                         ],
                     ),
                 ],
@@ -1597,6 +2133,92 @@ def build_app(
             f"{candidate_id}.json",
         )
 
+    @app.callback(
+        Output("studio-readiness-panel", "children"),
+        Output("node-studio-summary-panel", "children"),
+        Output("edge-studio-summary-panel", "children"),
+        Output("studio-status-banner", "children"),
+        Input("nodes-grid", "rowData"),
+        Input("candidate-links-grid", "rowData"),
+        Input("routes-grid", "rowData"),
+        Input("node-studio-summary", "children"),
+        Input("edge-studio-summary", "children"),
+        Input("studio-status", "children"),
+    )
+    def _refresh_studio_panels(
+        nodes_rows: list[dict[str, Any]] | None,
+        candidate_links_rows: list[dict[str, Any]] | None,
+        route_rows: list[dict[str, Any]] | None,
+        node_summary_text: str | None,
+        edge_summary_text: str | None,
+        studio_status_text: str | None,
+    ) -> tuple[Any, Any, Any, Any]:
+        return (
+            render_studio_readiness_panel(
+                build_studio_readiness_summary(nodes_rows or [], candidate_links_rows or [], route_rows or [])
+            ),
+            render_studio_selection_panel(_safe_json_loads(node_summary_text), "node"),
+            render_studio_selection_panel(_safe_json_loads(edge_summary_text), "edge"),
+            render_status_banner(studio_status_text),
+        )
+
+    @app.callback(
+        Output("run-jobs-overview-panel", "children"),
+        Output("run-job-detail-panel", "children"),
+        Output("run-jobs-status-banner", "children"),
+        Input("run-jobs-summary", "children"),
+        Input("run-job-detail", "children"),
+        Input("run-jobs-status", "children"),
+    )
+    def _refresh_run_panels(
+        summary_text: str | None,
+        detail_text: str | None,
+        status_text: str | None,
+    ) -> tuple[Any, Any, Any]:
+        return (
+            render_run_jobs_overview_panel(_safe_json_loads(summary_text)),
+            render_run_job_detail_panel(_safe_json_loads(detail_text)),
+            render_status_banner(status_text),
+        )
+
+    @app.callback(
+        Output("execution-summary-panel", "children"),
+        Output("bundle-io-summary-panel", "children"),
+        Input("execution-summary", "children"),
+        Input("bundle-io-summary", "children"),
+    )
+    def _refresh_audit_panels(execution_text: str | None, bundle_text: str | None) -> tuple[Any, Any]:
+        return (
+            render_execution_summary_panel(_safe_json_loads(execution_text)),
+            render_bundle_io_panel(_safe_json_loads(bundle_text)),
+        )
+
+    @app.callback(
+        Output("decision-summary-panel", "children"),
+        Output("decision-summary-panel-extended", "children"),
+        Output("catalog-state-summary-panel", "children"),
+        Output("selected-candidate-summary-panel", "children"),
+        Output("candidate-breakdown-panel", "children"),
+        Input("official-candidate-summary", "children"),
+        Input("catalog-state-summary", "children"),
+        Input("selected-candidate-summary", "children"),
+        Input("candidate-breakdown", "children"),
+    )
+    def _refresh_decision_panels(
+        official_text: str | None,
+        catalog_text: str | None,
+        candidate_text: str | None,
+        breakdown_text: str | None,
+    ) -> tuple[Any, Any, Any, Any, Any]:
+        official_payload = _safe_json_loads(official_text)
+        return (
+            render_decision_summary_panel(official_payload),
+            render_decision_summary_panel(official_payload),
+            render_catalog_state_panel(_safe_json_loads(catalog_text)),
+            render_candidate_summary_panel(_safe_json_loads(candidate_text)),
+            render_candidate_breakdown_panel(_safe_json_loads(breakdown_text)),
+        )
+
     return app
 
 
@@ -1870,10 +2492,13 @@ def build_official_candidate_summary(
         return {}
     candidate = next(item for item in result["catalog"] if item["candidate_id"] == official_candidate_id)
     metrics = candidate["metrics"]
+    winner = explanation.get("winner") or {}
     runner_up = explanation.get("runner_up") or {}
     return {
         "candidate_id": official_candidate_id,
         "active_profile_id": profile_id,
+        "decision_status": explanation.get("decision_status"),
+        "technical_tie": explanation.get("decision_status") == "technical_tie",
         "topology_family": candidate["topology_family"],
         "generation_source": candidate.get("generation_source"),
         "lineage_label": candidate.get("generation_metadata", {}).get("lineage_label"),
@@ -1893,6 +2518,10 @@ def build_official_candidate_summary(
         "runner_up_topology_family": runner_up.get("topology_family"),
         "runner_up_score_final": runner_up.get("score_final"),
         "runner_up_total_cost": runner_up.get("total_cost"),
+        "score_margin_winner": (explanation.get("score_margin") or {}).get("winner"),
+        "score_margin_runner_up": (explanation.get("score_margin") or {}).get("runner_up"),
+        "score_margin_delta": (explanation.get("score_margin") or {}).get("delta"),
+        "winner_total_cost": winner.get("total_cost"),
         "decision_differences": explanation.get("decision_differences", {}),
         "key_factors": explanation.get("key_factors", []),
         "winner_penalties": explanation.get("winner_penalties", []),

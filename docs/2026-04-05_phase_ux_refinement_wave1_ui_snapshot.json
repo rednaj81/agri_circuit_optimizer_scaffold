@@ -1,0 +1,118 @@
+{
+  "wave": "ux_phase_1_wave_1",
+  "scenario_dir": "data/decision_platform/maquete_v2",
+  "hero_headline": "Studio, runs e decisão numa jornada única",
+  "visible_tabs": [
+    {
+      "label": "Studio",
+      "value": "studio",
+      "key_panels": [
+        "studio-readiness-panel",
+        "node-studio-summary-panel",
+        "edge-studio-summary-panel"
+      ],
+      "details": [
+        {
+          "summary": "Auditoria técnica do Studio",
+          "component_ids": [
+            "node-studio-summary",
+            "edge-studio-summary"
+          ]
+        }
+      ]
+    },
+    {
+      "label": "Runs",
+      "value": "runs",
+      "key_panels": [
+        "run-jobs-overview-panel",
+        "run-job-detail-panel",
+        "execution-summary-panel"
+      ],
+      "details": [
+        {
+          "summary": "Auditoria técnica de runs",
+          "component_ids": [
+            "run-jobs-summary",
+            "run-job-detail",
+            "execution-summary"
+          ]
+        }
+      ]
+    },
+    {
+      "label": "Decisão",
+      "value": "decision",
+      "key_panels": [
+        "decision-summary-panel",
+        "catalog-state-summary-panel",
+        "selected-candidate-summary-panel",
+        "candidate-breakdown-panel"
+      ],
+      "details": [
+        {
+          "summary": "Ajustar pesos dinâmicos",
+          "component_ids": []
+        },
+        {
+          "summary": "Comparação aprofundada",
+          "component_ids": []
+        },
+        {
+          "summary": "Circuito do candidato em foco",
+          "component_ids": [
+            "selected-candidate-summary"
+          ]
+        },
+        {
+          "summary": "Resumo técnico do candidato",
+          "component_ids": [
+            "selected-candidate-summary"
+          ]
+        },
+        {
+          "summary": "Justificativa detalhada",
+          "component_ids": [
+            "official-candidate-summary",
+            "candidate-breakdown"
+          ]
+        },
+        {
+          "summary": "JSON técnico da justificativa",
+          "component_ids": [
+            "official-candidate-summary",
+            "candidate-breakdown"
+          ]
+        },
+        {
+          "summary": "Resumo técnico do estado de decisão",
+          "component_ids": [
+            "catalog-state-summary"
+          ]
+        }
+      ]
+    },
+    {
+      "label": "Auditoria",
+      "value": "audit",
+      "key_panels": [
+        "bundle-io-summary-panel"
+      ],
+      "details": [
+        {
+          "summary": "JSON técnico do bundle",
+          "component_ids": [
+            "bundle-io-summary"
+          ]
+        }
+      ]
+    }
+  ],
+  "visible_tab_labels": [
+    "Studio",
+    "Runs",
+    "Decisão",
+    "Auditoria"
+  ],
+  "details_component_count": 10
+}
