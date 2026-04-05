@@ -2771,6 +2771,7 @@ def build_run_job_detail_summary(
         "source_bundle_version": job.get("source_bundle_version"),
         "source_bundle_manifest": job.get("source_bundle_manifest"),
         "source_bundle_files": job.get("source_bundle_files", {}),
+        "queue_summary": job.get("queue_summary"),
         "result_summary_path": job.get("result_summary_path"),
         "error": job.get("error"),
         "engine_requested": telemetry["engine_requested"],
@@ -2796,6 +2797,7 @@ def build_run_job_detail_summary(
             "events_path": job.get("events_path"),
             "log_path": job.get("log_path"),
             "source_bundle_reference_path": job.get("source_bundle_reference_path"),
+            "queue_summary_source": (job.get("queue_summary") or {}).get("source"),
             "result_summary_path": job.get("result_summary_path"),
         },
     }

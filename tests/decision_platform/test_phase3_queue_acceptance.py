@@ -80,6 +80,21 @@ def _assert_run_evidence(detail: dict[str, Any], *, expected_status: str) -> dic
     return evidence
 
 
+def _assert_persisted_queue_summary(
+    job: dict[str, Any],
+    *,
+    expected_status: str,
+    source_run_id: str | None = None,
+) -> dict[str, Any]:
+    queue_summary = job.get("queue_summary")
+    assert isinstance(queue_summary, dict)
+    assert queue_summary["source"] == "persisted_queue_summary"
+    assert queue_summary["status"] == expected_status
+    assert queue_summary["lineage"]["source_run_id"] == source_run_id
+    assert queue_summary["evidence_summary"]["final_status_recorded"] is True
+    return queue_summary
+
+
 @pytest.mark.slow
 def test_phase3_queue_acceptance_serial_jobs_are_isolated_and_auditable() -> None:
     scenario_dir = prepare_maquete_v2_acceptance_scenario(
@@ -106,11 +121,15 @@ def test_phase3_queue_acceptance_serial_jobs_are_isolated_and_auditable() -> Non
 
         assert first_job["status"] == "queued"
         assert second_job["status"] == "queued"
+        assert _assert_persisted_queue_summary(first_job, expected_status="queued")["evidence_summary"]["artifact_file_count"] == 0
+        assert _assert_persisted_queue_summary(second_job, expected_status="queued")["evidence_summary"]["artifact_file_count"] == 0
         assert first_result is not None
         assert second_result is not None
         assert first_result["run_id"] != second_result["run_id"]
         assert first_result["status"] == "completed"
         assert second_result["status"] == "completed"
+        assert _assert_persisted_queue_summary(first_result, expected_status="completed")["evidence_summary"]["has_summary_json"] is True
+        assert _assert_persisted_queue_summary(second_result, expected_status="completed")["evidence_summary"]["has_summary_json"] is True
         assert [job["status"] for job in after_first].count("completed") == 1
         assert [job["status"] for job in after_first].count("queued") == 1
         assert final_summary["worker_mode"] == "serial"
@@ -210,8 +229,10 @@ def test_phase3_queue_acceptance_keeps_official_mode_julia_only(monkeypatch) -> 
         completed_detail = build_run_job_detail_summary(diagnostic_job["run_id"], queue_root=diagnostic_queue_root)
 
         assert official_job["requested_execution_mode"] == "official"
+        assert _assert_persisted_queue_summary(official_job, expected_status="queued")["evidence_summary"]["artifact_file_count"] == 0
         assert failed_job is not None
         assert failed_job["status"] == "failed"
+        assert _assert_persisted_queue_summary(failed_job, expected_status="failed")["evidence_summary"]["has_summary_json"] is False
         assert "invalid for the official Julia-only gate" in str(failed_job["error"])
         assert failed_job["artifacts"]["summary_json"] is None
         _assert_run_detail_has_telemetry(failed_detail)
@@ -277,6 +298,7 @@ def test_phase3_queue_acceptance_can_cancel_queued_jobs_without_execution_artifa
             final_summary = summarize_run_jobs(queue_root)
 
         assert canceled_job["status"] == "canceled"
+        assert _assert_persisted_queue_summary(canceled_job, expected_status="canceled")["evidence_summary"]["artifact_file_count"] == 0
         assert inspection["status"] == "canceled"
         assert inspection["run_id"] == canceled_candidate["run_id"]
         assert inspection["artifacts"]["summary_json"] is None
@@ -355,9 +377,11 @@ def test_phase3_queue_acceptance_can_rerun_terminal_runs_with_new_run_id(monkeyp
         assert failed_rerun_job["run_id"] != official_job["run_id"]
         assert failed_rerun_job["rerun_of_run_id"] == official_job["run_id"]
         assert failed_rerun_job["rerun_source"]["source_status"] == "failed"
+        assert _assert_persisted_queue_summary(failed_rerun_job, expected_status="queued", source_run_id=official_job["run_id"])
         assert failed_rerun_job["source_bundle_version"] == official_job["source_bundle_version"]
         assert failed_rerun_result is not None
         assert failed_rerun_result["status"] == "failed"
+        assert _assert_persisted_queue_summary(failed_rerun_result, expected_status="failed", source_run_id=official_job["run_id"])
         assert "invalid for the official Julia-only gate" in str(failed_rerun_result["error"])
         assert failed_rerun_inspection["events"][0]["status"] == "queued"
         assert failed_rerun_inspection["rerun_source"]["source_run_id"] == official_job["run_id"]
@@ -370,8 +394,10 @@ def test_phase3_queue_acceptance_can_rerun_terminal_runs_with_new_run_id(monkeyp
         assert completed_rerun_job["run_id"] != diagnostic_job["run_id"]
         assert completed_rerun_job["rerun_of_run_id"] == diagnostic_job["run_id"]
         assert completed_rerun_job["rerun_source"]["source_status"] == "completed"
+        assert _assert_persisted_queue_summary(completed_rerun_job, expected_status="queued", source_run_id=diagnostic_job["run_id"])
         assert completed_rerun_result is not None
         assert completed_rerun_result["status"] == "completed"
+        assert _assert_persisted_queue_summary(completed_rerun_result, expected_status="completed", source_run_id=diagnostic_job["run_id"])
         assert completed_rerun_result["execution_mode"] == "diagnostic"
         assert completed_rerun_inspection["rerun_source"]["source_run_id"] == diagnostic_job["run_id"]
         assert completed_rerun_inspection["artifacts"]["summary_json"] is not None
@@ -380,11 +406,14 @@ def test_phase3_queue_acceptance_can_rerun_terminal_runs_with_new_run_id(monkeyp
         assert completed_rerun_inspection["failure_reason"] is None
 
         assert canceled_rerun_source["status"] == "canceled"
+        assert _assert_persisted_queue_summary(canceled_rerun_source, expected_status="canceled", source_run_id=completed_rerun_job["run_id"])
         assert canceled_rerun_job["run_id"] != canceled_rerun_source["run_id"]
         assert canceled_rerun_job["rerun_of_run_id"] == canceled_rerun_source["run_id"]
         assert canceled_rerun_job["rerun_source"]["source_status"] == "canceled"
+        assert _assert_persisted_queue_summary(canceled_rerun_job, expected_status="queued", source_run_id=canceled_rerun_source["run_id"])
         assert canceled_rerun_result is not None
         assert canceled_rerun_result["status"] == "completed"
+        assert _assert_persisted_queue_summary(canceled_rerun_result, expected_status="completed", source_run_id=canceled_rerun_source["run_id"])
         assert canceled_rerun_result["execution_mode"] == "diagnostic"
         assert canceled_rerun_inspection["source_bundle_reference"]["run_id"] == canceled_rerun_job["run_id"]
         assert canceled_rerun_inspection["source_bundle_reference"]["rerun_source"]["source_run_id"] == canceled_rerun_source["run_id"]
@@ -446,6 +475,7 @@ def test_phase3_queue_acceptance_reopens_persisted_run_state_for_inspection() ->
         assert reopened_snapshot["selected_run_summary"]["summary_source"] == "persisted_queue_summary"
         assert reopened_snapshot["selected_run_summary"]["evidence_summary"] == persisted_canceled_job["queue_summary"]["evidence_summary"]
         assert reopened_snapshot["selected_run_detail"]["status"] == "canceled"
+        assert reopened_snapshot["selected_run_detail"]["queue_summary"] == persisted_canceled_job["queue_summary"]
         assert reopened_snapshot["selected_run_detail"]["rerun_of_run_id"] == completed_candidate["run_id"]
         assert reopened_snapshot["selected_run_detail"]["source_bundle_reference_path"] == canceled_job["source_bundle_reference_path"]
         assert reopened_snapshot["selected_run_detail"]["source_bundle_reference"]["rerun_source"]["source_run_id"] == completed_candidate["run_id"]
@@ -584,6 +614,8 @@ def test_phase3_queue_acceptance_app_can_cancel_and_rerun_via_callbacks() -> Non
         assert rerun_summary_entry["evidence_summary"]["artifact_file_count"] == 0
         assert rerun_summary_entry["summary_source"] == "persisted_queue_summary"
         assert rerun_detail["status"] == "queued"
+        assert rerun_detail["queue_summary"]["lineage"]["source_run_id"] == completed_result[2]
+        assert rerun_detail["queue_summary"]["evidence_summary"] == rerun_summary_entry["evidence_summary"]
         assert rerun_detail["rerun_of_run_id"] == completed_result[2]
         assert rerun_detail["rerun_source"]["source_run_id"] == completed_result[2]
         _assert_run_detail_has_telemetry(rerun_detail)

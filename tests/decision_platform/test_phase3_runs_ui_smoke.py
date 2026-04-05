@@ -68,6 +68,9 @@ def test_runs_tab_reopens_persisted_operational_telemetry() -> None:
         assert rerun_summary["evidence_summary"]["final_status_recorded"] is True
         assert detail_payload["selected_run_id"] == rerun_job["run_id"]
         assert detail_payload["rerun_of_run_id"] == created_job["run_id"]
+        assert detail_payload["queue_summary"]["source"] == "persisted_queue_summary"
+        assert detail_payload["queue_summary"]["lineage"] == rerun_summary["lineage"]
+        assert detail_payload["queue_summary"]["evidence_summary"] == rerun_summary["evidence_summary"]
         assert detail_payload["engine_requested"] == "watermodels_jl"
         assert detail_payload["engine_used"] == "python_emulated_julia"
         assert detail_payload["execution_mode"] == "diagnostic"
@@ -85,6 +88,7 @@ def test_runs_tab_reopens_persisted_operational_telemetry() -> None:
         assert detail_payload["telemetry"]["duration_s"] == detail_payload["duration_s"]
         assert detail_payload["inspection"]["queue_root"] == str(queue_root.resolve())
         assert detail_payload["inspection"]["artifacts_dir"] == rerun_result["artifacts_dir"]
+        assert detail_payload["inspection"]["queue_summary_source"] == "persisted_queue_summary"
         assert detail_payload["inspection"]["source_bundle_reference_path"] == rerun_job["source_bundle_reference_path"]
     finally:
         cleanup_scenario_copy(queue_root)
