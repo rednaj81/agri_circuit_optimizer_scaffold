@@ -1,29 +1,30 @@
 {
-  "updated_at": "2026-04-05T02:51:29.4955386Z",
+  "updated_at": "2026-04-05T03:02:33.4378149Z",
   "phase_id": "phase_1",
   "phase_assessment": "phase_closed",
   "recommended_next_phase": "phase_2",
   "current_focus": {
-    "active_wave_index": 6,
+    "active_wave_index": 7,
     "active_role": "developer",
-    "waves_completed": 6,
-    "last_updated_at": "2026-04-05T02:51:29.4955386Z",
+    "waves_completed": 7,
+    "last_updated_at": "2026-04-05T03:02:33.4378149Z",
     "health_state": "phase_1_closed_no_further_functional_waves",
-    "latest_commit": "914ec835949d1cf1c81f7cd318f7f7e867d46596"
+    "latest_commit": "5e7904e67cd9470f500c1291cfb0df5efc49ad1d"
   },
   "recent_wave_objectives": [
-    "Make canonical bundle save reliable and deterministic.",
     "Seal a reproducible phase_1 exit gate.",
     "Close phase_1 operationally without adding scope.",
-    "Apply one final operational correction for reproducible closure artifacts."
+    "Apply one final operational correction for reproducible closure artifacts.",
+    "Correct the regression in the phase_1 closure artifacts without reopening functional scope."
   ],
   "recent_wave_verdicts": [
     "significant_progress",
-    "significant_progress",
     "low_significance",
-    "low_significance"
+    "regression",
+    "corrective_closeout"
   ],
   "recent_commit_subjects": [
+    "wave6 fix phase1 closure artifacts",
     "wave5 close phase1 operational handoff",
     "wave4 seal phase1 exit gate",
     "wave3 atomize canonical bundle save",
@@ -31,13 +32,13 @@
     "wave1 harden bundle provenance signals"
   ],
   "directives": [
-    "Treat phase_1 as sealed after this operational correction.",
+    "Treat phase_1 as sealed after this regression correction.",
     "Do not schedule new functional waves inside phase_1.",
     "Open phase_2 explicitly for any structural studio continuation."
   ],
   "rationale": [
     "The functional exit criteria for phase_1 are already covered by code and tests.",
-    "The remaining work is only to make the closure artifacts reproducible and unambiguous."
+    "The only remaining work was restoring direct and reproducible reads of the closure artifacts."
   ],
   "phase_exit_evidence": {
     "manifest": "docs/codex_dual_agent_runtime/phase_0_validation_manifest.json",
@@ -45,9 +46,10 @@
     "handoff": "docs/2026-04-05_phase1_wave5_exit_handoff.md",
     "phase_plan": "docs/codex_dual_agent_hydraulic_autonomy_bundle/automation/phase_plan.yaml",
     "tests": [
-      "tests/decision_platform/test_scenario_settings_contract.py",
+      "tests/decision_platform/test_phase1_exit_acceptance.py",
       "tests/decision_platform/test_scenario_persistence.py",
-      "tests/decision_platform/test_phase1_exit_acceptance.py"
+      "tests/decision_platform/test_scenario_settings_contract.py",
+      "tests/decision_platform/test_phase1_exit_artifacts.py"
     ],
     "signals": [
       "scenario_bundle.yaml",
@@ -58,7 +60,7 @@
   },
   "phase_1_continuation_policy": {
     "additional_functional_waves_allowed": false,
-    "final_operational_correction_wave": 6,
+    "final_operational_correction_wave": 7,
     "next_functional_phase": "phase_2"
   },
   "out_of_scope_for_phase_1": [

@@ -4,7 +4,7 @@
 
 Close `phase_1` formally without adding any new functional scope, leaving a single operational reading for the sealed exit criteria and a clear redirect to `phase_2` for structural studio work.
 
-Wave 6 is a corrective closeout only: it fixes reproducibility of the closure artifacts and does not reopen any functional work inside `phase_1`.
+Wave 7 is a corrective regression fix only: it restores reproducibility of the closure artifacts and does not reopen any functional work inside `phase_1`.
 
 ## Point Of Truth
 
@@ -44,7 +44,7 @@ $env:PYTHONPATH='src;.'; .\.venv\Scripts\python.exe -m pytest tests/decision_pla
 
 `phase_1` is closed at this point. Any new functional progress should open `phase_2` explicitly and keep structural studio work out of the sealed `phase_1` gate.
 
-No additional functional wave should be scheduled inside `phase_1` after this operational correction.
+No additional functional wave should be scheduled inside `phase_1` after this regression correction.
 
 ## Honest Handoff
 

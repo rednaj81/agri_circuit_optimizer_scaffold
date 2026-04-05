@@ -24,7 +24,7 @@ phase_0:
 phase_1:
   target: "Normalizar domínio, persistência e cenários"
   status: "closed"
-  closure_mode: "sealed_after_wave_6_operational_fix"
+  closure_mode: "sealed_after_wave_7_regression_fix"
   next_phase_id: "phase_2"
   exit_criteria:
     - "cenários versionáveis"
@@ -37,11 +37,11 @@ phase_1:
     - 'O bundle oficial `data/decision_platform/maquete_v2` deve continuar canônico, versionável e rastreável via `scenario_bundle.yaml`, `component_catalog.csv`, `scenario_bundle_manifest` e `scenario_bundle_files`.'
     - 'Os entrypoints oficiais (`run_decision_pipeline` e `save_and_reopen_local_bundle`) devem continuar falhando fechado para layout legado sem manifesto.'
     - 'As suítes de contrato já endurecidas (`test_loaders.py`, `test_scenario_contract_validation.py`, `test_component_catalog_contract.py`, `test_scenario_settings_contract.py`) permanecem como sustentação da saída, não como tema reaberto.'
-    - 'Nenhuma nova wave funcional deve ocorrer dentro da phase_1 após a correção operacional final de fechamento.'
+    - 'Nenhuma nova wave funcional deve ocorrer dentro da phase_1 após a correção final da regressão operacional de fechamento.'
   closure_handoff:
     summary_doc: "docs/2026-04-05_phase1_wave5_exit_handoff.md"
     freeze_rule: "Phase_2 deve consumir o bundle canônico como baseline congelado; não reabrir persistência, catálogo, rotas, settings, topologia ou layout sem novo handoff objetivo."
-    transition_note: "A phase_1 está encerrada; a continuidade do programa deve migrar para a phase_2 apenas por abertura explícita após a correção operacional final."
+    transition_note: "A phase_1 está encerrada; a continuidade do programa deve migrar para a phase_2 apenas por abertura explícita após a correção final da regressão operacional."
 phase_2:
   target: "Entregar studio de nós e arestas"
   status: "planned"
