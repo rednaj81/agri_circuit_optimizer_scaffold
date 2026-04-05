@@ -11,9 +11,11 @@ from decision_platform.api.run_pipeline import (
     DEFAULT_RUN_QUEUE_ROOT,
     OfficialRuntimeConfigError,
     cancel_run_job,
+    create_run_job,
     inspect_run_job,
     rerun_run_job,
     run_decision_pipeline,
+    run_next_queued_job,
     summarize_run_jobs,
 )
 from decision_platform.catalog.explanation import build_selected_candidate_explanation
@@ -312,7 +314,9 @@ def build_app(
                         label="Runs",
                         children=[
                             html.H2("Runs seriais"),
-                            html.P("Inspeção mínima da fila serial local de run jobs."),
+                            html.P("Operação mínima da fila serial local de run jobs."),
+                            html.Button("Enfileirar cenário atual", id="run-job-enqueue-button"),
+                            html.Button("Executar próximo job", id="run-jobs-run-next-button"),
                             html.Button("Atualizar runs", id="run-jobs-refresh-button"),
                             dcc.Dropdown(
                                 id="run-job-selected-id",
@@ -974,6 +978,85 @@ def build_app(
             selected_link_id=selected_link_id,
         )
         return updated_rows, next_selected_link_id, ""
+
+    @app.callback(
+        Output("run-jobs-summary", "children", allow_duplicate=True),
+        Output("run-job-selected-id", "options", allow_duplicate=True),
+        Output("run-job-selected-id", "value", allow_duplicate=True),
+        Output("run-job-detail", "children", allow_duplicate=True),
+        Output("run-jobs-status", "children", allow_duplicate=True),
+        Input("run-job-enqueue-button", "n_clicks"),
+        State("scenario-dir", "data"),
+        State("run-queue-root", "data"),
+        prevent_initial_call=True,
+    )
+    def _enqueue_current_scenario_run_job(
+        n_clicks: Any,
+        current_scenario_dir: str,
+        current_run_queue_root: str,
+    ) -> tuple[str, list[dict[str, str]], str | None, str, str]:
+        status_message = ""
+        preferred_run_id = None
+        if n_clicks:
+            try:
+                current_bundle = load_scenario_bundle(current_scenario_dir)
+                queued_job = create_run_job(
+                    current_scenario_dir,
+                    queue_root=current_run_queue_root,
+                    allow_diagnostic_python_emulation=_requires_diagnostic_python_emulation(current_bundle),
+                )
+                preferred_run_id = queued_job["run_id"]
+                status_message = (
+                    f"run_job {queued_job['run_id']} enfileirada em modo "
+                    f"{queued_job['requested_execution_mode']}"
+                )
+            except Exception as exc:
+                status_message = str(exc)
+        snapshot = build_run_jobs_snapshot(current_run_queue_root, preferred_run_id=preferred_run_id)
+        return (
+            _serialize_json(snapshot["summary"]),
+            snapshot["options"],
+            snapshot["selected_run_id"],
+            _serialize_json(snapshot["selected_run_detail"]),
+            status_message,
+        )
+
+    @app.callback(
+        Output("run-jobs-summary", "children", allow_duplicate=True),
+        Output("run-job-selected-id", "options", allow_duplicate=True),
+        Output("run-job-selected-id", "value", allow_duplicate=True),
+        Output("run-job-detail", "children", allow_duplicate=True),
+        Output("run-jobs-status", "children", allow_duplicate=True),
+        Input("run-jobs-run-next-button", "n_clicks"),
+        State("run-job-selected-id", "value"),
+        State("run-queue-root", "data"),
+        prevent_initial_call=True,
+    )
+    def _run_next_serial_queue_job(
+        n_clicks: Any,
+        selected_run_id: str | None,
+        current_run_queue_root: str,
+    ) -> tuple[str, list[dict[str, str]], str | None, str, str]:
+        status_message = ""
+        preferred_run_id = selected_run_id
+        if n_clicks:
+            try:
+                executed_job = run_next_queued_job(queue_root=current_run_queue_root)
+                if executed_job is None:
+                    status_message = "Nenhum run_job em queued para execução."
+                else:
+                    preferred_run_id = executed_job["run_id"]
+                    status_message = f"run_job {executed_job['run_id']} -> {executed_job['status']}"
+            except Exception as exc:
+                status_message = str(exc)
+        snapshot = build_run_jobs_snapshot(current_run_queue_root, preferred_run_id=preferred_run_id)
+        return (
+            _serialize_json(snapshot["summary"]),
+            snapshot["options"],
+            snapshot["selected_run_id"],
+            _serialize_json(snapshot["selected_run_detail"]),
+            status_message,
+        )
 
     @app.callback(
         Output("run-jobs-summary", "children"),

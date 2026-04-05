@@ -14,6 +14,7 @@ Realign the administrative source of truth so `phase_3` is the only active funct
 ## Delivered Baseline
 
 - isolated local `run_job` entries executed by an explicit serial worker
+- the local `Runs` UI can enqueue the current scenario and trigger execution of the next queued job over the same backend
 - queued-job cancellation without execution artifacts
 - explicit re-run of `completed` or `failed` runs through a new `run_id`
 - individual run inspection with status, events, log, and artifacts

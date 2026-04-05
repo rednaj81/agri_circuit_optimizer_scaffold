@@ -198,6 +198,7 @@ Abertura mínima da phase 3:
 - `tests/decision_platform/test_phase3_queue_acceptance.py` valida o corte mínimo atual de fila serial
 - cada `run_job` usa diretório próprio com `job.json`, `events.jsonl`, `run.log`, `source_bundle_reference.json` e `artifacts/`
 - o worker da fase é serial e previsível: múltiplos jobs podem existir, mas apenas um é executado por vez
+- a aba `Runs` da UI local já permite enfileirar o cenário corrente e disparar a execução do próximo job da fila serial
 - jobs ainda em `queued` podem ser cancelados explicitamente com `status=canceled` e evento próprio, sem gerar artefatos de execução
 - runs `completed` ou `failed` podem gerar um re-run explícito com novo `run_id` e referência rastreável à run de origem
 - a UI local agora permite inspecionar uma run individual com status, eventos, caminhos de log e artefatos, além de acionar cancelamento/re-run mínimo

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any, Callable
 
 import pytest
 
@@ -22,6 +23,16 @@ from tests.decision_platform.scenario_utils import (
     prepare_maquete_v2_acceptance_scenario,
     prepare_isolated_tmp_dir,
 )
+
+
+def _get_callback(app: object, *, input_id: str) -> Callable[..., Any]:
+    callback_map = getattr(app, "callback_map", {})
+    for metadata in callback_map.values():
+        if any(item["id"] == input_id for item in metadata.get("inputs", [])):
+            callback = metadata.get("callback")
+            if callback is not None:
+                return getattr(callback, "__wrapped__", callback)
+    raise KeyError(f"Callback not found for input_id={input_id!r}")
 
 
 @pytest.mark.slow
@@ -294,11 +305,121 @@ def test_phase3_queue_acceptance_reopens_persisted_run_state_for_inspection() ->
 
 
 @pytest.mark.fast
+def test_phase3_queue_acceptance_app_can_enqueue_and_run_next_via_callbacks() -> None:
+    scenario_dir = prepare_maquete_v2_acceptance_scenario(
+        "maquete_v2_phase3_ui_enqueue_source",
+        scenario_overrides={"hydraulic_engine": {"fallback": "python_emulated_julia"}},
+    )
+    queue_root = prepare_isolated_tmp_dir("phase3_queue_ui_enqueue_root")
+    try:
+        with diagnostic_runtime_test_mode():
+            app = build_app(scenario_dir, run_queue_root=queue_root)
+
+        enqueue_callback = _get_callback(app, input_id="run-job-enqueue-button")
+        run_next_callback = _get_callback(app, input_id="run-jobs-run-next-button")
+
+        enqueue_result = enqueue_callback(1, str(Path(scenario_dir).resolve()), str(queue_root.resolve()))
+        queued_summary = json.loads(enqueue_result[0])
+        queued_detail = json.loads(enqueue_result[3])
+
+        assert queued_summary["status_counts"]["queued"] == 1
+        assert queued_detail["status"] == "queued"
+        assert queued_detail["requested_execution_mode"] == "diagnostic"
+        assert "enfileirada em modo diagnostic" in enqueue_result[4]
+
+        with diagnostic_runtime_test_mode():
+            run_next_result = run_next_callback(1, enqueue_result[2], str(queue_root.resolve()))
+
+        completed_summary = json.loads(run_next_result[0])
+        completed_detail = json.loads(run_next_result[3])
+
+        assert completed_summary["status_counts"]["queued"] == 0
+        assert completed_summary["status_counts"]["completed"] == 1
+        assert completed_detail["status"] == "completed"
+        assert completed_detail["execution_mode"] == "diagnostic"
+        assert completed_detail["artifacts"]["summary_json"] is not None
+        assert "-> completed" in run_next_result[4]
+    finally:
+        cleanup_scenario_copy(queue_root)
+        cleanup_scenario_copy(scenario_dir)
+
+
+@pytest.mark.fast
+def test_phase3_queue_acceptance_app_can_cancel_and_rerun_via_callbacks() -> None:
+    scenario_dir = prepare_maquete_v2_acceptance_scenario(
+        "maquete_v2_phase3_ui_cancel_rerun_source",
+        scenario_overrides={"hydraulic_engine": {"fallback": "python_emulated_julia"}},
+    )
+    queue_root = prepare_isolated_tmp_dir("phase3_queue_ui_cancel_rerun_root")
+    try:
+        with diagnostic_runtime_test_mode():
+            app = build_app(scenario_dir, run_queue_root=queue_root)
+
+        enqueue_callback = _get_callback(app, input_id="run-job-enqueue-button")
+        cancel_callback = _get_callback(app, input_id="run-job-cancel-button")
+        run_next_callback = _get_callback(app, input_id="run-jobs-run-next-button")
+        rerun_callback = _get_callback(app, input_id="run-job-rerun-button")
+
+        first_enqueue = enqueue_callback(1, str(Path(scenario_dir).resolve()), str(queue_root.resolve()))
+        canceled_result = cancel_callback(1, first_enqueue[2], str(queue_root.resolve()))
+        canceled_summary = json.loads(canceled_result[0])
+        canceled_detail = json.loads(canceled_result[3])
+
+        assert canceled_summary["status_counts"]["canceled"] == 1
+        assert canceled_detail["status"] == "canceled"
+        assert canceled_detail["artifacts"]["summary_json"] is None
+        assert "-> canceled" in canceled_result[4]
+
+        second_enqueue = enqueue_callback(2, str(Path(scenario_dir).resolve()), str(queue_root.resolve()))
+        with diagnostic_runtime_test_mode():
+            completed_result = run_next_callback(1, second_enqueue[2], str(queue_root.resolve()))
+        rerun_result = rerun_callback(1, completed_result[2], str(queue_root.resolve()))
+        rerun_summary = json.loads(rerun_result[0])
+        rerun_detail = json.loads(rerun_result[3])
+
+        assert rerun_summary["status_counts"]["queued"] == 1
+        assert rerun_summary["status_counts"]["completed"] == 1
+        assert rerun_summary["status_counts"]["canceled"] == 1
+        assert rerun_detail["status"] == "queued"
+        assert rerun_detail["rerun_of_run_id"] == completed_result[2]
+        assert rerun_detail["rerun_source"]["source_run_id"] == completed_result[2]
+        assert "re-run de" in rerun_result[4]
+    finally:
+        cleanup_scenario_copy(queue_root)
+        cleanup_scenario_copy(scenario_dir)
+
+
+@pytest.mark.fast
+def test_phase3_queue_acceptance_app_run_next_keeps_official_mode_fail_closed(monkeypatch) -> None:
+    monkeypatch.setenv(bridge.DISABLE_REAL_JULIA_PROBE_ENV, "1")
+    queue_root = prepare_isolated_tmp_dir("phase3_queue_ui_official_root")
+    try:
+        app = build_app("data/decision_platform/maquete_v2", run_queue_root=queue_root)
+        enqueue_callback = _get_callback(app, input_id="run-job-enqueue-button")
+        run_next_callback = _get_callback(app, input_id="run-jobs-run-next-button")
+
+        enqueue_result = enqueue_callback(1, str(Path("data/decision_platform/maquete_v2").resolve()), str(queue_root.resolve()))
+        failed_result = run_next_callback(1, enqueue_result[2], str(queue_root.resolve()))
+        failed_summary = json.loads(failed_result[0])
+        failed_detail = json.loads(failed_result[3])
+
+        assert failed_summary["status_counts"]["failed"] == 1
+        assert failed_detail["status"] == "failed"
+        assert failed_detail["requested_execution_mode"] == "official"
+        assert "invalid for the official Julia-only gate" in str(failed_detail["error"])
+        assert "-> failed" in failed_result[4]
+    finally:
+        cleanup_scenario_copy(queue_root)
+
+
+@pytest.mark.fast
 def test_phase3_queue_acceptance_app_exposes_run_inspection() -> None:
     with diagnostic_runtime_test_mode():
         app = build_app("data/decision_platform/maquete_v2")
 
     layout_repr = repr(app.layout)
+    assert "run-job-enqueue-button" in layout_repr
+    assert "run-jobs-run-next-button" in layout_repr
     assert "run-jobs-refresh-button" in layout_repr
     assert "run-jobs-summary" in layout_repr
     assert "run-job-selected-id" in layout_repr
