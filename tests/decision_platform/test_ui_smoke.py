@@ -15,6 +15,7 @@ from decision_platform.ui_dash.app import (
     apply_node_studio_edit,
     build_app,
     build_node_studio_elements,
+    build_primary_node_studio_elements,
     build_candidate_detail,
     build_comparison_records,
     build_official_candidate_summary,
@@ -155,6 +156,45 @@ def test_studio_tab_surfaces_readiness_and_selection_context() -> None:
     assert _find_component_by_id(studio_tab, "studio-status-banner") is not None
     assert _find_component_by_id(studio_tab, "node-studio-summary-panel") is not None
     assert _find_component_by_id(studio_tab, "edge-studio-summary-panel") is not None
+    assert _find_component_by_id(studio_tab, "node-studio-business-editor") is not None
+    assert _find_component_by_id(studio_tab, "edge-studio-business-editor") is not None
+
+
+def test_studio_primary_canvas_hides_internal_hubs() -> None:
+    with diagnostic_runtime_test_mode():
+        app = build_app("data/decision_platform/maquete_v2")
+
+    studio_tab = _find_tab_by_label(app.layout, "Studio")
+    cytoscape = _find_component_by_id(studio_tab, "node-studio-cytoscape")
+    assert cytoscape is not None
+    elements = getattr(cytoscape, "elements", [])
+    node_ids = {element["data"]["id"] for element in elements if "source" not in element["data"]}
+    edge_pairs = {
+        (element["data"]["source"], element["data"]["target"])
+        for element in elements
+        if "source" in element["data"]
+    }
+    assert "HS" not in node_ids
+    assert "HD" not in node_ids
+    assert ("W", "J1") in edge_pairs
+    assert all("HS" not in pair and "HD" not in pair for pair in edge_pairs)
+
+
+def test_studio_primary_editors_push_technical_fields_into_disclosure() -> None:
+    with diagnostic_runtime_test_mode():
+        app = build_app("data/decision_platform/maquete_v2")
+
+    studio_tab = _find_tab_by_label(app.layout, "Studio")
+    for component_id in [
+        "node-studio-node-id",
+        "node-studio-node-type",
+        "node-studio-allow-inbound",
+        "node-studio-allow-outbound",
+        "edge-studio-link-id",
+        "edge-studio-archetype",
+        "edge-studio-bidirectional",
+    ]:
+        assert _component_id_is_inside_details(studio_tab, component_id) is True
 
 
 def test_decision_tab_contains_advanced_sections_without_extra_primary_tabs() -> None:
@@ -738,6 +778,27 @@ def test_studio_callbacks_round_trip_structural_edits_through_ui_flow() -> None:
         cleanup_scenario_copy(final_output_dir)
         cleanup_scenario_copy(created_output_dir)
         cleanup_scenario_copy(scenario_dir)
+
+
+@pytest.mark.fast
+def test_primary_node_studio_elements_use_business_labels_and_hide_internal_nodes() -> None:
+    bundle = load_scenario_bundle("data/decision_platform/maquete_v2")
+    elements = build_primary_node_studio_elements(
+        bundle.nodes.to_dict("records"),
+        bundle.candidate_links.to_dict("records"),
+    )
+
+    node_ids = {element["data"]["id"] for element in elements if "source" not in element["data"]}
+    water_node = next(element for element in elements if element["data"].get("id") == "W")
+    supply_edge = next(element for element in elements if element["data"].get("id") == "L009")
+
+    assert "HS" not in node_ids
+    assert "HD" not in node_ids
+    assert water_node["data"]["label"] == "Tanque de água"
+    assert ":" not in water_node["data"]["label"]
+    assert supply_edge["data"]["label"] == "Água para barramento inferior"
+    assert supply_edge["data"]["source"] == "W"
+    assert supply_edge["data"]["target"] == "J1"
 
 
 @pytest.mark.fast

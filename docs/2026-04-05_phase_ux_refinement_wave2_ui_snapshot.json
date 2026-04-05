@@ -1,0 +1,81 @@
+{
+  "wave": "ux_phase_1_wave_2",
+  "studio_canvas": {
+    "visible_node_ids": [
+      "W",
+      "P1",
+      "P2",
+      "P3",
+      "P4",
+      "M",
+      "I",
+      "S",
+      "IR",
+      "J1",
+      "J2",
+      "J3",
+      "J4",
+      "U1",
+      "U2",
+      "U3"
+    ],
+    "visible_edge_ids": [
+      "L001",
+      "L002",
+      "L003",
+      "L004",
+      "L005",
+      "L006",
+      "L007",
+      "L008",
+      "L009",
+      "L010",
+      "L011",
+      "L012",
+      "L013",
+      "L014",
+      "L015",
+      "L016",
+      "L017",
+      "L018",
+      "L019",
+      "L020",
+      "L037",
+      "L038"
+    ],
+    "hidden_internal_nodes_confirmed": [
+      "HS",
+      "HD"
+    ],
+    "sample_node_labels": {
+      "W": "Tanque de água",
+      "P1": "Produto 1",
+      "M": "Misturador"
+    },
+    "sample_edge_labels": {
+      "L009": "Água para barramento inferior",
+      "L013": "Barramento inferior 1",
+      "L016": "Bypass superior"
+    }
+  },
+  "studio_surface": {
+    "business_editor_ids": [
+      "node-studio-business-editor",
+      "edge-studio-business-editor"
+    ],
+    "technical_fields_in_details": {
+      "node-studio-node-id": true,
+      "node-studio-node-type": true,
+      "node-studio-allow-inbound": true,
+      "node-studio-allow-outbound": true,
+      "edge-studio-link-id": true,
+      "edge-studio-archetype": true,
+      "edge-studio-bidirectional": true
+    },
+    "details_summaries": [
+      "Campos técnicos do nó",
+      "Campos técnicos da conexão",
+      "Auditoria técnica do Studio"
+    ]
+  }
+}

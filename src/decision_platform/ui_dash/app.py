@@ -207,6 +207,104 @@ def _coerce_truthy(value: Any) -> bool:
     return normalized in {"1", "true", "yes", "y"}
 
 
+NODE_TYPE_LABELS = {
+    "water_tank": "Tanque de água",
+    "product_tank": "Tanque de produto",
+    "mixer_tank": "Misturador",
+    "incorporator_tank": "Incorporador",
+    "external_outlet": "Saída externa",
+    "service_return": "Retorno de serviço",
+    "junction": "Junção operacional",
+}
+EDGE_ARCHETYPE_LABELS = {
+    "tank_tap": "Tomada de tanque",
+    "service_tap": "Tomada de serviço",
+    "supply_tap": "Entrada de água",
+    "outlet_tap": "Saída do circuito",
+    "bus_segment": "Trecho do barramento",
+    "pump_island_segment": "Trecho com ilha de bomba",
+    "upper_bypass_segment": "Trecho do bypass superior",
+    "vertical_link": "Conexão vertical",
+}
+
+
+def _studio_node_business_label(row: dict[str, Any] | None) -> str:
+    if not row:
+        return "-"
+    label = str(row.get("label", "")).strip()
+    node_id = str(row.get("node_id", "")).strip()
+    return label or node_id or "Entidade sem rótulo"
+
+
+def _studio_node_role_label(row: dict[str, Any] | None) -> str:
+    if not row:
+        return "Entidade"
+    return NODE_TYPE_LABELS.get(str(row.get("node_type", "")).strip(), "Entidade do cenário")
+
+
+def _studio_edge_role_label(row: dict[str, Any] | None) -> str:
+    if not row:
+        return "Conexão"
+    return EDGE_ARCHETYPE_LABELS.get(str(row.get("archetype", "")).strip(), "Conexão do cenário")
+
+
+def _is_internal_studio_node(row: dict[str, Any] | None) -> bool:
+    if not row:
+        return False
+    if bool(row.get("is_candidate_hub")):
+        return True
+    labels = " ".join(
+        str(row.get(field, "")).strip().lower()
+        for field in ("node_id", "label", "notes")
+    )
+    return "hub" in labels and str(row.get("node_type", "")).strip() == "junction"
+
+
+def _visible_studio_nodes(nodes_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [dict(row) for row in nodes_rows if not _is_internal_studio_node(row)]
+
+
+def _visible_studio_node_ids(nodes_rows: list[dict[str, Any]]) -> set[str]:
+    return {
+        str(row.get("node_id", "")).strip()
+        for row in _visible_studio_nodes(nodes_rows)
+        if str(row.get("node_id", "")).strip()
+    }
+
+
+def _visible_studio_edges(
+    nodes_rows: list[dict[str, Any]],
+    candidate_links_rows: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    visible_node_ids = _visible_studio_node_ids(nodes_rows)
+    visible_edges: list[dict[str, Any]] = []
+    for row in candidate_links_rows:
+        source = str(row.get("from_node", "")).strip()
+        target = str(row.get("to_node", "")).strip()
+        if source in visible_node_ids and target in visible_node_ids:
+            visible_edges.append(dict(row))
+    return visible_edges
+
+
+def _studio_edge_business_label(
+    row: dict[str, Any] | None,
+    node_lookup: dict[str, dict[str, Any]],
+) -> str:
+    if not row:
+        return "-"
+    notes = str(row.get("notes", "")).strip()
+    if notes:
+        return notes
+    source = _studio_node_business_label(node_lookup.get(str(row.get("from_node", "")).strip()))
+    target = _studio_node_business_label(node_lookup.get(str(row.get("to_node", "")).strip()))
+    if source != "-" and target != "-":
+        return f"{source} -> {target}"
+    family_hint = str(row.get("family_hint", "")).strip()
+    if family_hint:
+        return family_hint.split(",")[0].strip() or "Conexão do cenário"
+    return _studio_edge_role_label(row)
+
+
 def build_studio_readiness_summary(
     nodes_rows: list[dict[str, Any]],
     candidate_links_rows: list[dict[str, Any]],
@@ -254,11 +352,16 @@ def build_studio_readiness_summary(
     )
     if orphan_nodes:
         warnings.append("Nos sem conexao no grafo visivel: " + ", ".join(orphan_nodes[:6]))
+    visible_business_nodes = _visible_studio_nodes(nodes_rows)
+    visible_business_edges = _visible_studio_edges(nodes_rows, candidate_links_rows)
     status = "ready" if not blockers and node_ids and candidate_links_rows and mandatory_routes else "needs_attention"
     return {
         "status": status,
         "node_count": len(node_ids),
         "edge_count": len(candidate_links_rows),
+        "business_node_count": len(visible_business_nodes),
+        "business_edge_count": len(visible_business_edges),
+        "hidden_internal_node_count": max(len(nodes_rows) - len(visible_business_nodes), 0),
         "mandatory_route_count": len(mandatory_routes),
         "measurement_route_count": sum(1 for row in route_rows if _coerce_truthy(row.get("measurement_required"))),
         "blockers": list(dict.fromkeys(blockers)),
@@ -280,8 +383,9 @@ def render_studio_readiness_panel(summary: dict[str, Any]) -> Any:
             html.Div(
                 style=UI_THREE_COLUMN_STYLE,
                 children=[
-                    _metric_card("Nos", summary.get("node_count", 0)),
-                    _metric_card("Arestas", summary.get("edge_count", 0)),
+                    _metric_card("Entidades visíveis", summary.get("business_node_count", 0)),
+                    _metric_card("Conexões visíveis", summary.get("business_edge_count", 0)),
+                    _metric_card("Internos ocultos", summary.get("hidden_internal_node_count", 0), "Hubs e nós técnicos fora do canvas principal."),
                     _metric_card("Rotas obrigatorias", summary.get("mandatory_route_count", 0)),
                 ],
             ),
@@ -298,18 +402,38 @@ def render_studio_readiness_panel(summary: dict[str, Any]) -> Any:
 def render_studio_selection_panel(summary: dict[str, Any], selection_type: str) -> Any:
     key = "selected_node" if selection_type == "node" else "selected_edge"
     selected = summary.get(key) or {}
-    selected_id = summary.get("selected_node_id") if selection_type == "node" else summary.get("selected_link_id")
+    primary_label = str(summary.get("business_label") or "-")
+    role_label = str(summary.get("role_label") or ("Entidade" if selection_type == "node" else "Conexão"))
+    surface_tone = "Interno oculto" if summary.get("is_internal") else "Superfície principal"
     if not selected:
-        return html.Div([html.H4("Selecao ativa"), html.Div(f"Nenhum {selection_type} selecionado.")])
-    preview = []
-    for field_name in ["label", "node_type", "from_node", "to_node", "archetype", "family_hint", "length_m"]:
-        if field_name in selected and selected.get(field_name) not in (None, ""):
-            preview.append(html.Li(f"{field_name}: {selected.get(field_name)}"))
+        return html.Div([html.H4("Seleção ativa"), html.Div(f"Nenhum {selection_type} selecionado.")])
+    preview: list[str]
+    if selection_type == "node":
+        preview = [
+            f"Posição: x={selected.get('x_m')} m, y={selected.get('y_m')} m",
+            str(selected.get("notes", "")).strip(),
+        ]
+    else:
+        from_label = str(summary.get("from_label") or selected.get("from_node") or "-")
+        to_label = str(summary.get("to_label") or selected.get("to_node") or "-")
+        preview = [
+            f"Fluxo principal: {from_label} -> {to_label}",
+            f"Comprimento: {selected.get('length_m')} m" if selected.get("length_m") not in (None, "") else "",
+            f"Famílias: {selected.get('family_hint')}" if selected.get("family_hint") not in (None, "") else "",
+            str(selected.get("notes", "")).strip(),
+        ]
     return html.Div(
         children=[
-            html.H4(f"{selection_type.title()} ativo", style={"margin": 0}),
-            html.Div(str(selected_id), style={"fontSize": "22px", "fontWeight": 700, "marginTop": "6px"}),
-            html.Ul(preview[:5], style={"margin": "10px 0 0 18px", "lineHeight": "1.5"}) if preview else html.Div("Sem detalhes adicionais."),
+            html.H4("Seleção ativa", style={"margin": 0}),
+            html.Div(primary_label, style={"fontSize": "22px", "fontWeight": 700, "marginTop": "6px"}),
+            html.Div(
+                style={"display": "flex", "gap": "8px", "flexWrap": "wrap", "marginTop": "8px"},
+                children=[html.Span(role_label, style=UI_PILL_STYLE), html.Span(surface_tone, style=UI_PILL_STYLE)],
+            ),
+            html.Ul(
+                [html.Li(item) for item in preview if item],
+                style={"margin": "10px 0 0 18px", "lineHeight": "1.5"},
+            ),
         ]
     )
 
@@ -536,12 +660,18 @@ def build_app(
         profile_id=profile_id,
         active_selected_id=initial_state["selected_candidate_id"],
     )
-    initial_node_studio_selected_id = _default_node_studio_selection(authoring_payload["nodes_rows"])
-    initial_node_studio_elements = build_node_studio_elements(
+    initial_node_studio_selected_id = _default_primary_node_studio_selection(
         authoring_payload["nodes_rows"],
         authoring_payload["candidate_links_rows"],
     )
-    initial_edge_studio_selected_id = _default_edge_studio_selection(authoring_payload["candidate_links_rows"])
+    initial_node_studio_elements = build_primary_node_studio_elements(
+        authoring_payload["nodes_rows"],
+        authoring_payload["candidate_links_rows"],
+    )
+    initial_edge_studio_selected_id = _default_primary_edge_studio_selection(
+        authoring_payload["nodes_rows"],
+        authoring_payload["candidate_links_rows"],
+    )
     initial_node_studio_summary = json.dumps(
         _build_node_studio_summary(authoring_payload["nodes_rows"], initial_node_studio_selected_id),
         indent=2,
@@ -549,7 +679,11 @@ def build_app(
     )
     initial_node_studio_form = _node_studio_form_values(authoring_payload["nodes_rows"], initial_node_studio_selected_id)
     initial_edge_studio_summary = json.dumps(
-        _build_edge_studio_summary(authoring_payload["candidate_links_rows"], initial_edge_studio_selected_id),
+        _build_edge_studio_summary(
+            authoring_payload["nodes_rows"],
+            authoring_payload["candidate_links_rows"],
+            initial_edge_studio_selected_id,
+        ),
         indent=2,
         ensure_ascii=False,
     )
@@ -630,7 +764,7 @@ def build_app(
                         children=[
                             _section_intro(
                                 "Studio",
-                                "O canvas segue como superfície principal. Readiness, seleção ativa e mensagens críticas aparecem acima; JSON cru ficou em auditoria secundária.",
+                                "O Studio principal agora mostra apenas o grafo de negócio editável. Hubs internos e contratos crus continuam preservados, mas saem da superfície principal e aparecem apenas em campos avançados ou na Auditoria.",
                             ),
                             html.Div(
                                 style=UI_TWO_COLUMN_STYLE,
@@ -650,6 +784,10 @@ def build_app(
                                 style=UI_CARD_STYLE,
                                 children=[
                                     html.H3("Grafo de negócio", style={"marginTop": 0}),
+                                    html.P(
+                                        "A superfície principal mostra apenas entidades e conexões operacionais. Hubs internos e nós derivados permanecem fora do canvas principal.",
+                                        style={"marginTop": 0, "lineHeight": "1.6"},
+                                    ),
                                     cyto.Cytoscape(
                                         id="node-studio-cytoscape",
                                         elements=initial_node_studio_elements,
@@ -666,21 +804,22 @@ def build_app(
                                 style=UI_TWO_COLUMN_STYLE,
                                 children=[
                                     html.Div(
+                                        id="node-studio-business-editor",
                                         style=UI_CARD_STYLE,
                                         children=[
-                                            html.H3("Nó selecionado", style={"marginTop": 0}),
-                                            _field_block("Node ID", dcc.Input(id="node-studio-node-id", type="text", value=initial_node_studio_form["node_id"], persistence=True, persistence_type="session", style={"width": "100%"})),
-                                            _field_block("Rótulo", dcc.Input(id="node-studio-label", type="text", value=initial_node_studio_form["label"], persistence=True, persistence_type="session", style={"width": "100%"})),
-                                            _field_block("Tipo", dcc.Input(id="node-studio-node-type", type="text", value=initial_node_studio_form["node_type"], persistence=True, persistence_type="session", style={"width": "100%"})),
+                                            html.H3("Entidade do cenário", style={"marginTop": 0}),
+                                            html.P(
+                                                "Edite o nome exibido e a posição da entidade no grafo principal. IDs, tipo técnico e flags ficam em campos avançados.",
+                                                style={"marginTop": 0, "lineHeight": "1.6"},
+                                            ),
+                                            _field_block("Rótulo visível", dcc.Input(id="node-studio-label", type="text", value=initial_node_studio_form["label"], persistence=True, persistence_type="session", style={"width": "100%"})),
                                             html.Div(
                                                 style=UI_TWO_COLUMN_STYLE,
                                                 children=[
-                                                    _field_block("X (m)", dcc.Input(id="node-studio-x-m", type="number", value=initial_node_studio_form["x_m"], persistence=True, persistence_type="session", style={"width": "100%"})),
-                                                    _field_block("Y (m)", dcc.Input(id="node-studio-y-m", type="number", value=initial_node_studio_form["y_m"], persistence=True, persistence_type="session", style={"width": "100%"})),
+                                                    _field_block("Posição X (m)", dcc.Input(id="node-studio-x-m", type="number", value=initial_node_studio_form["x_m"], persistence=True, persistence_type="session", style={"width": "100%"})),
+                                                    _field_block("Posição Y (m)", dcc.Input(id="node-studio-y-m", type="number", value=initial_node_studio_form["y_m"], persistence=True, persistence_type="session", style={"width": "100%"})),
                                                 ],
                                             ),
-                                            _field_block("Permitir entrada", dcc.Checklist(id="node-studio-allow-inbound", options=[{"label": "allow_inbound", "value": "allow_inbound"}], value=initial_node_studio_form["allow_inbound"], persistence=True, persistence_type="session")),
-                                            _field_block("Permitir saída", dcc.Checklist(id="node-studio-allow-outbound", options=[{"label": "allow_outbound", "value": "allow_outbound"}], value=initial_node_studio_form["allow_outbound"], persistence=True, persistence_type="session")),
                                             html.Div(style=UI_ACTION_ROW_STYLE, children=[html.Button("Aplicar propriedades do nó", id="node-studio-apply-button", style=UI_BUTTON_STYLE), html.Button("Criar nó", id="node-studio-create-button", style=UI_BUTTON_STYLE), html.Button("Duplicar nó", id="node-studio-duplicate-button", style=UI_BUTTON_STYLE), html.Button("Excluir nó selecionado", id="node-studio-delete-button", style=UI_BUTTON_STYLE)]),
                                             html.Div(
                                                 style=UI_TWO_COLUMN_STYLE,
@@ -690,20 +829,41 @@ def build_app(
                                                 ],
                                             ),
                                             html.Button("Mover nó", id="node-studio-move-button", style=UI_BUTTON_STYLE),
+                                            html.Details(
+                                                style={**UI_MUTED_CARD_STYLE, "marginTop": "12px"},
+                                                children=[
+                                                    html.Summary("Campos técnicos do nó"),
+                                                    _field_block("Node ID contratual", dcc.Input(id="node-studio-node-id", type="text", value=initial_node_studio_form["node_id"], persistence=True, persistence_type="session", style={"width": "100%"})),
+                                                    _field_block("Tipo técnico", dcc.Input(id="node-studio-node-type", type="text", value=initial_node_studio_form["node_type"], persistence=True, persistence_type="session", style={"width": "100%"})),
+                                                    _field_block("Permitir entrada", dcc.Checklist(id="node-studio-allow-inbound", options=[{"label": "allow_inbound", "value": "allow_inbound"}], value=initial_node_studio_form["allow_inbound"], persistence=True, persistence_type="session")),
+                                                    _field_block("Permitir saída", dcc.Checklist(id="node-studio-allow-outbound", options=[{"label": "allow_outbound", "value": "allow_outbound"}], value=initial_node_studio_form["allow_outbound"], persistence=True, persistence_type="session")),
+                                                ],
+                                            ),
                                         ],
                                     ),
                                     html.Div(
+                                        id="edge-studio-business-editor",
                                         style=UI_CARD_STYLE,
                                         children=[
-                                            html.H3("Aresta selecionada", style={"marginTop": 0}),
-                                            _field_block("Link ID", dcc.Input(id="edge-studio-link-id", type="text", value=initial_edge_studio_form["link_id"], persistence=True, persistence_type="session", style={"width": "100%"})),
-                                            _field_block("Origem", dcc.Input(id="edge-studio-from-node", type="text", value=initial_edge_studio_form["from_node"], persistence=True, persistence_type="session", style={"width": "100%"})),
-                                            _field_block("Destino", dcc.Input(id="edge-studio-to-node", type="text", value=initial_edge_studio_form["to_node"], persistence=True, persistence_type="session", style={"width": "100%"})),
-                                            _field_block("Archetype", dcc.Input(id="edge-studio-archetype", type="text", value=initial_edge_studio_form["archetype"], persistence=True, persistence_type="session", style={"width": "100%"})),
+                                            html.H3("Conexão do cenário", style={"marginTop": 0}),
+                                            html.P(
+                                                "Mantenha a edição principal focada no fluxo entre entidades de negócio. IDs e archetype ficam em campos avançados.",
+                                                style={"marginTop": 0, "lineHeight": "1.6"},
+                                            ),
+                                            _field_block("Origem do fluxo", dcc.Input(id="edge-studio-from-node", type="text", value=initial_edge_studio_form["from_node"], persistence=True, persistence_type="session", style={"width": "100%"})),
+                                            _field_block("Destino do fluxo", dcc.Input(id="edge-studio-to-node", type="text", value=initial_edge_studio_form["to_node"], persistence=True, persistence_type="session", style={"width": "100%"})),
                                             _field_block("Comprimento (m)", dcc.Input(id="edge-studio-length-m", type="number", value=initial_edge_studio_form["length_m"], persistence=True, persistence_type="session", style={"width": "100%"})),
-                                            _field_block("Bidirecional", dcc.Checklist(id="edge-studio-bidirectional", options=[{"label": "bidirectional", "value": "bidirectional"}], value=initial_edge_studio_form["bidirectional"], persistence=True, persistence_type="session")),
                                             _field_block("Famílias sugeridas", dcc.Input(id="edge-studio-family-hint", type="text", value=initial_edge_studio_form["family_hint"], persistence=True, persistence_type="session", style={"width": "100%"})),
                                             html.Div(style=UI_ACTION_ROW_STYLE, children=[html.Button("Aplicar propriedades da aresta", id="edge-studio-apply-button", style=UI_BUTTON_STYLE), html.Button("Criar aresta", id="edge-studio-create-button", style=UI_BUTTON_STYLE), html.Button("Excluir aresta selecionada", id="edge-studio-delete-button", style=UI_BUTTON_STYLE)]),
+                                            html.Details(
+                                                style={**UI_MUTED_CARD_STYLE, "marginTop": "12px"},
+                                                children=[
+                                                    html.Summary("Campos técnicos da conexão"),
+                                                    _field_block("Link ID contratual", dcc.Input(id="edge-studio-link-id", type="text", value=initial_edge_studio_form["link_id"], persistence=True, persistence_type="session", style={"width": "100%"})),
+                                                    _field_block("Archetype técnico", dcc.Input(id="edge-studio-archetype", type="text", value=initial_edge_studio_form["archetype"], persistence=True, persistence_type="session", style={"width": "100%"})),
+                                                    _field_block("Bidirecional", dcc.Checklist(id="edge-studio-bidirectional", options=[{"label": "bidirectional", "value": "bidirectional"}], value=initial_edge_studio_form["bidirectional"], persistence=True, persistence_type="session")),
+                                                ],
+                                            ),
                                         ],
                                     ),
                                 ],
@@ -1160,13 +1320,25 @@ def build_app(
     ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], str, str, str]:
         normalized_nodes = nodes_rows or []
         normalized_links = candidate_links_rows or []
-        selected_id = _default_node_studio_selection(normalized_nodes, preferred_node_id=selected_node_id)
-        selected_link_id = _default_edge_studio_selection(normalized_links, preferred_link_id=selected_edge_id)
+        selected_id = _default_primary_node_studio_selection(
+            normalized_nodes,
+            normalized_links,
+            preferred_node_id=selected_node_id,
+        )
+        selected_link_id = _default_primary_edge_studio_selection(
+            normalized_nodes,
+            normalized_links,
+            preferred_link_id=selected_edge_id,
+        )
         return (
-            build_node_studio_elements(normalized_nodes, normalized_links),
+            build_primary_node_studio_elements(normalized_nodes, normalized_links),
             _build_node_studio_stylesheet(selected_id, selected_link_id),
             json.dumps(_build_node_studio_summary(normalized_nodes, selected_id), indent=2, ensure_ascii=False),
-            json.dumps(_build_edge_studio_summary(normalized_links, selected_link_id), indent=2, ensure_ascii=False),
+            json.dumps(
+                _build_edge_studio_summary(normalized_nodes, normalized_links, selected_link_id),
+                indent=2,
+                ensure_ascii=False,
+            ),
             str(studio_status_message or ""),
         )
 
@@ -3086,6 +3258,60 @@ def build_node_studio_elements(
     return elements
 
 
+def build_primary_node_studio_elements(
+    nodes_rows: list[dict[str, Any]],
+    candidate_links_rows: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    visible_nodes = _visible_studio_nodes(nodes_rows)
+    node_lookup = {
+        str(row.get("node_id", "")).strip(): dict(row)
+        for row in visible_nodes
+        if str(row.get("node_id", "")).strip()
+    }
+    visible_edges = _visible_studio_edges(nodes_rows, candidate_links_rows)
+    elements: list[dict[str, Any]] = []
+    for row in visible_nodes:
+        node_id = str(row.get("node_id", "")).strip()
+        if not node_id:
+            continue
+        elements.append(
+            {
+                "data": {
+                    "id": node_id,
+                    "node_id": node_id,
+                    "label": _studio_node_business_label(row),
+                    "business_role": _studio_node_role_label(row),
+                },
+                "position": _node_studio_position(row),
+                "classes": _node_studio_classes(row),
+            }
+        )
+    for row in visible_edges:
+        source = str(row.get("from_node", "")).strip()
+        target = str(row.get("to_node", "")).strip()
+        link_id = str(row.get("link_id", "")).strip()
+        if not source or not target or not link_id:
+            continue
+        elements.append(
+            {
+                "data": {
+                    "id": link_id,
+                    "link_id": link_id,
+                    "source": source,
+                    "target": target,
+                    "label": _studio_edge_business_label(row, node_lookup),
+                    "from_node": source,
+                    "to_node": target,
+                    "length_m": _coerce_edge_length(row.get("length_m"), 0.0),
+                    "bidirectional": bool(row.get("bidirectional")),
+                    "family_hint": str(row.get("family_hint", "")).strip(),
+                    "notes": str(row.get("notes", "")).strip(),
+                }
+            }
+        )
+    return elements
+
+
 def _normalize_scenario_dir(path: str | Path) -> Path:
     return Path(path).expanduser().resolve(strict=False)
 
@@ -3134,6 +3360,23 @@ def _default_node_studio_selection(
     return None
 
 
+def _default_primary_node_studio_selection(
+    nodes_rows: list[dict[str, Any]],
+    candidate_links_rows: list[dict[str, Any]],
+    *,
+    preferred_node_id: str | None = None,
+) -> str | None:
+    visible_node_ids = _visible_studio_node_ids(nodes_rows)
+    preferred = str(preferred_node_id or "").strip()
+    if preferred and preferred in visible_node_ids:
+        return preferred
+    for row in _visible_studio_nodes(nodes_rows):
+        node_id = str(row.get("node_id", "")).strip()
+        if node_id:
+            return node_id
+    return _default_node_studio_selection(nodes_rows, preferred_node_id=preferred_node_id)
+
+
 def _default_edge_studio_selection(
     candidate_links_rows: list[dict[str, Any]],
     *,
@@ -3147,6 +3390,27 @@ def _default_edge_studio_selection(
         if link_id:
             return link_id
     return None
+
+
+def _default_primary_edge_studio_selection(
+    nodes_rows: list[dict[str, Any]],
+    candidate_links_rows: list[dict[str, Any]],
+    *,
+    preferred_link_id: str | None = None,
+) -> str | None:
+    visible_link_ids = {
+        str(row.get("link_id", "")).strip()
+        for row in _visible_studio_edges(nodes_rows, candidate_links_rows)
+        if str(row.get("link_id", "")).strip()
+    }
+    preferred = str(preferred_link_id or "").strip()
+    if preferred and preferred in visible_link_ids:
+        return preferred
+    for row in _visible_studio_edges(nodes_rows, candidate_links_rows):
+        link_id = str(row.get("link_id", "")).strip()
+        if link_id:
+            return link_id
+    return _default_edge_studio_selection(candidate_links_rows, preferred_link_id=preferred_link_id)
 
 
 def _node_studio_form_values(nodes_rows: list[dict[str, Any]], selected_node_id: str | None) -> dict[str, Any]:
@@ -3214,12 +3478,18 @@ def _build_node_studio_summary(nodes_rows: list[dict[str, Any]], selected_node_i
     )
     return {
         "node_count": len(nodes_rows),
+        "business_node_count": len(_visible_studio_nodes(nodes_rows)),
+        "hidden_internal_node_count": max(len(nodes_rows) - len(_visible_studio_nodes(nodes_rows)), 0),
         "selected_node_id": selected_id,
         "selected_node": selected_row,
+        "business_label": _studio_node_business_label(selected_row),
+        "role_label": _studio_node_role_label(selected_row),
+        "is_internal": _is_internal_studio_node(selected_row),
     }
 
 
 def _build_edge_studio_summary(
+    nodes_rows: list[dict[str, Any]],
     candidate_links_rows: list[dict[str, Any]],
     selected_link_id: str | None,
 ) -> dict[str, Any]:
@@ -3228,10 +3498,25 @@ def _build_edge_studio_summary(
         (dict(item) for item in candidate_links_rows if str(item.get("link_id", "")).strip() == selected_id),
         None,
     )
+    node_lookup = {
+        str(row.get("node_id", "")).strip(): dict(row)
+        for row in nodes_rows
+        if str(row.get("node_id", "")).strip()
+    }
     return {
         "edge_count": len(candidate_links_rows),
+        "business_edge_count": len(_visible_studio_edges(nodes_rows, candidate_links_rows)),
         "selected_link_id": selected_id,
         "selected_edge": selected_row,
+        "business_label": _studio_edge_business_label(selected_row, node_lookup),
+        "role_label": _studio_edge_role_label(selected_row),
+        "from_label": _studio_node_business_label(node_lookup.get(str((selected_row or {}).get("from_node", "")).strip())),
+        "to_label": _studio_node_business_label(node_lookup.get(str((selected_row or {}).get("to_node", "")).strip())),
+        "is_internal": any(
+            _is_internal_studio_node(node_lookup.get(node_id))
+            for node_id in [str((selected_row or {}).get("from_node", "")).strip(), str((selected_row or {}).get("to_node", "")).strip()]
+            if node_id
+        ),
     }
 
 
