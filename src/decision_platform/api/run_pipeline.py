@@ -50,6 +50,7 @@ RUN_JOB_TELEMETRY_FIELDS = (
     "failure_reason",
     "failure_stacktrace_excerpt",
 )
+QUEUE_SUMMARY_REFRESH_PATH = "canonical_persist_run_job"
 
 
 def run_decision_pipeline(
@@ -175,10 +176,12 @@ def create_run_job(
         "queue_summary": None,
         **initial_telemetry,
     }
-    _write_json(job_path, job)
-    _append_run_event(job, status="queued", message="Run job queued.")
-    _append_run_log(job, "queued: run job queued and awaiting serial worker.")
-    return _refresh_persisted_run_job_summary(_read_run_job(job_path))
+    return _persist_run_job(
+        job,
+        event_status="queued",
+        event_message="Run job queued.",
+        log_message="queued: run job queued and awaiting serial worker.",
+    )
 
 
 def load_run_job(run_id: str, *, queue_root: str | Path = DEFAULT_RUN_QUEUE_ROOT) -> dict[str, Any]:
@@ -520,11 +523,12 @@ def _transition_run_job(
         updated_job["started_at"] = updated_job["updated_at"]
     if status in TERMINAL_RUN_JOB_STATUSES and updated_job.get("finished_at") is None:
         updated_job["finished_at"] = updated_job["updated_at"]
-    updated_job = _normalize_run_job(updated_job)
-    _write_json(Path(updated_job["job_path"]), updated_job)
-    _append_run_event(updated_job, status=status, message=message)
-    _append_run_log(updated_job, f"{status}: {message}")
-    return _refresh_persisted_run_job_summary(updated_job)
+    return _persist_run_job(
+        updated_job,
+        event_status=status,
+        event_message=message,
+        log_message=f"{status}: {message}",
+    )
 
 
 def _build_run_artifact_manifest(artifacts_dir: Path) -> dict[str, Any]:
@@ -1003,6 +1007,7 @@ def _build_run_job_lineage_summary(job: dict[str, Any]) -> dict[str, Any]:
 def _build_persisted_run_job_queue_summary(job: dict[str, Any]) -> dict[str, Any]:
     return {
         "source": "persisted_queue_summary",
+        "refresh_path": QUEUE_SUMMARY_REFRESH_PATH,
         "status": job.get("status"),
         "updated_at": job.get("updated_at"),
         "lineage": _build_run_job_lineage_summary(job),
@@ -1015,6 +1020,22 @@ def _refresh_persisted_run_job_summary(job: dict[str, Any]) -> dict[str, Any]:
     refreshed_job["queue_summary"] = _build_persisted_run_job_queue_summary(refreshed_job)
     _write_json(Path(refreshed_job["job_path"]), refreshed_job)
     return refreshed_job
+
+
+def _persist_run_job(
+    job: dict[str, Any],
+    *,
+    event_status: str | None = None,
+    event_message: str | None = None,
+    log_message: str | None = None,
+) -> dict[str, Any]:
+    persisted_job = _normalize_run_job(dict(job))
+    _write_json(Path(persisted_job["job_path"]), persisted_job)
+    if event_status is not None and event_message is not None:
+        _append_run_event(persisted_job, status=event_status, message=event_message)
+    if log_message is not None:
+        _append_run_log(persisted_job, log_message)
+    return _refresh_persisted_run_job_summary(persisted_job)
 
 
 def _build_run_job_evidence_summary(job: dict[str, Any]) -> dict[str, Any]:

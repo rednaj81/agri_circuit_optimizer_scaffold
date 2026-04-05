@@ -89,6 +89,7 @@ def _assert_persisted_queue_summary(
     queue_summary = job.get("queue_summary")
     assert isinstance(queue_summary, dict)
     assert queue_summary["source"] == "persisted_queue_summary"
+    assert queue_summary["refresh_path"] == "canonical_persist_run_job"
     assert queue_summary["status"] == expected_status
     assert queue_summary["lineage"]["source_run_id"] == source_run_id
     assert queue_summary["evidence_summary"]["final_status_recorded"] is True
@@ -476,6 +477,7 @@ def test_phase3_queue_acceptance_reopens_persisted_run_state_for_inspection() ->
         assert reopened_snapshot["selected_run_summary"]["evidence_summary"] == persisted_canceled_job["queue_summary"]["evidence_summary"]
         assert reopened_snapshot["selected_run_detail"]["status"] == "canceled"
         assert reopened_snapshot["selected_run_detail"]["queue_summary"] == persisted_canceled_job["queue_summary"]
+        assert reopened_snapshot["selected_run_detail"]["queue_summary"]["refresh_path"] == "canonical_persist_run_job"
         assert reopened_snapshot["selected_run_detail"]["rerun_of_run_id"] == completed_candidate["run_id"]
         assert reopened_snapshot["selected_run_detail"]["source_bundle_reference_path"] == canceled_job["source_bundle_reference_path"]
         assert reopened_snapshot["selected_run_detail"]["source_bundle_reference"]["rerun_source"]["source_run_id"] == completed_candidate["run_id"]

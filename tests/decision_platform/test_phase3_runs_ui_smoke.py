@@ -69,6 +69,7 @@ def test_runs_tab_reopens_persisted_operational_telemetry() -> None:
         assert detail_payload["selected_run_id"] == rerun_job["run_id"]
         assert detail_payload["rerun_of_run_id"] == created_job["run_id"]
         assert detail_payload["queue_summary"]["source"] == "persisted_queue_summary"
+        assert detail_payload["queue_summary"]["refresh_path"] == "canonical_persist_run_job"
         assert detail_payload["queue_summary"]["lineage"] == rerun_summary["lineage"]
         assert detail_payload["queue_summary"]["evidence_summary"] == rerun_summary["evidence_summary"]
         assert detail_payload["engine_requested"] == "watermodels_jl"
