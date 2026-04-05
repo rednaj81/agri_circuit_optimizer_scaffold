@@ -303,9 +303,14 @@ def test_phase3_queue_acceptance_can_rerun_terminal_runs_with_new_run_id(monkeyp
             completed_job = run_next_queued_job(queue_root=diagnostic_queue_root)
             completed_rerun_job = rerun_run_job(diagnostic_job["run_id"], queue_root=diagnostic_queue_root)
             completed_rerun_result = run_next_queued_job(queue_root=diagnostic_queue_root)
+            canceled_rerun_source = rerun_run_job(completed_rerun_job["run_id"], queue_root=diagnostic_queue_root)
+            canceled_rerun_source = cancel_run_job(canceled_rerun_source["run_id"], queue_root=diagnostic_queue_root)
+            canceled_rerun_job = rerun_run_job(canceled_rerun_source["run_id"], queue_root=diagnostic_queue_root)
+            canceled_rerun_result = run_next_queued_job(queue_root=diagnostic_queue_root)
 
         failed_rerun_inspection = inspect_run_job(failed_rerun_job["run_id"], queue_root=official_queue_root)
         completed_rerun_inspection = inspect_run_job(completed_rerun_job["run_id"], queue_root=diagnostic_queue_root)
+        canceled_rerun_inspection = inspect_run_job(canceled_rerun_job["run_id"], queue_root=diagnostic_queue_root)
 
         assert failed_job is not None
         assert failed_job["status"] == "failed"
@@ -335,6 +340,20 @@ def test_phase3_queue_acceptance_can_rerun_terminal_runs_with_new_run_id(monkeyp
         _assert_run_detail_has_telemetry(completed_rerun_inspection)
         assert completed_rerun_inspection["engine_used"] == "python_emulated_julia"
         assert completed_rerun_inspection["failure_reason"] is None
+
+        assert canceled_rerun_source["status"] == "canceled"
+        assert canceled_rerun_job["run_id"] != canceled_rerun_source["run_id"]
+        assert canceled_rerun_job["rerun_of_run_id"] == canceled_rerun_source["run_id"]
+        assert canceled_rerun_job["rerun_source"]["source_status"] == "canceled"
+        assert canceled_rerun_result is not None
+        assert canceled_rerun_result["status"] == "completed"
+        assert canceled_rerun_result["execution_mode"] == "diagnostic"
+        assert canceled_rerun_inspection["source_bundle_reference"]["run_id"] == canceled_rerun_job["run_id"]
+        assert canceled_rerun_inspection["source_bundle_reference"]["rerun_source"]["source_run_id"] == canceled_rerun_source["run_id"]
+        assert canceled_rerun_inspection["source_bundle_reference"]["scenario_provenance"]["bundle_manifest"]
+        _assert_run_detail_has_telemetry(canceled_rerun_inspection)
+        assert canceled_rerun_inspection["engine_used"] == "python_emulated_julia"
+        assert canceled_rerun_inspection["failure_reason"] is None
     finally:
         cleanup_scenario_copy(diagnostic_queue_root)
         cleanup_scenario_copy(official_queue_root)
@@ -379,6 +398,8 @@ def test_phase3_queue_acceptance_reopens_persisted_run_state_for_inspection() ->
         assert reopened_snapshot["selected_run_id"] == canceled_job["run_id"]
         assert reopened_snapshot["selected_run_detail"]["status"] == "canceled"
         assert reopened_snapshot["selected_run_detail"]["rerun_of_run_id"] == completed_candidate["run_id"]
+        assert reopened_snapshot["selected_run_detail"]["source_bundle_reference_path"] == canceled_job["source_bundle_reference_path"]
+        assert reopened_snapshot["selected_run_detail"]["source_bundle_reference"]["rerun_source"]["source_run_id"] == completed_candidate["run_id"]
         _assert_run_detail_has_telemetry(reopened_snapshot["selected_run_detail"])
         assert reopened_snapshot["summary"]["queue_state"] == "idle"
         assert reopened_snapshot["summary"]["queued_run_ids"] == []
@@ -393,6 +414,9 @@ def test_phase3_queue_acceptance_reopens_persisted_run_state_for_inspection() ->
         assert canceled_detail["status"] == "canceled"
         assert canceled_detail["events"][-1]["status"] == "canceled"
         assert canceled_detail["artifacts"]["summary_json"] is None
+        assert canceled_detail["source_bundle_reference_path"] == canceled_job["source_bundle_reference_path"]
+        assert canceled_detail["source_bundle_reference"]["rerun_source"]["source_run_id"] == completed_candidate["run_id"]
+        assert canceled_detail["inspection"]["source_bundle_reference_path"] == canceled_job["source_bundle_reference_path"]
         _assert_run_detail_has_telemetry(canceled_detail)
         assert "run-queue-root" in layout_repr
         assert queue_root_store.data == queue_root_str
@@ -476,16 +500,30 @@ def test_phase3_queue_acceptance_app_can_cancel_and_rerun_via_callbacks() -> Non
         _assert_run_detail_has_telemetry(canceled_detail)
         assert "-> canceled" in canceled_result[4]
 
+        rerun_canceled_result = rerun_callback(1, canceled_result[2], str(queue_root.resolve()))
+        rerun_canceled_summary = json.loads(rerun_canceled_result[0])
+        rerun_canceled_detail = json.loads(rerun_canceled_result[3])
+
+        assert rerun_canceled_summary["status_counts"]["queued"] == 1
+        assert rerun_canceled_summary["status_counts"]["canceled"] == 1
+        assert rerun_canceled_detail["status"] == "queued"
+        assert rerun_canceled_detail["rerun_of_run_id"] == canceled_result[2]
+        assert rerun_canceled_detail["source_bundle_reference"]["rerun_source"]["source_status"] == "canceled"
+        _assert_run_detail_has_telemetry(rerun_canceled_detail)
+        assert "re-run de" in rerun_canceled_result[4]
+
         second_enqueue = enqueue_callback(2, str(Path(scenario_dir).resolve()), str(queue_root.resolve()))
         with diagnostic_runtime_test_mode():
-            completed_result = run_next_callback(1, second_enqueue[2], str(queue_root.resolve()))
+            completed_rerun_from_canceled = run_next_callback(1, rerun_canceled_result[2], str(queue_root.resolve()))
+            completed_result = run_next_callback(2, second_enqueue[2], str(queue_root.resolve()))
         rerun_result = rerun_callback(1, completed_result[2], str(queue_root.resolve()))
         rerun_summary = json.loads(rerun_result[0])
         rerun_detail = json.loads(rerun_result[3])
 
         assert rerun_summary["status_counts"]["queued"] == 1
-        assert rerun_summary["status_counts"]["completed"] == 1
+        assert rerun_summary["status_counts"]["completed"] == 2
         assert rerun_summary["status_counts"]["canceled"] == 1
+        assert json.loads(completed_rerun_from_canceled[3])["rerun_of_run_id"] == canceled_result[2]
         assert rerun_detail["status"] == "queued"
         assert rerun_detail["rerun_of_run_id"] == completed_result[2]
         assert rerun_detail["rerun_source"]["source_run_id"] == completed_result[2]

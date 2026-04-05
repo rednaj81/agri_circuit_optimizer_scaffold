@@ -63,8 +63,12 @@ def test_runs_tab_reopens_persisted_operational_telemetry() -> None:
         assert detail_payload["execution_mode"] == "diagnostic"
         assert detail_payload["policy_mode"] == "diagnostic_override_probe_disabled"
         assert detail_payload["failure_reason"] is None
+        assert detail_payload["source_bundle_reference_path"] == created_job["source_bundle_reference_path"]
+        assert detail_payload["source_bundle_reference"]["run_id"] == created_job["run_id"]
+        assert detail_payload["source_bundle_reference"]["scenario_provenance"]["bundle_manifest"]
         assert detail_payload["telemetry"]["duration_s"] == detail_payload["duration_s"]
         assert detail_payload["inspection"]["queue_root"] == str(queue_root.resolve())
+        assert detail_payload["inspection"]["source_bundle_reference_path"] == created_job["source_bundle_reference_path"]
     finally:
         cleanup_scenario_copy(queue_root)
         cleanup_scenario_copy(scenario_dir)

@@ -2765,6 +2765,8 @@ def build_run_job_detail_summary(
         "run_dir": job.get("run_dir"),
         "events_path": job.get("events_path"),
         "log_path": job.get("log_path"),
+        "source_bundle_reference_path": job.get("source_bundle_reference_path"),
+        "source_bundle_reference": job.get("source_bundle_reference"),
         "source_bundle_root": job.get("source_bundle_root"),
         "source_bundle_version": job.get("source_bundle_version"),
         "source_bundle_manifest": job.get("source_bundle_manifest"),
@@ -2791,6 +2793,7 @@ def build_run_job_detail_summary(
             "run_dir": job.get("run_dir"),
             "events_path": job.get("events_path"),
             "log_path": job.get("log_path"),
+            "source_bundle_reference_path": job.get("source_bundle_reference_path"),
             "result_summary_path": job.get("result_summary_path"),
         },
     }

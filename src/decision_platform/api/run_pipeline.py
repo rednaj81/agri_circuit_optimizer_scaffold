@@ -261,9 +261,9 @@ def cancel_run_job(run_id: str, *, queue_root: str | Path = DEFAULT_RUN_QUEUE_RO
 
 def rerun_run_job(run_id: str, *, queue_root: str | Path = DEFAULT_RUN_QUEUE_ROOT) -> dict[str, Any]:
     source_job = load_run_job(run_id, queue_root=queue_root)
-    if source_job["status"] not in {"completed", "failed"}:
+    if source_job["status"] not in TERMINAL_RUN_JOB_STATUSES:
         raise RuntimeError(
-            "Only completed or failed run_job entries can be re-run explicitly in the serial phase_3 worker."
+            "Only terminal run_job entries can be re-run explicitly in the serial phase_3 worker."
         )
     rerun_source = _build_rerun_source(source_job)
     return create_run_job(
@@ -554,11 +554,13 @@ def _build_run_job_detail(job: dict[str, Any]) -> dict[str, Any]:
     log_path = Path(job["log_path"])
     artifacts_dir = Path(job["artifacts_dir"])
     normalized_job = _normalize_run_job(job)
+    source_bundle_reference_path = Path(normalized_job["source_bundle_reference_path"])
     return {
         **normalized_job,
         "events": _read_run_events(events_path),
         "log_tail": _read_log_tail(log_path),
         "artifacts": normalized_job.get("artifacts") or _build_run_artifact_manifest(artifacts_dir),
+        "source_bundle_reference": _read_json_if_exists(source_bundle_reference_path),
     }
 
 

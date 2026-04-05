@@ -14,6 +14,7 @@ Executar cenários em background, com isolamento e acompanhamento.
 - logs por run
 - artefatos por run
 - cancelamento e re-run
+- re-run explícito deve aceitar qualquer run terminal (`completed`, `failed`, `canceled`) com novo `run_id` e vínculo rastreável com a execução de origem
 
 ## Estados de run
 - queued
