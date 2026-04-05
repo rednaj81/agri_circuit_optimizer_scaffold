@@ -10,12 +10,15 @@ from decision_platform.api.run_pipeline import OfficialRuntimeConfigError
 from decision_platform.data_io.loader import load_scenario_bundle
 from decision_platform.ui_dash._compat import DASH_AVAILABLE
 from decision_platform.ui_dash.app import (
+    apply_node_studio_edit,
     build_app,
+    build_node_studio_elements,
     build_candidate_detail,
     build_comparison_records,
     build_official_candidate_summary,
     build_catalog_view_state,
     filter_catalog_records,
+    move_node_studio_selection,
     rerank_catalog,
     save_and_reopen_local_bundle,
 )
@@ -53,6 +56,7 @@ def test_dash_app_builds_layout_and_callbacks_even_when_fail_closed() -> None:
     assert callback_count >= 4
 
 
+@pytest.mark.skipif(not DASH_AVAILABLE, reason="Dash stack not installed in local validation environment.")
 def test_real_dash_stack_is_available() -> None:
     assert DASH_AVAILABLE is True
 
@@ -62,6 +66,9 @@ def test_dash_app_exposes_authoring_save_reopen_controls() -> None:
         app = build_app("data/decision_platform/maquete_v2")
 
     layout_repr = repr(app.layout)
+    assert "node-studio-cytoscape" in layout_repr
+    assert "node-studio-apply-button" in layout_repr
+    assert "node-studio-move-button" in layout_repr
     assert "save-reopen-bundle-button" in layout_repr
     assert "candidate-links-grid" in layout_repr
     assert "edge-component-rules-grid" in layout_repr
@@ -257,6 +264,94 @@ def test_ui_rebuilds_from_saved_bundle_after_source_cleanup() -> None:
     finally:
         if scenario_dir is not None and Path(scenario_dir).exists():
             cleanup_scenario_copy(scenario_dir)
+
+
+@pytest.mark.fast
+def test_node_studio_helpers_update_layout_and_properties() -> None:
+    bundle = load_scenario_bundle("data/decision_platform/maquete_v2")
+    nodes_rows = bundle.nodes.to_dict("records")
+    moved_rows, selected_id = move_node_studio_selection(
+        nodes_rows,
+        selected_node_id="W",
+        direction="right",
+        step=0.05,
+    )
+    edited_rows, edited_selected_id = apply_node_studio_edit(
+        moved_rows,
+        selected_node_id=selected_id,
+        node_id="W_STUDIO",
+        label="Tanque movido",
+        node_type="water_tank",
+        x_m=0.12,
+        y_m=0.33,
+        allow_inbound=False,
+        allow_outbound=True,
+    )
+    elements = build_node_studio_elements(edited_rows, bundle.candidate_links.to_dict("records"))
+
+    selected_row = next(row for row in edited_rows if row["node_id"] == "W_STUDIO")
+    selected_node = next(element for element in elements if element["data"].get("id") == "W_STUDIO")
+    assert edited_selected_id == "W_STUDIO"
+    assert selected_row["label"] == "Tanque movido"
+    assert float(selected_row["x_m"]) == 0.12
+    assert float(selected_row["y_m"]) == 0.33
+    assert bool(selected_row["allow_inbound"]) is False
+    assert bool(selected_row["allow_outbound"]) is True
+    assert selected_node["position"]["x"] == 120.0
+    assert selected_node["position"]["y"] == 198.0
+
+
+@pytest.mark.slow
+def test_node_studio_round_trip_persists_visual_node_edits() -> None:
+    scenario_dir = prepare_scenario_copy(
+        "data/decision_platform/maquete_v2",
+        "maquete_v2_node_studio_round_trip",
+        scenario_overrides={"hydraulic_engine": {"fallback": "python_emulated_julia"}},
+    )
+    output_dir = prepare_isolated_tmp_dir("maquete_v2_node_studio_saved")
+    try:
+        bundle = load_scenario_bundle(scenario_dir)
+        nodes_rows, selected_id = move_node_studio_selection(
+            bundle.nodes.to_dict("records"),
+            selected_node_id="P1",
+            direction="down",
+            step=0.04,
+        )
+        nodes_rows, selected_id = apply_node_studio_edit(
+            nodes_rows,
+            selected_node_id=selected_id,
+            label="Produto 1 studio",
+            node_type="product_tank",
+            x_m=0.21,
+            y_m=0.17,
+            allow_inbound=True,
+            allow_outbound=True,
+        )
+
+        with diagnostic_runtime_test_mode():
+            saved = save_and_reopen_local_bundle(
+                current_scenario_dir=scenario_dir,
+                output_dir=output_dir,
+                nodes_rows=nodes_rows,
+                components_rows=bundle.components.to_dict("records"),
+                candidate_links_rows=bundle.candidate_links.to_dict("records"),
+                edge_component_rules_rows=bundle.edge_component_rules.to_dict("records"),
+                route_rows=bundle.route_requirements.to_dict("records"),
+                layout_constraints_rows=bundle.layout_constraints.to_dict("records"),
+                topology_rules_text=yaml.safe_dump(bundle.topology_rules, sort_keys=False, allow_unicode=True),
+                scenario_settings_text=yaml.safe_dump(bundle.scenario_settings, sort_keys=False, allow_unicode=True),
+            )
+
+        saved_row = saved["bundle"].nodes.loc[saved["bundle"].nodes["node_id"] == "P1"].iloc[0]
+        assert saved["scenario_dir"] == str(output_dir.resolve())
+        assert saved_row["label"] == "Produto 1 studio"
+        assert float(saved_row["x_m"]) == 0.21
+        assert float(saved_row["y_m"]) == 0.17
+        assert bool(saved_row["allow_outbound"]) is True
+        assert saved["pipeline_error"] is None
+    finally:
+        cleanup_scenario_copy(output_dir)
+        cleanup_scenario_copy(scenario_dir)
 
 
 @pytest.mark.fast

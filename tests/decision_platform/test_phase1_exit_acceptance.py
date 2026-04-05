@@ -174,18 +174,19 @@ def test_phase1_exit_official_run_rejects_saved_bundle_with_invalid_manifest_ver
     save_dir = prepare_isolated_tmp_dir("maquete_v2_phase1_exit_invalid_manifest_saved")
     try:
         bundle = load_scenario_bundle(scenario_dir)
-        save_and_reopen_local_bundle(
-            current_scenario_dir=scenario_dir,
-            output_dir=save_dir,
-            nodes_rows=bundle.nodes.to_dict("records"),
-            components_rows=bundle.components.to_dict("records"),
-            candidate_links_rows=bundle.candidate_links.to_dict("records"),
-            edge_component_rules_rows=bundle.edge_component_rules.to_dict("records"),
-            route_rows=bundle.route_requirements.to_dict("records"),
-            layout_constraints_rows=bundle.layout_constraints.to_dict("records"),
-            topology_rules_text=yaml.safe_dump(bundle.topology_rules, sort_keys=False, allow_unicode=True),
-            scenario_settings_text=yaml.safe_dump(bundle.scenario_settings, sort_keys=False, allow_unicode=True),
-        )
+        with diagnostic_runtime_test_mode():
+            save_and_reopen_local_bundle(
+                current_scenario_dir=scenario_dir,
+                output_dir=save_dir,
+                nodes_rows=bundle.nodes.to_dict("records"),
+                components_rows=bundle.components.to_dict("records"),
+                candidate_links_rows=bundle.candidate_links.to_dict("records"),
+                edge_component_rules_rows=bundle.edge_component_rules.to_dict("records"),
+                route_rows=bundle.route_requirements.to_dict("records"),
+                layout_constraints_rows=bundle.layout_constraints.to_dict("records"),
+                topology_rules_text=yaml.safe_dump(bundle.topology_rules, sort_keys=False, allow_unicode=True),
+                scenario_settings_text=yaml.safe_dump(bundle.scenario_settings, sort_keys=False, allow_unicode=True),
+            )
         manifest_path = save_dir / "scenario_bundle.yaml"
         manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8")) or {}
         manifest["bundle_version"] = "decision_platform_scenario_bundle/v999"

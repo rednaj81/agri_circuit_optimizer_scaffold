@@ -48,6 +48,17 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
         profile_id=profile_id,
         active_selected_id=initial_state["selected_candidate_id"],
     )
+    initial_node_studio_selected_id = _default_node_studio_selection(authoring_payload["nodes_rows"])
+    initial_node_studio_elements = build_node_studio_elements(
+        authoring_payload["nodes_rows"],
+        authoring_payload["candidate_links_rows"],
+    )
+    initial_node_studio_summary = json.dumps(
+        _build_node_studio_summary(authoring_payload["nodes_rows"], initial_node_studio_selected_id),
+        indent=2,
+        ensure_ascii=False,
+    )
+    initial_node_studio_form = _node_studio_form_values(authoring_payload["nodes_rows"], initial_node_studio_selected_id)
     initial_bundle_output_dir = str(Path(scenario_dir).parent / f"{Path(scenario_dir).name}_saved")
     initial_bundle_io_summary = json.dumps(
         {
@@ -70,8 +81,94 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
         children=[
             html.H1("Decision Platform - Circuitos Hidráulicos"),
             dcc.Store(id="scenario-dir", data=str(Path(scenario_dir))),
+            dcc.Store(id="node-studio-selected-id", data=initial_node_studio_selected_id),
             dcc.Tabs(
                 children=[
+                    dcc.Tab(
+                        label="Studio",
+                        children=[
+                            html.H2("Studio de Nós"),
+                            html.P("Edição visual mínima de layout e propriedades básicas de nodes.csv."),
+                            cyto.Cytoscape(
+                                id="node-studio-cytoscape",
+                                elements=initial_node_studio_elements,
+                                layout={"name": "preset"},
+                                style={"width": "100%", "height": "520px"},
+                                stylesheet=_build_node_studio_stylesheet(initial_node_studio_selected_id),
+                            ),
+                            html.Pre(initial_node_studio_summary, id="node-studio-summary"),
+                            dcc.Input(
+                                id="node-studio-node-id",
+                                type="text",
+                                value=initial_node_studio_form["node_id"],
+                                persistence=True,
+                                persistence_type="session",
+                            ),
+                            dcc.Input(
+                                id="node-studio-label",
+                                type="text",
+                                value=initial_node_studio_form["label"],
+                                persistence=True,
+                                persistence_type="session",
+                            ),
+                            dcc.Input(
+                                id="node-studio-node-type",
+                                type="text",
+                                value=initial_node_studio_form["node_type"],
+                                persistence=True,
+                                persistence_type="session",
+                            ),
+                            dcc.Input(
+                                id="node-studio-x-m",
+                                type="number",
+                                value=initial_node_studio_form["x_m"],
+                                persistence=True,
+                                persistence_type="session",
+                            ),
+                            dcc.Input(
+                                id="node-studio-y-m",
+                                type="number",
+                                value=initial_node_studio_form["y_m"],
+                                persistence=True,
+                                persistence_type="session",
+                            ),
+                            dcc.Checklist(
+                                id="node-studio-allow-inbound",
+                                options=[{"label": "allow_inbound", "value": "allow_inbound"}],
+                                value=initial_node_studio_form["allow_inbound"],
+                                persistence=True,
+                                persistence_type="session",
+                            ),
+                            dcc.Checklist(
+                                id="node-studio-allow-outbound",
+                                options=[{"label": "allow_outbound", "value": "allow_outbound"}],
+                                value=initial_node_studio_form["allow_outbound"],
+                                persistence=True,
+                                persistence_type="session",
+                            ),
+                            html.Button("Aplicar propriedades do nó", id="node-studio-apply-button"),
+                            dcc.Dropdown(
+                                id="node-studio-move-direction",
+                                options=[
+                                    {"label": "Esquerda", "value": "left"},
+                                    {"label": "Direita", "value": "right"},
+                                    {"label": "Cima", "value": "up"},
+                                    {"label": "Baixo", "value": "down"},
+                                ],
+                                value="right",
+                                persistence=True,
+                                persistence_type="session",
+                            ),
+                            dcc.Input(
+                                id="node-studio-move-step",
+                                type="number",
+                                value=0.02,
+                                persistence=True,
+                                persistence_type="session",
+                            ),
+                            html.Button("Mover nó", id="node-studio-move-button"),
+                        ],
+                    ),
                     dcc.Tab(
                         label="Dados",
                         children=[
@@ -382,6 +479,128 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
                 scenario_settings_text or "",
                 _build_execution_summary(None, str(exc)),
             )
+
+    @app.callback(
+        Output("node-studio-cytoscape", "elements"),
+        Output("node-studio-cytoscape", "stylesheet"),
+        Output("node-studio-summary", "children"),
+        Input("nodes-grid", "rowData"),
+        Input("candidate-links-grid", "rowData"),
+        Input("node-studio-selected-id", "data"),
+    )
+    def _refresh_node_studio(
+        nodes_rows: list[dict[str, Any]] | None,
+        candidate_links_rows: list[dict[str, Any]] | None,
+        selected_node_id: str | None,
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], str]:
+        normalized_rows = nodes_rows or []
+        selected_id = _default_node_studio_selection(normalized_rows, preferred_node_id=selected_node_id)
+        return (
+            build_node_studio_elements(normalized_rows, candidate_links_rows or []),
+            _build_node_studio_stylesheet(selected_id),
+            json.dumps(_build_node_studio_summary(normalized_rows, selected_id), indent=2, ensure_ascii=False),
+        )
+
+    @app.callback(
+        Output("node-studio-selected-id", "data"),
+        Output("node-studio-node-id", "value"),
+        Output("node-studio-label", "value"),
+        Output("node-studio-node-type", "value"),
+        Output("node-studio-x-m", "value"),
+        Output("node-studio-y-m", "value"),
+        Output("node-studio-allow-inbound", "value"),
+        Output("node-studio-allow-outbound", "value"),
+        Input("nodes-grid", "rowData"),
+        Input("node-studio-cytoscape", "tapNodeData"),
+        State("node-studio-selected-id", "data"),
+    )
+    def _sync_node_studio_form(
+        nodes_rows: list[dict[str, Any]] | None,
+        tap_node_data: dict[str, Any] | None,
+        current_selected_node_id: str | None,
+    ) -> tuple[str | None, str, str, str, float | None, float | None, list[str], list[str]]:
+        selected_id = current_selected_node_id
+        if tap_node_data:
+            selected_id = str(tap_node_data.get("id") or tap_node_data.get("node_id") or "").strip() or current_selected_node_id
+        selected_id = _default_node_studio_selection(nodes_rows or [], preferred_node_id=selected_id)
+        form_values = _node_studio_form_values(nodes_rows or [], selected_id)
+        return (
+            selected_id,
+            form_values["node_id"],
+            form_values["label"],
+            form_values["node_type"],
+            form_values["x_m"],
+            form_values["y_m"],
+            form_values["allow_inbound"],
+            form_values["allow_outbound"],
+        )
+
+    @app.callback(
+        Output("nodes-grid", "rowData", allow_duplicate=True),
+        Output("node-studio-selected-id", "data", allow_duplicate=True),
+        Input("node-studio-apply-button", "n_clicks"),
+        State("nodes-grid", "rowData"),
+        State("node-studio-selected-id", "data"),
+        State("node-studio-node-id", "value"),
+        State("node-studio-label", "value"),
+        State("node-studio-node-type", "value"),
+        State("node-studio-x-m", "value"),
+        State("node-studio-y-m", "value"),
+        State("node-studio-allow-inbound", "value"),
+        State("node-studio-allow-outbound", "value"),
+        prevent_initial_call=True,
+    )
+    def _apply_node_studio_properties(
+        n_clicks: Any,
+        nodes_rows: list[dict[str, Any]] | None,
+        selected_node_id: str | None,
+        node_id: str | None,
+        label: str | None,
+        node_type: str | None,
+        x_m: Any,
+        y_m: Any,
+        allow_inbound: list[str] | None,
+        allow_outbound: list[str] | None,
+    ) -> tuple[list[dict[str, Any]], str | None]:
+        if not n_clicks:
+            return nodes_rows or [], selected_node_id
+        return apply_node_studio_edit(
+            nodes_rows or [],
+            selected_node_id=selected_node_id,
+            node_id=node_id,
+            label=label,
+            node_type=node_type,
+            x_m=x_m,
+            y_m=y_m,
+            allow_inbound="allow_inbound" in (allow_inbound or []),
+            allow_outbound="allow_outbound" in (allow_outbound or []),
+        )
+
+    @app.callback(
+        Output("nodes-grid", "rowData", allow_duplicate=True),
+        Output("node-studio-selected-id", "data", allow_duplicate=True),
+        Input("node-studio-move-button", "n_clicks"),
+        State("nodes-grid", "rowData"),
+        State("node-studio-selected-id", "data"),
+        State("node-studio-move-direction", "value"),
+        State("node-studio-move-step", "value"),
+        prevent_initial_call=True,
+    )
+    def _move_node_studio_selection(
+        n_clicks: Any,
+        nodes_rows: list[dict[str, Any]] | None,
+        selected_node_id: str | None,
+        direction: str | None,
+        step: Any,
+    ) -> tuple[list[dict[str, Any]], str | None]:
+        if not n_clicks:
+            return nodes_rows or [], selected_node_id
+        return move_node_studio_selection(
+            nodes_rows or [],
+            selected_node_id=selected_node_id,
+            direction=direction,
+            step=step,
+        )
 
     @app.callback(
         Output("profile-dropdown", "options"),
@@ -1220,6 +1439,116 @@ def save_and_reopen_local_bundle(
     }
 
 
+def apply_node_studio_edit(
+    nodes_rows: list[dict[str, Any]],
+    *,
+    selected_node_id: str | None,
+    node_id: str | None = None,
+    label: str | None = None,
+    node_type: str | None = None,
+    x_m: Any = None,
+    y_m: Any = None,
+    allow_inbound: bool | None = None,
+    allow_outbound: bool | None = None,
+) -> tuple[list[dict[str, Any]], str | None]:
+    selected_id = _default_node_studio_selection(nodes_rows, preferred_node_id=selected_node_id)
+    if selected_id is None:
+        return nodes_rows, None
+    updated_rows: list[dict[str, Any]] = []
+    next_selected_id = selected_id
+    for row in nodes_rows:
+        current_id = str(row.get("node_id", "")).strip()
+        updated_row = dict(row)
+        if current_id == selected_id:
+            updated_row["node_id"] = str(node_id if node_id is not None else row.get("node_id", "")).strip()
+            updated_row["label"] = str(label if label is not None else row.get("label", "")).strip()
+            updated_row["node_type"] = str(node_type if node_type is not None else row.get("node_type", "")).strip()
+            updated_row["x_m"] = _coerce_node_coordinate(x_m, updated_row.get("x_m"))
+            updated_row["y_m"] = _coerce_node_coordinate(y_m, updated_row.get("y_m"))
+            if allow_inbound is not None:
+                updated_row["allow_inbound"] = bool(allow_inbound)
+            if allow_outbound is not None:
+                updated_row["allow_outbound"] = bool(allow_outbound)
+            next_selected_id = str(updated_row["node_id"]).strip() or selected_id
+        updated_rows.append(updated_row)
+    return updated_rows, next_selected_id
+
+
+def move_node_studio_selection(
+    nodes_rows: list[dict[str, Any]],
+    *,
+    selected_node_id: str | None,
+    direction: str | None,
+    step: Any,
+) -> tuple[list[dict[str, Any]], str | None]:
+    selected_id = _default_node_studio_selection(nodes_rows, preferred_node_id=selected_node_id)
+    if selected_id is None:
+        return nodes_rows, None
+    step_value = abs(_coerce_node_coordinate(step, 0.02))
+    delta_x = 0.0
+    delta_y = 0.0
+    if direction == "left":
+        delta_x = -step_value
+    elif direction == "right":
+        delta_x = step_value
+    elif direction == "up":
+        delta_y = -step_value
+    elif direction == "down":
+        delta_y = step_value
+    updated_rows: list[dict[str, Any]] = []
+    for row in nodes_rows:
+        updated_row = dict(row)
+        if str(row.get("node_id", "")).strip() == selected_id:
+            updated_row["x_m"] = round(_coerce_node_coordinate(row.get("x_m"), 0.0) + delta_x, 4)
+            updated_row["y_m"] = round(_coerce_node_coordinate(row.get("y_m"), 0.0) + delta_y, 4)
+        updated_rows.append(updated_row)
+    return updated_rows, selected_id
+
+
+def build_node_studio_elements(
+    nodes_rows: list[dict[str, Any]],
+    candidate_links_rows: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    node_ids = {str(row.get("node_id", "")).strip() for row in nodes_rows if str(row.get("node_id", "")).strip()}
+    elements: list[dict[str, Any]] = []
+    for row in nodes_rows:
+        node_id = str(row.get("node_id", "")).strip()
+        if not node_id:
+            continue
+        elements.append(
+            {
+                "data": {
+                    "id": node_id,
+                    "label": f"{node_id}: {str(row.get('label', '')).strip()}",
+                    "node_type": str(row.get("node_type", "")).strip(),
+                    "allow_inbound": bool(row.get("allow_inbound")),
+                    "allow_outbound": bool(row.get("allow_outbound")),
+                },
+                "position": _node_studio_position(row),
+                "classes": _node_studio_classes(row),
+            }
+        )
+    for row in candidate_links_rows:
+        source = str(row.get("from_node", "")).strip()
+        target = str(row.get("to_node", "")).strip()
+        link_id = str(row.get("link_id", "")).strip()
+        if not source or not target or not link_id:
+            continue
+        if source not in node_ids or target not in node_ids:
+            continue
+        elements.append(
+            {
+                "data": {
+                    "id": link_id,
+                    "source": source,
+                    "target": target,
+                    "label": str(row.get("archetype", "")).strip(),
+                }
+            }
+        )
+    return elements
+
+
 def _normalize_scenario_dir(path: str | Path) -> Path:
     return Path(path).expanduser().resolve(strict=False)
 
@@ -1251,6 +1580,135 @@ def _build_execution_summary(result: dict[str, Any] | None, error: str | None) -
         indent=2,
         ensure_ascii=False,
     )
+
+
+def _default_node_studio_selection(
+    nodes_rows: list[dict[str, Any]],
+    *,
+    preferred_node_id: str | None = None,
+) -> str | None:
+    preferred = str(preferred_node_id or "").strip()
+    if preferred and any(str(row.get("node_id", "")).strip() == preferred for row in nodes_rows):
+        return preferred
+    for row in nodes_rows:
+        node_id = str(row.get("node_id", "")).strip()
+        if node_id:
+            return node_id
+    return None
+
+
+def _node_studio_form_values(nodes_rows: list[dict[str, Any]], selected_node_id: str | None) -> dict[str, Any]:
+    selected_id = _default_node_studio_selection(nodes_rows, preferred_node_id=selected_node_id)
+    row = next(
+        (dict(item) for item in nodes_rows if str(item.get("node_id", "")).strip() == selected_id),
+        None,
+    )
+    if row is None:
+        return {
+            "node_id": "",
+            "label": "",
+            "node_type": "",
+            "x_m": None,
+            "y_m": None,
+            "allow_inbound": [],
+            "allow_outbound": [],
+        }
+    return {
+        "node_id": str(row.get("node_id", "")).strip(),
+        "label": str(row.get("label", "")).strip(),
+        "node_type": str(row.get("node_type", "")).strip(),
+        "x_m": float(row.get("x_m", 0.0)),
+        "y_m": float(row.get("y_m", 0.0)),
+        "allow_inbound": ["allow_inbound"] if bool(row.get("allow_inbound")) else [],
+        "allow_outbound": ["allow_outbound"] if bool(row.get("allow_outbound")) else [],
+    }
+
+
+def _build_node_studio_summary(nodes_rows: list[dict[str, Any]], selected_node_id: str | None) -> dict[str, Any]:
+    selected_id = _default_node_studio_selection(nodes_rows, preferred_node_id=selected_node_id)
+    selected_row = next(
+        (dict(item) for item in nodes_rows if str(item.get("node_id", "")).strip() == selected_id),
+        None,
+    )
+    return {
+        "node_count": len(nodes_rows),
+        "selected_node_id": selected_id,
+        "selected_node": selected_row,
+    }
+
+
+def _node_studio_position(row: dict[str, Any]) -> dict[str, float]:
+    return {
+        "x": round(_coerce_node_coordinate(row.get("x_m"), 0.0) * 1000.0, 2),
+        "y": round(_coerce_node_coordinate(row.get("y_m"), 0.0) * 600.0, 2),
+    }
+
+
+def _node_studio_classes(row: dict[str, Any]) -> str:
+    classes: list[str] = [str(row.get("node_type", "")).strip() or "generic"]
+    if bool(row.get("allow_inbound")):
+        classes.append("allow-inbound")
+    else:
+        classes.append("block-inbound")
+    if bool(row.get("allow_outbound")):
+        classes.append("allow-outbound")
+    else:
+        classes.append("block-outbound")
+    if bool(row.get("is_candidate_hub")):
+        classes.append("candidate-hub")
+    return " ".join(classes)
+
+
+def _build_node_studio_stylesheet(selected_node_id: str | None) -> list[dict[str, Any]]:
+    stylesheet = [
+        {
+            "selector": "node",
+            "style": {
+                "label": "data(label)",
+                "width": 34,
+                "height": 34,
+                "background-color": "#0f766e",
+                "color": "#0f172a",
+                "font-size": 11,
+                "text-wrap": "wrap",
+                "text-max-width": 92,
+                "border-width": 2,
+                "border-color": "#0f172a",
+            },
+        },
+        {
+            "selector": "edge",
+            "style": {
+                "curve-style": "bezier",
+                "line-color": "#94a3b8",
+                "target-arrow-shape": "triangle",
+                "target-arrow-color": "#94a3b8",
+                "width": 2,
+                "font-size": 9,
+                "label": "data(label)",
+            },
+        },
+        {"selector": ".candidate-hub", "style": {"background-color": "#f59e0b", "shape": "diamond"}},
+        {"selector": ".block-inbound", "style": {"border-color": "#dc2626"}},
+        {"selector": ".block-outbound", "style": {"border-style": "dashed"}},
+    ]
+    if selected_node_id:
+        stylesheet.append(
+            {
+                "selector": f'node[id = "{selected_node_id}"]',
+                "style": {
+                    "border-width": 5,
+                    "border-color": "#1d4ed8",
+                    "background-color": "#38bdf8",
+                },
+            }
+        )
+    return stylesheet
+
+
+def _coerce_node_coordinate(value: Any, default: Any) -> float:
+    candidate = default if value in (None, "") else value
+    return float(candidate)
 
 
 def _requires_diagnostic_python_emulation(bundle: Any) -> bool:

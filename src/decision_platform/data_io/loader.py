@@ -352,6 +352,7 @@ def _validate_bundle(
     components = tables["components.csv"]
     edge_rules = tables["edge_component_rules.csv"]
     profiles = tables["weight_profiles.csv"]
+    _validate_nodes(nodes)
     node_directions = nodes.set_index("node_id")[["allow_inbound", "allow_outbound"]]
 
     node_ids = set(nodes["node_id"].tolist())
@@ -441,6 +442,27 @@ def _validate_bundle(
         raise ValueError("scenario_settings.yaml hydraulic_engine.primary must be 'watermodels_jl' or 'python_emulated_julia'.")
     if fallback_engine not in {"none", "python_emulated_julia"}:
         raise ValueError("scenario_settings.yaml hydraulic_engine.fallback must be 'none' or 'python_emulated_julia'.")
+
+
+def _validate_nodes(nodes: pd.DataFrame) -> None:
+    blank_node_ids = sorted({node_id for node_id in nodes["node_id"].tolist() if not str(node_id).strip()})
+    if blank_node_ids:
+        raise ValueError("nodes.csv contains blank node_id values.")
+    duplicate_node_ids = sorted(nodes.loc[nodes["node_id"].duplicated(keep=False), "node_id"].unique().tolist())
+    if duplicate_node_ids:
+        raise ValueError(f"nodes.csv contains duplicated node_id values: {duplicate_node_ids}")
+    blank_node_types = nodes.loc[~nodes["node_type"].map(lambda value: bool(str(value).strip())), ["node_id"]]
+    if not blank_node_types.empty:
+        raise ValueError(
+            "nodes.csv contains nodes with blank node_type values: "
+            f"{blank_node_types.to_dict('records')}"
+        )
+    blank_labels = nodes.loc[~nodes["label"].map(lambda value: bool(str(value).strip())), ["node_id"]]
+    if not blank_labels.empty:
+        raise ValueError(
+            "nodes.csv contains nodes with blank label values: "
+            f"{blank_labels.to_dict('records')}"
+        )
 
 
 def _validate_component_catalog(components: pd.DataFrame) -> None:

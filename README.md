@@ -83,6 +83,7 @@ Observações:
 - o pipeline oficial exporta catálogo, ranking, candidato oficial, explicação do vencedor e agregados de viabilidade.
 - a comparação Julia vs Python existe apenas como trilha diagnóstica explícita.
 - a UI Dash já cobre catálogo, comparação, circuito, candidato oficial e filtros de decisão com persistência simples em sessão.
+- a phase 2 abriu com um studio visual mínimo de nós no app: seleção, nudge e edição básica de `nodes.csv` sobre o bundle canônico.
 - o cenário `maquete_v2` agora tem save/reopen local versionado via `scenario_bundle.yaml` e `component_catalog.csv`.
 
 ### O que já está validado
@@ -98,7 +99,7 @@ Observações:
 - `DecisionEngine.jl` roda em Julia real e importa `WaterModels`, `JuMP` e `HiGHS`, mas a avaliação hidráulica decisória ainda é lógica própria em Julia, não um solve completo de rede via API do `WaterModels`
 - resiliência e parte da exploração topológica continuam heurísticas
 - a UI ainda é orientada a análise local; não há persistência multiusuário nem workflow de aprovação
-- studio visual, fila/background runs e workflow completo de decisão humana assistida continuam fora desta onda
+- o studio ainda é mínimo e focado em nós; edição visual completa de arestas, fila/background runs e workflow completo de decisão humana assistida continuam fora desta onda
 
 ### Critério prático de aceite
 

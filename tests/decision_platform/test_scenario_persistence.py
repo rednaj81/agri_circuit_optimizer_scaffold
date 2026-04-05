@@ -10,7 +10,12 @@ import yaml
 from decision_platform.api.run_pipeline import run_decision_pipeline
 from decision_platform.data_io.loader import BUNDLE_MANIFEST_FILENAME, load_scenario_bundle
 from decision_platform.data_io.storage import save_authored_scenario_bundle, save_scenario_bundle
-from tests.decision_platform.scenario_utils import cleanup_scenario_copy, prepare_isolated_tmp_dir, prepare_scenario_copy
+from tests.decision_platform.scenario_utils import (
+    cleanup_scenario_copy,
+    diagnostic_runtime_test_mode,
+    prepare_isolated_tmp_dir,
+    prepare_scenario_copy,
+)
 
 
 pytestmark = [pytest.mark.fast]
@@ -190,10 +195,11 @@ def test_saved_bundle_runs_with_canonical_execution_provenance() -> None:
                 allow_unicode=True,
             ),
         )
-        result = run_decision_pipeline(
-            output_dir,
-            allow_diagnostic_python_emulation=True,
-        )
+        with diagnostic_runtime_test_mode():
+            result = run_decision_pipeline(
+                output_dir,
+                allow_diagnostic_python_emulation=True,
+            )
 
         assert reloaded.bundle_manifest_path is not None
         assert result["scenario_bundle_root"] == str(output_dir.resolve())
@@ -221,6 +227,65 @@ def test_save_authored_bundle_fails_closed_for_invalid_route_contract() -> None:
                 "data/decision_platform/maquete_v2",
                 output_dir,
                 route_rows=route_rows,
+                topology_rules_text=yaml.safe_dump(
+                    source_bundle.topology_rules,
+                    sort_keys=False,
+                    allow_unicode=True,
+                ),
+                scenario_settings_text=yaml.safe_dump(
+                    source_bundle.scenario_settings,
+                    sort_keys=False,
+                    allow_unicode=True,
+                ),
+            )
+    finally:
+        if output_dir.exists():
+            shutil.rmtree(output_dir)
+
+
+def test_save_authored_bundle_fails_closed_for_invalid_node_contract() -> None:
+    source_bundle = load_scenario_bundle("data/decision_platform/maquete_v2")
+    output_dir = prepare_isolated_tmp_dir("scenario_persistence_invalid_node")
+    try:
+        nodes_rows = source_bundle.nodes.to_dict("records")
+        nodes_rows[0]["node_id"] = nodes_rows[1]["node_id"]
+
+        with pytest.raises(ValueError, match="duplicated node_id"):
+            save_authored_scenario_bundle(
+                "data/decision_platform/maquete_v2",
+                output_dir,
+                nodes_rows=nodes_rows,
+                topology_rules_text=yaml.safe_dump(
+                    source_bundle.topology_rules,
+                    sort_keys=False,
+                    allow_unicode=True,
+                ),
+                scenario_settings_text=yaml.safe_dump(
+                    source_bundle.scenario_settings,
+                    sort_keys=False,
+                    allow_unicode=True,
+                ),
+            )
+    finally:
+        if output_dir.exists():
+            shutil.rmtree(output_dir)
+
+
+def test_save_authored_bundle_fails_closed_for_invalid_node_direction_contract() -> None:
+    source_bundle = load_scenario_bundle("data/decision_platform/maquete_v2")
+    output_dir = prepare_isolated_tmp_dir("scenario_persistence_invalid_node_direction")
+    try:
+        nodes_rows = source_bundle.nodes.to_dict("records")
+        for row in nodes_rows:
+            if row["node_id"] == "W":
+                row["allow_outbound"] = False
+                break
+
+        with pytest.raises(ValueError, match="allow_outbound=false"):
+            save_authored_scenario_bundle(
+                "data/decision_platform/maquete_v2",
+                output_dir,
+                nodes_rows=nodes_rows,
                 topology_rules_text=yaml.safe_dump(
                     source_bundle.topology_rules,
                     sort_keys=False,
