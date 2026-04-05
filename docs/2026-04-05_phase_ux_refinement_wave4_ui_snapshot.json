@@ -1,40 +1,27 @@
 {
   "wave": "ux_phase_1_wave_4",
-  "layout_components": {
-    "projection_panel_present": true,
-    "technical_guide_present": true,
-    "open_guide_button_present": true,
-    "open_audit_button_present": true
+  "validation": {
+    "targeted": "1 passed, 37 deselected in 0.55s",
+    "full": "38 passed in 421.16s"
   },
-  "projection_states": {
-    "complete": {
-      "status": "complete",
-      "projected_route_count": 18,
-      "covered_node_count": 9,
-      "business_node_count": 9
-    },
-    "partial": {
-      "status": "partial",
-      "uncovered_nodes": [
-        "Tanque de água"
-      ],
-      "projected_route_count": 14
-    },
-    "degraded": {
-      "status": "degraded",
-      "projected_route_count": 0,
-      "guidance": [
-        "A camada principal manteve apenas as entidades de negócio.",
-        "Abra a trilha técnica para revisar campos avançados ou a aba Auditoria enquanto os metadados de rota são completados."
-      ]
-    }
+  "decision_language": {
+    "translated_infeasibility_markers": [
+      "rota obrigatória não conseguiu fechar",
+      "faltou conectividade",
+      "capacidade hidráulica ou de medição"
+    ],
+    "translated_route_issue_marker": "Rota crítica R001: sem caminho conectado",
+    "technical_status_marker": "Empate técnico"
   },
-  "technical_fields_in_details": {
-    "node-studio-node-id": true,
-    "node-studio-node-type": true,
-    "edge-studio-link-id": true,
-    "edge-studio-from-node": true,
-    "edge-studio-to-node": true,
-    "edge-studio-archetype": true
-  }
+  "primary_surfaces_touched": [
+    "decision-summary-panel",
+    "decision-contrast-panel",
+    "decision-signal-panel",
+    "selected-candidate-summary-panel"
+  ],
+  "raw_codes_blocked_from_primary_surface": [
+    "mandatory_route_failure",
+    "infeasibility_reason:",
+    "engine_used:"
+  ]
 }

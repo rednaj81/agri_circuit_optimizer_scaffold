@@ -1,41 +1,42 @@
-# Phase UX Refinement Wave 4 - Studio Projection Coverage and Technical Discovery
+# Phase UX Refinement Wave 4 - Decision Language Hardening
 
 ## Objective
 
-Close `ux_phase_1` by making the Studio explain the coverage and limits of its business projection, and by making the technical trail discoverable without reintroducing engineering clutter into the primary surface.
+Remove raw backend failure codes from the primary `Decisão` experience and replace them with faithful product-language explanations for inviability, `technical_tie`, and contrast signals, without changing ranking, selection, or runtime behavior.
 
 ## Delivered
 
-- Added an explicit projection-coverage panel to the Studio primary surface with complete/partial/degraded states.
-- Surfaced clear product-language guidance for each projection state so the user understands when the business view is complete, when metadata is partial, and when the primary layer is intentionally reduced to business entities only.
-- Added a discoverable technical-trail guide directly in the Studio and introduced CTAs to open the technical explanation and jump to the `Auditoria` tab.
-- Kept the primary surface business-first in all states: internal nodes, hubs, and raw structural identifiers remain hidden by default even when route metadata is poor or absent.
-- Expanded UI/smoke coverage to protect the projection-state logic, the technical-discovery controls, and the continued disclosure-only placement of technical fields.
+- Added a shared translation layer in `src/decision_platform/ui_dash/app.py` to humanize primary infeasibility reasons and route issues before they reach the first decision fold.
+- Replaced raw codes such as `mandatory_route_failure`, `connectivity`, `hydraulics`, and `measurement_required_without_compatible_meter` with operator-facing explanations that preserve the underlying meaning.
+- Aligned the language of `Escolha oficial`, `Runner-up e contraste`, `Sinais para decisão humana`, and `Candidato em foco` so the decision surface no longer mixes product copy with backend identifiers.
+- Kept technical disclosure available through existing JSON/details areas; only the primary language changed.
+- Preserved `technical_tie`, winner, runner-up, and all ranking semantics exactly as delivered by the backend.
+- Updated smoke coverage to block regressions where raw infeasibility codes or backend field labels leak back into the main decision surface.
 
 ## Validation
 
 ```powershell
-$env:PYTHONPATH='src;.'; .\.venv\Scripts\python.exe -m pytest tests/decision_platform/test_ui_smoke.py -q -p no:cacheprovider -k "studio and not slow" --basetemp tests/_tmp/pytest-basetemp-ux-wave4-fast
-$env:PYTHONPATH='src;.'; .\.venv\Scripts\python.exe -m pytest tests/decision_platform/test_ui_smoke.py -q -p no:cacheprovider --basetemp tests/_tmp/pytest-basetemp-ux-wave4
+$env:PYTHONPATH='src;.'; .\.venv\Scripts\python.exe -m pytest tests/decision_platform/test_ui_smoke.py -q -p no:cacheprovider -k "primary_decision_panels_hide_raw_metric_keys_in_main_surface" --basetemp tests/_tmp/pytest-basetemp-ux-wave4-targeted
+$env:PYTHONPATH='src;.'; .\.venv\Scripts\python.exe -m pytest tests/decision_platform/test_ui_smoke.py -q -p no:cacheprovider --basetemp tests/_tmp/pytest-basetemp-ux-wave4-full
 ```
 
 Result:
 
-- `10 passed, 23 deselected in 1.38s`
-- `33 passed in 312.22s`
+- `1 passed, 37 deselected in 0.55s`
+- `38 passed in 421.16s`
 
 ## Evidence
 
-- Structured Studio coverage snapshot: `docs/2026-04-05_phase_ux_refinement_wave4_ui_snapshot.json`
+- Structured decision-language snapshot: `docs/2026-04-05_phase_ux_refinement_wave4_ui_snapshot.json`
 
 ## Scope Guardrails
 
 - No architecture reopening.
 - No replacement of Dash or Cytoscape.
-- No changes to `docs/05_data_contract.md`.
-- No changes to the canonical bundle files or runtime semantics.
-- No changes to backend pipeline, Julia-only execution, or hydraulic solver logic.
+- No change to ranking, official-candidate selection, infeasibility computation, or `technical_tie` behavior.
+- No change to the Julia-only official path, fail-closed behavior, or queue/runs semantics.
+- No reintroduction of logs, raw JSON, or technical identifiers as primary UX.
 
 ## Honest Handoff
 
-This wave finished the Navigation and IA cleanup phase from the Studio side. The business projection is now not only cleaner but also self-explanatory: the user can see when the primary view is trustworthy, when it is partial, and where to go for deeper technical inspection. The fallback remains intentionally business-first; it does not regress to a raw engineering canvas when route metadata is missing.
+This wave fixed a real UX leakage rather than adding polish for its own sake. The backend still decides inviability exactly as before, but the operator no longer sees raw failure codes in the first decision read. The translation is intentionally narrow and faithful: it explains the operational impact while leaving the technical trail intact in disclosure for deeper diagnosis.

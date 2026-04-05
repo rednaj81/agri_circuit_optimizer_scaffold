@@ -222,6 +222,54 @@ def _label_value_list(items: list[tuple[str, Any]]) -> Any:
     )
 
 
+def _humanize_infeasibility_reason(reason: Any) -> str:
+    normalized = str(reason or "").strip()
+    if not normalized:
+        return "nenhum"
+    reason_lookup = {
+        "mandatory_route_failure": "uma rota obrigatória não conseguiu fechar com a configuração atual",
+        "connectivity": "faltou conectividade para cumprir pelo menos uma rota obrigatória",
+        "components": "faltaram componentes compatíveis para montar a alternativa",
+        "measurement": "a rota exige medição direta, mas não há medição compatível disponível",
+        "family_rules": "a alternativa viola regras estruturais da família topológica escolhida",
+        "hydraulics": "a capacidade hidráulica ou de medição não sustenta a rota exigida",
+        "fallback_not_allowed": "o caminho oficial Julia-only não ficou disponível para sustentar a execução requerida",
+        "python_engine_fallback": "o caminho oficial Julia-only não ficou disponível e o fallback não é aceitável no fluxo oficial",
+        "no_path": "não existe caminho conectado para atender a rota requerida",
+        "no_pump_available": "não há bomba compatível disponível para a rota exigida",
+        "measurement_required_without_compatible_meter": "a rota exige medição direta e não há medidor compatível disponível",
+        "idle_pumps_not_allowed": "a alternativa deixa bombas ociosas em uma família que não aceita esse estado",
+        "idle_meters_not_allowed": "a alternativa deixa medidores ociosos em uma família que não aceita esse estado",
+        "insufficient_effective_capacity": "a capacidade efetiva ficou abaixo do necessário para cumprir a rota",
+        "hydraulic_or_meter_infeasible": "as restrições hidráulicas ou de medição impediram fechar a alternativa",
+        "quality_gate": "a alternativa falhou em um gate de qualidade obrigatório",
+        "unknown": "há uma restrição estrutural sem classificação legível; revise a trilha técnica para detalhar",
+    }
+    if normalized.startswith("quality_rule:"):
+        rule_id = normalized.split(":", 1)[1].strip() or "gate de qualidade"
+        return f"a alternativa falhou em um gate de qualidade obrigatório ({rule_id})"
+    return reason_lookup.get(
+        normalized,
+        "há uma restrição estrutural não traduzida na leitura de produto; revise a trilha técnica para detalhar",
+    )
+
+
+def _humanize_route_issue(reason: Any) -> str:
+    normalized = str(reason or "").strip()
+    if not normalized:
+        return "sem motivo registrado"
+    route_lookup = {
+        "no_path": "sem caminho conectado",
+        "no_pump_available": "sem bomba compatível disponível",
+        "measurement_required_without_compatible_meter": "sem medição direta compatível",
+        "idle_pumps_not_allowed": "família não aceita bombas ociosas nesta rota",
+        "idle_meters_not_allowed": "família não aceita medidores ociosos nesta rota",
+        "insufficient_effective_capacity": "capacidade efetiva abaixo do necessário",
+        "hydraulic_or_meter_infeasible": "restrição hidráulica ou de medição",
+    }
+    return route_lookup.get(normalized, normalized)
+
+
 def _coerce_truthy(value: Any) -> bool:
     if isinstance(value, bool):
         return value
@@ -852,7 +900,7 @@ def render_candidate_summary_panel(summary: dict[str, Any]) -> Any:
             _label_value_list(
                 [
                     ("Engine de avaliação", summary.get("engine_used")),
-                    ("Motivo de inviabilidade", summary.get("infeasibility_reason") or "nenhum"),
+                    ("Motivo de inviabilidade", _humanize_infeasibility_reason(summary.get("infeasibility_reason"))),
                 ]
             ),
         ]
@@ -863,7 +911,7 @@ def render_decision_summary_panel(summary: dict[str, Any]) -> Any:
     if not summary:
         return html.Div([html.H3("Escolha oficial", style={"marginTop": 0}), html.Div("Nenhum resumo decisorio disponivel.")])
     decision_status = str(summary.get("decision_status") or ("technical_tie" if summary.get("technical_tie") else "winner_clear"))
-    decision_label = "Technical tie" if decision_status == "technical_tie" else "Winner claro"
+    decision_label = "Empate técnico" if decision_status == "technical_tie" else "Winner claro"
     feasibility_label = "Viável" if summary.get("feasible") else "Inviável"
     return html.Div(
         children=[
@@ -954,14 +1002,14 @@ def render_decision_signal_panel(summary: dict[str, Any]) -> Any:
     signal_lines: list[str] = []
     infeasibility_reason = str(summary.get("infeasibility_reason") or "").strip()
     if infeasibility_reason:
-        signal_lines.append(f"A escolha oficial ficou inviável por: {infeasibility_reason}.")
+        signal_lines.append(f"A escolha oficial ficou inviável porque {_humanize_infeasibility_reason(infeasibility_reason)}.")
     else:
         signal_lines.append("A escolha oficial segue viável na leitura atual do ranking.")
     for penalty in list(summary.get("winner_penalties", []))[:2]:
         signal_lines.append(f"Atenção: {penalty}.")
     for route in list(summary.get("critical_routes", []))[:2]:
         route_id = str(route.get("route_id") or "-")
-        reason = str(route.get("reason") or "sem motivo registrado")
+        reason = _humanize_route_issue(route.get("reason"))
         signal_lines.append(f"Rota crítica {route_id}: {reason}.")
     return html.Div(
         children=[

@@ -391,13 +391,13 @@ def test_primary_decision_panels_hide_raw_metric_keys_in_main_surface() -> None:
         {
             "candidate_id": "cand-01",
             "topology_family": "hybrid_free",
-            "feasible": True,
+            "feasible": False,
             "install_cost": 10.0,
             "fallback_cost": 0.5,
             "score_final": 91.2,
             "fallback_component_count": 1,
             "engine_used": "julia",
-            "infeasibility_reason": None,
+            "infeasibility_reason": "mandatory_route_failure",
         }
     )
     breakdown_panel = render_candidate_breakdown_panel(
@@ -419,18 +419,21 @@ def test_primary_decision_panels_hide_raw_metric_keys_in_main_surface() -> None:
     selected_text = _collect_text_content(selected_panel)
     breakdown_text = _collect_text_content(breakdown_panel)
 
-    assert "Technical tie" in decision_text
+    assert "Empate técnico" in decision_text
     assert "Runner-up e contraste" in contrast_text
     assert "cand-02" in contrast_text
     assert "Empate técnico" in contrast_text
-    assert "mandatory_route_failure" in signal_text
+    assert "mandatory_route_failure" not in signal_text
+    assert "rota obrigatória não conseguiu fechar" in signal_text
     assert "Rota crítica R001" in signal_text
+    assert "mandatory_route_failure" not in selected_text
     assert "engine_used:" not in selected_text
     assert "infeasibility_reason:" not in selected_text
     assert "quality_score_raw:" not in breakdown_text
     assert "resilience_score:" not in breakdown_text
     assert "winner_penalties" not in signal_text
     assert "Engine de avaliação:" in selected_text
+    assert "rota obrigatória não conseguiu fechar" in selected_text
     assert "Qualidade bruta:" in breakdown_text
 
 
