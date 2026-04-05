@@ -24,43 +24,33 @@ phase_0:
 phase_1:
   target: "Normalizar domínio, persistência e cenários"
   status: "closed"
-  closure_mode: "frozen_after_wave_7"
+  closure_mode: "sealed_after_wave_6_operational_fix"
   next_phase_id: "phase_2"
   exit_criteria:
     - "cenários versionáveis"
     - "catálogo de componentes persistido"
   canonical_acceptance_target: "tests/decision_platform/test_phase1_exit_acceptance.py"
   phase_exit_checklist:
-    - "Executar `.\.venv\\Scripts\\python.exe -m pytest tests/decision_platform/test_phase1_exit_acceptance.py -q` como gate único e objetivo da fase."
-    - "O gate acima deve permanecer reproduzível no codebase local sem limpeza manual prévia de `tests/_tmp`."
-    - "Usar `docs/2026-04-04_phase1_exit.md` como fonte única de saída operacional da phase_1."
-    - "O bundle oficial `data/decision_platform/maquete_v2` deve continuar canônico, versionável e rastreável via `scenario_bundle.yaml`, `component_catalog.csv`, `scenario_bundle_manifest` e `scenario_bundle_files`."
-    - "Os entrypoints oficiais (`run_decision_pipeline` e `save_and_reopen_local_bundle`) devem continuar falhando fechado para layout legado sem manifesto."
-    - "As suítes de contrato já endurecidas (`test_loaders.py`, `test_scenario_contract_validation.py`, `test_component_catalog_contract.py`, `test_scenario_settings_contract.py`) permanecem como sustentação da saída, não como tema reaberto."
+    - 'Executar `$env:PYTHONPATH=''src;.''; .\.venv\Scripts\python.exe -m pytest tests/decision_platform/test_scenario_settings_contract.py tests/decision_platform/test_scenario_persistence.py tests/decision_platform/test_phase1_exit_acceptance.py -q --basetemp tests/_tmp/pytest-basetemp-wave4-exit` como gate reproduzível e objetivo da fase.'
+    - 'O gate acima deve permanecer reproduzível no codebase local sem limpeza manual prévia de `tests/_tmp`.'
+    - 'Usar `docs/codex_dual_agent_runtime/phase_0_validation_manifest.json` no bloco `phase_1_exit_validation`, `docs/codex_dual_agent_runtime/supervisor_guidance.json` e `docs/2026-04-05_phase1_wave5_exit_handoff.md` como fonte única de saída operacional da phase_1.'
+    - 'O bundle oficial `data/decision_platform/maquete_v2` deve continuar canônico, versionável e rastreável via `scenario_bundle.yaml`, `component_catalog.csv`, `scenario_bundle_manifest` e `scenario_bundle_files`.'
+    - 'Os entrypoints oficiais (`run_decision_pipeline` e `save_and_reopen_local_bundle`) devem continuar falhando fechado para layout legado sem manifesto.'
+    - 'As suítes de contrato já endurecidas (`test_loaders.py`, `test_scenario_contract_validation.py`, `test_component_catalog_contract.py`, `test_scenario_settings_contract.py`) permanecem como sustentação da saída, não como tema reaberto.'
+    - 'Nenhuma nova wave funcional deve ocorrer dentro da phase_1 após a correção operacional final de fechamento.'
   closure_handoff:
-    summary_doc: "docs/2026-04-04_phase1_to_phase2_handoff.md"
+    summary_doc: "docs/2026-04-05_phase1_wave5_exit_handoff.md"
     freeze_rule: "Phase_2 deve consumir o bundle canônico como baseline congelado; não reabrir persistência, catálogo, rotas, settings, topologia ou layout sem novo handoff objetivo."
-    transition_note: "A phase_1 está encerrada; a continuidade do programa deve migrar para a phase_2 usando o handoff único desta transição."
+    transition_note: "A phase_1 está encerrada; a continuidade do programa deve migrar para a phase_2 apenas por abertura explícita após a correção operacional final."
 phase_2:
   target: "Entregar studio de nós e arestas"
-  status: "closed"
-  closure_mode: "frozen_after_wave_4"
-  next_phase_id: "phase_3"
+  status: "planned"
+  activation_mode: "explicit_open_after_phase_1_closeout"
+  activation_note: "Studio estrutural pertence à phase_2 e não deve voltar a contaminar o gate congelado da phase_1."
   exit_criteria:
     - "nós editáveis"
     - "arestas editáveis"
     - "salvar/reabrir cenário"
-  canonical_acceptance_target: "tests/decision_platform/test_phase2_exit_acceptance.py"
-  phase_exit_checklist:
-    - "Executar `.\.venv\\Scripts\\python.exe -m pytest tests/decision_platform/test_phase2_exit_acceptance.py -q -p no:cacheprovider` como gate único e objetivo da fase."
-    - "O gate acima deve provar criação, edição e exclusão estrutural mínima de nós e arestas via `Studio -> save/reopen -> rerun local` no bundle canônico."
-    - "O gate acima deve continuar falhando fechado para referências inválidas e para layout legado sem `scenario_bundle.yaml`."
-    - "Usar `docs/2026-04-05_phase2_exit.md` como fonte única de saída operacional da phase_2."
-    - "A próxima fase deve tratar fila/background runs como novo tema explícito, não como continuação implícita do save/reopen local."
-  closure_handoff:
-    summary_doc: "docs/2026-04-05_phase2_to_phase3_handoff.md"
-    freeze_rule: "A phase_3 deve consumir o Studio atual como baseline congelada; não reabrir autoria local de nós/arestas sem novo handoff objetivo."
-    transition_note: "A phase_2 está encerrada; a continuidade do programa deve migrar para a phase_3 com foco em fila/background runs."
 phase_3:
   target: "Fila e background runs"
   exit_criteria:

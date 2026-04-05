@@ -1,6 +1,6 @@
 {
   "phase_id": "phase_0",
-  "generated_at": "2026-04-04T18:18:36.4398905-03:00",
+  "generated_at": "2026-04-05T02:51:29.4955386Z",
   "script_path": "C:\\d\\dev\\agri_circuit_optimizer_scaffold\\scripts\\run_decision_platform_runtime_validation.ps1",
   "profiles_path": "C:\\d\\dev\\agri_circuit_optimizer_scaffold\\scripts\\decision_platform_runtime_validation_profiles.json",
   "logs_dir": "C:\\d\\dev\\agri_circuit_optimizer_scaffold\\scripts\\logs",
@@ -8,7 +8,7 @@
   "official_validation_sufficiency": "official_evidence",
   "phase_1_exit_validation": {
     "phase_id": "phase_1",
-    "generated_at": "2026-04-05T02:43:07.4504607Z",
+    "generated_at": "2026-04-05T02:51:29.4955386Z",
     "validation_profile": "phase_1_exit_gate",
     "validation_sufficiency": "phase_1_exit_evidence",
     "status": "sealed",
@@ -44,14 +44,17 @@
       "data/decision_platform/maquete_v2/scenario_bundle.yaml",
       "data/decision_platform/maquete_v2/component_catalog.csv",
       "docs/2026-04-05_phase1_wave4_exit_gate_handoff.md",
-      "docs/2026-04-05_phase1_wave5_exit_handoff.md"
+      "docs/2026-04-05_phase1_wave5_exit_handoff.md",
+      "docs/codex_dual_agent_runtime/supervisor_guidance.json"
     ],
     "out_of_scope": [
       "tests/decision_platform/test_studio_structure.py",
       "structural node or edge creation, duplication, or deletion",
       "queue and background runs",
       "ranking, scoring, and decision UI expansion"
-    ]
+    ],
+    "operational_closeout": "wave_6_corrective_only_no_new_functional_scope",
+    "no_additional_phase1_functional_waves": true
   },
   "profiles": {
     "diagnostic": {
@@ -166,5 +169,8 @@
   "current_phase_status": "sealed",
   "next_functional_phase": "phase_2",
   "current_phase_handoff": "docs/2026-04-05_phase1_wave5_exit_handoff.md",
-  "phase_0_runtime_handoff": "docs/codex_dual_agent_runtime/phase_0_exit.md"
+  "phase_0_runtime_handoff": "docs/codex_dual_agent_runtime/phase_0_exit.md",
+  "current_phase_guidance": "docs/codex_dual_agent_runtime/supervisor_guidance.json",
+  "phase_1_additional_functional_waves_allowed": false,
+  "final_operational_correction_wave": 6
 }
