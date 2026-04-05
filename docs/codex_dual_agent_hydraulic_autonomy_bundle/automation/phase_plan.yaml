@@ -43,10 +43,24 @@ phase_1:
     transition_note: "A phase_1 está encerrada; a continuidade do programa deve migrar para a phase_2 usando o handoff único desta transição."
 phase_2:
   target: "Entregar studio de nós e arestas"
+  status: "closed"
+  closure_mode: "frozen_after_wave_4"
+  next_phase_id: "phase_3"
   exit_criteria:
     - "nós editáveis"
     - "arestas editáveis"
     - "salvar/reabrir cenário"
+  canonical_acceptance_target: "tests/decision_platform/test_phase2_exit_acceptance.py"
+  phase_exit_checklist:
+    - "Executar `.\.venv\\Scripts\\python.exe -m pytest tests/decision_platform/test_phase2_exit_acceptance.py -q -p no:cacheprovider` como gate único e objetivo da fase."
+    - "O gate acima deve provar criação, edição e exclusão estrutural mínima de nós e arestas via `Studio -> save/reopen -> rerun local` no bundle canônico."
+    - "O gate acima deve continuar falhando fechado para referências inválidas e para layout legado sem `scenario_bundle.yaml`."
+    - "Usar `docs/2026-04-05_phase2_exit.md` como fonte única de saída operacional da phase_2."
+    - "A próxima fase deve tratar fila/background runs como novo tema explícito, não como continuação implícita do save/reopen local."
+  closure_handoff:
+    summary_doc: "docs/2026-04-05_phase2_to_phase3_handoff.md"
+    freeze_rule: "A phase_3 deve consumir o Studio atual como baseline congelada; não reabrir autoria local de nós/arestas sem novo handoff objetivo."
+    transition_note: "A phase_2 está encerrada; a continuidade do programa deve migrar para a phase_3 com foco em fila/background runs."
 phase_3:
   target: "Fila e background runs"
   exit_criteria:
