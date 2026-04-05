@@ -83,7 +83,7 @@ Observações:
 - o pipeline oficial exporta catálogo, ranking, candidato oficial, explicação do vencedor e agregados de viabilidade.
 - a comparação Julia vs Python existe apenas como trilha diagnóstica explícita.
 - a UI Dash já cobre catálogo, comparação, circuito, candidato oficial e filtros de decisão com persistência simples em sessão.
-- a phase 2 abriu com um studio visual mínimo de nós no app: seleção, nudge e edição básica de `nodes.csv` sobre o bundle canônico.
+- a phase 2 já cobre um studio visual mínimo de nós e arestas no app: seleção, nudge, edição básica e autoria estrutural mínima sobre `nodes.csv` e `candidate_links.csv` no bundle canônico.
 - o cenário `maquete_v2` agora tem save/reopen local versionado via `scenario_bundle.yaml` e `component_catalog.csv`.
 
 ### O que já está validado
@@ -99,7 +99,7 @@ Observações:
 - `DecisionEngine.jl` roda em Julia real e importa `WaterModels`, `JuMP` e `HiGHS`, mas a avaliação hidráulica decisória ainda é lógica própria em Julia, não um solve completo de rede via API do `WaterModels`
 - resiliência e parte da exploração topológica continuam heurísticas
 - a UI ainda é orientada a análise local; não há persistência multiusuário nem workflow de aprovação
-- o studio ainda é mínimo e focado em nós; edição visual completa de arestas, fila/background runs e workflow completo de decisão humana assistida continuam fora desta onda
+- o studio ainda é mínimo; ele já cria, duplica e exclui nós e cria/exclui arestas no bundle canônico, mas edição visual completa, fila/background runs e workflow completo de decisão humana assistida continuam fora desta onda
 
 ### Critério prático de aceite
 
@@ -181,8 +181,9 @@ Persistência local introduzida na phase 1:
 - `components.csv` permanece apenas como alias legado de compatibilidade
 - `save_scenario_bundle(...)` grava o bundle determinístico e `load_scenario_bundle(...)` reabre tanto o formato novo quanto o layout legado
 - `save_authored_scenario_bundle(...)` persiste as tabelas de autoria (`nodes`, `components`, `candidate_links`, `edge_component_rules`, `route_requirements`, `layout_constraints`) e os documentos `topology_rules.yaml` e `scenario_settings.yaml` no mesmo bundle canônico
-- a aba `Dados` da UI local expõe um fluxo único de `Salvar e reabrir bundle` para gravar e reabrir esse bundle sem depender só do estado de sessão
+- a aba `Dados` da UI local expõe um fluxo único de `Salvar e reabrir bundle` para gravar e reabrir esse bundle sem depender só do estado de sessão; o `Studio` usa esse mesmo fluxo para autoria estrutural mínima
 - o loader falha fechado para `candidate_links.csv` com `link_id` vazio/duplicado, self-loop, `archetype` sem regra correspondente e `family_hint` fora das famílias conhecidas/habilitadas
+- o `Studio` falha fechado ao tentar renomear ou excluir `node_id` ainda referenciado por `candidate_links.csv` ou `route_requirements.csv`
 - `docs/2026-04-04_phase1_exit.md` e `phase_1.phase_exit_checklist` em `docs/codex_dual_agent_hydraulic_autonomy_bundle/automation/phase_plan.yaml` são a fonte única de saída da phase 1
 - a `phase_1` está encerrada; o handoff único para iniciar a `phase_2` está em `docs/2026-04-04_phase1_to_phase2_handoff.md`
 

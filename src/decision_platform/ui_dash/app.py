@@ -166,6 +166,9 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
                                 persistence_type="session",
                             ),
                             html.Button("Aplicar propriedades do nó", id="node-studio-apply-button"),
+                            html.Button("Criar nó", id="node-studio-create-button"),
+                            html.Button("Duplicar nó", id="node-studio-duplicate-button"),
+                            html.Button("Excluir nó selecionado", id="node-studio-delete-button"),
                             dcc.Dropdown(
                                 id="node-studio-move-direction",
                                 options=[
@@ -238,6 +241,8 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
                                 persistence_type="session",
                             ),
                             html.Button("Aplicar propriedades da aresta", id="edge-studio-apply-button"),
+                            html.Button("Criar aresta", id="edge-studio-create-button"),
+                            html.Button("Excluir aresta selecionada", id="edge-studio-delete-button"),
                         ],
                     ),
                     dcc.Tab(
@@ -697,6 +702,81 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
         return updated_rows, next_selected_id, ""
 
     @app.callback(
+        Output("nodes-grid", "rowData", allow_duplicate=True),
+        Output("node-studio-selected-id", "data", allow_duplicate=True),
+        Output("studio-status-message", "data", allow_duplicate=True),
+        Input("node-studio-create-button", "n_clicks"),
+        State("nodes-grid", "rowData"),
+        State("node-studio-selected-id", "data"),
+        prevent_initial_call=True,
+    )
+    def _create_node_studio_entry(
+        n_clicks: Any,
+        nodes_rows: list[dict[str, Any]] | None,
+        selected_node_id: str | None,
+    ) -> tuple[list[dict[str, Any]], str | None, str]:
+        if not n_clicks:
+            return nodes_rows or [], selected_node_id, ""
+        updated_rows, next_selected_id = create_node_studio_node(
+            nodes_rows or [],
+            selected_node_id=selected_node_id,
+        )
+        return updated_rows, next_selected_id, ""
+
+    @app.callback(
+        Output("nodes-grid", "rowData", allow_duplicate=True),
+        Output("node-studio-selected-id", "data", allow_duplicate=True),
+        Output("studio-status-message", "data", allow_duplicate=True),
+        Input("node-studio-duplicate-button", "n_clicks"),
+        State("nodes-grid", "rowData"),
+        State("node-studio-selected-id", "data"),
+        prevent_initial_call=True,
+    )
+    def _duplicate_node_studio_entry(
+        n_clicks: Any,
+        nodes_rows: list[dict[str, Any]] | None,
+        selected_node_id: str | None,
+    ) -> tuple[list[dict[str, Any]], str | None, str]:
+        if not n_clicks:
+            return nodes_rows or [], selected_node_id, ""
+        updated_rows, next_selected_id = duplicate_node_studio_selection(
+            nodes_rows or [],
+            selected_node_id=selected_node_id,
+        )
+        return updated_rows, next_selected_id, ""
+
+    @app.callback(
+        Output("nodes-grid", "rowData", allow_duplicate=True),
+        Output("node-studio-selected-id", "data", allow_duplicate=True),
+        Output("studio-status-message", "data", allow_duplicate=True),
+        Input("node-studio-delete-button", "n_clicks"),
+        State("nodes-grid", "rowData"),
+        State("node-studio-selected-id", "data"),
+        State("candidate-links-grid", "rowData"),
+        State("routes-grid", "rowData"),
+        prevent_initial_call=True,
+    )
+    def _delete_node_studio_entry(
+        n_clicks: Any,
+        nodes_rows: list[dict[str, Any]] | None,
+        selected_node_id: str | None,
+        candidate_links_rows: list[dict[str, Any]] | None,
+        route_rows: list[dict[str, Any]] | None,
+    ) -> tuple[list[dict[str, Any]], str | None, str]:
+        if not n_clicks:
+            return nodes_rows or [], selected_node_id, ""
+        try:
+            updated_rows, next_selected_id = delete_node_studio_selection(
+                nodes_rows or [],
+                selected_node_id=selected_node_id,
+                candidate_links_rows=candidate_links_rows or [],
+                route_rows=route_rows or [],
+            )
+        except ValueError as exc:
+            return nodes_rows or [], selected_node_id, str(exc)
+        return updated_rows, next_selected_id, ""
+
+    @app.callback(
         Output("edge-studio-selected-id", "data"),
         Output("edge-studio-link-id", "value"),
         Output("edge-studio-from-node", "value"),
@@ -783,6 +863,77 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
             )
         except ValueError as exc:
             return candidate_links_rows or [], selected_link_id, str(exc)
+        return updated_rows, next_selected_link_id, ""
+
+    @app.callback(
+        Output("candidate-links-grid", "rowData", allow_duplicate=True),
+        Output("edge-studio-selected-id", "data", allow_duplicate=True),
+        Output("studio-status-message", "data", allow_duplicate=True),
+        Input("edge-studio-create-button", "n_clicks"),
+        State("candidate-links-grid", "rowData"),
+        State("edge-studio-selected-id", "data"),
+        State("edge-studio-from-node", "value"),
+        State("edge-studio-to-node", "value"),
+        State("edge-studio-archetype", "value"),
+        State("edge-studio-length-m", "value"),
+        State("edge-studio-bidirectional", "value"),
+        State("edge-studio-family-hint", "value"),
+        State("nodes-grid", "rowData"),
+        State("edge-component-rules-grid", "rowData"),
+        prevent_initial_call=True,
+    )
+    def _create_edge_studio_entry(
+        n_clicks: Any,
+        candidate_links_rows: list[dict[str, Any]] | None,
+        selected_link_id: str | None,
+        from_node: str | None,
+        to_node: str | None,
+        archetype: str | None,
+        length_m: Any,
+        bidirectional: list[str] | None,
+        family_hint: str | None,
+        nodes_rows: list[dict[str, Any]] | None,
+        edge_component_rules_rows: list[dict[str, Any]] | None,
+    ) -> tuple[list[dict[str, Any]], str | None, str]:
+        if not n_clicks:
+            return candidate_links_rows or [], selected_link_id, ""
+        try:
+            updated_rows, next_selected_link_id = create_edge_studio_link(
+                candidate_links_rows or [],
+                selected_link_id=selected_link_id,
+                from_node=from_node,
+                to_node=to_node,
+                archetype=archetype,
+                length_m=length_m,
+                bidirectional="bidirectional" in (bidirectional or []),
+                family_hint=family_hint,
+                nodes_rows=nodes_rows or [],
+                edge_component_rules_rows=edge_component_rules_rows or [],
+            )
+        except ValueError as exc:
+            return candidate_links_rows or [], selected_link_id, str(exc)
+        return updated_rows, next_selected_link_id, ""
+
+    @app.callback(
+        Output("candidate-links-grid", "rowData", allow_duplicate=True),
+        Output("edge-studio-selected-id", "data", allow_duplicate=True),
+        Output("studio-status-message", "data", allow_duplicate=True),
+        Input("edge-studio-delete-button", "n_clicks"),
+        State("candidate-links-grid", "rowData"),
+        State("edge-studio-selected-id", "data"),
+        prevent_initial_call=True,
+    )
+    def _delete_edge_studio_entry(
+        n_clicks: Any,
+        candidate_links_rows: list[dict[str, Any]] | None,
+        selected_link_id: str | None,
+    ) -> tuple[list[dict[str, Any]], str | None, str]:
+        if not n_clicks:
+            return candidate_links_rows or [], selected_link_id, ""
+        updated_rows, next_selected_link_id = delete_edge_studio_selection(
+            candidate_links_rows or [],
+            selected_link_id=selected_link_id,
+        )
         return updated_rows, next_selected_link_id, ""
 
     @app.callback(
@@ -1703,6 +1854,102 @@ def apply_node_studio_edit(
     return updated_rows, next_selected_id
 
 
+def create_node_studio_node(
+    nodes_rows: list[dict[str, Any]],
+    *,
+    selected_node_id: str | None,
+) -> tuple[list[dict[str, Any]], str]:
+    selected_id = _default_node_studio_selection(nodes_rows, preferred_node_id=selected_node_id)
+    selected_row = next(
+        (dict(row) for row in nodes_rows if str(row.get("node_id", "")).strip() == selected_id),
+        dict(nodes_rows[0]) if nodes_rows else {},
+    )
+    existing_ids = {
+        str(row.get("node_id", "")).strip()
+        for row in nodes_rows
+        if str(row.get("node_id", "")).strip()
+    }
+    next_node_id = _next_structural_identifier(existing_ids, "NEW_NODE")
+    base_x = _coerce_node_coordinate(selected_row.get("x_m"), 0.0) if selected_row else 0.0
+    base_y = _coerce_node_coordinate(selected_row.get("y_m"), 0.0) if selected_row else 0.0
+    new_row = {
+        **selected_row,
+        "node_id": next_node_id,
+        "node_type": "junction",
+        "label": f"Novo nó {next_node_id}",
+        "x_m": round(base_x + 0.03, 4),
+        "y_m": round(base_y + 0.03, 4),
+        "allow_inbound": True,
+        "allow_outbound": True,
+        "requires_mixing_service": False,
+        "zone": "internal",
+        "is_candidate_hub": False,
+        "notes": "Criado no studio",
+    }
+    return [*nodes_rows, new_row], next_node_id
+
+
+def duplicate_node_studio_selection(
+    nodes_rows: list[dict[str, Any]],
+    *,
+    selected_node_id: str | None,
+) -> tuple[list[dict[str, Any]], str | None]:
+    selected_id = _default_node_studio_selection(nodes_rows, preferred_node_id=selected_node_id)
+    if selected_id is None:
+        return nodes_rows, None
+    source_row = next(
+        (dict(row) for row in nodes_rows if str(row.get("node_id", "")).strip() == selected_id),
+        None,
+    )
+    if source_row is None:
+        return nodes_rows, None
+    existing_ids = {
+        str(row.get("node_id", "")).strip()
+        for row in nodes_rows
+        if str(row.get("node_id", "")).strip()
+    }
+    next_node_id = _next_structural_identifier(existing_ids, f"{selected_id}_copy")
+    duplicated_row = {
+        **source_row,
+        "node_id": next_node_id,
+        "label": f"{str(source_row.get('label', '')).strip()} copia",
+        "x_m": round(_coerce_node_coordinate(source_row.get("x_m"), 0.0) + 0.03, 4),
+        "y_m": round(_coerce_node_coordinate(source_row.get("y_m"), 0.0) + 0.03, 4),
+        "notes": f"{str(source_row.get('notes', '')).strip()} | duplicado no studio".strip(" |"),
+    }
+    return [*nodes_rows, duplicated_row], next_node_id
+
+
+def delete_node_studio_selection(
+    nodes_rows: list[dict[str, Any]],
+    *,
+    selected_node_id: str | None,
+    candidate_links_rows: list[dict[str, Any]] | None = None,
+    route_rows: list[dict[str, Any]] | None = None,
+) -> tuple[list[dict[str, Any]], str | None]:
+    selected_id = _default_node_studio_selection(nodes_rows, preferred_node_id=selected_node_id)
+    if selected_id is None:
+        return nodes_rows, None
+    link_refs = sorted(
+        str(row.get("link_id", "")).strip()
+        for row in (candidate_links_rows or [])
+        if str(row.get("from_node", "")).strip() == selected_id or str(row.get("to_node", "")).strip() == selected_id
+    )
+    route_refs = sorted(
+        str(row.get("route_id", "")).strip()
+        for row in (route_rows or [])
+        if str(row.get("source", "")).strip() == selected_id or str(row.get("sink", "")).strip() == selected_id
+    )
+    if link_refs or route_refs:
+        raise ValueError(
+            "Deleting node_id requires explicit reconciliation because candidate_links.csv/route_requirements.csv "
+            f"still reference '{selected_id}': links={link_refs}, routes={route_refs}"
+        )
+    remaining_rows = [dict(row) for row in nodes_rows if str(row.get("node_id", "")).strip() != selected_id]
+    next_selected_id = _default_node_studio_selection(remaining_rows)
+    return remaining_rows, next_selected_id
+
+
 def move_node_studio_selection(
     nodes_rows: list[dict[str, Any]],
     *,
@@ -1820,6 +2067,90 @@ def apply_edge_studio_edit(
             next_selected_id = target_link_id
         updated_rows.append(updated_row)
     return updated_rows, next_selected_id
+
+
+def create_edge_studio_link(
+    candidate_links_rows: list[dict[str, Any]],
+    *,
+    selected_link_id: str | None,
+    from_node: str | None = None,
+    to_node: str | None = None,
+    archetype: str | None = None,
+    length_m: Any = None,
+    bidirectional: bool | None = None,
+    family_hint: str | None = None,
+    nodes_rows: list[dict[str, Any]] | None = None,
+    edge_component_rules_rows: list[dict[str, Any]] | None = None,
+) -> tuple[list[dict[str, Any]], str]:
+    node_ids = [
+        str(row.get("node_id", "")).strip()
+        for row in (nodes_rows or [])
+        if str(row.get("node_id", "")).strip()
+    ]
+    if len(node_ids) < 2:
+        raise ValueError("candidate_links.csv requires at least two nodes to create an edge.")
+    selected_id = _default_edge_studio_selection(candidate_links_rows, preferred_link_id=selected_link_id)
+    selected_row = next(
+        (dict(row) for row in candidate_links_rows if str(row.get("link_id", "")).strip() == selected_id),
+        dict(candidate_links_rows[0]) if candidate_links_rows else {},
+    )
+    existing_ids = {
+        str(row.get("link_id", "")).strip()
+        for row in candidate_links_rows
+        if str(row.get("link_id", "")).strip()
+    }
+    next_link_id = _next_structural_identifier(
+        existing_ids,
+        f"{selected_id}_copy" if selected_id else "NEW_LINK",
+    )
+    default_from = str(from_node if from_node is not None else selected_row.get("from_node", node_ids[0])).strip()
+    default_to = str(to_node if to_node is not None else selected_row.get("to_node", node_ids[1])).strip()
+    if default_from == default_to:
+        default_to = next((node_id for node_id in node_ids if node_id != default_from), default_to)
+    default_archetype = str(
+        archetype if archetype is not None else selected_row.get("archetype", _default_edge_archetype(edge_component_rules_rows or []))
+    ).strip()
+    new_row = {
+        **selected_row,
+        "link_id": next_link_id,
+        "from_node": default_from,
+        "to_node": default_to,
+        "archetype": default_archetype,
+        "length_m": round(_coerce_edge_length(length_m, selected_row.get("length_m", 0.1)), 4),
+        "bidirectional": bool(
+            bidirectional if bidirectional is not None else bool(selected_row.get("bidirectional"))
+        ),
+        "family_hint": str(family_hint if family_hint is not None else selected_row.get("family_hint", "")).strip(),
+        "group_id": str(selected_row.get("group_id", "")).strip() or next_link_id.lower(),
+        "notes": str(selected_row.get("notes", "")).strip() or "Criada no studio",
+    }
+    updated_rows = [*candidate_links_rows, new_row]
+    return apply_edge_studio_edit(
+        updated_rows,
+        selected_link_id=next_link_id,
+        link_id=next_link_id,
+        from_node=new_row["from_node"],
+        to_node=new_row["to_node"],
+        archetype=new_row["archetype"],
+        length_m=new_row["length_m"],
+        bidirectional=bool(new_row["bidirectional"]),
+        family_hint=new_row["family_hint"],
+        nodes_rows=nodes_rows or [],
+        edge_component_rules_rows=edge_component_rules_rows or [],
+    )
+
+
+def delete_edge_studio_selection(
+    candidate_links_rows: list[dict[str, Any]],
+    *,
+    selected_link_id: str | None,
+) -> tuple[list[dict[str, Any]], str | None]:
+    selected_id = _default_edge_studio_selection(candidate_links_rows, preferred_link_id=selected_link_id)
+    if selected_id is None:
+        return candidate_links_rows, None
+    remaining_rows = [dict(row) for row in candidate_links_rows if str(row.get("link_id", "")).strip() != selected_id]
+    next_selected_id = _default_edge_studio_selection(remaining_rows)
+    return remaining_rows, next_selected_id
 
 
 def build_node_studio_elements(
@@ -2020,6 +2351,24 @@ def _build_edge_studio_summary(
         "selected_link_id": selected_id,
         "selected_edge": selected_row,
     }
+
+
+def _next_structural_identifier(existing_ids: set[str], base_id: str) -> str:
+    normalized_base = str(base_id).strip() or "NEW_ITEM"
+    if normalized_base not in existing_ids:
+        return normalized_base
+    suffix = 1
+    while f"{normalized_base}_{suffix}" in existing_ids:
+        suffix += 1
+    return f"{normalized_base}_{suffix}"
+
+
+def _default_edge_archetype(edge_component_rules_rows: list[dict[str, Any]]) -> str:
+    for row in edge_component_rules_rows:
+        archetype = str(row.get("archetype", "")).strip()
+        if archetype:
+            return archetype
+    return ""
 
 
 def _node_studio_position(row: dict[str, Any]) -> dict[str, float]:
