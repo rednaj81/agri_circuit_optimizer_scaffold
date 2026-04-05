@@ -10,6 +10,9 @@ import yaml
 from decision_platform.api.run_pipeline import (
     DEFAULT_RUN_QUEUE_ROOT,
     OfficialRuntimeConfigError,
+    cancel_run_job,
+    inspect_run_job,
+    rerun_run_job,
     run_decision_pipeline,
     summarize_run_jobs,
 )
@@ -75,11 +78,11 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
         authoring_payload["candidate_links_rows"],
         initial_edge_studio_selected_id,
     )
-    initial_run_jobs_summary = json.dumps(
-        build_run_jobs_summary(),
-        indent=2,
-        ensure_ascii=False,
-    )
+    initial_run_jobs_snapshot = build_run_jobs_snapshot()
+    initial_run_jobs_summary = _serialize_json(initial_run_jobs_snapshot["summary"])
+    initial_run_job_options = initial_run_jobs_snapshot["options"]
+    initial_run_job_selected_id = initial_run_jobs_snapshot["selected_run_id"]
+    initial_run_job_detail = _serialize_json(initial_run_jobs_snapshot["selected_run_detail"])
     initial_bundle_output_dir = str(Path(scenario_dir).parent / f"{Path(scenario_dir).name}_saved")
     initial_bundle_io_summary = json.dumps(
         {
@@ -305,7 +308,18 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
                             html.H2("Runs seriais"),
                             html.P("Inspeção mínima da fila serial local de run jobs."),
                             html.Button("Atualizar runs", id="run-jobs-refresh-button"),
+                            dcc.Dropdown(
+                                id="run-job-selected-id",
+                                options=initial_run_job_options,
+                                value=initial_run_job_selected_id,
+                                persistence=True,
+                                persistence_type="session",
+                            ),
+                            html.Button("Cancelar run selecionada", id="run-job-cancel-button"),
+                            html.Button("Reexecutar run selecionada", id="run-job-rerun-button"),
+                            html.Pre("", id="run-jobs-status"),
                             html.Pre(initial_run_jobs_summary, id="run-jobs-summary"),
+                            html.Pre(initial_run_job_detail, id="run-job-detail"),
                         ],
                     ),
                     dcc.Tab(
@@ -957,12 +971,113 @@ def build_app(scenario_dir: str | Path = "data/decision_platform/maquete_v2") ->
 
     @app.callback(
         Output("run-jobs-summary", "children"),
+        Output("run-job-selected-id", "options"),
+        Output("run-job-selected-id", "value"),
+        Output("run-job-detail", "children"),
+        Output("run-jobs-status", "children"),
         Input("run-jobs-refresh-button", "n_clicks"),
+        State("run-job-selected-id", "value"),
     )
-    def _refresh_run_jobs_summary(n_clicks: Any) -> str:
+    def _refresh_run_jobs_summary(
+        n_clicks: Any,
+        selected_run_id: str | None,
+    ) -> tuple[str, list[dict[str, str]], str | None, str, str]:
         if not n_clicks:
-            return initial_run_jobs_summary
-        return json.dumps(build_run_jobs_summary(), indent=2, ensure_ascii=False)
+            return (
+                initial_run_jobs_summary,
+                initial_run_job_options,
+                initial_run_job_selected_id,
+                initial_run_job_detail,
+                "",
+            )
+        snapshot = build_run_jobs_snapshot(preferred_run_id=selected_run_id)
+        return (
+            _serialize_json(snapshot["summary"]),
+            snapshot["options"],
+            snapshot["selected_run_id"],
+            _serialize_json(snapshot["selected_run_detail"]),
+            "",
+        )
+
+    @app.callback(
+        Output("run-jobs-summary", "children", allow_duplicate=True),
+        Output("run-job-selected-id", "options", allow_duplicate=True),
+        Output("run-job-selected-id", "value", allow_duplicate=True),
+        Output("run-job-detail", "children", allow_duplicate=True),
+        Output("run-jobs-status", "children", allow_duplicate=True),
+        Input("run-job-cancel-button", "n_clicks"),
+        State("run-job-selected-id", "value"),
+        prevent_initial_call=True,
+    )
+    def _cancel_selected_run_job(
+        n_clicks: Any,
+        selected_run_id: str | None,
+    ) -> tuple[str, list[dict[str, str]], str | None, str, str]:
+        status_message = ""
+        preferred_run_id = selected_run_id
+        if n_clicks:
+            if not selected_run_id:
+                status_message = "Nenhuma run selecionada para cancelamento."
+            else:
+                try:
+                    job = cancel_run_job(selected_run_id)
+                    preferred_run_id = job["run_id"]
+                    status_message = f"run_job {job['run_id']} -> {job['status']}"
+                except Exception as exc:
+                    status_message = str(exc)
+        snapshot = build_run_jobs_snapshot(preferred_run_id=preferred_run_id)
+        return (
+            _serialize_json(snapshot["summary"]),
+            snapshot["options"],
+            snapshot["selected_run_id"],
+            _serialize_json(snapshot["selected_run_detail"]),
+            status_message,
+        )
+
+    @app.callback(
+        Output("run-jobs-summary", "children", allow_duplicate=True),
+        Output("run-job-selected-id", "options", allow_duplicate=True),
+        Output("run-job-selected-id", "value", allow_duplicate=True),
+        Output("run-job-detail", "children", allow_duplicate=True),
+        Output("run-jobs-status", "children", allow_duplicate=True),
+        Input("run-job-rerun-button", "n_clicks"),
+        State("run-job-selected-id", "value"),
+        prevent_initial_call=True,
+    )
+    def _rerun_selected_run_job(
+        n_clicks: Any,
+        selected_run_id: str | None,
+    ) -> tuple[str, list[dict[str, str]], str | None, str, str]:
+        status_message = ""
+        preferred_run_id = selected_run_id
+        if n_clicks:
+            if not selected_run_id:
+                status_message = "Nenhuma run selecionada para reexecução."
+            else:
+                try:
+                    rerun_job = rerun_run_job(selected_run_id)
+                    preferred_run_id = rerun_job["run_id"]
+                    status_message = (
+                        f"run_job {rerun_job['run_id']} enfileirada como re-run de {selected_run_id}"
+                    )
+                except Exception as exc:
+                    status_message = str(exc)
+        snapshot = build_run_jobs_snapshot(preferred_run_id=preferred_run_id)
+        return (
+            _serialize_json(snapshot["summary"]),
+            snapshot["options"],
+            snapshot["selected_run_id"],
+            _serialize_json(snapshot["selected_run_detail"]),
+            status_message,
+        )
+
+    @app.callback(
+        Output("run-job-detail", "children", allow_duplicate=True),
+        Input("run-job-selected-id", "value"),
+        prevent_initial_call=True,
+    )
+    def _refresh_selected_run_job_detail(selected_run_id: str | None) -> str:
+        return _serialize_json(build_run_job_detail_summary(selected_run_id))
 
     @app.callback(
         Output("profile-dropdown", "options"),
@@ -2503,6 +2618,80 @@ def build_run_jobs_summary(queue_root: str | Path = DEFAULT_RUN_QUEUE_ROOT) -> d
             "error": str(exc),
             "runs": [],
         }
+
+
+def build_run_job_detail_summary(
+    run_id: str | None,
+    queue_root: str | Path = DEFAULT_RUN_QUEUE_ROOT,
+) -> dict[str, Any]:
+    if not run_id:
+        return {
+            "selected_run_id": None,
+            "status": "idle",
+            "message": "Nenhuma run selecionada.",
+        }
+    try:
+        job = inspect_run_job(run_id, queue_root=queue_root)
+    except Exception as exc:  # pragma: no cover
+        return {
+            "selected_run_id": run_id,
+            "status": "error",
+            "error": str(exc),
+        }
+    return {
+        "selected_run_id": job["run_id"],
+        "status": job["status"],
+        "requested_execution_mode": job.get("requested_execution_mode"),
+        "execution_mode": job.get("execution_mode"),
+        "official_gate_valid": job.get("official_gate_valid"),
+        "rerun_of_run_id": job.get("rerun_of_run_id"),
+        "rerun_source": job.get("rerun_source"),
+        "created_at": job.get("created_at"),
+        "started_at": job.get("started_at"),
+        "finished_at": job.get("finished_at"),
+        "run_dir": job.get("run_dir"),
+        "events_path": job.get("events_path"),
+        "log_path": job.get("log_path"),
+        "source_bundle_root": job.get("source_bundle_root"),
+        "source_bundle_version": job.get("source_bundle_version"),
+        "source_bundle_manifest": job.get("source_bundle_manifest"),
+        "source_bundle_files": job.get("source_bundle_files", {}),
+        "result_summary_path": job.get("result_summary_path"),
+        "error": job.get("error"),
+        "artifacts": job.get("artifacts", {}),
+        "events": job.get("events", []),
+        "log_tail": job.get("log_tail", ""),
+    }
+
+
+def build_run_jobs_snapshot(
+    queue_root: str | Path = DEFAULT_RUN_QUEUE_ROOT,
+    *,
+    preferred_run_id: str | None = None,
+) -> dict[str, Any]:
+    summary = build_run_jobs_summary(queue_root)
+    ordered_runs = list(summary.get("runs", []))
+    options = [
+        {
+            "label": f"{run['run_id']} [{run['status']}]",
+            "value": run["run_id"],
+        }
+        for run in reversed(ordered_runs)
+    ]
+    option_values = {option["value"] for option in options}
+    selected_run_id = preferred_run_id if preferred_run_id in option_values else (
+        options[0]["value"] if options else None
+    )
+    return {
+        "summary": summary,
+        "options": options,
+        "selected_run_id": selected_run_id,
+        "selected_run_detail": build_run_job_detail_summary(selected_run_id, queue_root=queue_root),
+    }
+
+
+def _serialize_json(payload: Any) -> str:
+    return json.dumps(payload, indent=2, ensure_ascii=False)
 
 
 def _requires_diagnostic_python_emulation(bundle: Any) -> bool:

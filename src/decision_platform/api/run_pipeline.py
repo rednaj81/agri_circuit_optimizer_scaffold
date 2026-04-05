@@ -88,6 +88,7 @@ def create_run_job(
     queue_root: str | Path = DEFAULT_RUN_QUEUE_ROOT,
     include_engine_comparison: bool = False,
     allow_diagnostic_python_emulation: bool = False,
+    rerun_source: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     normalized_scenario_dir = _normalize_path(scenario_dir)
     normalized_queue_root = _normalize_path(queue_root)
@@ -113,6 +114,8 @@ def create_run_job(
         "run_id": run_id,
         "scenario_provenance": scenario_provenance,
     }
+    if rerun_source is not None:
+        bundle_reference["rerun_source"] = rerun_source
     bundle_reference_path.write_text(json.dumps(bundle_reference, indent=2, ensure_ascii=False), encoding="utf-8")
     job = {
         "run_id": run_id,
@@ -132,9 +135,12 @@ def create_run_job(
         "log_path": str(log_path),
         "source_bundle_reference_path": str(bundle_reference_path),
         "source_bundle_root": scenario_provenance["scenario_root"],
+        "source_bundle_version": scenario_provenance["bundle_version"],
         "source_bundle_manifest": scenario_provenance["bundle_manifest"],
         "source_bundle_files": scenario_provenance["bundle_files"],
         "scenario_provenance": scenario_provenance,
+        "rerun_of_run_id": str(rerun_source.get("source_run_id")) if rerun_source is not None else None,
+        "rerun_source": rerun_source,
         "artifacts": {},
         "error": None,
         "runtime": None,
@@ -180,11 +186,17 @@ def summarize_run_jobs(queue_root: str | Path = DEFAULT_RUN_QUEUE_ROOT) -> dict[
                 "requested_execution_mode": job["requested_execution_mode"],
                 "source_bundle_root": job["source_bundle_root"],
                 "artifacts_dir": job["artifacts_dir"],
+                "rerun_of_run_id": job.get("rerun_of_run_id"),
                 "error": job.get("error"),
             }
             for job in jobs
         ],
     }
+
+
+def inspect_run_job(run_id: str, *, queue_root: str | Path = DEFAULT_RUN_QUEUE_ROOT) -> dict[str, Any]:
+    job = load_run_job(run_id, queue_root=queue_root)
+    return _build_run_job_detail(job)
 
 
 def cancel_run_job(run_id: str, *, queue_root: str | Path = DEFAULT_RUN_QUEUE_ROOT) -> dict[str, Any]:
@@ -197,6 +209,23 @@ def cancel_run_job(run_id: str, *, queue_root: str | Path = DEFAULT_RUN_QUEUE_RO
         job,
         status="canceled",
         message="Run job canceled before execution.",
+        artifacts=_build_run_artifact_manifest(Path(job["artifacts_dir"])),
+    )
+
+
+def rerun_run_job(run_id: str, *, queue_root: str | Path = DEFAULT_RUN_QUEUE_ROOT) -> dict[str, Any]:
+    source_job = load_run_job(run_id, queue_root=queue_root)
+    if source_job["status"] not in {"completed", "failed"}:
+        raise RuntimeError(
+            "Only completed or failed run_job entries can be re-run explicitly in the serial phase_3 worker."
+        )
+    rerun_source = _build_rerun_source(source_job)
+    return create_run_job(
+        source_job["source_bundle_root"],
+        queue_root=queue_root,
+        include_engine_comparison=bool(source_job.get("include_engine_comparison")),
+        allow_diagnostic_python_emulation=bool(source_job.get("allow_diagnostic_python_emulation")),
+        rerun_source=rerun_source,
     )
 
 
@@ -348,6 +377,17 @@ def _read_run_job(job_path: Path) -> dict[str, Any]:
     return json.loads(job_path.read_text(encoding="utf-8"))
 
 
+def _read_run_events(events_path: Path) -> list[dict[str, Any]]:
+    if not events_path.exists():
+        return []
+    events: list[dict[str, Any]] = []
+    for line in events_path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        events.append(json.loads(line))
+    return events
+
+
 def _append_run_event(job: dict[str, Any], *, status: str, message: str) -> None:
     event = {
         "timestamp": _utc_now_iso(),
@@ -366,6 +406,15 @@ def _append_run_log(job: dict[str, Any], message: str) -> None:
     log_path.parent.mkdir(parents=True, exist_ok=True)
     with log_path.open("a", encoding="utf-8") as handle:
         handle.write(f"{_utc_now_iso()} {message}\n")
+
+
+def _read_log_tail(log_path: Path, *, max_chars: int = 4000) -> str:
+    if not log_path.exists():
+        return ""
+    text = log_path.read_text(encoding="utf-8")
+    if len(text) <= max_chars:
+        return text
+    return text[-max_chars:]
 
 
 def _transition_run_job(
@@ -396,6 +445,9 @@ def _build_run_artifact_manifest(artifacts_dir: Path) -> dict[str, Any]:
         return {
             "artifacts_dir": str(artifacts_dir),
             "files": [],
+            "summary_json": None,
+            "catalog_csv": None,
+            "selected_candidate_json": None,
         }
     files = sorted(
         str(path.relative_to(artifacts_dir))
@@ -410,6 +462,36 @@ def _build_run_artifact_manifest(artifacts_dir: Path) -> dict[str, Any]:
         "selected_candidate_json": str(artifacts_dir / "selected_candidate.json")
         if (artifacts_dir / "selected_candidate.json").exists()
         else None,
+    }
+
+
+def _build_rerun_source(source_job: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "source_run_id": source_job["run_id"],
+        "source_status": source_job["status"],
+        "source_created_at": source_job.get("created_at"),
+        "source_finished_at": source_job.get("finished_at"),
+        "source_requested_execution_mode": source_job.get("requested_execution_mode"),
+        "source_execution_mode": source_job.get("execution_mode"),
+        "source_official_gate_valid": source_job.get("official_gate_valid"),
+        "source_bundle_root": source_job.get("source_bundle_root"),
+        "source_bundle_version": source_job.get("source_bundle_version"),
+        "source_bundle_manifest": source_job.get("source_bundle_manifest"),
+        "source_bundle_files": source_job.get("source_bundle_files", {}),
+        "source_job_path": source_job.get("job_path"),
+        "source_result_summary_path": source_job.get("result_summary_path"),
+    }
+
+
+def _build_run_job_detail(job: dict[str, Any]) -> dict[str, Any]:
+    events_path = Path(job["events_path"])
+    log_path = Path(job["log_path"])
+    artifacts_dir = Path(job["artifacts_dir"])
+    return {
+        **job,
+        "events": _read_run_events(events_path),
+        "log_tail": _read_log_tail(log_path),
+        "artifacts": job.get("artifacts") or _build_run_artifact_manifest(artifacts_dir),
     }
 
 

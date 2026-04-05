@@ -60,6 +60,9 @@ phase_3:
     - "run_job persistido localmente com estados canônicos"
     - "worker serial explícito sem simultaneidade no MVP"
     - "diretório isolado por run com log, eventos e artefatos próprios"
+    - "cancelamento explícito de jobs queued sem artefatos de execução"
+    - "re-run explícito de runs terminals com novo run_id e rastreabilidade da origem"
+    - "inspeção individual de run com status, eventos, log e artefatos"
   exit_criteria:
     - "jobs isolados"
     - "status por run"

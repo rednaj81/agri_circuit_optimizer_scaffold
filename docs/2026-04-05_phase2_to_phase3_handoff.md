@@ -36,6 +36,9 @@ A `phase_3` deve avançar em fila/background runs, isolamento por execução, st
 - `run_job` persistido localmente com estados `queued`, `preparing`, `running`, `exporting`, `completed`, `failed` e `canceled`
 - worker serial explícito: um job por vez, sem simultaneidade no MVP
 - diretório isolado por run com `job.json`, `events.jsonl`, `run.log`, `source_bundle_reference.json` e `artifacts/`
+- cancelamento explícito de jobs ainda em `queued`, sem artefatos de execução
+- re-run explícito de runs `completed` ou `failed`, sempre por criação de novo `run_id` com referência à run de origem
+- inspeção individual de run na UI local com status, eventos, log e diretório de artefatos
 - trilha diagnóstica continua opt-in explícito; modo oficial continua Julia-only quando solicitado
 
 ## Riscos operacionais remanescentes

@@ -198,6 +198,9 @@ Abertura mínima da phase 3:
 - `tests/decision_platform/test_phase3_queue_acceptance.py` valida o corte mínimo atual de fila serial
 - cada `run_job` usa diretório próprio com `job.json`, `events.jsonl`, `run.log`, `source_bundle_reference.json` e `artifacts/`
 - o worker da fase é serial e previsível: múltiplos jobs podem existir, mas apenas um é executado por vez
+- jobs ainda em `queued` podem ser cancelados explicitamente com `status=canceled` e evento próprio, sem gerar artefatos de execução
+- runs `completed` ou `failed` podem gerar um re-run explícito com novo `run_id` e referência rastreável à run de origem
+- a UI local agora permite inspecionar uma run individual com status, eventos, caminhos de log e artefatos, além de acionar cancelamento/re-run mínimo
 - o modo oficial continua Julia-only quando solicitado; qualquer trilha diagnóstica da fila segue opt-in explícito e não oficial
 
 Execução reproduzida nesta máquina em 2026-04-04 e consolidada pelo manifesto `docs/codex_dual_agent_runtime/phase_0_validation_manifest.json`. O artefato `engine_comparison.json` continua sendo apenas diagnóstico e nunca substitui a validação oficial do profile `official`, e criação/duplicação/exclusão estrutural de nós e arestas segue explicitamente fora do gate da `phase_1`.
