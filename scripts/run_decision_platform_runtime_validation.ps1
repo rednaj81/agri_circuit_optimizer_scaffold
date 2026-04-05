@@ -106,6 +106,19 @@ function Read-JsonFile {
     return Get-Content -LiteralPath $PathValue -Raw | ConvertFrom-Json -AsHashtable
 }
 
+function Write-JsonUtf8NoBom {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$PathValue,
+        [Parameter(Mandatory = $true)]
+        [object]$Payload
+    )
+
+    $json = $Payload | ConvertTo-Json -Depth 20
+    $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+    [System.IO.File]::WriteAllText($PathValue, $json, $utf8NoBom)
+}
+
 function Get-NestedValue {
     param(
         [Parameter(Mandatory = $true)]
@@ -144,7 +157,7 @@ function Save-Report {
         "decision-platform-runtime-validation_{0}_{1}.json" -f $script:ValidationProfile, $script:ReportTimestamp.ToString("yyyyMMdd-HHmmss-fff")
     )
     $script:Report.report_path = $reportPath
-    ($script:Report | ConvertTo-Json -Depth 20) | Set-Content -LiteralPath $reportPath -Encoding utf8
+    Write-JsonUtf8NoBom -PathValue $reportPath -Payload $script:Report
     return $reportPath
 }
 
@@ -282,7 +295,27 @@ function Save-Phase0ValidationManifest {
         profiles = $profiles
     }
 
-    ($manifest | ConvertTo-Json -Depth 20) | Set-Content -LiteralPath $script:ResolvedManifestPath -Encoding utf8
+    if (Test-Path -LiteralPath $script:ResolvedManifestPath) {
+        $existingManifest = Read-JsonFile -PathValue $script:ResolvedManifestPath
+        foreach ($fieldName in @(
+                "artifact_scope",
+                "current_phase_exit",
+                "current_phase_status",
+                "next_functional_phase",
+                "current_phase_handoff",
+                "phase_0_runtime_handoff",
+                "current_phase_guidance",
+                "phase_1_additional_functional_waves_allowed",
+                "final_operational_correction_wave",
+                "phase_1_exit_validation"
+            )) {
+            if ($existingManifest.ContainsKey($fieldName)) {
+                $manifest[$fieldName] = $existingManifest[$fieldName]
+            }
+        }
+    }
+
+    Write-JsonUtf8NoBom -PathValue $script:ResolvedManifestPath -Payload $manifest
     return $script:ResolvedManifestPath
 }
 

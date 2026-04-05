@@ -1,42 +1,74 @@
 {
-  "updated_at": "2026-04-05T04:10:00Z",
-  "phase_id": "phase_1",
-  "phase_assessment": "phase_closed",
-  "recommended_next_phase": "phase_2",
-  "current_focus": {
-    "active_wave_index": 0,
-    "active_role": "",
-    "waves_completed": 7,
-    "last_updated_at": "2026-04-05T04:10:00Z",
-    "health_state": "sealed",
-    "latest_commit": "9d873ed3f917400ae1f3a626326aaa71c3f8540b"
-  },
-  "recent_wave_objectives": [
-    "Concluir a primeira onda funcional da phase_1 consolidando o bundle canonico de cenario e a persistencia do catalogo de componentes, com round-trip reproduzivel e validacao fail-closed do contrato de dados.",
-    "Sanear a leitura operacional da phase_1 para que o repositorio a exponha apenas como encerrada, com continuidade funcional permitida somente por abertura explicita da phase_2."
-  ],
-  "recent_wave_verdicts": [
-    "moderate_progress",
-    "operational_correction"
-  ],
-  "recent_commit_subjects": [
-    "wave1 seal canonical manifest paths",
-    "wave5 close phase1 operational handoff",
-    "wave7 guard phase1 exit artifacts",
-    "wave4 seal phase1 exit gate"
-  ],
-  "directives": [
-    "Nao reabrir a phase_1: qualquer continuidade funcional exige abertura explicita da phase_2.",
-    "Usar apenas `phase_plan.yaml`, `phase_0_validation_manifest.json` e o handoff operacional ativo como fonte de verdade da fase.",
-    "Evitar novos wrappers, perfis ou camadas de automacao sem relacao direta com os criterios de saida ja selados."
-  ],
-  "rationale": [
-    "O plano canonico de fases e o manifesto de validacao ja registram a phase_1 como fechada e apontam a continuidade para a phase_2.",
-    "Snapshots de sessao como `supervisor_state.json` e `loop_state.json` podem refletir execucao local em andamento, mas nao devem redefinir o estado funcional congelado da fase."
-  ],
-  "closure_source": {
-    "phase_plan": "docs/codex_dual_agent_hydraulic_autonomy_bundle/automation/phase_plan.yaml",
-    "validation_manifest": "docs/codex_dual_agent_runtime/phase_0_validation_manifest.json",
-    "active_handoff": "docs/2026-04-05_phase1_wave5_exit_handoff.md"
-  }
+    "updated_at":  "2026-04-05T03:55:07.1968099Z",
+    "phase_id":  "phase_1",
+    "phase_assessment":  "phase_closed",
+    "recommended_next_phase":  "phase_2",
+    "current_focus":  {
+                          "active_wave_index":  7,
+                          "active_role":  "developer",
+                          "waves_completed":  7,
+                          "last_updated_at":  "2026-04-05T03:55:07.2080625Z",
+                          "health_state":  "phase_1_closed_no_further_functional_waves",
+                          "latest_commit":  "92d87fbb2fbd24f5bd15e18fbb1f6c7c9f77ea56"
+                      },
+    "recent_wave_objectives":  [
+                                   "Seal a reproducible phase_1 exit gate.",
+                                   "Close phase_1 operationally without adding scope.",
+                                   "Apply one final operational correction for reproducible closure artifacts.",
+                                   "Correct the regression in the phase_1 closure artifacts without reopening functional scope."
+                               ],
+    "recent_wave_verdicts":  [
+                                 "significant_progress",
+                                 "low_significance",
+                                 "regression",
+                                 "corrective_closeout"
+                             ],
+    "recent_commit_subjects":  [
+                                   "wave3 preserve phase2 redirect",
+                                   "wave2 reconcile phase1 sealed state",
+                                   "wave1 seal canonical manifest paths",
+                                   "wave8 restore phase1 guidance utf8",
+                                   "wave7 open phase3 serial queue",
+                                   "wave8 restore phase1 guidance utf8",
+                                   "wave7 guard phase1 exit artifacts",
+                                   "wave6 fix phase1 closure artifacts"
+                               ],
+    "directives":  [
+                       "Treat phase_1 as sealed after this regression correction.",
+                       "Do not schedule new functional waves inside phase_1.",
+                       "Open phase_2 explicitly for any structural studio continuation."
+                   ],
+    "rationale":  [
+                      "The functional exit criteria for phase_1 are already covered by code and tests.",
+                      "The only remaining work was restoring direct and reproducible reads of the closure artifacts."
+                  ],
+    "phase_exit_evidence":  {
+                                "manifest":  "docs/codex_dual_agent_runtime/phase_0_validation_manifest.json",
+                                "manifest_block":  "phase_1_exit_validation",
+                                "handoff":  "docs/2026-04-05_phase1_wave5_exit_handoff.md",
+                                "phase_plan":  "docs/codex_dual_agent_hydraulic_autonomy_bundle/automation/phase_plan.yaml",
+                                "tests":  [
+                                              "tests/decision_platform/test_scenario_settings_contract.py",
+                                              "tests/decision_platform/test_scenario_persistence.py",
+                                              "tests/decision_platform/test_phase1_exit_acceptance.py",
+                                              "tests/decision_platform/test_phase1_exit_artifacts.py"
+                                          ],
+                                "signals":  [
+                                                "scenario_bundle.yaml",
+                                                "component_catalog.csv",
+                                                "scenario_settings.storage canonical mapping",
+                                                "save -\u003e reopen -\u003e run provenance"
+                                            ]
+                            },
+    "phase_1_continuation_policy":  {
+                                        "additional_functional_waves_allowed":  false,
+                                        "final_operational_correction_wave":  7,
+                                        "next_functional_phase":  "phase_2"
+                                    },
+    "out_of_scope_for_phase_1":  [
+                                     "tests/decision_platform/test_studio_structure.py",
+                                     "structural node or edge creation, duplication, or deletion",
+                                     "queue and background runs",
+                                     "ranking, scoring, and decision UI expansion"
+                                 ]
 }

@@ -61,7 +61,8 @@ def read_json(path: Path) -> Any:
 
 def write_json(path: Path, payload: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+    serialized = json.dumps(payload, indent=2, ensure_ascii=False)
+    path.write_bytes(serialized.lstrip("\ufeff").encode("utf-8"))
 
 
 def tail_text(path: Path, max_chars: int = 12000) -> str:

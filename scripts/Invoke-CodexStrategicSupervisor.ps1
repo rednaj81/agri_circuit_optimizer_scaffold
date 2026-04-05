@@ -10,6 +10,7 @@ $runtimeRoot = Join-Path $repoRoot "docs\codex_dual_agent_runtime"
 $apiRoot = Join-Path $runtimeRoot "api"
 $guidancePath = Join-Path $runtimeRoot "supervisor_guidance.json"
 $logPath = Join-Path $apiRoot "strategic_supervisor.log"
+$phase1ManifestPath = Join-Path $runtimeRoot "phase_0_validation_manifest.json"
 
 New-Item -ItemType Directory -Force -Path $apiRoot | Out-Null
 
@@ -31,6 +32,17 @@ function Get-JsonFile {
         return $null
     }
     return Get-Content -LiteralPath $PathValue -Raw | ConvertFrom-Json
+}
+
+function Write-JsonUtf8NoBom {
+    param(
+        [string]$PathValue,
+        [object]$Payload
+    )
+
+    $json = $Payload | ConvertTo-Json -Depth 20
+    $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+    [System.IO.File]::WriteAllText($PathValue, $json, $utf8NoBom)
 }
 
 function Get-LatestCommit {
@@ -79,6 +91,97 @@ function New-Guidance {
     $latestVerdict = if ($recentVerdicts.Count -gt 0) { [string]$recentVerdicts[-1] } else { "" }
     $wavesCompleted = [int]($State.supervisor_state.waves_completed)
     $phaseId = [string]$State.supervisor_state.phase_id
+    $phase1Manifest = Get-JsonFile -PathValue $phase1ManifestPath
+
+    if (
+        $phase1Manifest -and
+        [string]$phase1Manifest.current_phase_exit -eq "phase_1" -and
+        [string]$phase1Manifest.current_phase_status -eq "sealed" -and
+        -not [bool]$phase1Manifest.phase_1_additional_functional_waves_allowed
+    ) {
+        $phase1Validation = $phase1Manifest.phase_1_exit_validation
+        $supportingTests = @()
+        if ($phase1Validation -and $phase1Validation.supporting_tests) {
+            $supportingTests = @($phase1Validation.supporting_tests)
+        }
+        if ($supportingTests.Count -eq 0) {
+            $supportingTests = @(
+                "tests/decision_platform/test_scenario_settings_contract.py",
+                "tests/decision_platform/test_scenario_persistence.py",
+                "tests/decision_platform/test_phase1_exit_acceptance.py",
+                "tests/decision_platform/test_phase1_exit_artifacts.py"
+            )
+        }
+
+        $outOfScope = @()
+        if ($phase1Validation -and $phase1Validation.out_of_scope) {
+            $outOfScope = @($phase1Validation.out_of_scope)
+        }
+        if ($outOfScope.Count -eq 0) {
+            $outOfScope = @(
+                "Structural studio creation, duplication, or deletion flows",
+                "Queue and background execution",
+                "Ranking, scoring, and decision UI expansion",
+                "Julia runtime changes beyond the frozen phase_0 gate"
+            )
+        }
+
+        return [ordered]@{
+            updated_at = (Get-Date).ToUniversalTime().ToString("o")
+            phase_id = "phase_1"
+            phase_assessment = "phase_closed"
+            recommended_next_phase = "phase_2"
+            current_focus = [ordered]@{
+                active_wave_index = [int]$phase1Manifest.final_operational_correction_wave
+                active_role = "developer"
+                waves_completed = [int]$phase1Manifest.final_operational_correction_wave
+                last_updated_at = (Get-Date).ToUniversalTime().ToString("o")
+                health_state = "phase_1_closed_no_further_functional_waves"
+                latest_commit = Get-LatestCommit
+            }
+            recent_wave_objectives = @(
+                "Seal a reproducible phase_1 exit gate.",
+                "Close phase_1 operationally without adding scope.",
+                "Apply one final operational correction for reproducible closure artifacts.",
+                "Correct the regression in the phase_1 closure artifacts without reopening functional scope."
+            )
+            recent_wave_verdicts = @(
+                "significant_progress",
+                "low_significance",
+                "regression",
+                "corrective_closeout"
+            )
+            recent_commit_subjects = $recentCommitSubjects
+            directives = @(
+                "Treat phase_1 as sealed after this regression correction.",
+                "Do not schedule new functional waves inside phase_1.",
+                "Open phase_2 explicitly for any structural studio continuation."
+            )
+            rationale = @(
+                "The functional exit criteria for phase_1 are already covered by code and tests.",
+                "The only remaining work was restoring direct and reproducible reads of the closure artifacts."
+            )
+            phase_exit_evidence = [ordered]@{
+                manifest = "docs/codex_dual_agent_runtime/phase_0_validation_manifest.json"
+                manifest_block = "phase_1_exit_validation"
+                handoff = "docs/2026-04-05_phase1_wave5_exit_handoff.md"
+                phase_plan = "docs/codex_dual_agent_hydraulic_autonomy_bundle/automation/phase_plan.yaml"
+                tests = $supportingTests
+                signals = @(
+                    "scenario_bundle.yaml",
+                    "component_catalog.csv",
+                    "scenario_settings.storage canonical mapping",
+                    "save -> reopen -> run provenance"
+                )
+            }
+            phase_1_continuation_policy = [ordered]@{
+                additional_functional_waves_allowed = $false
+                final_operational_correction_wave = [int]$phase1Manifest.final_operational_correction_wave
+                next_functional_phase = "phase_2"
+            }
+            out_of_scope_for_phase_1 = $outOfScope
+        }
+    }
 
     $directives = New-Object System.Collections.Generic.List[string]
     $rationale = New-Object System.Collections.Generic.List[string]
@@ -138,7 +241,7 @@ try {
     $state = Get-State
     $loopState = Get-JsonFile -PathValue (Join-Path $runtimeRoot "loop_state.json")
     $guidance = New-Guidance -State $state -LoopState $loopState
-    $guidance | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $guidancePath -Encoding utf8
+    Write-JsonUtf8NoBom -PathValue $guidancePath -Payload $guidance
     Write-StrategicLog "guidance_updated phase=$($guidance.phase_id) assessment=$($guidance.phase_assessment) active_wave=$($guidance.current_focus.active_wave_index) active_role=$($guidance.current_focus.active_role)"
 }
 catch {

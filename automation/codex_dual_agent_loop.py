@@ -489,7 +489,7 @@ def write_codex_config(
 
 def write_utf8(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(content, encoding="utf-8")
+    path.write_bytes(content.lstrip("\ufeff").encode("utf-8"))
 
 
 def powershell_single_quoted(value: str) -> str:
