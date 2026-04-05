@@ -1,15 +1,15 @@
 {
-    "updated_at":  "2026-04-05T07:13:23.3328418Z",
+    "updated_at":  "2026-04-05T07:19:27.2546324Z",
     "phase_id":  "phase_3",
     "phase_assessment":  "continue_phase",
     "recommended_next_phase":  "phase_3",
     "current_focus":  {
-                          "active_wave_index":  3,
-                          "active_role":  "developer",
-                          "waves_completed":  2,
-                          "last_updated_at":  "2026-04-05T07:12:24.092092+00:00",
+                          "active_wave_index":  4,
+                          "active_role":  "architect",
+                          "waves_completed":  3,
+                          "last_updated_at":  "2026-04-05T07:18:11.610352+00:00",
                           "health_state":  "phase_3_serial_queue_active",
-                          "latest_commit":  "ea139e07431f1971ae2e34d119dada1c65d1f954"
+                          "latest_commit":  "2c3d7bc03b1c904b48c6d166b2c9fc29a9514d44"
                       },
     "recent_wave_objectives":  [
                                    "Open phase_3 with the serial queue MVP.",
@@ -22,14 +22,14 @@
                                  "operational_alignment"
                              ],
     "recent_commit_subjects":  [
+                                   "wave5 preserve phase3 governance provenance",
                                    "wave4 align phase3 governance evidence",
                                    "wave3 harden terminal rerun traceability",
                                    "wave2 add phase3 run telemetry inspection",
                                    "wave6 record phase1 stop trigger",
                                    "wave14 add runs ui operations",
                                    "wave5 close phase1 follow-up track",
-                                   "wave4 finalize phase1 governance redirect",
-                                   "wave3 remove pytest cache warning"
+                                   "wave4 finalize phase1 governance redirect"
                                ],
     "directives":  [
                        "Treat phase_1 and phase_2 as closed baselines.",
@@ -43,7 +43,7 @@
     "current_phase_gate":  {
                                "manifest":  "docs/codex_dual_agent_runtime/phase_0_validation_manifest.json",
                                "manifest_block":  "phase_3_current_validation",
-                               "handoff":  "docs/2026-04-05_phase3_wave5_governance_provenance_redirect_handoff.md",
+                               "handoff":  "docs/2026-04-05_phase3_wave6_governance_commit_sync_handoff.md",
                                "phase_plan":  "docs/codex_dual_agent_hydraulic_autonomy_bundle/automation/phase_plan.yaml",
                                "tests":  [
                                              "tests/decision_platform/test_phase3_queue_acceptance.py",
