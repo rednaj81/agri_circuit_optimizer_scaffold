@@ -33,6 +33,7 @@ from decision_platform.ui_dash.app import (
     render_run_job_detail_panel,
     render_runs_flow_panel,
     render_studio_connectivity_panel,
+    render_studio_focus_panel,
     render_studio_readiness_panel,
     move_node_studio_selection,
     rerank_catalog,
@@ -185,6 +186,7 @@ def test_studio_tab_surfaces_readiness_and_selection_context() -> None:
     assert _find_component_by_id(studio_tab, "studio-readiness-panel") is not None
     assert _find_component_by_id(studio_tab, "studio-status-banner") is not None
     assert _find_component_by_id(studio_tab, "studio-projection-coverage-panel") is not None
+    assert _find_component_by_id(studio_tab, "studio-focus-panel") is not None
     assert _find_component_by_id(studio_tab, "studio-connectivity-panel") is not None
     assert _find_component_by_id(studio_tab, "node-studio-summary-panel") is not None
     assert _find_component_by_id(studio_tab, "edge-studio-summary-panel") is not None
@@ -307,6 +309,12 @@ def test_studio_connectivity_panel_surfaces_routes_and_measurement_near_canvas()
                 "Salvar e reabrir o bundle canonico quando a revisao estiver pronta.",
             ],
         },
+        {
+            "selected_node_id": "W",
+        },
+        {
+            "selected_edge": {"from_node": "W", "to_node": "M"},
+        },
         [
             {"route_id": "R001", "source": "W", "sink": "M", "mandatory": True, "measurement_required": False},
             {"route_id": "R002", "source": "I", "sink": "M", "mandatory": True, "measurement_required": True},
@@ -316,8 +324,36 @@ def test_studio_connectivity_panel_surfaces_routes_and_measurement_near_canvas()
 
     assert "Conectividade do grafo" in panel_text
     assert "R001: W -> M (obrigatória)" in panel_text
-    assert "R002: I -> M (obrigatória, medição direta)" in panel_text
+    assert "Prioridade da seleção atual" in panel_text
     assert "Corrigir bloqueios estruturais" in panel_text
+
+
+def test_studio_focus_panel_uses_canvas_selection_as_primary_context() -> None:
+    panel = render_studio_focus_panel(
+        {
+            "selected_node_id": "W",
+            "business_label": "Tanque de água",
+            "role_label": "Tanque de água",
+        },
+        {
+            "selected_link_id": "L001",
+            "business_label": "Água para misturador",
+            "selected_edge": {"from_node": "W", "to_node": "M"},
+            "from_label": "Tanque de água",
+            "to_label": "Misturador",
+        },
+        [
+            {"route_id": "R001", "source": "W", "sink": "M", "mandatory": True},
+            {"route_id": "R002", "source": "P1", "sink": "M", "mandatory": True},
+        ],
+    )
+    panel_text = _collect_text_content(panel)
+
+    assert "Foco do canvas" in panel_text
+    assert "Tanque de água" in panel_text
+    assert "Água para misturador" in panel_text
+    assert "Rotas ligadas ao nó" in panel_text
+    assert "Revise as rotas ligadas a W" in panel_text
 
 
 def test_runs_flow_panel_reflects_studio_gate_and_queue_state() -> None:

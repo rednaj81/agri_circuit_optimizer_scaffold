@@ -666,11 +666,24 @@ def render_studio_projection_panel(summary: dict[str, Any]) -> Any:
 
 def render_studio_connectivity_panel(
     summary: dict[str, Any],
+    node_summary: dict[str, Any],
+    edge_summary: dict[str, Any],
     route_rows: list[dict[str, Any]] | None,
 ) -> Any:
     route_rows = route_rows or []
+    focus_node_ids = {
+        str(node_summary.get("selected_node_id") or "").strip(),
+        str((edge_summary.get("selected_edge") or {}).get("from_node") or "").strip(),
+        str((edge_summary.get("selected_edge") or {}).get("to_node") or "").strip(),
+    }
+    focus_node_ids = {node_id for node_id in focus_node_ids if node_id}
+    prioritized_routes = [
+        route
+        for route in route_rows
+        if str(route.get("source") or "").strip() in focus_node_ids or str(route.get("sink") or "").strip() in focus_node_ids
+    ]
     route_lines = []
-    for route in route_rows[:4]:
+    for route in (prioritized_routes or route_rows)[:4]:
         route_id = str(route.get("route_id") or "ROTA")
         source = str(route.get("source") or "-")
         sink = str(route.get("sink") or "-")
@@ -691,13 +704,70 @@ def render_studio_connectivity_panel(
                     _metric_card("Bloqueios", summary.get("blocker_count", 0)),
                     _metric_card("Avisos", summary.get("warning_count", 0)),
                     _metric_card("Rotas obrigatórias", summary.get("mandatory_route_count", 0)),
-                    _metric_card("Medição direta", summary.get("measurement_route_count", 0)),
-                ],
+            _metric_card("Medição direta", summary.get("measurement_route_count", 0)),
+        ],
+    ),
+            html.Div(
+                "Prioridade da seleção atual" if prioritized_routes else "Prioridade geral do cenário",
+                style={"marginTop": "10px", "fontWeight": 700, "lineHeight": "1.5"},
             ),
             html.H4("Rotas em foco", style={"marginBottom": "6px"}),
             _bullet_list(route_lines, "Sem rotas registradas para esta leitura."),
             html.H4("Próxima ação", style={"marginBottom": "6px", "marginTop": "14px"}),
             _bullet_list(list(summary.get("next_steps", []))[:2], "Sem próximo passo registrado."),
+        ],
+    )
+
+
+def render_studio_focus_panel(
+    node_summary: dict[str, Any],
+    edge_summary: dict[str, Any],
+    route_rows: list[dict[str, Any]] | None,
+) -> Any:
+    route_rows = route_rows or []
+    selected_node_id = str(node_summary.get("selected_node_id") or "-")
+    selected_edge = edge_summary.get("selected_edge") or {}
+    selected_edge_id = str(edge_summary.get("selected_link_id") or "-")
+    relevant_routes = [
+        route
+        for route in route_rows
+        if selected_node_id not in {"", "-"}
+        and selected_node_id in {str(route.get("source") or "").strip(), str(route.get("sink") or "").strip()}
+    ]
+    node_next_action = (
+        f"Revise as rotas ligadas a {selected_node_id} antes de ajustar posição ou nome."
+        if relevant_routes
+        else "Use a bancada de edição apenas depois de confirmar se este nó precisa participar de uma rota obrigatória."
+    )
+    edge_next_action = (
+        f"Confira comprimento e famílias sugeridas para a conexão {selected_edge_id}."
+        if selected_edge
+        else "Selecione uma conexão no canvas para revisar impacto de fluxo e famílias sugeridas."
+    )
+    return html.Div(
+        id="studio-focus-panel",
+        children=[
+            html.H3("Foco do canvas", style={"marginTop": 0}),
+            html.Div(
+                style=UI_THREE_COLUMN_STYLE,
+                children=[
+                    _metric_card("Nó em foco", node_summary.get("business_label") or "-"),
+                    _metric_card("Conexão em foco", edge_summary.get("business_label") or "-"),
+                    _metric_card("Rotas ligadas ao nó", len(relevant_routes)),
+                ],
+            ),
+            html.H4("Impacto operacional", style={"marginBottom": "6px"}),
+            _bullet_list(
+                [
+                    f"Nó em foco: {node_summary.get('role_label') or '-'} na superfície principal.",
+                    f"Conexão em foco: {edge_summary.get('from_label') or '-'} -> {edge_summary.get('to_label') or '-'}."
+                    if selected_edge
+                    else "Selecione uma conexão no canvas para ver o fluxo principal em detalhe.",
+                ],
+                "Sem foco atual registrado.",
+            ),
+            html.H4("Próxima ação", style={"marginBottom": "6px", "marginTop": "14px"}),
+            _bullet_list([node_next_action, edge_next_action], "Sem próxima ação registrada."),
         ],
     )
 
@@ -1295,9 +1365,17 @@ def build_app(
                                         style={**UI_MUTED_CARD_STYLE, "display": "grid", "gap": "12px"},
                                         children=[
                                             html.Div(id="studio-status-banner", children=render_status_banner("")),
-                                            html.Div(id="node-studio-summary-panel", children=render_studio_selection_panel(_safe_json_loads(initial_node_studio_summary), "node")),
-                                            html.Div(id="edge-studio-summary-panel", children=render_studio_selection_panel(_safe_json_loads(initial_edge_studio_summary), "edge")),
-                                            render_studio_connectivity_panel(initial_studio_readiness, authoring_payload["route_rows"]),
+                                            render_studio_focus_panel(
+                                                _safe_json_loads(initial_node_studio_summary),
+                                                _safe_json_loads(initial_edge_studio_summary),
+                                                authoring_payload["route_rows"],
+                                            ),
+                                            render_studio_connectivity_panel(
+                                                initial_studio_readiness,
+                                                _safe_json_loads(initial_node_studio_summary),
+                                                _safe_json_loads(initial_edge_studio_summary),
+                                                authoring_payload["route_rows"],
+                                            ),
                                         ],
                                     ),
                                 ],
@@ -1314,6 +1392,7 @@ def build_app(
                                                 id="node-studio-business-editor",
                                                 style=UI_CARD_STYLE,
                                                 children=[
+                                                    html.Div(id="node-studio-summary-panel", children=render_studio_selection_panel(_safe_json_loads(initial_node_studio_summary), "node")),
                                                     html.H3("Entidade do cenário", style={"marginTop": 0}),
                                                     html.P(
                                                         "Edite o nome exibido e a posição da entidade no grafo principal. IDs, tipo técnico e flags ficam em campos avançados.",
@@ -1352,6 +1431,7 @@ def build_app(
                                                 id="edge-studio-business-editor",
                                                 style=UI_CARD_STYLE,
                                                 children=[
+                                                    html.Div(id="edge-studio-summary-panel", children=render_studio_selection_panel(_safe_json_loads(initial_edge_studio_summary), "edge")),
                                                     html.H3("Conexão do cenário", style={"marginTop": 0}),
                                                     html.P(
                                                         "Mantenha a edição principal focada na leitura do fluxo. Origem, destino e contratos técnicos ficam em campos avançados.",
@@ -2861,6 +2941,7 @@ def build_app(
         Output("studio-readiness-panel", "children"),
         Output("studio-projection-coverage-panel", "children"),
         Output("runs-flow-panel", "children"),
+        Output("studio-focus-panel", "children"),
         Output("studio-connectivity-panel", "children"),
         Output("node-studio-summary-panel", "children"),
         Output("edge-studio-summary-panel", "children"),
@@ -2881,17 +2962,20 @@ def build_app(
         node_summary_text: str | None,
         edge_summary_text: str | None,
         studio_status_text: str | None,
-    ) -> tuple[Any, Any, Any, Any, Any, Any, Any]:
+    ) -> tuple[Any, Any, Any, Any, Any, Any, Any, Any]:
         studio_readiness = build_studio_readiness_summary(nodes_rows or [], candidate_links_rows or [], route_rows or [])
+        node_summary = _safe_json_loads(node_summary_text)
+        edge_summary = _safe_json_loads(edge_summary_text)
         return (
             render_studio_readiness_panel(studio_readiness),
             render_studio_projection_panel(
                 build_studio_projection_summary(nodes_rows or [], candidate_links_rows or [], route_rows or [])
             ),
             render_runs_flow_panel(studio_readiness, _safe_json_loads(run_jobs_summary_text)),
-            render_studio_connectivity_panel(studio_readiness, route_rows),
-            render_studio_selection_panel(_safe_json_loads(node_summary_text), "node"),
-            render_studio_selection_panel(_safe_json_loads(edge_summary_text), "edge"),
+            render_studio_focus_panel(node_summary, edge_summary, route_rows),
+            render_studio_connectivity_panel(studio_readiness, node_summary, edge_summary, route_rows),
+            render_studio_selection_panel(node_summary, "node"),
+            render_studio_selection_panel(edge_summary, "edge"),
             render_status_banner(studio_status_text),
         )
 

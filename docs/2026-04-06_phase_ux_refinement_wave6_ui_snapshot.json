@@ -1,0 +1,42 @@
+{
+  "wave": "ux_phase_2_wave_2",
+  "validation": {
+    "targeted": "3 passed, 37 deselected in 0.61s",
+    "full": "40 passed in 403.39s"
+  },
+  "studio_focus_surface": {
+    "primary_panel_ids": [
+      "studio-focus-panel",
+      "studio-connectivity-panel",
+      "node-studio-summary-panel",
+      "edge-studio-summary-panel",
+      "studio-editor-workbench"
+    ],
+    "markers": [
+      "Foco do canvas",
+      "Conectividade do grafo",
+      "Ações de edição do grafo"
+    ]
+  },
+  "selection_driven_context": {
+    "focus_metrics": [
+      "Nó em foco",
+      "Conexão em foco",
+      "Rotas ligadas ao nó"
+    ],
+    "connectivity_priority_marker": "Prioridade da seleção atual",
+    "selection_examples": [
+      "Tanque de água",
+      "Água para misturador"
+    ]
+  },
+  "secondary_surface": {
+    "workbench_id": "studio-editor-workbench",
+    "technical_disclosure_ids": [
+      "node-studio-node-id",
+      "edge-studio-link-id",
+      "node-studio-summary",
+      "edge-studio-summary"
+    ]
+  }
+}
