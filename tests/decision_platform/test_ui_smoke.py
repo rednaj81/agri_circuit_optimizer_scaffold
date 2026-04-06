@@ -980,6 +980,8 @@ def test_runs_workspace_panel_prioritizes_queue_focus_and_primary_transition() -
     panel_text = _collect_text_content(panel)
 
     assert "Leitura operacional de Runs" in panel_text
+    assert "O que esta área resolve" in panel_text
+    assert "Estado atual" in panel_text
     assert "Gate do cenário" in panel_text
     assert "Fila agora" in panel_text
     assert "O que move a jornada agora" in panel_text
@@ -990,6 +992,20 @@ def test_runs_workspace_panel_prioritizes_queue_focus_and_primary_transition() -
 
 
 def test_primary_runs_panels_hide_raw_backend_keys_in_main_surface() -> None:
+    overview_panel = render_run_jobs_overview_panel(
+        {
+            "run_count": 4,
+            "queue_state": "running",
+            "worker_mode": "serial",
+            "next_queued_run_id": "run-004",
+            "active_run_ids": ["run-003"],
+            "queued_run_ids": ["run-004"],
+            "terminal_run_ids": ["run-001", "run-002"],
+            "latest_run_id": "run-003",
+            "latest_updated_at": "2026-04-06T04:00:00Z",
+            "status_counts": {"queued": 1, "running": 1, "completed": 1, "failed": 1},
+        }
+    )
     detail_panel = render_run_job_detail_panel(
         {
             "selected_run_id": "run-001",
@@ -1012,9 +1028,11 @@ def test_primary_runs_panels_hide_raw_backend_keys_in_main_surface() -> None:
             "error": None,
         }
     )
+    overview_text = _collect_text_content(overview_panel)
     detail_text = _collect_text_content(detail_panel)
     execution_text = _collect_text_content(execution_panel)
 
+    assert "Leitura operacional detalhada" in overview_text
     assert "official_gate_valid:" not in detail_text
     assert "policy_mode:" not in detail_text
     assert "duracao_s:" not in detail_text
@@ -1026,6 +1044,8 @@ def test_primary_runs_panels_hide_raw_backend_keys_in_main_surface() -> None:
     assert "Próxima ação" in detail_text
     assert "Próxima ação" in execution_text
     assert "Abrir Decisão desta execução" in execution_text
+    assert _component_id_is_inside_details(overview_panel, "run-jobs-overview-history-block") is True
+    assert _component_id_is_inside_details(execution_panel, "execution-summary-context-list") is True
 
 
 def test_run_job_detail_panel_covers_preparing_and_exporting_states() -> None:
@@ -1083,6 +1103,7 @@ def test_run_jobs_overview_panel_clarifies_queue_now_vs_recent_history() -> None
     assert "Próxima a rodar: run-004" in panel_text
     assert "Última run conhecida: run-003" in panel_text
     assert "Falhas" in panel_text
+    assert _component_id_is_inside_details(panel, "run-jobs-overview-history-block") is True
 
 
 def test_execution_summary_panel_only_opens_decision_with_usable_result() -> None:
@@ -1284,6 +1305,8 @@ def test_decision_workspace_panel_makes_winner_runner_up_and_tie_legible() -> No
     panel_text = _collect_text_content(panel)
 
     assert "Leitura principal da decisão" in panel_text
+    assert "O que esta área resolve" in panel_text
+    assert "Estado atual" in panel_text
     assert "Winner atual" in panel_text
     assert "Runner-up" in panel_text
     assert "Technical tieExplícito" in panel_text
@@ -1580,8 +1603,10 @@ def test_audit_bundle_panel_preserves_technical_space_but_explains_next_step() -
     assert "Bundle canônico pronto para auditoria e persistência." in panel_text
     assert "Pronto" in panel_text
     assert "Objetivo desta área" in panel_text
+    assert "Estado do bundle" in panel_text
     assert "Próxima ação" in panel_text
     assert "Use este espaço quando precisar salvar, reabrir ou reconciliar o bundle canônico" in panel_text
+    assert _component_id_is_inside_details(panel, "bundle-io-address-list") is True
 
 
 def test_audit_workspace_panel_relegates_auditoria_to_advanced_path() -> None:
@@ -1599,6 +1624,8 @@ def test_audit_workspace_panel_relegates_auditoria_to_advanced_path() -> None:
     panel_text = _collect_text_content(panel)
 
     assert "Trilha avançada" in panel_text
+    assert "O que esta área resolve" in panel_text
+    assert "Estado atual" in panel_text
     assert "Quando entrar aqui" in panel_text
     assert "Quando não entrar aqui" in panel_text
     assert "não bastar para reconciliar bundle" in panel_text.lower()

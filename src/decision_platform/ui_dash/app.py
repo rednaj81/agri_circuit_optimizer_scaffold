@@ -2788,26 +2788,45 @@ def render_run_jobs_overview_panel(summary: dict[str, Any]) -> Any:
                     _metric_card("Próxima run", summary.get("next_queued_run_id") or "-", "Entrada seguinte da fila"),
                 ],
             ),
-            html.H4("Fila agora", style={"marginBottom": "6px", "marginTop": "14px"}),
-            _bullet_list(
-                [
-                    f"Em execução: {', '.join(active_run_ids[:2])}" if active_run_ids else "",
-                    f"Próxima a rodar: {next_queued_run_id}" if next_queued_run_id else "",
-                    f"Worker local: {summary.get('worker_mode') or '-'}",
+            html.Details(
+                id="run-jobs-overview-history-details",
+                style={**UI_MUTED_CARD_STYLE, "marginTop": "14px"},
+                children=[
+                    html.Summary("Leitura operacional detalhada"),
+                    html.Div(
+                        id="run-jobs-overview-history-block",
+                        children=[
+                            html.H4("Fila agora", style={"marginBottom": "6px", "marginTop": "12px"}),
+                            _bullet_list(
+                                [
+                                    f"Em execução: {', '.join(active_run_ids[:2])}" if active_run_ids else "",
+                                    f"Próxima a rodar: {next_queued_run_id}" if next_queued_run_id else "",
+                                ],
+                                "Sem run ativa ou aguardando nesta leitura.",
+                            ),
+                            html.H4("Histórico recente", style={"marginBottom": "6px", "marginTop": "14px"}),
+                            _bullet_list(
+                                [
+                                    f"Última run conhecida: {latest_run_id}" if latest_run_id else "",
+                                    f"Última atualização observada: {latest_updated_at}" if latest_updated_at else "",
+                                    f"Runs terminais registradas: {len(summary.get('terminal_run_ids', []))}" if isinstance(summary, dict) else "",
+                                ],
+                                "Ainda não há histórico recente para leitura.",
+                            ),
+                            html.H4("Status por quantidade", style={"marginBottom": "6px", "marginTop": "14px"}),
+                            _bullet_list(
+                                [f"{_humanize_run_status(status)}: {count}" for status, count in status_counts.items()],
+                                "Ainda não há histórico suficiente para distribuir a fila por status.",
+                            ),
+                            html.H4("Contexto operacional", style={"marginBottom": "6px", "marginTop": "14px"}),
+                            _bullet_list(
+                                [f"Worker local: {summary.get('worker_mode') or '-'}"],
+                                "Sem contexto operacional adicional.",
+                            ),
+                        ],
+                    ),
                 ],
-                "Sem run ativa ou aguardando nesta leitura.",
             ),
-            html.H4("Histórico recente", style={"marginBottom": "6px", "marginTop": "14px"}),
-            _bullet_list(
-                [
-                    f"Última run conhecida: {latest_run_id}" if latest_run_id else "",
-                    f"Última atualização observada: {latest_updated_at}" if latest_updated_at else "",
-                    f"Runs terminais registradas: {len(summary.get('terminal_run_ids', []))}" if isinstance(summary, dict) else "",
-                ],
-                "Ainda não há histórico recente para leitura.",
-            ),
-            html.H4("Status por quantidade", style={"marginBottom": "6px", "marginTop": "14px"}),
-            _bullet_list([f"{_humanize_run_status(status)}: {count}" for status, count in status_counts.items()], "Ainda não há histórico suficiente para distribuir a fila por status."),
         ]
     )
 
@@ -2932,8 +2951,10 @@ def render_runs_workspace_panel(
                 ],
             ),
             html.Div(
-                style={**UI_THREE_COLUMN_STYLE, "marginBottom": "12px"},
+                style={**UI_TWO_COLUMN_STYLE, "marginBottom": "12px"},
                 children=[
+                    _guidance_card("O que esta área resolve", "Transformar readiness do Studio em fila, execução e próxima ação legíveis, sem depender de logs brutos."),
+                    _guidance_card("Estado atual", state["headline"]),
                     _guidance_card("Gate do cenário", str(studio_summary.get("readiness_headline") or state["readiness_note"])),
                     _guidance_card("Fila agora", queue_focus),
                     _guidance_card("Próxima ação", state["next_action"]),
@@ -3108,15 +3129,23 @@ def render_execution_summary_panel(summary: dict[str, Any]) -> Any:
                 ],
             ),
             html.Div(style=UI_THREE_COLUMN_STYLE, children=[_metric_card("Candidatos", summary.get("candidate_count", 0)), _metric_card("Viáveis", summary.get("feasible_count", 0)), _metric_card("Selecionado", summary.get("selected_candidate_id") or "-", str(summary.get("default_profile_id") or ""))]),
-            _label_value_list(
-                [
-                    ("Bundle analisado", summary.get("scenario_bundle_root")),
-                    ("Perfil padrão", summary.get("default_profile_id")),
-                    ("Erro operacional", error or "sem bloqueio crítico"),
-                ]
+            html.Details(
+                id="execution-summary-context-details",
+                style={**UI_MUTED_CARD_STYLE, "marginTop": "14px"},
+                children=[
+                    html.Summary("Contexto técnico secundário desta execução"),
+                    html.Div(
+                        id="execution-summary-context-list",
+                        children=_label_value_list(
+                            [
+                                ("Bundle analisado", summary.get("scenario_bundle_root")),
+                                ("Perfil padrão", summary.get("default_profile_id")),
+                                ("Erro operacional", error or "sem bloqueio crítico"),
+                            ]
+                        ),
+                    ),
+                ],
             ),
-            html.H4("Próxima ação", style={"marginBottom": "6px", "marginTop": "14px"}),
-            html.Div(next_action, style={"lineHeight": "1.6", "fontWeight": 700}),
             html.Div(
                 style=UI_ACTION_ROW_STYLE,
                 children=[html.Button(decision_button_label, id="execution-open-decision-button", style=UI_BUTTON_STYLE, disabled=not can_open_decision)],
@@ -3129,24 +3158,37 @@ def render_bundle_io_panel(summary: dict[str, Any]) -> Any:
     status = str(summary.get("status") or "idle")
     if status == "error":
         next_action = "Corrija o bloqueio de persistência antes de confiar neste bundle como fonte canônica."
+        state_text = "A trilha canônica precisa de correção antes de seguir."
     else:
         next_action = "Use este espaço quando precisar salvar, reabrir ou reconciliar o bundle canônico fora do fluxo principal."
+        state_text = "Bundle canônico pronto para auditoria e persistência."
     return html.Div(
         children=[
             html.Div(style={"display": "flex", "gap": "8px", "flexWrap": "wrap", "marginBottom": "8px"}, children=[html.Span(_humanize_audit_status(status), style=UI_PILL_STYLE), html.Span(str(summary.get("bundle_version") or "-"), style=UI_PILL_STYLE)]),
             html.Div("Estado atual", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
-            html.Div("Bundle canônico pronto para auditoria e persistência." if status != "error" else "A trilha canônica precisa de correção antes de seguir.", style={"lineHeight": "1.6", "fontWeight": 700, "margin": "6px 0 8px"}),
+            html.Div(state_text, style={"lineHeight": "1.6", "fontWeight": 700, "margin": "6px 0 8px"}),
             html.Div(
                 style={**UI_TWO_COLUMN_STYLE, "marginBottom": "12px"},
                 children=[
                     _guidance_card("Objetivo desta área", "Guardar a trilha canônica e a persistência do cenário sem recolocar isso na superfície principal."),
+                    _guidance_card("Estado do bundle", state_text),
                     _guidance_card("Próxima ação", next_action),
                 ],
             ),
-            html.Div(f"Raiz canonica: {summary.get('canonical_scenario_root') or '-'}", style={"lineHeight": "1.6"}),
-            html.Div(f"Manifesto: {summary.get('bundle_manifest') or '-'}", style={"lineHeight": "1.6"}),
-            html.H4("Próxima ação", style={"marginBottom": "6px", "marginTop": "14px"}),
-            html.Div(next_action, style={"lineHeight": "1.6", "fontWeight": 700}),
+            html.Details(
+                id="bundle-io-address-details",
+                style={**UI_MUTED_CARD_STYLE, "marginTop": "14px"},
+                children=[
+                    html.Summary("Endereços canônicos e manifesto"),
+                    html.Div(
+                        id="bundle-io-address-list",
+                        children=[
+                            html.Div(f"Raiz canonica: {summary.get('canonical_scenario_root') or '-'}", style={"lineHeight": "1.6"}),
+                            html.Div(f"Manifesto: {summary.get('bundle_manifest') or '-'}", style={"lineHeight": "1.6"}),
+                        ],
+                    ),
+                ],
+            ),
         ]
     )
 
@@ -3178,8 +3220,10 @@ def render_audit_workspace_panel(
                 ],
             ),
             html.Div(
-                style={**UI_THREE_COLUMN_STYLE, "marginBottom": "12px"},
+                style={**UI_TWO_COLUMN_STYLE, "marginBottom": "12px"},
                 children=[
+                    _guidance_card("O que esta área resolve", "Reconciliar bundle, persistência e evidência técnica sem competir com Studio, Runs ou Decisão."),
+                    _guidance_card("Estado atual", headline),
                     _guidance_card("Quando entrar aqui", "Quando bundle canônico, YAMLs, persistência ou tabelas completas forem necessários para reconciliar a trilha técnica."),
                     _guidance_card("Quando não entrar aqui", "Quando a próxima ação ainda for preparar o cenário, revisar a fila ou comparar winner e runner-up."),
                     _guidance_card("Próxima ação", next_action),
@@ -3329,8 +3373,10 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
                 ],
             ),
             html.Div(
-                style={**UI_THREE_COLUMN_STYLE, "marginBottom": "12px"},
+                style={**UI_TWO_COLUMN_STYLE, "marginBottom": "12px"},
                 children=[
+                    _guidance_card("O que esta área resolve", "Transformar a última execução utilizável em leitura comparável entre winner, runner-up e risco principal."),
+                    _guidance_card("Estado atual", decision_state["headline"]),
                     _guidance_card("Winner atual", candidate_id or "Ainda sem winner oficial legível"),
                     _guidance_card("Runner-up", runner_up_id or "Ainda sem runner-up comparável"),
                     _guidance_card("Próxima ação", decision_state["next_action"]),

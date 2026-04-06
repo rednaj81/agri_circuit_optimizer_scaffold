@@ -1,45 +1,31 @@
 {
   "wave": "ux_phase_1_wave_3",
   "validation": {
-    "targeted": "7 passed, 62 deselected in 1.42s",
-    "full": "74 passed in 421.08s (0:07:01)"
+    "targeted": "6 passed, 72 deselected in 0.73s",
+    "full": "87 passed in 592.06s (0:09:52)"
   },
-  "persistent_banner": {
-    "component_id": "product-space-banner",
-    "style": {
-      "position": "sticky",
-      "top": "16px",
-      "zIndex": 10
-    },
-    "switcher_ids": [
-      "product-space-switcher-studio-link",
-      "product-space-switcher-runs-link",
-      "product-space-switcher-decision-link",
-      "product-space-switcher-audit-link"
-    ],
-    "labels": [
-      "O que esta área resolve",
-      "Condição de saída",
-      "Trocar espaço"
-    ]
+  "first_fold_markers": {
+    "runs_workspace": "Leitura operacional de RunsDecisão disponívelA última execução já gerou contexto suficiente para entrar em Decisão.O que esta área resolveTransformar readiness do Studio em fila, execução e próxima ação legíveis, sem depender de logs brutos.Estado atualA última execução já gerou contexto suficiente para entrar em Decisão.",
+    "decision_workspace": "Leitura principal da decisãoEmpate técnicoWinner e runner-up seguem próximos o suficiente para exigir decisão humana assistida.O que esta área resolveTransformar a última execução utilizável em leitura comparável entre winner, runner-up e risco principal.Estado atualWinner e runner-up seguem próximos o suficiente para exigir decisão humana assistida.",
+    "audit_workspace": "Trilha avançadaProntoAuditoria permanece disponível como trilha avançada, sem competir com Studio, Runs ou Decisão.O que esta área resolveReconciliar bundle, persistência e evidência técnica sem competir com Studio, Runs ou Decisão.Estado atualAuditoria permanece disponível como trilha avançada, sem competir com Studio, Runs ou Decisão."
   },
-  "space_preview": {
-    "studio": "Espaço ativoStudioGrafo de negócio e readiness do cenárioTrocar espaçoStudioRunsDecisãoAuditoriaAqui a jornada começa no canvas principal, com foco em montar o cenário, revisar readiness e manter a leitura na camada de negócio.O que esta área resolveDeixar o cenário claro o suficiente para seguir para Runs sem depender",
-    "runs": "Espaço ativoRunsFila local e execução em focoTrocar espaçoStudioRunsDecisãoAuditoriaAqui a jornada sai do preparo do cenário e vira leitura operacional da fila, da run em foco e do último resultado.O que esta área resolveDecidir se ainda falta corrigir o cenário, executar a próxima rodada ou já abrir a decisão assistid",
-    "decision": "Espaço ativoDecisãoWinner, runner-up e contraste com contextoTrocar espaçoStudioRunsDecisãoAuditoriaAqui a jornada deixa de ser operacional e passa a ser comparativa, mantendo candidato oficial, runner-up e sinais de risco na mesma leitura.O que esta área resolveConfirmar se já existe escolha oficial legível ou se aind",
-    "audit": "Espaço ativoAuditoriaTrilha canônica e evidência técnicaTrocar espaçoStudioRunsDecisãoAuditoriaAqui ficam bundle, YAMLs e tabelas completas para reconciliação e explicabilidade, fora do caminho primário de produto.O que esta área resolveAprofundar persistência, contrato e evidência técnica sem recolocar isso na primeir"
+  "progressive_disclosure": {
+    "runs_overview_history_inside_details": true,
+    "execution_context_inside_details": true,
+    "bundle_addresses_inside_details": true
   },
-  "shell_sync": {
-    "query_param_decision": true,
-    "cta_runs": true,
-    "cta_audit": true
+  "panel_language": {
+    "runs_has_objective": true,
+    "decision_has_objective": true,
+    "audit_has_objective": true,
+    "runs_has_state": true,
+    "decision_has_state": true,
+    "audit_has_state": true
   },
-  "layout_presence": {
-    "banner_present": true,
-    "switcher_studio_present": true,
-    "switcher_runs_present": true,
-    "switcher_decision_present": true,
-    "switcher_audit_present": true
-  },
-  "visual_evidence_note": "Structured snapshot generated from the persistent shell banner and tab-aligned render paths for wave 3."
+  "visual_evidence_note": "Structured snapshot generated from Runs, Decision and Audit first-fold panels plus nested disclosure checks for wave 3.",
+  "residual_risks": [
+    "the denser ranking, comparison and canonical-editing surfaces remain intentionally available in deeper disclosure areas",
+    "visual screenshot evidence is still unavailable because this wave used structured UI evidence only",
+    "the repository worktree still contains unrelated agent and supervisor overlay changes outside this implementation commit"
+  ]
 }
