@@ -1,0 +1,246 @@
+{
+  "wave": "ux_phase_1_wave_1",
+  "captured_at": "2026-04-06",
+  "scenario_dir": "data/decision_platform/maquete_v2",
+  "hero_headline": "Studio, runs e decisão numa jornada única",
+  "validation": {
+    "command": "$env:PYTHONPATH='src;.'; .\\.venv\\Scripts\\python.exe -m pytest tests/decision_platform/test_ui_smoke.py -q -p no:cacheprovider --basetemp tests/_tmp/pytest-basetemp-ux-wave1-full-current",
+    "result": "50 passed in 482.60s (0:08:02)"
+  },
+  "visible_tab_labels": [
+    "Studio",
+    "Runs",
+    "Decisão",
+    "Auditoria"
+  ],
+  "product_space_banner": {
+    "present": true,
+    "studio": "Espaço ativoStudioGrafo de negócio e readiness do cenárioAqui a jornada começa no canvas principal, com foco em montar o cenário, revisar readiness e manter a leitura na camada de negócio.O que resolver aquiDeixar o cenário claro o suficiente para seguir para Runs sem depender da trilha técnica como superfície principal.Antes de sair desta áreaResolva readiness, projeção e foco do canvas antes de abrir a fila.",
+    "runs": "Espaço ativoRunsFila local e execução em focoAqui a jornada sai do preparo do cenário e vira leitura operacional da fila, da run em foco e do último resultado.O que resolver aquiDecidir se ainda falta corrigir o cenário, executar a próxima rodada ou já abrir a decisão assistida.Antes de sair desta áreaRevise a fila e a execução em foco antes de avançar para Decisão.",
+    "decision": "Espaço ativoDecisãoWinner, runner-up e contraste com contextoAqui a jornada deixa de ser operacional e passa a ser comparativa, mantendo candidato oficial, runner-up e sinais de risco na mesma leitura.O que resolver aquiConfirmar se já existe escolha oficial legível ou se ainda falta contraste para a decisão humana assistida.Antes de sair desta áreaValide winner, runner-up e sinais de risco antes de exportar ou abrir Auditoria.",
+    "audit": "Espaço ativoAuditoriaTrilha canônica e evidência técnicaAqui ficam bundle, YAMLs e tabelas completas para reconciliação e explicabilidade, fora do caminho primário de produto.O que resolver aquiAprofundar persistência, contrato e evidência técnica sem recolocar isso na primeira dobra das outras áreas.Antes de sair desta áreaUse esta área apenas quando a leitura principal não for suficiente para reconciliar o cenário ou a decisão."
+  },
+  "hero_navigation_links": [
+    "hero-open-studio-link",
+    "hero-open-runs-link",
+    "hero-open-decision-link",
+    "hero-open-audit-link"
+  ],
+  "visible_tabs": [
+    {
+      "label": "Studio",
+      "value": "studio",
+      "contains": {
+        "product_space_banner": false,
+        "studio_canvas_guidance_panel": true,
+        "runs_flow_panel": false,
+        "decision_flow_panel": false,
+        "bundle_io_summary": false
+      },
+      "details": [
+        {
+          "summary": "Outros atalhos rápidos",
+          "component_ids": [
+            "studio-focus-delete-edge-button",
+            "studio-focus-duplicate-node-button",
+            "studio-focus-move-down-button",
+            "studio-focus-move-left-button",
+            "studio-focus-move-up-button",
+            "studio-focus-open-workbench-button"
+          ]
+        },
+        {
+          "summary": "Ações de edição do grafo",
+          "component_ids": [
+            "edge-studio-apply-button",
+            "edge-studio-archetype",
+            "edge-studio-bidirectional",
+            "edge-studio-business-editor",
+            "edge-studio-create-button",
+            "edge-studio-delete-button",
+            "edge-studio-family-hint",
+            "edge-studio-from-node",
+            "edge-studio-length-m",
+            "edge-studio-link-id",
+            "edge-studio-summary-panel",
+            "edge-studio-to-node",
+            "node-studio-allow-inbound",
+            "node-studio-allow-outbound",
+            "node-studio-apply-button",
+            "node-studio-business-editor",
+            "node-studio-create-button",
+            "node-studio-delete-button",
+            "node-studio-duplicate-button",
+            "node-studio-label",
+            "node-studio-move-button",
+            "node-studio-move-direction",
+            "node-studio-move-step",
+            "node-studio-node-id",
+            "node-studio-node-type",
+            "node-studio-summary-panel",
+            "node-studio-x-m",
+            "node-studio-y-m"
+          ]
+        },
+        {
+          "summary": "Campos técnicos do nó",
+          "component_ids": [
+            "node-studio-allow-inbound",
+            "node-studio-allow-outbound",
+            "node-studio-node-id",
+            "node-studio-node-type"
+          ]
+        },
+        {
+          "summary": "Campos técnicos da conexão",
+          "component_ids": [
+            "edge-studio-archetype",
+            "edge-studio-bidirectional",
+            "edge-studio-from-node",
+            "edge-studio-link-id",
+            "edge-studio-to-node"
+          ]
+        },
+        {
+          "summary": "Onde está a trilha técnica",
+          "component_ids": []
+        },
+        {
+          "summary": "Auditoria técnica do Studio",
+          "component_ids": [
+            "edge-studio-summary",
+            "node-studio-summary",
+            "studio-status"
+          ]
+        }
+      ]
+    },
+    {
+      "label": "Runs",
+      "value": "runs",
+      "contains": {
+        "product_space_banner": false,
+        "studio_canvas_guidance_panel": false,
+        "runs_flow_panel": true,
+        "decision_flow_panel": false,
+        "bundle_io_summary": false
+      },
+      "details": [
+        {
+          "summary": "Auditoria técnica de runs",
+          "component_ids": [
+            "execution-summary",
+            "run-job-detail",
+            "run-jobs-status",
+            "run-jobs-summary"
+          ]
+        }
+      ]
+    },
+    {
+      "label": "Decisão",
+      "value": "decision",
+      "contains": {
+        "product_space_banner": false,
+        "studio_canvas_guidance_panel": false,
+        "runs_flow_panel": false,
+        "decision_flow_panel": true,
+        "bundle_io_summary": false
+      },
+      "details": [
+        {
+          "summary": "Ajustar pesos dinâmicos",
+          "component_ids": [
+            "weight-cleaning",
+            "weight-cost",
+            "weight-flow",
+            "weight-operability",
+            "weight-quality",
+            "weight-resilience"
+          ]
+        },
+        {
+          "summary": "Comparação aprofundada",
+          "component_ids": [
+            "compare-candidates-dropdown",
+            "comparison-download",
+            "comparison-figure",
+            "comparison-grid",
+            "comparison-json-download",
+            "export-comparison-button",
+            "export-comparison-json-button"
+          ]
+        },
+        {
+          "summary": "Circuito do candidato em foco",
+          "component_ids": [
+            "circuit-cytoscape",
+            "export-selected-button",
+            "route-highlight-dropdown",
+            "route-metrics-grid",
+            "selected-candidate-download",
+            "selected-candidate-dropdown",
+            "selected-candidate-summary",
+            "selected-candidate-summary-panel"
+          ]
+        },
+        {
+          "summary": "Resumo técnico do candidato",
+          "component_ids": [
+            "selected-candidate-summary"
+          ]
+        },
+        {
+          "summary": "Justificativa detalhada",
+          "component_ids": [
+            "candidate-breakdown",
+            "candidate-breakdown-panel",
+            "decision-summary-panel-extended",
+            "official-candidate-summary"
+          ]
+        },
+        {
+          "summary": "JSON técnico da justificativa",
+          "component_ids": [
+            "candidate-breakdown",
+            "official-candidate-summary"
+          ]
+        },
+        {
+          "summary": "Resumo técnico do estado de decisão",
+          "component_ids": [
+            "catalog-state-summary"
+          ]
+        }
+      ]
+    },
+    {
+      "label": "Auditoria",
+      "value": "audit",
+      "contains": {
+        "product_space_banner": false,
+        "studio_canvas_guidance_panel": false,
+        "runs_flow_panel": false,
+        "decision_flow_panel": false,
+        "bundle_io_summary": false
+      },
+      "details": [
+        {
+          "summary": "JSON técnico do bundle",
+          "component_ids": [
+            "bundle-io-summary"
+          ]
+        }
+      ]
+    }
+  ],
+  "product_transitions": {
+    "studio_to_runs": true,
+    "studio_to_audit": true,
+    "runs_to_studio": true,
+    "runs_to_decision": true,
+    "execution_to_decision": true,
+    "decision_to_runs": true,
+    "decision_to_audit": true
+  }
+}
