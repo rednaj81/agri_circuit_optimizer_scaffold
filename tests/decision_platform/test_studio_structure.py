@@ -35,6 +35,8 @@ def test_dash_app_exposes_structural_studio_controls() -> None:
     assert "node-studio-delete-button" in layout_repr
     assert "edge-studio-create-button" in layout_repr
     assert "edge-studio-delete-button" in layout_repr
+    assert "studio-canvas-open-workbench-button" in layout_repr
+    assert "studio-canvas-open-technical-guide-button" in layout_repr
 
 
 @pytest.mark.fast

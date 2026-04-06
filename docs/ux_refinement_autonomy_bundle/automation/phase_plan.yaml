@@ -188,3 +188,16 @@ wave_journal:
       ui_snapshot: docs/2026-04-06_phase_ux_refinement_wave9_ui_snapshot.json
       validation_command: "$env:PYTHONPATH='src;.'; .\\.venv\\Scripts\\python.exe -m pytest tests/decision_platform/test_ui_smoke.py -q -p no:cacheprovider --basetemp tests/_tmp/pytest-basetemp-ux-wave9-full"
       validation_result: "66 passed in 462.67s (0:07:42)"
+  - wave: 10
+    phase_id: ux_phase_5
+    status: completed
+    summary:
+      - the final wave stayed in stabilization mode and introduced no new flow, panel or primary interaction path
+      - the remaining structural Studio control expectations were aligned in the structural UI suite
+      - final combined validation now covers smoke and structural UI suites together for the closed phase state
+      - closure evidence is documented with a final structured snapshot and explicit residual-risk notes
+    evidence:
+      handoff: docs/2026-04-06_phase_ux_refinement_wave10_handoff.md
+      ui_snapshot: docs/2026-04-06_phase_ux_refinement_wave10_ui_snapshot.json
+      validation_command: "$env:PYTHONPATH='src;.'; .\\.venv\\Scripts\\python.exe -m pytest tests/decision_platform/test_ui_smoke.py tests/decision_platform/test_studio_structure.py -q -p no:cacheprovider --basetemp tests/_tmp/pytest-basetemp-ux-wave10-final"
+      validation_result: "71 passed in 508.02s (0:08:28)"
