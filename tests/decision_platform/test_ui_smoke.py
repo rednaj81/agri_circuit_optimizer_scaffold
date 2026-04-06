@@ -245,6 +245,8 @@ def test_studio_tab_surfaces_readiness_and_selection_context() -> None:
     assert _find_component_by_id(studio_tab, "studio-open-technical-guide-button") is not None
     assert _find_component_by_id(studio_tab, "studio-open-audit-button") is not None
     assert _find_component_by_id(studio_tab, "studio-open-runs-button") is not None
+    assert _find_component_by_id(studio_tab, "studio-readiness-open-runs-link") is not None
+    assert _find_component_by_id(studio_tab, "studio-readiness-open-audit-link") is not None
     recommended_focus_actions = [
         _find_component_by_id(studio_tab, "studio-focus-recommended-move-right-button"),
         _find_component_by_id(studio_tab, "studio-focus-recommended-open-workbench-button"),
@@ -360,6 +362,8 @@ def test_decision_tab_contains_advanced_sections_without_extra_primary_tabs() ->
     assert _find_component_by_id(decision_tab, "decision-contrast-panel") is not None
     assert _find_component_by_id(decision_tab, "decision-signal-panel") is not None
     assert _find_component_by_id(decision_tab, "decision-flow-panel") is not None
+    assert _find_component_by_id(decision_tab, "decision-flow-open-runs-link") is not None
+    assert _find_component_by_id(decision_tab, "decision-flow-open-audit-link") is not None
     assert _find_component_by_id(decision_tab, "decision-open-runs-button") is not None
     assert _find_component_by_id(decision_tab, "decision-open-audit-button") is not None
     assert _find_component_by_id(decision_tab, "compare-candidates-dropdown") is not None
@@ -376,6 +380,8 @@ def test_runs_tab_combines_queue_and_execution_summary() -> None:
     assert runs_tab is not None
     assert _find_component_by_id(runs_tab, "run-jobs-overview-panel") is not None
     assert _find_component_by_id(runs_tab, "runs-flow-panel") is not None
+    assert _find_component_by_id(runs_tab, "runs-flow-open-studio-link") is not None
+    assert _find_component_by_id(runs_tab, "runs-flow-open-decision-link") is not None
     assert _find_component_by_id(runs_tab, "execution-summary-panel") is not None
     assert _find_component_by_id(runs_tab, "runs-open-studio-button") is not None
     assert _find_component_by_id(runs_tab, "runs-open-decision-button") is not None
@@ -395,10 +401,15 @@ def test_studio_readiness_panel_surfaces_runs_transition_with_real_readiness() -
     assert "Passagem para Runs" in panel_text
     assert "Objetivo desta área" in panel_text
     assert "Ação principal" in panel_text
+    assert "Fluxo principal" in panel_text
+    assert "Agora no Studio" in panel_text
+    assert "Destino seguinte" in panel_text
     assert "ainda não tem fluxo suficiente" in panel_text.lower()
     assert "Conectar o grafo principal" in panel_text
     assert "Abrir Runs quando o cenário estiver pronto" in panel_text
     assert _find_component_by_id(panel, "studio-open-runs-button") is not None
+    assert getattr(_find_component_by_id(panel, "studio-readiness-open-runs-link"), "href", None) == "?tab=runs"
+    assert getattr(_find_component_by_id(panel, "studio-readiness-open-audit-link"), "href", None) == "?tab=audit"
 
 
 def test_studio_readiness_panel_humanizes_primary_blockers_and_warnings() -> None:
@@ -585,11 +596,16 @@ def test_runs_flow_panel_reflects_studio_gate_and_queue_state() -> None:
     assert "Passagem Studio -> Runs" in panel_text
     assert "Objetivo desta área" in panel_text
     assert "Ação principal" in panel_text
+    assert "Fluxo principal" in panel_text
+    assert "Entrada de Studio" in panel_text
+    assert "Saída para Decisão" in panel_text
     assert "Exige atenção" in panel_text
     assert "Voltar ao Studio" in panel_text
     assert "Ir para Decisão" in panel_text
     assert "run-003" in panel_text
     assert "conectividade" in panel_text.lower()
+    assert getattr(_find_component_by_id(panel, "runs-flow-open-studio-link"), "href", None) == "?tab=studio"
+    assert getattr(_find_component_by_id(panel, "runs-flow-open-decision-link"), "href", None) == "?tab=decision"
 
 
 def test_primary_runs_panels_hide_raw_backend_keys_in_main_surface() -> None:
@@ -668,12 +684,17 @@ def test_decision_flow_panel_makes_transition_and_next_action_explicit() -> None
     assert "Passagem Runs -> Decisão" in panel_text
     assert "Objetivo desta área" in panel_text
     assert "Ação principal" in panel_text
+    assert "Fluxo principal" in panel_text
+    assert "Winner atual" in panel_text
+    assert "Saída do fluxo" in panel_text
     assert "cand-01" in panel_text
     assert "cand-02" in panel_text
     assert "Empate técnico" in panel_text
     assert "Voltar para Runs" in panel_text
     assert "Abrir Auditoria" in panel_text
     assert "leitura humana assistida" in panel_text.lower()
+    assert getattr(_find_component_by_id(panel, "decision-flow-open-runs-link"), "href", None) == "?tab=runs"
+    assert getattr(_find_component_by_id(panel, "decision-flow-open-audit-link"), "href", None) == "?tab=audit"
 
 
 def test_catalog_state_panel_explains_when_filters_hide_all_candidates() -> None:

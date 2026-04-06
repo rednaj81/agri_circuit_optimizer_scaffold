@@ -1235,17 +1235,55 @@ def render_studio_focus_panel(
         if selected_edge
         else "Selecione uma conexão no canvas para revisar impacto de fluxo e famílias sugeridas."
     )
+    if edge_breaks_direction_rule and selected_edge_present:
+        selection_state_label = "Conexão em foco"
+        selection_state_headline = "A conexão selecionada ainda trava o cenário."
+    elif selected_edge_present:
+        selection_state_label = "Conexão em foco"
+        selection_state_headline = "A conexão selecionada concentra o próximo ajuste do fluxo."
+    elif selected_node_present:
+        selection_state_label = "Nó em foco"
+        selection_state_headline = f"{node_summary.get('business_label') or selected_node_id} já orienta a próxima revisão no canvas."
+    else:
+        selection_state_label = "Sem seleção"
+        selection_state_headline = "Selecione um nó ou uma conexão para abrir o contexto principal do Studio."
+    support_items = [
+        f"Nó em foco: {node_summary.get('role_label') or '-'} na superfície principal."
+        if selected_node_present
+        else "Nenhum nó em foco no momento.",
+        f"Conexão em foco: {edge_summary.get('from_label') or '-'} -> {edge_summary.get('to_label') or '-'}."
+        if selected_edge
+        else "Nenhuma conexão em foco no momento.",
+        f"Rotas deste foco: {mandatory_route_count} obrigatória(s), {dosing_route_count} com dosagem, {measurement_route_count} com medição direta."
+        if relevant_routes
+        else "Sem rota ligada a este foco neste momento.",
+    ]
+    context_highlights = list(
+        dict.fromkeys(
+            [focus_objective]
+            + focus_rules[:2]
+            + readiness_context[:2]
+        )
+    )
+    next_steps = list(
+        dict.fromkeys(
+            [recommended_action_text]
+            + ([edge_next_action] if selected_edge_present else [node_next_action])
+            + ([] if blocker_count > 0 else [runs_gate_text])
+        )
+    )
     return html.Div(
         id="studio-focus-panel",
         children=[
             html.H3("Foco do canvas", style={"marginTop": 0}),
             html.Div(id="studio-status-banner", children=render_status_banner(status_text or "")),
+            html.Div(selection_state_label, style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d", "marginTop": "8px"}),
+            html.Div(selection_state_headline, style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"}),
             html.Div(
-                style={**UI_THREE_COLUMN_STYLE, "marginBottom": "12px"},
+                style={**UI_TWO_COLUMN_STYLE, "marginTop": "12px", "marginBottom": "12px"},
                 children=[
-                    _guidance_card("Objetivo desta leitura", focus_objective),
-                    _guidance_card("Próxima ação no canvas", recommended_action_text),
-                    _guidance_card("Passagem para Runs", runs_gate_text),
+                    _guidance_card("Problema ou oportunidade", context_highlights[0] if context_highlights else focus_objective),
+                    _guidance_card("Próxima ação", recommended_action_text),
                 ],
             ),
             html.Div(
@@ -1254,25 +1292,16 @@ def render_studio_focus_panel(
                     _metric_card("Nó em foco", node_summary.get("business_label") or "-"),
                     _metric_card("Conexão em foco", edge_summary.get("business_label") or "-"),
                     _metric_card("Rotas ligadas ao nó", len(relevant_routes)),
+                    _metric_card("Readiness", _humanize_readiness_status(readiness_summary.get("status") or "needs_attention")),
                 ],
             ),
-            html.H4("Impacto operacional", style={"marginBottom": "6px"}),
-            _bullet_list(
-                [
-                    f"Nó em foco: {node_summary.get('role_label') or '-'} na superfície principal.",
-                    f"Conexão em foco: {edge_summary.get('from_label') or '-'} -> {edge_summary.get('to_label') or '-'}."
-                    if selected_edge
-                    else "Selecione uma conexão no canvas para ver o fluxo principal em detalhe.",
-                    f"Rotas deste foco: {mandatory_route_count} obrigatória(s), {dosing_route_count} com dosagem, {measurement_route_count} com medição direta."
-                    if relevant_routes
-                    else "Sem rota ligada a este foco neste momento.",
-                ],
-                "Sem foco atual registrado.",
+            html.H4("Por que este foco importa", style={"marginBottom": "6px", "marginTop": "14px"}),
+            _bullet_list(support_items + context_highlights[1:], "Sem foco atual registrado."),
+            html.H4("Passagem para Runs", style={"marginBottom": "6px", "marginTop": "14px"}),
+            html.Div(
+                style={**UI_MUTED_CARD_STYLE, "padding": "12px"},
+                children=[html.Div(runs_gate_text, style={"fontWeight": 700, "lineHeight": "1.5"})],
             ),
-            html.H4("Regras deste foco", style={"marginBottom": "6px", "marginTop": "14px"}),
-            _bullet_list(focus_rules, "Nenhuma regra estrutural adicional foi acionada neste foco."),
-            html.H4("Readiness deste foco", style={"marginBottom": "6px", "marginTop": "14px"}),
-            _bullet_list(readiness_context, "Sem observação adicional de readiness neste foco."),
             html.H4("Ações rápidas deste foco", style={"marginBottom": "6px", "marginTop": "14px"}),
             html.Div(
                 style={**UI_MUTED_CARD_STYLE, "padding": "14px", "marginTop": "8px"},
@@ -1300,7 +1329,7 @@ def render_studio_focus_panel(
                 ],
             ),
             html.H4("Próxima ação", style={"marginBottom": "6px", "marginTop": "14px"}),
-            _bullet_list([node_next_action, edge_next_action], "Sem próxima ação registrada."),
+            _bullet_list(next_steps, "Sem próxima ação registrada."),
         ],
     )
 
@@ -1313,13 +1342,18 @@ def render_studio_selection_panel(summary: dict[str, Any], selection_type: str) 
     surface_tone = "Interno oculto" if summary.get("is_internal") else "Superfície principal"
     if not selected:
         selection_label = "entidade" if selection_type == "node" else "conexão"
+        empty_state_text = (
+            "Selecione um nó no canvas para preparar edição de posição, rótulo e papel operacional desta entidade."
+            if selection_type == "node"
+            else "Selecione uma conexão no canvas para revisar fluxo, famílias sugeridas e impacto estrutural."
+        )
         return html.Div(
             children=[
                 html.H4("Seleção ativa", style={"margin": 0}),
                 html.Div(f"Nenhuma {selection_label} em foco.", style={"marginTop": "6px", "lineHeight": "1.6"}),
                 html.H4("Próxima ação", style={"marginBottom": "6px", "marginTop": "14px"}),
                 html.Div(
-                    "Selecione um nó ou uma conexão no canvas para abrir a leitura contextual e os atalhos rápidos deste espaço.",
+                    empty_state_text,
                     style={"lineHeight": "1.6", "fontWeight": 700},
                 ),
             ]
@@ -1346,6 +1380,12 @@ def render_studio_selection_panel(summary: dict[str, Any], selection_type: str) 
             html.Div(
                 style={"display": "flex", "gap": "8px", "flexWrap": "wrap", "marginTop": "8px"},
                 children=[html.Span(role_label, style=UI_PILL_STYLE), html.Span(surface_tone, style=UI_PILL_STYLE)],
+            ),
+            html.Div(
+                "Use este resumo para preparar a edição do nó sem tirar o canvas do centro."
+                if selection_type == "node"
+                else "Use este resumo para preparar a revisão desta conexão antes de abrir campos avançados.",
+                style={"marginTop": "10px", "lineHeight": "1.6", "fontWeight": 700},
             ),
             html.Ul(
                 [html.Li(item) for item in preview if item],
@@ -1659,12 +1699,15 @@ def render_decision_flow_panel(summary: dict[str, Any]) -> Any:
     if not candidate_id:
         headline = "Ainda falta uma run confiável para abrir a leitura principal de decisão."
         next_action = "Volte para Runs, revise a execução em foco e só então retorne para a decisão humana assistida."
+        contrast_state = "Sem winner e runner-up legíveis nesta leitura."
     elif decision_status == "technical_tie":
         headline = "Winner e runner-up seguem próximos o suficiente para exigir leitura humana assistida."
         next_action = "Mantenha a comparação aprofundada aberta, valide riscos e use Auditoria apenas se precisar reconciliar a trilha técnica."
+        contrast_state = "Empate técnico ativo; mantenha o runner-up visível antes de oficializar."
     else:
         headline = "A execução atual já entrega um winner legível e um runner-up de referência."
         next_action = "Confirme os sinais de risco, compare o runner-up e siga para Auditoria apenas se precisar aprofundar evidências técnicas."
+        contrast_state = "Winner claro; use o runner-up como contraste de referência antes de exportar."
     return html.Div(
         children=[
             html.H3("Passagem Runs -> Decisão", style={"marginTop": 0}),
@@ -1673,6 +1716,15 @@ def render_decision_flow_panel(summary: dict[str, Any]) -> Any:
                 children=[
                     _guidance_card("Objetivo desta área", "Explicar se a execução atual já pode ser lida como decisão ou se ainda falta contexto."),
                     _guidance_card("Ação principal", next_action),
+                ],
+            ),
+            html.H4("Fluxo principal", style={"marginBottom": "6px"}),
+            html.Div(
+                style={**UI_THREE_COLUMN_STYLE, "marginBottom": "12px"},
+                children=[
+                    _guidance_card("Winner atual", candidate_id or "Ainda sem candidato oficial legível."),
+                    _guidance_card("Contraste atual", contrast_state),
+                    _guidance_card("Saída do fluxo", next_action),
                 ],
             ),
             html.Div(headline, style={"fontWeight": 700, "lineHeight": "1.5"}),
@@ -1689,6 +1741,8 @@ def render_decision_flow_panel(summary: dict[str, Any]) -> Any:
             html.Div(
                 style=UI_ACTION_ROW_STYLE,
                 children=[
+                    _button_link("Voltar para Runs", "?tab=runs", "decision-flow-open-runs-link"),
+                    _button_link("Abrir Auditoria", "?tab=audit", "decision-flow-open-audit-link", primary=True),
                     html.Button("Voltar para Runs", id="decision-open-runs-button", style=UI_BUTTON_STYLE),
                     html.Button("Abrir Auditoria", id="decision-open-audit-button", style=UI_BUTTON_STYLE),
                 ],
@@ -2232,18 +2286,19 @@ def build_app(
                                 state_hint="Camada principal: fila local, run em foco e último resumo executivo.",
                                 action_hint="Escolha a próxima run, revise o estado atual e execute apenas o próximo passo necessário.",
                             ),
+                            html.Div(id="runs-flow-panel", children=render_runs_flow_panel(initial_studio_readiness, initial_run_jobs_snapshot["summary"]), style=UI_CARD_STYLE),
                             html.Div(
                                 style=UI_TWO_COLUMN_STYLE,
                                 children=[
                                     html.Div(id="run-jobs-overview-panel", children=render_run_jobs_overview_panel(initial_run_jobs_snapshot["summary"]), style=UI_CARD_STYLE),
-                                    html.Div(id="runs-flow-panel", children=render_runs_flow_panel(initial_studio_readiness, initial_run_jobs_snapshot["summary"]), style=UI_MUTED_CARD_STYLE),
+                                    html.Div(id="execution-summary-panel", children=render_execution_summary_panel(_safe_json_loads(initial_execution_summary)), style=UI_MUTED_CARD_STYLE),
                                 ],
                             ),
                             html.Div(
                                 style=UI_TWO_COLUMN_STYLE,
                                 children=[
-                                    html.Div(id="execution-summary-panel", children=render_execution_summary_panel(_safe_json_loads(initial_execution_summary)), style=UI_MUTED_CARD_STYLE),
-                                    html.Div(id="run-jobs-status-banner", children=render_status_banner(""), style=UI_CARD_STYLE),
+                                    html.Div(id="run-job-detail-panel", children=render_run_job_detail_panel(initial_run_jobs_snapshot["selected_run_detail"]), style=UI_MUTED_CARD_STYLE),
+                                    html.Div(id="run-jobs-status-banner", children=render_status_banner(""), style=UI_MUTED_CARD_STYLE),
                                 ],
                             ),
                             html.Div(
@@ -2257,7 +2312,6 @@ def build_app(
                                             _field_block("Run selecionada", dcc.Dropdown(id="run-job-selected-id", options=initial_run_job_options, value=initial_run_job_selected_id, persistence=True, persistence_type="session")),
                                         ],
                                     ),
-                                    html.Div(id="run-job-detail-panel", children=render_run_job_detail_panel(initial_run_jobs_snapshot["selected_run_detail"]), style=UI_MUTED_CARD_STYLE),
                                 ],
                             ),
                             html.Details(
@@ -2289,6 +2343,7 @@ def build_app(
                                 state_hint="Camada principal: escolha oficial, comparação e circuito do candidato.",
                                 action_hint="Confirme winner versus runner-up, leia o technical tie quando houver e só depois aprofunde o racional técnico.",
                             ),
+                            html.Div(id="decision-flow-panel", children=render_decision_flow_panel(initial_official_summary), style=UI_CARD_STYLE),
                             html.Div(
                                 style=UI_TWO_COLUMN_STYLE,
                                 children=[
@@ -2300,10 +2355,9 @@ def build_app(
                                 style=UI_TWO_COLUMN_STYLE,
                                 children=[
                                     html.Div(id="decision-signal-panel", children=render_decision_signal_panel(initial_official_summary), style=UI_CARD_STYLE),
-                                    html.Div(id="decision-flow-panel", children=render_decision_flow_panel(initial_official_summary), style=UI_MUTED_CARD_STYLE),
+                                    html.Div(id="catalog-state-summary-panel", children=render_catalog_state_panel(_safe_json_loads(initial_catalog_summary)), style=UI_MUTED_CARD_STYLE),
                                 ],
                             ),
-                            html.Div(id="catalog-state-summary-panel", children=render_catalog_state_panel(_safe_json_loads(initial_catalog_summary)), style={**UI_MUTED_CARD_STYLE, "marginTop": "16px"}),
                             html.Div(
                                 style=UI_CARD_STYLE,
                                 children=[
