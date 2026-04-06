@@ -157,6 +157,16 @@ def _hero_navigation_link(label: str, href: str, component_id: str) -> Any:
     return html.A(label, href=href, id=component_id, style=UI_NAV_LINK_STYLE)
 
 
+def _guidance_card(label: str, text: str) -> Any:
+    return html.Div(
+        style={**UI_MUTED_CARD_STYLE, "padding": "12px"},
+        children=[
+            html.Div(label, style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+            html.Div(text, style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"}),
+        ],
+    )
+
+
 def _section_intro(title: str, description: str, *, state_hint: str | None = None, action_hint: str | None = None) -> Any:
     hint_children = []
     for label, text in [("Estado atual", state_hint), ("Próxima ação", action_hint)]:
@@ -238,6 +248,17 @@ def _label_value_list(items: list[tuple[str, Any]]) -> Any:
     )
 
 
+def _guided_empty_state(title: str, state_text: str, next_action: str) -> Any:
+    return html.Div(
+        children=[
+            html.H3(title, style={"marginTop": 0}),
+            html.Div(state_text, style={"lineHeight": "1.6"}),
+            html.H4("Próxima ação", style={"marginBottom": "6px", "marginTop": "14px"}),
+            html.Div(next_action, style={"lineHeight": "1.6", "fontWeight": 700}),
+        ]
+    )
+
+
 def _humanize_infeasibility_reason(reason: Any) -> str:
     normalized = str(reason or "").strip()
     if not normalized:
@@ -284,6 +305,91 @@ def _humanize_route_issue(reason: Any) -> str:
         "hydraulic_or_meter_infeasible": "restrição hidráulica ou de medição",
     }
     return route_lookup.get(normalized, normalized)
+
+
+def _humanize_readiness_status(status: Any) -> str:
+    lookup = {
+        "ready": "Pronto",
+        "needs_attention": "Exige atenção",
+        "blocked": "Bloqueado",
+        "partial": "Parcial",
+        "complete": "Completo",
+        "degraded": "Degradado",
+    }
+    normalized = str(status or "").strip().lower()
+    return lookup.get(normalized, normalized.replace("_", " ") or "-")
+
+
+def _humanize_run_status(status: Any) -> str:
+    lookup = {
+        "idle": "Sem pendências",
+        "queued": "Na fila",
+        "running": "Executando",
+        "completed": "Concluída",
+        "failed": "Falhou",
+        "canceled": "Cancelada",
+        "unknown": "Sem leitura",
+    }
+    normalized = str(status or "").strip().lower()
+    return lookup.get(normalized, normalized.replace("_", " ") or "-")
+
+
+def _humanize_decision_status(status: Any) -> str:
+    normalized = str(status or "").strip().lower()
+    if normalized == "technical_tie":
+        return "Empate técnico"
+    if normalized == "winner_clear":
+        return "Winner claro"
+    return normalized.replace("_", " ") or "-"
+
+
+def _humanize_readiness_issue(issue: Any) -> str:
+    text = str(issue or "").strip()
+    if not text:
+        return "Sem detalhe registrado."
+    if " entra em W" in text:
+        link_id = text.split(" entra em W", 1)[0]
+        return f"A conexão {link_id} termina em W, mas W deve apenas iniciar fluxo."
+    if " sai de S" in text:
+        link_id = text.split(" sai de S", 1)[0]
+        return f"A conexão {link_id} sai de S, mas S deve aparecer apenas como destino final."
+    if text.startswith("Rotas com dosagem sem medicao direta:"):
+        route_ids = text.split(":", 1)[1].strip()
+        return f"Há rotas com dosagem sem medição direta compatível: {route_ids}."
+    if " referencia source inexistente:" in text:
+        route_id, source = text.split(" referencia source inexistente:", 1)
+        return f"A rota {route_id} aponta para uma origem que não está disponível no cenário: {source.strip()}."
+    if " referencia sink inexistente:" in text:
+        route_id, sink = text.split(" referencia sink inexistente:", 1)
+        return f"A rota {route_id} aponta para um destino que não está disponível no cenário: {sink.strip()}."
+    if " ainda nao tem saida conectada a partir de " in text:
+        route_id, source = text.split(" ainda nao tem saida conectada a partir de ", 1)
+        return f"A rota {route_id} ainda não encontrou uma saída conectada a partir de {source.strip()}."
+    if " ainda nao tem entrada conectada em " in text:
+        route_id, sink = text.split(" ainda nao tem entrada conectada em ", 1)
+        return f"A rota {route_id} ainda não encontrou uma entrada conectada em {sink.strip()}."
+    if text.startswith("Nos sem conexao no grafo visivel:"):
+        node_ids = text.split(":", 1)[1].strip()
+        return f"Ainda existem entidades sem conexão na leitura principal do grafo: {node_ids}."
+    return text
+
+
+def _guided_empty_state(title: str, headline: str, next_action: str, *, tone: str = "needs_attention") -> Any:
+    background, color = _status_tone(tone)
+    return html.Div(
+        children=[
+            html.H3(title, style={"marginTop": 0}),
+            html.Div(
+                style={"display": "flex", "alignItems": "center", "gap": "10px", "margin": "8px 0 14px", "flexWrap": "wrap"},
+                children=[
+                    html.Span("Aguardando contexto", style={"padding": "6px 10px", "borderRadius": "999px", "background": background, "color": color, "fontWeight": 700}),
+                    html.Span(headline, style={"fontWeight": 700, "lineHeight": "1.5"}),
+                ],
+            ),
+            html.H4("Próxima ação", style={"marginBottom": "6px"}),
+            html.Div(next_action, style={"lineHeight": "1.6", "fontWeight": 700}),
+        ],
+    )
 
 
 def _coerce_truthy(value: Any) -> bool:
@@ -494,11 +600,54 @@ def build_studio_readiness_summary(
     visible_business_nodes = _visible_studio_nodes(nodes_rows)
     projected_business_routes = _primary_route_projection_rows(nodes_rows, route_rows)
     status = "ready" if not blockers and node_ids and candidate_links_rows and mandatory_routes else "needs_attention"
-    readiness_headline = (
-        "Cenário pronto para seguir para Runs."
-        if status == "ready"
-        else "Ainda há bloqueios ou avisos a revisar antes de enfileirar."
-    )
+    if not node_ids:
+        readiness_headline = "Comece montando o cenário no Studio antes de abrir a fila."
+        readiness_stage = "Montar a base do cenário"
+        primary_action = "Adicionar entidades de negócio no canvas para começar a leitura operacional."
+        next_steps = [
+            "Adicione as entidades principais do circuito antes de pensar em Runs.",
+            "Depois conecte o grafo visível e só então revise a trilha técnica.",
+        ]
+    elif not candidate_links_rows:
+        readiness_headline = "O cenário já tem entidades, mas ainda não tem fluxo suficiente para seguir para Runs."
+        readiness_stage = "Conectar o grafo principal"
+        primary_action = "Criar conexões de negócio entre as entidades já posicionadas no canvas."
+        next_steps = [
+            "Conecte o grafo principal antes de enfileirar uma nova run.",
+            "Revise avisos de conectividade só depois que o fluxo principal estiver montado.",
+        ]
+    elif not mandatory_routes:
+        readiness_headline = "Falta definir pelo menos uma rota obrigatória antes de comparar candidatos."
+        readiness_stage = "Definir a meta operacional"
+        primary_action = "Registrar as rotas obrigatórias que a execução precisa atender."
+        next_steps = [
+            "Defina as rotas obrigatórias antes de abrir Runs.",
+            "Use Auditoria apenas se precisar reconciliar a estrutura canônica dessa definição.",
+        ]
+    elif blockers:
+        readiness_headline = "Ainda há bloqueios estruturais impedindo a passagem segura para Runs."
+        readiness_stage = "Remover bloqueios"
+        primary_action = "Corrigir regras estruturais e rotas inválidas antes de enfileirar uma nova run."
+        next_steps = [
+            "Feche os bloqueios estruturais antes de enfileirar uma nova run.",
+            "Salve e reabra o bundle canônico quando a revisão estiver pronta.",
+        ]
+    elif warnings:
+        readiness_headline = "O cenário já pode avançar, mas ainda vale fechar avisos antes de rodar."
+        readiness_stage = "Lapidar antes da fila"
+        primary_action = "Revisar avisos de conectividade para reduzir retrabalho em Runs."
+        next_steps = [
+            "Revise avisos de conectividade e siga para Runs quando a leitura estiver clara.",
+            "Salve e reabra o bundle canônico quando a revisão estiver pronta.",
+        ]
+    else:
+        readiness_headline = "Cenário pronto para seguir para Runs."
+        readiness_stage = "Liberar a fila"
+        primary_action = "Abrir Runs para enfileirar o cenário ou revisar a última execução."
+        next_steps = [
+            "Siga para Runs para enfileirar ou revisar a fila local.",
+            "Salve e reabra o bundle canônico quando a revisão estiver pronta.",
+        ]
     return {
         "status": status,
         "node_count": len(node_ids),
@@ -510,13 +659,12 @@ def build_studio_readiness_summary(
         "measurement_route_count": sum(1 for row in route_rows if _coerce_truthy(row.get("measurement_required"))),
         "blocker_count": len(list(dict.fromkeys(blockers))),
         "warning_count": len(list(dict.fromkeys(warnings))),
+        "readiness_stage": readiness_stage,
         "readiness_headline": readiness_headline,
+        "primary_action": primary_action,
         "blockers": list(dict.fromkeys(blockers)),
         "warnings": list(dict.fromkeys(warnings)),
-        "next_steps": [
-            "Corrigir bloqueios estruturais antes de enfileirar uma nova run." if blockers else "Revisar avisos de conectividade e seguir para Runs.",
-            "Salvar e reabrir o bundle canonico quando a revisao estiver pronta.",
-        ],
+        "next_steps": next_steps,
     }
 
 
@@ -526,7 +674,14 @@ def render_studio_readiness_panel(summary: dict[str, Any]) -> Any:
     return html.Div(
         children=[
             html.Div("Readiness do cenário", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
-            html.Div(style={"display": "flex", "alignItems": "center", "gap": "10px", "margin": "8px 0 14px", "flexWrap": "wrap"}, children=[html.Span(str(status).replace("_", " "), style={"padding": "6px 10px", "borderRadius": "999px", "background": background, "color": color, "fontWeight": 700}), html.Span(str(summary.get("readiness_headline") or ("Pronto para rodar" if status == "ready" else "Ainda exige atencao estrutural")), style={"fontWeight": 700, "lineHeight": "1.5"})]),
+            html.Div(style={"display": "flex", "alignItems": "center", "gap": "10px", "margin": "8px 0 14px", "flexWrap": "wrap"}, children=[html.Span(_humanize_readiness_status(status), style={"padding": "6px 10px", "borderRadius": "999px", "background": background, "color": color, "fontWeight": 700}), html.Span(str(summary.get("readiness_headline") or ("Pronto para rodar" if status == "ready" else "Ainda exige atencao estrutural")), style={"fontWeight": 700, "lineHeight": "1.5"})]),
+            html.Div(
+                style={**UI_TWO_COLUMN_STYLE, "marginBottom": "12px"},
+                children=[
+                    _guidance_card("Objetivo desta área", "Confirmar se o cenário já pode sair do Studio sem depender da trilha técnica."),
+                    _guidance_card("Ação principal", str(summary.get("primary_action") or "Revise a camada principal antes de abrir Runs.")),
+                ],
+            ),
             html.Div(
                 style=UI_THREE_COLUMN_STYLE,
                 children=[
@@ -542,22 +697,20 @@ def render_studio_readiness_panel(summary: dict[str, Any]) -> Any:
             html.Div(
                 style={**UI_MUTED_CARD_STYLE, "padding": "12px"},
                 children=[
-                    html.Div(
-                        "Quando o cenário estiver `ready`, siga para Runs para enfileirar ou revisar a fila. Se ainda houver bloqueios, fique no Studio até fechar as regras obrigatórias.",
-                        style={"lineHeight": "1.6"},
-                    ),
+                    html.Div(str(summary.get("readiness_stage") or "Preparar a passagem"), style={"fontWeight": 700, "lineHeight": "1.5"}),
+                    html.Div("Quando a camada principal estiver clara, siga para Runs para enfileirar ou revisar a fila. Se ainda houver bloqueios, termine a revisão no Studio antes de abrir uma nova rodada.", style={"lineHeight": "1.6", "marginTop": "6px"}),
                     html.Div(
                         style=UI_ACTION_ROW_STYLE,
                         children=[
-                            html.Button("Ir para Runs", id="studio-open-runs-button", style=UI_BUTTON_STYLE),
+                            html.Button("Abrir Runs", id="studio-open-runs-button", style=UI_BUTTON_STYLE),
                         ],
                     ),
                 ],
             ),
             html.H4("Bloqueios", style={"marginBottom": "6px"}),
-            _bullet_list(list(summary.get("blockers", [])), "Nenhum bloqueio estrutural detectado."),
+            _bullet_list([_humanize_readiness_issue(item) for item in list(summary.get("blockers", []))], "Nenhum bloqueio estrutural detectado."),
             html.H4("Avisos", style={"marginBottom": "6px", "marginTop": "14px"}),
-            _bullet_list(list(summary.get("warnings", [])), "Sem aviso relevante neste momento."),
+            _bullet_list([_humanize_readiness_issue(item) for item in list(summary.get("warnings", []))], "Sem aviso relevante neste momento."),
             html.H4("Proximos passos", style={"marginBottom": "6px", "marginTop": "14px"}),
             _bullet_list(list(summary.get("next_steps", [])), "Sem proximo passo registrado."),
         ],
@@ -925,7 +1078,18 @@ def render_studio_selection_panel(summary: dict[str, Any], selection_type: str) 
     role_label = str(summary.get("role_label") or ("Entidade" if selection_type == "node" else "Conexão"))
     surface_tone = "Interno oculto" if summary.get("is_internal") else "Superfície principal"
     if not selected:
-        return html.Div([html.H4("Seleção ativa"), html.Div(f"Nenhum {selection_type} selecionado.")])
+        selection_label = "entidade" if selection_type == "node" else "conexão"
+        return html.Div(
+            children=[
+                html.H4("Seleção ativa", style={"margin": 0}),
+                html.Div(f"Nenhuma {selection_label} em foco.", style={"marginTop": "6px", "lineHeight": "1.6"}),
+                html.H4("Próxima ação", style={"marginBottom": "6px", "marginTop": "14px"}),
+                html.Div(
+                    "Selecione um nó ou uma conexão no canvas para abrir a leitura contextual e os atalhos rápidos deste espaço.",
+                    style={"lineHeight": "1.6", "fontWeight": 700},
+                ),
+            ]
+        )
     preview: list[str]
     if selection_type == "node":
         preview = [
@@ -971,19 +1135,24 @@ def render_run_jobs_overview_panel(summary: dict[str, Any]) -> Any:
         children=[
             html.H3("Resumo da fila", style={"marginTop": 0}),
             html.Div(
+                style={**UI_TWO_COLUMN_STYLE, "marginBottom": "12px"},
+                children=[
+                    _guidance_card("Objetivo desta área", "Entender o que já rodou, o que ainda está na fila e qual run merece sua atenção agora."),
+                    _guidance_card("Ação principal", queue_guidance),
+                ],
+            ),
+            html.Div(
                 style=UI_THREE_COLUMN_STYLE,
                 children=[
                     _metric_card("Runs", summary.get("run_count", 0), "Total observavel na fila local."),
-                    _metric_card("Estado", summary.get("queue_state", "idle"), "serial local"),
+                    _metric_card("Estado", _humanize_run_status(summary.get("queue_state", "idle")), "fila serial local"),
                     _metric_card("Proxima run", summary.get("next_queued_run_id") or "-", "Entrada seguinte da fila"),
                 ],
             ),
-            html.Div(queue_guidance, style={"marginTop": "12px", "fontWeight": 700, "lineHeight": "1.5"}),
-            html.H4("Status por quantidade", style={"marginBottom": "6px"}),
-            html.Ul(
-                [html.Li(f"{status}: {count}") for status, count in status_counts.items()],
-                style={"margin": "8px 0 0 18px", "lineHeight": "1.6"},
-            ),
+            html.H4("Estado atual", style={"marginBottom": "6px", "marginTop": "14px"}),
+            html.Div(queue_guidance, style={"fontWeight": 700, "lineHeight": "1.5"}),
+            html.H4("Status por quantidade", style={"marginBottom": "6px", "marginTop": "14px"}),
+            _bullet_list([f"{_humanize_run_status(status)}: {count}" for status, count in status_counts.items()], "Ainda não há histórico suficiente para distribuir a fila por status."),
         ]
     )
 
@@ -1006,9 +1175,16 @@ def render_runs_flow_panel(studio_summary: dict[str, Any], run_summary: dict[str
         children=[
             html.H3("Passagem Studio -> Runs", style={"marginTop": 0}),
             html.Div(
+                style={**UI_TWO_COLUMN_STYLE, "marginBottom": "12px"},
+                children=[
+                    _guidance_card("Objetivo desta área", "Transformar readiness do Studio em uma leitura clara de fila, execução e próximo passo."),
+                    _guidance_card("Ação principal", next_action),
+                ],
+            ),
+            html.Div(
                 style=UI_THREE_COLUMN_STYLE,
                 children=[
-                    _metric_card("Readiness", studio_status, readiness_note),
+                    _metric_card("Readiness", _humanize_readiness_status(studio_status), readiness_note),
                     _metric_card("Bloqueios", studio_summary.get("blocker_count", 0)),
                     _metric_card("Avisos", studio_summary.get("warning_count", 0)),
                     _metric_card("Runs locais", run_count),
@@ -1031,7 +1207,11 @@ def render_runs_flow_panel(studio_summary: dict[str, Any], run_summary: dict[str
 
 def render_run_job_detail_panel(detail: dict[str, Any]) -> Any:
     if not detail or not detail.get("selected_run_id"):
-        return html.Div([html.H3("Run em foco", style={"marginTop": 0}), html.Div("Nenhuma run selecionada.")])
+        return _guided_empty_state(
+            "Run em foco",
+            "Ainda não existe uma run em foco para leitura operacional.",
+            "Selecione uma run da fila ou enfileire o cenário atual para abrir este espaço com contexto real.",
+        )
     status = str(detail.get("status") or "unknown")
     gate_valid = detail.get("official_gate_valid")
     if gate_valid is True:
@@ -1057,7 +1237,7 @@ def render_run_job_detail_panel(detail: dict[str, Any]) -> Any:
             html.Div(
                 style={"display": "flex", "gap": "8px", "flexWrap": "wrap", "marginTop": "8px"},
                 children=[
-                    html.Span(status, style=UI_PILL_STYLE),
+                    html.Span(_humanize_run_status(status), style=UI_PILL_STYLE),
                     html.Span(str(detail.get("requested_execution_mode") or detail.get("execution_mode") or "n/a"), style=UI_PILL_STYLE),
                 ],
             ),
@@ -1066,7 +1246,7 @@ def render_run_job_detail_panel(detail: dict[str, Any]) -> Any:
                 children=[
                     _metric_card("Gate oficial", gate_label),
                     _metric_card("Duração (s)", detail.get("duration_s") or "-"),
-                    _metric_card("Política", detail.get("policy_mode") or "-"),
+                    _metric_card("Modo da rodada", detail.get("policy_mode") or "-"),
                 ],
             ),
             html.H4("Leitura operacional", style={"marginBottom": "6px"}),
@@ -1084,6 +1264,12 @@ def render_run_job_detail_panel(detail: dict[str, Any]) -> Any:
 
 
 def render_execution_summary_panel(summary: dict[str, Any]) -> Any:
+    if not summary:
+        return _guided_empty_state(
+            "Resumo executivo",
+            "Ainda não há resultado executivo suficiente para abrir a leitura principal deste espaço.",
+            "Execute uma run em Runs para gerar candidato oficial, viabilidade e bundle analisado.",
+        )
     error = str(summary.get("error") or "").strip()
     has_selected_candidate = bool(summary.get("selected_candidate_id"))
     if error:
@@ -1118,30 +1304,62 @@ def render_execution_summary_panel(summary: dict[str, Any]) -> Any:
 
 
 def render_bundle_io_panel(summary: dict[str, Any]) -> Any:
+    status = str(summary.get("status") or "idle")
+    if status == "error":
+        next_action = "Corrija o bloqueio de persistência antes de confiar neste bundle como fonte canônica."
+    else:
+        next_action = "Use este espaço quando precisar salvar, reabrir ou reconciliar o bundle canônico fora do fluxo principal."
     return html.Div(
         children=[
             html.Div(style={"display": "flex", "gap": "8px", "flexWrap": "wrap", "marginBottom": "8px"}, children=[html.Span(str(summary.get("status") or "idle"), style=UI_PILL_STYLE), html.Span(str(summary.get("bundle_version") or "-"), style=UI_PILL_STYLE)]),
+            html.Div("Estado atual", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+            html.Div("Bundle canônico pronto para auditoria e persistência." if status != "error" else "A trilha canônica precisa de correção antes de seguir.", style={"lineHeight": "1.6", "fontWeight": 700, "margin": "6px 0 8px"}),
             html.Div(f"Raiz canonica: {summary.get('canonical_scenario_root') or '-'}", style={"lineHeight": "1.6"}),
             html.Div(f"Manifesto: {summary.get('bundle_manifest') or '-'}", style={"lineHeight": "1.6"}),
+            html.H4("Próxima ação", style={"marginBottom": "6px", "marginTop": "14px"}),
+            html.Div(next_action, style={"lineHeight": "1.6", "fontWeight": 700}),
         ]
     )
 
 
 def render_catalog_state_panel(summary: dict[str, Any]) -> Any:
     visible_family_summary = summary.get("visible_family_summary") or []
+    visible_candidate_count = int(summary.get("visible_candidate_count", 0) or 0)
     top_family = visible_family_summary[0]["topology_family"] if visible_family_summary else "-"
+    if visible_candidate_count == 0:
+        return _guided_empty_state(
+            "Leitura atual da decisão",
+            "Nenhum candidato ficou visível com os filtros e o perfil atuais.",
+            "Revise filtros, fallback e viabilidade antes de concluir que ainda não há leitura comparável.",
+        )
     return html.Div(
         children=[
             html.H3("Leitura atual da decisão", style={"marginTop": 0}),
-            html.Div(style=UI_THREE_COLUMN_STYLE, children=[_metric_card("Visiveis", summary.get("visible_candidate_count", 0)), _metric_card("Selecionado", summary.get("selected_candidate_id") or "-"), _metric_card("Familia lider", top_family)]),
+            html.Div(
+                style={**UI_TWO_COLUMN_STYLE, "marginBottom": "12px"},
+                children=[
+                    _guidance_card("Objetivo desta área", "Mostrar quantos candidatos seguem visíveis e quem lidera a leitura atual."),
+                    _guidance_card("Ação principal", "Ajuste filtros e pesos só o suficiente para manter um conjunto comparável antes de aprofundar o candidato em foco."),
+                ],
+            ),
+            html.Div(style=UI_THREE_COLUMN_STYLE, children=[_metric_card("Visiveis", visible_candidate_count), _metric_card("Selecionado", summary.get("selected_candidate_id") or "-"), _metric_card("Familia lider", top_family)]),
             html.Div(f"Topo visivel: {summary.get('top_visible_candidate_id') or '-'}", style={"marginTop": "10px"}),
+            html.H4("Próxima ação", style={"marginBottom": "6px", "marginTop": "14px"}),
+            html.Div(
+                "Ajuste filtros e pesos só o suficiente para manter um conjunto comparável antes de aprofundar o candidato em foco.",
+                style={"lineHeight": "1.6", "fontWeight": 700},
+            ),
         ]
     )
 
 
 def render_candidate_summary_panel(summary: dict[str, Any]) -> Any:
     if not summary:
-        return html.Div([html.H3("Candidato em foco", style={"marginTop": 0}), html.Div("Nenhum candidato disponivel.")])
+        return _guided_empty_state(
+            "Candidato em foco",
+            "Ainda não há candidato visível para leitura neste espaço.",
+            "Volte para Runs ou alivie os filtros da Decisão para recuperar um candidato comparável.",
+        )
     total_cost = round(float(summary.get("install_cost") or 0.0) + float(summary.get("fallback_cost") or 0.0), 3)
     feasibility_label = "Viável" if summary.get("feasible") else "Inviável"
     return html.Div(
@@ -1184,13 +1402,20 @@ def render_decision_flow_panel(summary: dict[str, Any]) -> Any:
     return html.Div(
         children=[
             html.H3("Passagem Runs -> Decisão", style={"marginTop": 0}),
+            html.Div(
+                style={**UI_TWO_COLUMN_STYLE, "marginBottom": "12px"},
+                children=[
+                    _guidance_card("Objetivo desta área", "Explicar se a execução atual já pode ser lida como decisão ou se ainda falta contexto."),
+                    _guidance_card("Ação principal", next_action),
+                ],
+            ),
             html.Div(headline, style={"fontWeight": 700, "lineHeight": "1.5"}),
             html.Div(
                 style={**UI_THREE_COLUMN_STYLE, "marginTop": "12px"},
                 children=[
                     _metric_card("Winner", candidate_id or "-"),
                     _metric_card("Runner-up", runner_up_id or "-"),
-                    _metric_card("Estado", "technical tie" if decision_status == "technical_tie" else "winner clear"),
+                    _metric_card("Estado", _humanize_decision_status(decision_status)),
                 ],
             ),
             html.H4("Próxima ação", style={"marginBottom": "6px", "marginTop": "14px"}),
@@ -1208,7 +1433,11 @@ def render_decision_flow_panel(summary: dict[str, Any]) -> Any:
 
 def render_decision_summary_panel(summary: dict[str, Any]) -> Any:
     if not summary:
-        return html.Div([html.H3("Escolha oficial", style={"marginTop": 0}), html.Div("Nenhum resumo decisorio disponivel.")])
+        return _guided_empty_state(
+            "Escolha oficial",
+            "A decisão humana assistida ainda não tem um winner legível neste momento.",
+            "Revise a última execução em Runs antes de tentar oficializar um candidato.",
+        )
     decision_status = str(summary.get("decision_status") or ("technical_tie" if summary.get("technical_tie") else "winner_clear"))
     decision_label = "Empate técnico" if decision_status == "technical_tie" else "Winner claro"
     feasibility_label = "Viável" if summary.get("feasible") else "Inviável"
@@ -1252,7 +1481,11 @@ def render_decision_summary_panel(summary: dict[str, Any]) -> Any:
 
 def render_decision_contrast_panel(summary: dict[str, Any]) -> Any:
     if not summary:
-        return html.Div([html.H3("Runner-up e contraste", style={"marginTop": 0}), html.Div("Nenhum runner-up disponivel.")])
+        return _guided_empty_state(
+            "Runner-up e contraste",
+            "Ainda não existe runner-up suficiente para sustentar a comparação principal.",
+            "Gere ou recupere uma execução comparável antes de fechar a leitura de contraste.",
+        )
     decision_status = str(summary.get("decision_status") or ("technical_tie" if summary.get("technical_tie") else "winner_clear"))
     runner_up_cost = summary.get("runner_up_total_cost")
     winner_cost = summary.get("total_cost") or summary.get("winner_total_cost")
@@ -1297,7 +1530,11 @@ def render_decision_contrast_panel(summary: dict[str, Any]) -> Any:
 
 def render_decision_signal_panel(summary: dict[str, Any]) -> Any:
     if not summary:
-        return html.Div([html.H3("Sinais para decisão humana", style={"marginTop": 0}), html.Div("Nenhum sinal disponível.")])
+        return _guided_empty_state(
+            "Sinais para decisão humana",
+            "Ainda não há sinais consolidados para suportar a leitura de risco desta decisão.",
+            "Abra uma execução válida ou um candidato em foco para revelar penalidades, rotas críticas e fallback.",
+        )
     signal_lines: list[str] = []
     infeasibility_reason = str(summary.get("infeasibility_reason") or "").strip()
     if infeasibility_reason:
@@ -1329,7 +1566,11 @@ def render_decision_signal_panel(summary: dict[str, Any]) -> Any:
 
 def render_candidate_breakdown_panel(summary: dict[str, Any]) -> Any:
     if not summary:
-        return html.Div([html.H3("Justificativa detalhada", style={"marginTop": 0}), html.Div("Nenhum breakdown disponivel.")])
+        return _guided_empty_state(
+            "Justificativa detalhada",
+            "Ainda não existe breakdown suficiente para explicar um candidato neste espaço.",
+            "Selecione um candidato visível ou volte à comparação para abrir o racional completo.",
+        )
     total_cost = round(float(summary.get("install_cost") or 0.0), 3)
     if (summary.get("constraint_failure_count") or 0) > 0:
         next_action = "Há falhas de restrição. Releia as regras disparadas antes de confirmar este candidato."

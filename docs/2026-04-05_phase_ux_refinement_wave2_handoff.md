@@ -1,30 +1,27 @@
-# Phase UX Refinement Wave 2 - Studio Readiness to Runs Flow
+# Phase UX Refinement Wave 2 - Primary States and Progressive Disclosure
 
 ## Objective
 
-Make the main path between `Studio` and `Runs` explicit in the product surface so the operator can tell when the scenario is really ready to enqueue, when it still needs structural fixes, and how the local queue should be read without falling back to raw technical output.
+Close the remaining information-hierarchy gaps in `decision_platform` by making empty states, no-selection states, and no-result states read in product language across `Studio`, `Runs`, `Decisão`, and `Auditoria`, while keeping technical evidence behind progressive disclosure.
 
 ## Delivered
 
-- Strengthened `Studio` readiness with an explicit headline, blocker/warning counters, and a dedicated `Passagem para Runs` block in the primary panel.
-- Added a direct `Ir para Runs` CTA from the main Studio readiness surface without exposing technical fields or reopening the information architecture.
-- Added a mirrored `Passagem Studio -> Runs` panel inside `Runs` so queue reading now starts from the real Studio readiness state instead of only from the queue internals.
-- Added a `Voltar ao Studio` CTA in `Runs` to make the corrective path explicit whenever readiness still signals structural issues.
-- Kept logs, JSON, and technical paths behind progressive disclosure; the first screen of `Runs` now prioritizes queue summary, readiness-to-run context, execution summary, and run-in-focus guidance.
-- Preserved the existing Dash/Cytoscape architecture, Julia-only official path, fail-closed runtime behavior, and hidden technical graph entities in the Studio primary canvas.
-- Extended smoke coverage to protect the new readiness-to-runs copy, the cross-tab CTAs, and the continued separation between primary UX and technical disclosure.
+- Reworked empty and no-selection states in the main product surfaces so they now explain what is missing and what the operator should do next instead of stopping at terse "none selected" copy.
+- Kept `Studio` focused on the business graph while clarifying that an empty focus state should be resolved directly on the canvas, not through raw technical forms.
+- Refined `Runs` queue, run-detail, and execution panels so they now explain the purpose of the area, the current state, and the next operator move even before there is a selected run or a completed execution.
+- Clarified `Decisão` no-result states for official winner, runner-up contrast, candidate summary, breakdown, and filtered-catalog views so the user can tell whether the issue is missing execution context or filters hiding all candidates.
+- Humanized the main Audit bundle panel so it clearly reads as a canonical evidence space with a boundary from the primary flow, while preserving the raw JSON bundle summary behind disclosure.
+- Extended smoke coverage to lock the new product-language empty states, filtered-decision guidance, and the Audit boundary copy.
 
 ## Validation
 
 ```powershell
-$env:PYTHONPATH='src;.'; .\.venv\Scripts\python.exe -m pytest tests/decision_platform/test_ui_smoke.py -q -p no:cacheprovider -k "studio_readiness_panel_surfaces_runs_transition_with_real_readiness or runs_flow_panel_reflects_studio_gate_and_queue_state or studio_discovery_callbacks_open_guide_and_audit_tab or runs_tab_combines_queue_and_execution_summary" --basetemp tests/_tmp/pytest-basetemp-ux-wave2-targeted
-$env:PYTHONPATH='src;.'; .\.venv\Scripts\python.exe -m pytest tests/decision_platform/test_ui_smoke.py -q -p no:cacheprovider --basetemp tests/_tmp/pytest-basetemp-ux-wave2-full
+$env:PYTHONPATH='src;.'; .\.venv\Scripts\python.exe -m pytest tests/decision_platform/test_ui_smoke.py -q -p no:cacheprovider --basetemp tests/_tmp/pytest-basetemp-ux-wave2-current
 ```
 
 Result:
 
-- `4 passed, 34 deselected in 0.81s`
-- `38 passed in 424.06s`
+- `45 passed in 460.22s (0:07:40)`
 
 ## Evidence
 
@@ -36,8 +33,8 @@ Result:
 - No replacement of Dash or Cytoscape.
 - No change to the Julia-only official execution path or fail-closed semantics.
 - No change to `docs/05_data_contract.md`.
-- No change to solver, runner, ranking, or official-candidate logic beyond UX framing of already-existing state.
+- No backend optimization, queue, or solver changes beyond product-surface copy and state framing.
 
 ## Honest Handoff
 
-This wave stayed on the product surface and did not introduce backend behavior. The key change was making readiness and queue entry read as one guided flow across `Studio` and `Runs`, with explicit CTAs and real blocker/warning counts tied to the existing readiness rules. Technical disclosure remains available, but it no longer competes with the first operational read of the scenario and queue state.
+This wave stayed strictly on UX framing. It did not add new product areas or backend behavior; it closed the gap where the main tabs still relied on sparse empty states or generic "none available" messages that forced the operator to infer the next step. Technical detail remains available, but the first read of each space now explains purpose, current state, and next action more directly.

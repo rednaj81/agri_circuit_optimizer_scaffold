@@ -1,8 +1,8 @@
 {
   "wave": "ux_phase_1_wave_2",
   "validation": {
-    "targeted": "4 passed, 34 deselected in 0.81s",
-    "full": "38 passed in 424.06s"
+    "command": "$env:PYTHONPATH='src;.'; .\\.venv\\Scripts\\python.exe -m pytest tests/decision_platform/test_ui_smoke.py -q -p no:cacheprovider --basetemp tests/_tmp/pytest-basetemp-ux-wave2-current",
+    "result": "45 passed in 460.22s (0:07:40)"
   },
   "visible_tab_labels": [
     "Studio",
@@ -10,53 +10,21 @@
     "Decisão",
     "Auditoria"
   ],
-  "studio_surface": {
-    "markers": [
-      "Readiness do cenário",
-      "Passagem para Runs",
-      "Ir para Runs"
-    ],
-    "primary_panel_ids": [
-      "studio-readiness-panel",
-      "studio-projection-coverage-panel",
-      "node-studio-summary-panel",
-      "edge-studio-summary-panel"
-    ],
-    "technical_disclosure_preserved": [
-      "studio-technical-guide",
-      "node-studio-summary",
-      "edge-studio-summary"
-    ]
+  "primary_empty_states": {
+    "studio_selection": "Seleção ativaNenhuma entidade em foco.Próxima açãoSelecione um nó ou uma conexão no canvas para abrir a leitura contextual e os atalhos rápidos deste espaço.",
+    "runs_queue": "Resumo da filaObjetivo desta áreaEntender o que já rodou, o que ainda está na fila e qual run merece sua atenção agora.Ação principalNenhuma run registrada ainda. Enfileire o cenario atual para iniciar a trilha operacional.Runs0Total observavel na fila local.EstadoSem pendênciasfila serial localProxima run-Entrada seguinte da filaEstado atualNenhuma run registrada ainda. Enfileire o cenario atual para iniciar a trilha operacional.Status por quantidadeAinda não há histórico suficiente para distribuir a fila por status.",
+    "run_detail": "Run em focoAguardando contextoAinda não existe uma run em foco para leitura operacional.Próxima açãoSelecione uma run da fila ou enfileire o cenário atual para abrir este espaço com contexto real.",
+    "execution_summary": "Resumo executivoAguardando contextoAinda não há resultado executivo suficiente para abrir a leitura principal deste espaço.Próxima açãoExecute uma run em Runs para gerar candidato oficial, viabilidade e bundle analisado.",
+    "catalog_state": "Leitura atual da decisãoAguardando contextoNenhum candidato ficou visível com os filtros e o perfil atuais.Próxima açãoRevise filtros, fallback e viabilidade antes de concluir que ainda não há leitura comparável.",
+    "decision_summary": "Escolha oficialAguardando contextoA decisão humana assistida ainda não tem um winner legível neste momento.Próxima açãoRevise a última execução em Runs antes de tentar oficializar um candidato.",
+    "decision_contrast": "Runner-up e contrasteAguardando contextoAinda não existe runner-up suficiente para sustentar a comparação principal.Próxima açãoGere ou recupere uma execução comparável antes de fechar a leitura de contraste.",
+    "decision_signal": "Sinais para decisão humanaAguardando contextoAinda não há sinais consolidados para suportar a leitura de risco desta decisão.Próxima açãoAbra uma execução válida ou um candidato em foco para revelar penalidades, rotas críticas e fallback.",
+    "candidate_breakdown": "Justificativa detalhadaAguardando contextoAinda não existe breakdown suficiente para explicar um candidato neste espaço.Próxima açãoSelecione um candidato visível ou volte à comparação para abrir o racional completo.",
+    "audit_bundle": "idle2026.04Estado atualBundle canônico pronto para auditoria e persistência.Raiz canonica: data/decision_platform/maquete_v2Manifesto: data/decision_platform/maquete_v2/scenario_bundle.yamlPróxima açãoUse este espaço quando precisar salvar, reabrir ou reconciliar o bundle canônico fora do fluxo principal."
   },
-  "runs_surface": {
-    "markers": [
-      "Passagem Studio -> Runs",
-      "Voltar ao Studio",
-      "Resumo executivo"
-    ],
-    "primary_panel_ids": [
-      "run-jobs-overview-panel",
-      "runs-flow-panel",
-      "execution-summary-panel",
-      "run-job-detail-panel"
-    ],
-    "technical_disclosure_preserved": [
-      "run-jobs-summary",
-      "run-job-detail",
-      "execution-summary"
-    ]
-  },
-  "navigation_callbacks": {
-    "query_tabs_supported": [
-      "studio",
-      "runs",
-      "decision",
-      "audit"
-    ],
-    "cross_tab_ctas": [
-      "studio-open-runs-button",
-      "runs-open-studio-button",
-      "studio-open-audit-button"
-    ]
+  "main_markers": {
+    "runs_cta": "Ir para Decisão",
+    "decision_cta": "Abrir Auditoria",
+    "audit_boundary": "Use este espaço quando precisar salvar, reabrir ou reconciliar o bundle canônico fora do fluxo principal."
   }
 }

@@ -24,6 +24,8 @@ from decision_platform.ui_dash.app import (
     build_official_candidate_summary,
     build_catalog_view_state,
     filter_catalog_records,
+    render_bundle_io_panel,
+    render_catalog_state_panel,
     render_candidate_breakdown_panel,
     render_candidate_summary_panel,
     render_decision_contrast_panel,
@@ -32,10 +34,12 @@ from decision_platform.ui_dash.app import (
     render_decision_summary_panel,
     render_execution_summary_panel,
     render_run_job_detail_panel,
+    render_run_jobs_overview_panel,
     render_runs_flow_panel,
     render_studio_connectivity_panel,
     render_studio_focus_panel,
     render_studio_readiness_panel,
+    render_studio_selection_panel,
     move_node_studio_selection,
     rerank_catalog,
     save_and_reopen_local_bundle,
@@ -312,8 +316,37 @@ def test_studio_readiness_panel_surfaces_runs_transition_with_real_readiness() -
     panel_text = _collect_text_content(panel)
 
     assert "Passagem para Runs" in panel_text
-    assert "bloqueios ou avisos" in panel_text.lower()
+    assert "Objetivo desta área" in panel_text
+    assert "Ação principal" in panel_text
+    assert "ainda não tem fluxo suficiente" in panel_text.lower()
+    assert "Conectar o grafo principal" in panel_text
     assert _find_component_by_id(panel, "studio-open-runs-button") is not None
+
+
+def test_studio_readiness_panel_humanizes_primary_blockers_and_warnings() -> None:
+    panel = render_studio_readiness_panel(
+        {
+            "status": "needs_attention",
+            "readiness_headline": "Ainda há bloqueios estruturais impedindo a passagem segura para Runs.",
+            "readiness_stage": "Remover bloqueios",
+            "primary_action": "Corrigir regras estruturais e rotas inválidas antes de enfileirar uma nova run.",
+            "business_node_count": 4,
+            "business_edge_count": 2,
+            "hidden_internal_node_count": 3,
+            "mandatory_route_count": 2,
+            "blocker_count": 2,
+            "warning_count": 1,
+            "blockers": ["L900 entra em W", "Rotas com dosagem sem medicao direta: R002"],
+            "warnings": ["Nos sem conexao no grafo visivel: P3"],
+            "next_steps": ["Feche os bloqueios estruturais antes de enfileirar uma nova run."],
+        }
+    )
+    panel_text = _collect_text_content(panel)
+
+    assert "A conexão L900 termina em W" in panel_text
+    assert "Há rotas com dosagem sem medição direta compatível: R002." in panel_text
+    assert "Ainda existem entidades sem conexão na leitura principal do grafo: P3." in panel_text
+    assert "Abrir Runs" in panel_text
 
 
 def test_studio_connectivity_panel_surfaces_routes_and_measurement_near_canvas() -> None:
@@ -439,6 +472,9 @@ def test_runs_flow_panel_reflects_studio_gate_and_queue_state() -> None:
     panel_text = _collect_text_content(panel)
 
     assert "Passagem Studio -> Runs" in panel_text
+    assert "Objetivo desta área" in panel_text
+    assert "Ação principal" in panel_text
+    assert "Exige atenção" in panel_text
     assert "Voltar ao Studio" in panel_text
     assert "Ir para Decisão" in panel_text
     assert "run-003" in panel_text
@@ -474,10 +510,35 @@ def test_primary_runs_panels_hide_raw_backend_keys_in_main_surface() -> None:
     assert "official_gate_valid:" not in detail_text
     assert "policy_mode:" not in detail_text
     assert "duracao_s:" not in detail_text
+    assert "Concluída" in detail_text
+    assert "Modo da rodada" in detail_text
     assert "Erro operacional:" in execution_text
     assert "Próxima ação" in detail_text
     assert "Próxima ação" in execution_text
     assert "Ir para Decisão" in execution_text
+
+
+def test_primary_surfaces_explain_empty_states_without_debug_language() -> None:
+    studio_selection = render_studio_selection_panel({}, "node")
+    runs_queue = render_run_jobs_overview_panel({})
+    run_detail = render_run_job_detail_panel({})
+    execution = render_execution_summary_panel({})
+    decision = render_decision_summary_panel({})
+    candidate = render_candidate_summary_panel({})
+    contrast = render_decision_contrast_panel({})
+    signals = render_decision_signal_panel({})
+    breakdown = render_candidate_breakdown_panel({})
+
+    assert "Nenhuma entidade em foco." in _collect_text_content(studio_selection)
+    assert "Selecione um nó ou uma conexão no canvas" in _collect_text_content(studio_selection)
+    assert "Nenhuma run registrada ainda." in _collect_text_content(runs_queue)
+    assert "Ainda não existe uma run em foco" in _collect_text_content(run_detail)
+    assert "Ainda não há resultado executivo suficiente" in _collect_text_content(execution)
+    assert "ainda não tem um winner legível" in _collect_text_content(decision).lower()
+    assert "Ainda não há candidato visível" in _collect_text_content(candidate)
+    assert "Ainda não existe runner-up suficiente" in _collect_text_content(contrast)
+    assert "Ainda não há sinais consolidados" in _collect_text_content(signals)
+    assert "Ainda não existe breakdown suficiente" in _collect_text_content(breakdown)
 
 
 def test_decision_flow_panel_makes_transition_and_next_action_explicit() -> None:
@@ -492,11 +553,29 @@ def test_decision_flow_panel_makes_transition_and_next_action_explicit() -> None
     panel_text = _collect_text_content(panel)
 
     assert "Passagem Runs -> Decisão" in panel_text
+    assert "Objetivo desta área" in panel_text
+    assert "Ação principal" in panel_text
     assert "cand-01" in panel_text
     assert "cand-02" in panel_text
+    assert "Empate técnico" in panel_text
     assert "Voltar para Runs" in panel_text
     assert "Abrir Auditoria" in panel_text
     assert "leitura humana assistida" in panel_text.lower()
+
+
+def test_catalog_state_panel_explains_when_filters_hide_all_candidates() -> None:
+    panel = render_catalog_state_panel(
+        {
+            "visible_candidate_count": 0,
+            "selected_candidate_id": None,
+            "visible_family_summary": [],
+            "top_visible_candidate_id": None,
+        }
+    )
+    panel_text = _collect_text_content(panel)
+
+    assert "Nenhum candidato ficou visível" in panel_text
+    assert "Revise filtros, fallback e viabilidade" in panel_text
 
 
 def test_primary_decision_panels_hide_raw_metric_keys_in_main_surface() -> None:
@@ -587,6 +666,21 @@ def test_primary_decision_panels_hide_raw_metric_keys_in_main_surface() -> None:
     assert "Engine de avaliação:" in selected_text
     assert "rota obrigatória não conseguiu fechar" in selected_text
     assert "Qualidade bruta:" in breakdown_text
+
+
+def test_audit_bundle_panel_preserves_technical_space_but_explains_next_step() -> None:
+    panel = render_bundle_io_panel(
+        {
+            "status": "idle",
+            "bundle_version": "2026.04",
+            "canonical_scenario_root": "data/decision_platform/maquete_v2",
+            "bundle_manifest": "data/decision_platform/maquete_v2/scenario_bundle.yaml",
+        }
+    )
+    panel_text = _collect_text_content(panel)
+
+    assert "Bundle canônico pronto para auditoria e persistência." in panel_text
+    assert "Use este espaço quando precisar salvar, reabrir ou reconciliar o bundle canônico" in panel_text
 
 
 def test_audit_tab_holds_bundle_editors_and_technical_surfaces() -> None:
