@@ -244,7 +244,8 @@ def test_product_space_banner_uses_consistent_product_language_for_each_space() 
     assert "Trocar espaço" in studio_banner
     assert "Studio" in studio_banner
     assert "O que esta área resolve" in studio_banner
-    assert "Condição de saída" in studio_banner
+    assert "Estado do fluxo agora" in studio_banner
+    assert "Próximo destino sugerido" in studio_banner
     assert "Runs" in runs_banner
     assert "Fila local e execução em foco" in runs_banner
     assert "Decisão" in decision_banner
@@ -254,41 +255,75 @@ def test_product_space_banner_uses_consistent_product_language_for_each_space() 
 
 
 def test_product_space_banner_exposes_shell_switcher_for_all_primary_spaces() -> None:
-    banner = render_product_space_banner("runs")
+    banner = render_product_space_banner(
+        "runs",
+        {"status": "ready", "readiness_headline": "O cenário está pronto para seguir para Runs."},
+        {"run_count": 1, "active_run_ids": [], "next_queued_run_id": None},
+        {"candidate_id": "cand-01", "feasible": True},
+    )
     banner_text = _collect_text_content(banner)
 
     assert "Trocar espaço" in banner_text
+    assert "Estado do fluxo agora" in banner_text
+    assert "Próximo destino sugerido" in banner_text
+    assert "Ir para Decisão" in banner_text
     assert getattr(_find_component_by_id(banner, "product-space-switcher-studio-link"), "href", None) == "?tab=studio"
     assert getattr(_find_component_by_id(banner, "product-space-switcher-runs-link"), "href", None) == "?tab=runs"
     assert getattr(_find_component_by_id(banner, "product-space-switcher-decision-link"), "href", None) == "?tab=decision"
     assert getattr(_find_component_by_id(banner, "product-space-switcher-audit-link"), "href", None) == "?tab=audit"
 
 
-def test_product_journey_panel_summarizes_all_primary_spaces() -> None:
-    panel_text = _collect_text_content(
-        render_product_journey_panel(
-            "runs",
+def test_product_space_banner_guides_next_destination_from_real_state() -> None:
+    studio_ready_banner = _collect_text_content(
+        render_product_space_banner(
+            "studio",
             {
                 "status": "ready",
-                "readiness_headline": "O cenário está pronto para seguir para Runs.",
-                "next_steps": ["Abra a fila para validar a próxima rodada."],
+                "readiness_headline": "O cenário já pode sair do Studio sem depender da trilha técnica.",
+                "primary_action": "Validar a fila.",
             },
-            {
-                "run_count": 2,
-                "next_queued_run_id": "run-002",
-                "active_run_ids": [],
-                "status_counts": {"completed": 1, "failed": 0},
-            },
-            {
-                "candidate_id": "cand-01",
-                "runner_up_candidate_id": "cand-02",
-                "decision_status": "technical_tie",
-                "technical_tie": True,
-                "feasible": True,
-            },
+            {"run_count": 0, "active_run_ids": [], "next_queued_run_id": None},
+            {},
+        )
+    )
+    decision_blocked_banner = _collect_text_content(
+        render_product_space_banner(
+            "decision",
+            {"status": "ready"},
+            {"run_count": 2, "active_run_ids": [], "next_queued_run_id": None},
+            {},
         )
     )
 
+    assert "Fluxo liberado" in studio_ready_banner
+    assert "Seguir para Runs" in studio_ready_banner
+    assert "Decisão ainda depende de Runs" in decision_blocked_banner
+    assert "Voltar para Runs" in decision_blocked_banner
+
+
+def test_product_journey_panel_summarizes_all_primary_spaces() -> None:
+    panel = render_product_journey_panel(
+        "runs",
+        {
+            "status": "ready",
+            "readiness_headline": "O cenário está pronto para seguir para Runs.",
+            "next_steps": ["Abra a fila para validar a próxima rodada."],
+        },
+        {
+            "run_count": 2,
+            "next_queued_run_id": "run-002",
+            "active_run_ids": [],
+            "status_counts": {"completed": 1, "failed": 0},
+        },
+        {
+            "candidate_id": "cand-01",
+            "runner_up_candidate_id": "cand-02",
+            "decision_status": "technical_tie",
+            "technical_tie": True,
+            "feasible": True,
+        },
+    )
+    panel_text = _collect_text_content(panel)
     assert "Jornada principal" in panel_text
     assert "Escolha a próxima área pelo estado do produto" in panel_text
     assert "Studio" in panel_text
@@ -299,6 +334,11 @@ def test_product_journey_panel_summarizes_all_primary_spaces() -> None:
     assert "Empate técnico" in panel_text
     assert "Auditoria" in panel_text
     assert "Trilha técnica" in panel_text
+    assert "Transição sugerida" in panel_text
+    assert "Seguir para Runs" in panel_text
+    assert "Ir para Decisão" in panel_text
+    assert getattr(_find_component_by_id(panel, "product-journey-open-studio-link"), "href", None) == "?tab=runs"
+    assert getattr(_find_component_by_id(panel, "product-journey-open-runs-link"), "href", None) == "?tab=decision"
 
 
 def test_product_space_banner_callback_tracks_active_primary_tab() -> None:
@@ -306,13 +346,19 @@ def test_product_space_banner_callback_tracks_active_primary_tab() -> None:
         app = build_app("data/decision_platform/maquete_v2")
 
     callback = _get_callback(app, output_prefix="product-space-banner.children")
-    studio_text = _collect_text_content(callback("studio"))
-    runs_text = _collect_text_content(callback("runs"))
-    decision_text = _collect_text_content(callback("decision"))
-    audit_text = _collect_text_content(callback("audit"))
+    nodes_rows = [{"node_id": "W"}, {"node_id": "P1"}]
+    routes_rows = [{"route_id": "R001", "source": "W", "sink": "P1", "mandatory": True}]
+    run_summary_text = json.dumps({"run_count": 1, "active_run_ids": [], "next_queued_run_id": None}, ensure_ascii=False)
+    decision_summary_text = json.dumps({"candidate_id": "cand-01", "feasible": True}, ensure_ascii=False)
+    studio_text = _collect_text_content(callback("studio", nodes_rows, [], routes_rows, run_summary_text, decision_summary_text))
+    runs_text = _collect_text_content(callback("runs", nodes_rows, [], routes_rows, run_summary_text, decision_summary_text))
+    decision_text = _collect_text_content(callback("decision", nodes_rows, [], routes_rows, run_summary_text, decision_summary_text))
+    audit_text = _collect_text_content(callback("audit", nodes_rows, [], routes_rows, run_summary_text, decision_summary_text))
 
     assert "Studio" in studio_text
+    assert "Próximo destino sugerido" in studio_text
     assert "Runs" in runs_text
+    assert "Ir para Decisão" in runs_text
     assert "Decisão" in decision_text
     assert "Auditoria" in audit_text
 
@@ -323,14 +369,18 @@ def test_product_space_banner_stays_aligned_with_navigation_resolution() -> None
 
     navigation_callback = _get_callback(app, input_id="studio-open-audit-button")
     banner_callback = _get_callback(app, output_prefix="product-space-banner.children")
+    nodes_rows = [{"node_id": "W"}, {"node_id": "P1"}]
+    routes_rows = [{"route_id": "R001", "source": "W", "sink": "P1", "mandatory": True}]
+    run_summary_text = json.dumps({"run_count": 1, "active_run_ids": [], "next_queued_run_id": None}, ensure_ascii=False)
+    decision_summary_text = json.dumps({"candidate_id": "cand-01", "feasible": True}, ensure_ascii=False)
 
     runs_tab = navigation_callback("?tab=studio", 0, 40, 0, 0, 0, 0, "studio")
     decision_tab = navigation_callback("?tab=studio", 0, 0, 0, 50, 0, 0, "runs")
     audit_tab = navigation_callback("?tab=studio", 60, 0, 0, 0, 0, 0, "decision")
 
-    assert "Runs" in _collect_text_content(banner_callback(runs_tab))
-    assert "Decisão" in _collect_text_content(banner_callback(decision_tab))
-    assert "Auditoria" in _collect_text_content(banner_callback(audit_tab))
+    assert "Runs" in _collect_text_content(banner_callback(runs_tab, nodes_rows, [], routes_rows, run_summary_text, decision_summary_text))
+    assert "Decisão" in _collect_text_content(banner_callback(decision_tab, nodes_rows, [], routes_rows, run_summary_text, decision_summary_text))
+    assert "Auditoria" in _collect_text_content(banner_callback(audit_tab, nodes_rows, [], routes_rows, run_summary_text, decision_summary_text))
 
 
 def test_product_journey_panel_callback_tracks_active_primary_tab_and_state() -> None:

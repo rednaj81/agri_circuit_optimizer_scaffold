@@ -388,6 +388,162 @@ def _journey_space_state(space: str, studio_summary: dict[str, Any], run_summary
     }
 
 
+def _space_transition_guidance(
+    space: str,
+    studio_summary: dict[str, Any],
+    run_summary: dict[str, Any],
+    decision_summary: dict[str, Any],
+) -> dict[str, str]:
+    studio_status = str(studio_summary.get("status") or "needs_attention").strip().lower()
+    studio_blocker_count = int(studio_summary.get("blocker_count", 0) or 0)
+    studio_warning_count = int(studio_summary.get("warning_count", 0) or 0)
+    run_count = int(run_summary.get("run_count", 0) or 0)
+    next_queued_run_id = str(run_summary.get("next_queued_run_id") or "").strip()
+    active_run_ids = [str(item) for item in run_summary.get("active_run_ids", []) if str(item).strip()]
+    decision_candidate_id = str(decision_summary.get("candidate_id") or decision_summary.get("selected_candidate_id") or "").strip()
+    decision_state = _decision_primary_state(decision_summary)
+
+    if space == "studio":
+        if studio_status == "ready":
+            return {
+                "flow_label": "Fluxo liberado",
+                "flow_text": str(studio_summary.get("readiness_headline") or "O cenário já pode sair do Studio sem depender da trilha técnica."),
+                "target_space": "runs",
+                "target_label": "Seguir para Runs",
+                "target_reason": "O gate principal de readiness está liberado; a fila passa a ser a próxima leitura principal.",
+            }
+        if studio_blocker_count:
+            return {
+                "flow_label": "Bloqueado no Studio",
+                "flow_text": str(studio_summary.get("readiness_headline") or "Ainda existem bloqueios impedindo a passagem segura para Runs."),
+                "target_space": "studio",
+                "target_label": "Continuar no Studio",
+                "target_reason": str(studio_summary.get("primary_action") or "Corrija conectividade, rotas obrigatórias e medição direta no canvas antes de sair desta área."),
+            }
+        if studio_warning_count:
+            return {
+                "flow_label": "Readiness parcial",
+                "flow_text": str(studio_summary.get("readiness_headline") or "Ainda existem avisos que merecem revisão antes da fila."),
+                "target_space": "studio",
+                "target_label": "Fechar avisos no Studio",
+                "target_reason": str(studio_summary.get("primary_action") or "Revise os avisos do cenário antes de decidir se já vale abrir Runs."),
+            }
+        return {
+            "flow_label": "Montagem em andamento",
+            "flow_text": "O canvas ainda segue como superfície principal para completar a leitura do cenário.",
+            "target_space": "studio",
+            "target_label": "Continuar no Studio",
+            "target_reason": "Termine a montagem e a revisão do readiness antes de avançar para a fila.",
+        }
+    if space == "runs":
+        if decision_candidate_id:
+            return {
+                "flow_label": "Decisão disponível",
+                "flow_text": decision_state["headline"],
+                "target_space": "decision",
+                "target_label": "Ir para Decisão",
+                "target_reason": "Já existe resultado utilizável para comparar winner, runner-up e sinais de risco.",
+            }
+        if active_run_ids:
+            return {
+                "flow_label": "Execução em andamento",
+                "flow_text": f"A run {active_run_ids[0]} ainda está em processamento e segue como foco desta área.",
+                "target_space": "runs",
+                "target_label": "Acompanhar Runs",
+                "target_reason": "Espere a execução terminar antes de trocar a leitura principal para Decisão.",
+            }
+        if next_queued_run_id:
+            return {
+                "flow_label": "Fila pronta",
+                "flow_text": f"A próxima run na fila é {next_queued_run_id}.",
+                "target_space": "runs",
+                "target_label": "Revisar fila",
+                "target_reason": "Confirme a próxima rodada necessária antes de abrir outra área.",
+            }
+        if studio_status != "ready":
+            return {
+                "flow_label": "Studio ainda bloqueia a fila",
+                "flow_text": str(studio_summary.get("readiness_headline") or "O cenário ainda não está pronto para sustentar uma nova run."),
+                "target_space": "studio",
+                "target_label": "Voltar ao Studio",
+                "target_reason": str(studio_summary.get("primary_action") or "Feche os bloqueios do cenário antes de insistir em Runs."),
+            }
+        if run_count:
+            return {
+                "flow_label": "Histórico sem decisão clara",
+                "flow_text": "Já existe histórico, mas a leitura principal ainda não liberou uma decisão utilizável.",
+                "target_space": "runs",
+                "target_label": "Continuar em Runs",
+                "target_reason": "Revise a execução mais recente e decida se vale reenfileirar ou abrir Decisão com cautela.",
+            }
+        return {
+            "flow_label": "Fila vazia",
+            "flow_text": "Nenhuma run foi registrada ainda para este cenário.",
+            "target_space": "studio" if studio_status != "ready" else "runs",
+            "target_label": "Preparar próxima run" if studio_status == "ready" else "Voltar ao Studio",
+            "target_reason": (
+                "O cenário já passou pelo gate principal; agora a próxima ação é enfileirar a primeira run."
+                if studio_status == "ready"
+                else "A fila ainda não deve virar o foco principal enquanto o Studio segue bloqueado."
+            ),
+        }
+    if space == "decision":
+        if not decision_candidate_id:
+            return {
+                "flow_label": "Decisão ainda depende de Runs",
+                "flow_text": decision_state["headline"],
+                "target_space": "runs",
+                "target_label": "Voltar para Runs",
+                "target_reason": "Sem execução utilizável, a próxima ação continua sendo recuperar contexto em Runs.",
+            }
+        if decision_summary.get("feasible") is False:
+            return {
+                "flow_label": "Winner bloqueado",
+                "flow_text": decision_state["headline"],
+                "target_space": "runs",
+                "target_label": "Voltar para Runs",
+                "target_reason": "A leitura principal segue travada; vale rever a execução antes de aprofundar a trilha técnica.",
+            }
+        if str(decision_summary.get("decision_status") or "").strip().lower() == "technical_tie" or bool(decision_summary.get("technical_tie")):
+            return {
+                "flow_label": "Comparação ainda em aberto",
+                "flow_text": decision_state["headline"],
+                "target_space": "decision",
+                "target_label": "Manter comparação aberta",
+                "target_reason": "O próximo passo continua sendo comparar winner e runner-up antes de chamar Auditoria.",
+            }
+        return {
+            "flow_label": "Decisão principal legível",
+            "flow_text": decision_state["headline"],
+            "target_space": "audit",
+            "target_label": "Abrir Auditoria só se precisar",
+            "target_reason": "A trilha técnica continua secundária e só deve entrar quando a leitura principal não bastar.",
+        }
+    if decision_candidate_id:
+        return {
+            "flow_label": "Auditoria em modo de apoio",
+            "flow_text": "A decisão principal já está legível; esta área segue como reconciliação técnica sob demanda.",
+            "target_space": "decision",
+            "target_label": "Voltar para Decisão",
+            "target_reason": "Retorne para a leitura principal assim que a evidência técnica necessária estiver reconciliada.",
+        }
+    if studio_status != "ready":
+        return {
+            "flow_label": "Auditoria não substitui o Studio",
+            "flow_text": "O cenário ainda depende do canvas principal para fechar readiness.",
+            "target_space": "studio",
+            "target_label": "Voltar ao Studio",
+            "target_reason": "Use Auditoria apenas como trilha de apoio; a próxima ação real continua no Studio.",
+        }
+    return {
+        "flow_label": "Auditoria não substitui Runs",
+        "flow_text": "Sem decisão utilizável, esta área continua secundária diante da fila e da execução.",
+        "target_space": "runs",
+        "target_label": "Voltar para Runs",
+        "target_reason": "A próxima leitura principal ainda depende de run utilizável ou histórico operacional.",
+    }
+
+
 def _journey_space_card(
     *,
     space: str,
@@ -398,6 +554,7 @@ def _journey_space_card(
     decision_summary: dict[str, Any],
 ) -> Any:
     state = _journey_space_state(space, studio_summary, run_summary, decision_summary)
+    guidance = _space_transition_guidance(space, studio_summary, run_summary, decision_summary)
     is_active = str(active_tab or "studio") == space
     card_style = UI_JOURNEY_CARD_ACTIVE_STYLE if is_active else UI_JOURNEY_CARD_STYLE
     muted_color = "#d9ece5" if is_active else "#5b756d"
@@ -418,9 +575,11 @@ def _journey_space_card(
             html.Div(state["state_text"], style={"lineHeight": "1.6"}),
             html.Div("Próxima ação", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": muted_color}),
             html.Div(state["next_action"], style={"lineHeight": "1.6", "fontWeight": 700}),
+            html.Div("Transição sugerida", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": muted_color}),
+            html.Div(guidance["target_reason"], style={"lineHeight": "1.6"}),
             _button_link(
-                f"Abrir {title}",
-                state["href"],
+                guidance["target_label"],
+                f"?tab={guidance['target_space']}",
                 f"product-journey-open-{space}-link",
                 primary=is_active,
             ),
@@ -483,9 +642,15 @@ def render_product_journey_panel(
     )
 
 
-def render_product_space_banner(space: str | None) -> Any:
+def render_product_space_banner(
+    space: str | None,
+    studio_summary: dict[str, Any] | None = None,
+    run_summary: dict[str, Any] | None = None,
+    decision_summary: dict[str, Any] | None = None,
+) -> Any:
     normalized = str(space or "studio").strip().lower()
     content = _product_space_content(normalized)
+    guidance = _space_transition_guidance(normalized, studio_summary or {}, run_summary or {}, decision_summary or {})
     return html.Div(
         children=[
             html.Div(
@@ -516,10 +681,11 @@ def render_product_space_banner(space: str | None) -> Any:
             ),
             html.P(content["description"], style={"margin": "10px 0 0", "lineHeight": "1.6"}),
             html.Div(
-                style={**UI_TWO_COLUMN_STYLE, "marginTop": "14px"},
+                style={**UI_THREE_COLUMN_STYLE, "marginTop": "14px"},
                 children=[
                     _guidance_card("O que esta área resolve", content["objective"]),
-                    _guidance_card("Condição de saída", content["next_action"]),
+                    _guidance_card("Estado do fluxo agora", f"{guidance['flow_label']}: {guidance['flow_text']}"),
+                    _guidance_card("Próximo destino sugerido", f"{guidance['target_label']}: {guidance['target_reason']}"),
                 ],
             ),
         ]
@@ -3658,7 +3824,12 @@ def build_app(
                     ),
                     html.Div(
                         id="product-space-banner",
-                        children=render_product_space_banner("studio"),
+                        children=render_product_space_banner(
+                            "studio",
+                            initial_studio_readiness,
+                            initial_run_jobs_snapshot["summary"],
+                            initial_official_summary,
+                        ),
                         style=UI_PERSISTENT_BANNER_STYLE,
                     ),
                     dcc.Tabs(
@@ -5903,9 +6074,27 @@ def build_app(
     @app.callback(
         Output("product-space-banner", "children"),
         Input("primary-navigation-tabs", "value"),
+        Input("nodes-grid", "rowData"),
+        Input("candidate-links-grid", "rowData"),
+        Input("routes-grid", "rowData"),
+        Input("run-jobs-summary", "children"),
+        Input("official-candidate-summary", "children"),
     )
-    def _refresh_product_space_banner(current_tab: str | None) -> Any:
-        return render_product_space_banner(current_tab)
+    def _refresh_product_space_banner(
+        current_tab: str | None,
+        nodes_rows: list[dict[str, Any]] | None,
+        candidate_links_rows: list[dict[str, Any]] | None,
+        route_rows: list[dict[str, Any]] | None,
+        run_jobs_summary_text: str | None,
+        decision_summary_text: str | None,
+    ) -> Any:
+        studio_summary = build_studio_readiness_summary(nodes_rows or [], candidate_links_rows or [], route_rows or [])
+        return render_product_space_banner(
+            current_tab,
+            studio_summary,
+            _safe_json_loads(run_jobs_summary_text),
+            _safe_json_loads(decision_summary_text),
+        )
 
     @app.callback(
         Output("run-jobs-overview-panel", "children"),

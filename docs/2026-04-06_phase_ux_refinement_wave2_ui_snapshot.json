@@ -1,67 +1,41 @@
 {
   "wave": "ux_phase_1_wave_2",
   "validation": {
-    "targeted": "10 passed, 57 deselected in 1.40s",
-    "full": "72 passed in 504.20s (0:08:24)"
+    "targeted": "9 passed, 69 deselected in 1.56s",
+    "full": "87 passed in 460.22s (0:07:40)"
   },
-  "first_fold_ids": {
-    "studio": [
-      "studio-readiness-panel",
-      "studio-open-runs-button",
-      "studio-readiness-open-workbench-button"
-    ],
-    "runs": [
-      "runs-flow-panel",
-      "runs-flow-open-decision-button",
-      "execution-summary-panel"
-    ],
-    "decision": [
-      "decision-flow-panel",
-      "decision-summary-panel",
-      "decision-flow-open-runs-link",
-      "decision-flow-open-audit-link"
+  "persistent_shell": {
+    "banner_present": true,
+    "journey_present": true,
+    "active_space_switcher_ids": [
+      "product-space-switcher-studio-link",
+      "product-space-switcher-runs-link",
+      "product-space-switcher-decision-link",
+      "product-space-switcher-audit-link"
     ]
+  },
+  "guided_navigation": {
+    "banner_cards": [
+      "O que esta área resolve",
+      "Estado do fluxo agora",
+      "Próximo destino sugerido"
+    ],
+    "journey_ctas": {
+      "studio_href": "?tab=runs",
+      "runs_href": "?tab=decision",
+      "decision_href": "?tab=decision",
+      "audit_href": "?tab=decision"
+    }
   },
   "state_markers": {
-    "studio": [
-      "Estado dominante",
-      "Bloqueado no Studio",
-      "Corrigir no canvas"
-    ],
-    "runs_blocked": [
-      "Aguardando readiness do Studio",
-      "Decisão ainda secundária"
-    ],
-    "runs_ready": [
-      "Decisão disponível",
-      "Ir para Decisão"
-    ],
-    "decision": [
-      "Estado dominante",
-      "Empate técnico",
-      "Abrir Auditoria"
-    ],
-    "execution": [
-      "Estado dominante",
-      "Decisão disponível",
-      "Abrir Decisão desta execução"
-    ]
+    "banner_runs": "Espaço ativoRunsFila local e execução em focoTrocar espaçoStudioRunsDecisãoAuditoriaAqui a jornada sai do preparo do cenário e vira leitura operacional da fila, da run em foco e do último resultado.O que esta área resolveDecidir se ainda falta corrigir o cenário, executar a próxima rodada ou já abrir a decisão assistida.Estado do fluxo agoraDecisão disponível",
+    "banner_decision_without_result": "Espaço ativoDecisãoWinner, runner-up e contraste com contextoTrocar espaçoStudioRunsDecisãoAuditoriaAqui a jornada deixa de ser operacional e passa a ser comparativa, mantendo candidato oficial, runner-up e sinais de risco na mesma leitura.O que esta área resolveConfirmar se já existe escolha oficial legível ou se ainda falta contraste para a decisão humana assistida.Estado do fluxo agoraDecisão ainda depende de Runs",
+    "journey": "Jornada principalEscolha a próxima área pelo estado do produtoA navegação principal agora mostra Studio, Runs, Decisão e Auditoria como uma jornada única. Cada área resume objetivo, estado atual e próxima ação antes dos detalhes técnicos.StudioEspaço principalMontar o cenário no grafo de negócio e liberar o gate principal de readiness.Estado atualPronto para Runs"
   },
-  "button_states": {
-    "runs_when_blocked_disabled": true,
-    "runs_when_decision_ready_disabled": false
-  },
-  "text_preview": {
-    "studio": "Readiness do cenárioExige atençãoAinda há bloqueios estruturais impedindo a passagem segura para Runs.Estado dominanteBloqueado no StudioObjetivo desta áreaConfirmar se o cenário já pode sair do Studio sem depender da trilha técnica.Próxima açãoCorrigir regras estruturais e rotas inválidas antes de enfileirar uma nova run.Bloqueio principalA conexão L900 ter",
-    "runs_blocked": "Passagem Studio -> RunsEstado atualAinda há bloqueios ou avisos a revisar antes de enfileirar.Objetivo desta áreaTransformar readiness do Studio em uma leitura clara de fila, execução e próximo passo.Próxima açãoVolte ao Studio para corrigir conectividade, regras obrigatórias e medição direta antes de abrir uma nova run.Estado dominanteAguardando readiness d",
-    "runs_ready": "Passagem Studio -> RunsEstado atualA última execução já gerou contexto suficiente para entrar em Decisão.Objetivo desta áreaTransformar readiness do Studio em uma leitura clara de fila, execução e próximo passo.Próxima açãoAbra a Decisão para confirmar winner, runner-up e sinais de risco antes de oficializar.Estado dominanteDecisão disponívelEstado do cenári",
-    "decision": "Passagem Runs -> DecisãoEstado atualWinner e runner-up seguem próximos o suficiente para exigir decisão humana assistida.Objetivo desta áreaExplicar se a execução atual já pode ser lida como decisão ou se ainda falta contexto.Próxima açãoMantenha a comparação aberta, valide os sinais de risco e aprofunde a Auditoria apenas se precisar reconciliar a trilha té",
-    "execution": "Resumo executivoÚltima execução disponível para decisãoEstado dominanteDecisão disponívelObjetivo desta áreaMostrar se a última execução já gerou contexto suficiente para entrar em Decisão.Próxima açãoRevise o candidato oficial e siga para a comparação lado a lado quando precisar"
-  },
-  "layout_presence": {
-    "studio_readiness_open_workbench_button": true,
-    "runs_flow_open_decision_button": true,
-    "execution_open_decision_button": true
-  },
-  "visual_evidence_note": "Structured snapshot generated from the Dash layout and first-fold render functions for wave 2."
+  "visual_evidence_note": "Structured snapshot generated from the persistent shell banner and product journey cards for wave 2.",
+  "residual_risks": [
+    "the journey CTA ids remain attached to their original cards even though the labels and targets are now state-driven",
+    "visual screenshot evidence is still unavailable because this wave used structured UI evidence only",
+    "the repository worktree still contains unrelated agent and supervisor overlay changes outside this implementation commit"
+  ]
 }
