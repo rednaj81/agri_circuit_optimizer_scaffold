@@ -1091,6 +1091,25 @@ def _visible_studio_edges(
     return visible_edges
 
 
+def _humanize_label_list(items: list[str]) -> str:
+    unique_items = list(
+        dict.fromkeys(
+            str(item).strip()
+            for item in items
+            if str(item).strip()
+        )
+    )
+    if not unique_items:
+        return ""
+    if len(unique_items) == 1:
+        return unique_items[0]
+    if len(unique_items) == 2:
+        return f"{unique_items[0]} e {unique_items[1]}"
+    if len(unique_items) == 3:
+        return f"{unique_items[0]}, {unique_items[1]} e {unique_items[2]}"
+    return f"{unique_items[0]}, {unique_items[1]}, {unique_items[2]} e mais {len(unique_items) - 3}"
+
+
 def _primary_route_projection_rows(
     nodes_rows: list[dict[str, Any]],
     route_rows: list[dict[str, Any]] | None,
@@ -1141,6 +1160,148 @@ def _studio_edge_business_label(
     if family_hint:
         return family_hint.split(",")[0].strip() or "Conexão do cenário"
     return _studio_edge_role_label(row)
+
+
+def build_studio_business_flow_summary(
+    nodes_rows: list[dict[str, Any]],
+    candidate_links_rows: list[dict[str, Any]],
+    route_rows: list[dict[str, Any]] | None,
+    focus_node_ids: set[str] | None = None,
+) -> dict[str, Any]:
+    visible_nodes = _visible_studio_nodes(nodes_rows)
+    node_lookup = {
+        str(row.get("node_id", "")).strip(): dict(row)
+        for row in visible_nodes
+        if str(row.get("node_id", "")).strip()
+    }
+    relation_map: dict[tuple[str, str], dict[str, Any]] = {}
+
+    def register_relation(
+        source: str,
+        target: str,
+        *,
+        route_id: str = "",
+        mandatory: bool = False,
+    ) -> None:
+        source = str(source).strip()
+        target = str(target).strip()
+        if source not in node_lookup or target not in node_lookup or source == target:
+            return
+        relation = relation_map.setdefault(
+            (source, target),
+            {
+                "source": source,
+                "target": target,
+                "route_ids": [],
+                "mandatory": False,
+            },
+        )
+        if route_id and route_id not in relation["route_ids"]:
+            relation["route_ids"].append(route_id)
+        relation["mandatory"] = relation["mandatory"] or mandatory
+
+    for row in _visible_studio_edges(nodes_rows, candidate_links_rows):
+        register_relation(
+            str(row.get("from_node", "")).strip(),
+            str(row.get("to_node", "")).strip(),
+        )
+    for route in _primary_route_projection_rows(nodes_rows, route_rows):
+        register_relation(
+            str(route.get("source", "")).strip(),
+            str(route.get("target", "")).strip(),
+            route_id=str(route.get("route_id", "")).strip(),
+            mandatory=bool(route.get("mandatory")),
+        )
+
+    inbound_by_node: dict[str, set[str]] = {node_id: set() for node_id in node_lookup}
+    outbound_by_node: dict[str, set[str]] = {node_id: set() for node_id in node_lookup}
+    connection_lines: list[str] = []
+    for relation in relation_map.values():
+        source = relation["source"]
+        target = relation["target"]
+        inbound_by_node[target].add(source)
+        outbound_by_node[source].add(target)
+        source_label = _studio_node_business_label(node_lookup.get(source))
+        target_label = _studio_node_business_label(node_lookup.get(target))
+        qualifiers: list[str] = []
+        if relation["mandatory"]:
+            qualifiers.append("rota obrigatória")
+        if relation["route_ids"]:
+            qualifiers.append("rotas " + ", ".join(relation["route_ids"][:2]))
+        qualifier_text = f" ({', '.join(qualifiers)})" if qualifiers else ""
+        connection_lines.append(f"{source_label} supre {target_label}{qualifier_text}.")
+
+    normalized_focus_node_ids = {
+        str(node_id).strip()
+        for node_id in (focus_node_ids or set())
+        if str(node_id).strip() in node_lookup
+    }
+    focus_labels = [_studio_node_business_label(node_lookup.get(node_id)) for node_id in sorted(normalized_focus_node_ids)]
+    supplied_by_labels = sorted(
+        {
+            _studio_node_business_label(node_lookup.get(source))
+            for node_id in normalized_focus_node_ids
+            for source in inbound_by_node.get(node_id, set())
+            if source not in normalized_focus_node_ids
+        }
+    )
+    supplies_labels = sorted(
+        {
+            _studio_node_business_label(node_lookup.get(target))
+            for node_id in normalized_focus_node_ids
+            for target in outbound_by_node.get(node_id, set())
+            if target not in normalized_focus_node_ids
+        }
+    )
+    focus_connection_lines = [
+        line
+        for relation, line in zip(relation_map.values(), connection_lines)
+        if relation["source"] in normalized_focus_node_ids or relation["target"] in normalized_focus_node_ids
+    ]
+    source_labels = sorted(
+        _studio_node_business_label(node_lookup.get(node_id))
+        for node_id in node_lookup
+        if outbound_by_node.get(node_id) and not inbound_by_node.get(node_id)
+    )
+    sink_labels = sorted(
+        _studio_node_business_label(node_lookup.get(node_id))
+        for node_id in node_lookup
+        if inbound_by_node.get(node_id) and not outbound_by_node.get(node_id)
+    )
+    orphan_labels = sorted(
+        _studio_node_business_label(node_lookup.get(node_id))
+        for node_id in node_lookup
+        if not inbound_by_node.get(node_id) and not outbound_by_node.get(node_id)
+    )
+    if normalized_focus_node_ids:
+        focus_display = _humanize_label_list(focus_labels)
+        if supplied_by_labels and supplies_labels:
+            headline = f"{focus_display} é suprido por {_humanize_label_list(supplied_by_labels)} e supre {_humanize_label_list(supplies_labels)}."
+        elif supplied_by_labels:
+            headline = f"{focus_display} é suprido por {_humanize_label_list(supplied_by_labels)}."
+        elif supplies_labels:
+            headline = f"{focus_display} supre {_humanize_label_list(supplies_labels)}."
+        else:
+            headline = f"{focus_display} ainda não participa de um trecho visível de suprimento."
+        scope_label = focus_display
+    else:
+        if source_labels and sink_labels:
+            headline = f"O fluxo principal visível parte de {_humanize_label_list(source_labels)} e atende {_humanize_label_list(sink_labels)}."
+        elif connection_lines:
+            headline = "A camada principal já mostra quem supre e quem é suprido no cenário."
+        else:
+            headline = "A camada principal ainda não mostra relações de suprimento entre entidades de negócio."
+        scope_label = "Cenário inteiro"
+    return {
+        "scope_label": scope_label,
+        "headline": headline,
+        "supplied_by_label": _humanize_label_list(supplied_by_labels) or "Ainda não recebe suprimento visível.",
+        "supplies_label": _humanize_label_list(supplies_labels) or "Ainda não abastece outra entidade visível.",
+        "connection_lines": focus_connection_lines or connection_lines,
+        "source_labels": source_labels,
+        "sink_labels": sink_labels,
+        "orphan_labels": orphan_labels,
+    }
 
 
 def build_studio_readiness_summary(
@@ -1406,6 +1567,8 @@ def render_studio_workspace_panel(
     studio_summary: dict[str, Any],
     node_summary: dict[str, Any],
     edge_summary: dict[str, Any],
+    nodes_rows: list[dict[str, Any]],
+    candidate_links_rows: list[dict[str, Any]],
     route_rows: list[dict[str, Any]] | None,
     studio_status_text: str | None,
 ) -> Any:
@@ -1418,6 +1581,16 @@ def render_studio_workspace_panel(
         _humanize_readiness_issue(item)
         for item in [*(studio_summary.get("blockers") or []), *(studio_summary.get("warnings") or [])]
     ]
+    business_flow = build_studio_business_flow_summary(
+        nodes_rows,
+        candidate_links_rows,
+        route_rows,
+        focus_node_ids={
+            str(node_summary.get("selected_node_id") or "").strip(),
+            str((edge_summary.get("selected_edge") or {}).get("from_node") or "").strip(),
+            str((edge_summary.get("selected_edge") or {}).get("to_node") or "").strip(),
+        },
+    )
     top_issue = issues[0] if issues else "Nenhum bloqueio ou aviso domina a leitura atual do cenário."
     runs_enabled = status == "ready"
     runs_button_label = "Ir para Runs" if runs_enabled else "Runs bloqueado neste estado"
@@ -1457,6 +1630,27 @@ def render_studio_workspace_panel(
                     html.Div(top_issue, style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"}),
                     html.Div(focus_summary["headline"], style={"lineHeight": "1.6", "marginTop": "10px"}),
                     html.Div(focus_summary["recommended_action"], style={"lineHeight": "1.6", "marginTop": "10px", "fontWeight": 700}),
+                ],
+            ),
+            html.Div(
+                id="studio-business-flow-panel",
+                style={**UI_MUTED_CARD_STYLE, "padding": "12px", "marginBottom": "12px"},
+                children=[
+                    html.Div("Quem supre quem na camada principal", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+                    html.Div(str(business_flow.get("headline") or "Sem cadeia principal visível."), style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"}),
+                    html.Div(
+                        style={**UI_THREE_COLUMN_STYLE, "marginTop": "12px"},
+                        children=[
+                            _guidance_card("Escopo desta leitura", str(business_flow.get("scope_label") or "Cenário inteiro")),
+                            _guidance_card("É suprido por", str(business_flow.get("supplied_by_label") or "Ainda não recebe suprimento visível.")),
+                            _guidance_card("Supre", str(business_flow.get("supplies_label") or "Ainda não abastece outra entidade visível.")),
+                        ],
+                    ),
+                    html.Div("Trechos de negócio já legíveis", style={"fontWeight": 700, "marginTop": "12px", "marginBottom": "6px"}),
+                    _bullet_list(
+                        list(business_flow.get("connection_lines") or [])[:4],
+                        "Ainda não há trecho de suprimento legível na camada principal.",
+                    ),
                 ],
             ),
             html.Div(
@@ -1957,6 +2151,8 @@ def render_studio_connectivity_panel(
 def render_studio_focus_panel(
     node_summary: dict[str, Any],
     edge_summary: dict[str, Any],
+    nodes_rows: list[dict[str, Any]],
+    candidate_links_rows: list[dict[str, Any]],
     route_rows: list[dict[str, Any]] | None,
     readiness_summary: dict[str, Any] | None = None,
     status_text: str | None = None,
@@ -1972,6 +2168,12 @@ def render_studio_focus_panel(
         str(selected_edge.get("to_node") or "").strip(),
     }
     focus_node_ids = {node_id for node_id in focus_node_ids if node_id}
+    business_flow = build_studio_business_flow_summary(
+        nodes_rows,
+        candidate_links_rows,
+        route_rows,
+        focus_node_ids=focus_node_ids,
+    )
     relevant_routes = [
         route
         for route in route_rows
@@ -2145,6 +2347,29 @@ def render_studio_focus_panel(
                     _metric_card("Conexão em foco", edge_summary.get("business_label") or "-"),
                     _metric_card("Rotas ligadas ao nó", len(relevant_routes)),
                     _metric_card("Readiness", _humanize_readiness_status(readiness_summary.get("status") or "needs_attention")),
+                ],
+            ),
+            html.H4("Relações de negócio deste foco", style={"marginBottom": "6px", "marginTop": "14px"}),
+            html.Div(
+                style={**UI_MUTED_CARD_STYLE, "padding": "14px", "marginTop": "8px"},
+                children=[
+                    html.Div(str(business_flow.get("headline") or "Sem relação de negócio legível neste foco."), style={"fontWeight": 700, "lineHeight": "1.6"}),
+                    html.Div(
+                        style={**UI_THREE_COLUMN_STYLE, "marginTop": "12px"},
+                        children=[
+                            _guidance_card("É suprido por", str(business_flow.get("supplied_by_label") or "Ainda não recebe suprimento visível.")),
+                            _guidance_card("Supre", str(business_flow.get("supplies_label") or "Ainda não abastece outra entidade visível.")),
+                            _guidance_card(
+                                "Órfãos visíveis",
+                                _humanize_label_list(list(business_flow.get("orphan_labels") or [])[:3]) or "Nenhum nó órfão domina a leitura principal.",
+                            ),
+                        ],
+                    ),
+                    html.Div("Trechos ligados a este foco", style={"fontWeight": 700, "marginTop": "12px", "marginBottom": "6px"}),
+                    _bullet_list(
+                        list(business_flow.get("connection_lines") or [])[:4],
+                        "Ainda não há trecho legível de suprimento neste foco.",
+                    ),
                 ],
             ),
             html.H4("Por que este foco importa", style={"marginBottom": "6px", "marginTop": "14px"}),
@@ -3404,6 +3629,8 @@ def build_app(
                                                     initial_studio_readiness,
                                                     _safe_json_loads(initial_node_studio_summary),
                                                     _safe_json_loads(initial_edge_studio_summary),
+                                                    authoring_payload["nodes_rows"],
+                                                    authoring_payload["candidate_links_rows"],
                                                     authoring_payload["route_rows"],
                                                     "",
                                                 ),
@@ -3433,6 +3660,8 @@ def build_app(
                                                 children=render_studio_focus_panel(
                                                     _safe_json_loads(initial_node_studio_summary),
                                                     _safe_json_loads(initial_edge_studio_summary),
+                                                    authoring_payload["nodes_rows"],
+                                                    authoring_payload["candidate_links_rows"],
                                                     authoring_payload["route_rows"],
                                                     initial_studio_readiness,
                                                     "",
@@ -5332,7 +5561,15 @@ def build_app(
                 nodes_rows or [],
                 candidate_links_rows or [],
             ),
-            render_studio_workspace_panel(studio_readiness, node_summary, edge_summary, route_rows, studio_status_text),
+            render_studio_workspace_panel(
+                studio_readiness,
+                node_summary,
+                edge_summary,
+                nodes_rows or [],
+                candidate_links_rows or [],
+                route_rows,
+                studio_status_text,
+            ),
             render_studio_readiness_panel(studio_readiness),
             render_studio_projection_panel(
                 build_studio_projection_summary(nodes_rows or [], candidate_links_rows or [], route_rows or [])
@@ -5347,7 +5584,15 @@ def build_app(
                 run_jobs_summary,
                 execution_summary,
             ),
-            render_studio_focus_panel(node_summary, edge_summary, route_rows, studio_readiness, studio_status_text),
+            render_studio_focus_panel(
+                node_summary,
+                edge_summary,
+                nodes_rows or [],
+                candidate_links_rows or [],
+                route_rows,
+                studio_readiness,
+                studio_status_text,
+            ),
             render_studio_connectivity_panel(studio_readiness, node_summary, edge_summary, route_rows),
             render_studio_selection_panel(node_summary, "node"),
             render_studio_selection_panel(edge_summary, "edge"),

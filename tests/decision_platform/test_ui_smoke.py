@@ -478,6 +478,15 @@ def test_studio_workspace_panel_unifies_focus_connectivity_and_runs_gate() -> No
         },
         {},
         [
+            {"node_id": "W", "label": "Tanque de água", "node_type": "water_tank", "zone": "supply"},
+            {"node_id": "P1", "label": "Bomba principal", "node_type": "pump", "zone": "process"},
+            {"node_id": "M", "label": "Misturador", "node_type": "mixer", "zone": "process"},
+        ],
+        [
+            {"link_id": "L001", "from_node": "W", "to_node": "P1", "archetype": "bus_segment"},
+            {"link_id": "L002", "from_node": "P1", "to_node": "M", "archetype": "bus_segment"},
+        ],
+        [
             {"route_id": "R001", "source": "P1", "sink": "M", "mandatory": True},
         ],
         "Nó reposicionado com sucesso.",
@@ -489,10 +498,14 @@ def test_studio_workspace_panel_unifies_focus_connectivity_and_runs_gate() -> No
     assert "Passagem para Runs" in panel_text
     assert "Ainda bloqueada" in panel_text
     assert "A conexão L900 termina em W" in panel_text
+    assert "Quem supre quem na camada principal" in panel_text
+    assert "Bomba principal é suprido por Tanque de água e supre Misturador." in panel_text
+    assert "Tanque de água supre Bomba principal." in panel_text
     assert "Bomba principal" in panel_text
     assert "Corrigir no canvas" in panel_text
     assert "Runs bloqueado neste estado" in panel_text
     assert getattr(_find_component_by_id(panel, "studio-workspace-open-runs-button"), "disabled", None) is True
+    assert _find_component_by_id(panel, "studio-business-flow-panel") is not None
 
 
 def test_studio_primary_canvas_hides_internal_and_hub_nodes() -> None:
@@ -741,6 +754,15 @@ def test_studio_focus_panel_uses_canvas_selection_as_primary_context() -> None:
             "to_label": "Misturador",
         },
         [
+            {"node_id": "W", "label": "Tanque de água", "node_type": "water_tank", "zone": "supply"},
+            {"node_id": "M", "label": "Misturador", "node_type": "mixer", "zone": "process"},
+            {"node_id": "P1", "label": "Bomba principal", "node_type": "pump", "zone": "process"},
+        ],
+        [
+            {"link_id": "L001", "from_node": "W", "to_node": "M", "archetype": "bus_segment"},
+            {"link_id": "L002", "from_node": "W", "to_node": "P1", "archetype": "bus_segment"},
+        ],
+        [
             {"route_id": "R001", "source": "W", "sink": "M", "mandatory": True, "dose_min_l": 2.0, "measurement_required": True},
             {"route_id": "R002", "source": "P1", "sink": "M", "mandatory": True},
         ],
@@ -753,6 +775,10 @@ def test_studio_focus_panel_uses_canvas_selection_as_primary_context() -> None:
     assert "Rotas ligadas ao nó" in panel_text
     assert "Conexão em foco" in panel_text
     assert "Problema ou oportunidade" in panel_text
+    assert "Relações de negócio deste foco" in panel_text
+    assert "Tanque de água e Misturador supre Bomba principal." not in panel_text
+    assert "Tanque de água supre Misturador (rota obrigatória, rotas R001)." in panel_text
+    assert "Tanque de água supre Bomba principal." in panel_text
     assert "Por que este foco importa" in panel_text
     assert "Exige atenção" in panel_text
     assert "Ações rápidas deste foco" in panel_text
@@ -778,6 +804,13 @@ def test_studio_focus_panel_embeds_status_and_runs_gate_context() -> None:
             "role_label": "Bomba principal",
         },
         {},
+        [
+            {"node_id": "W", "label": "Tanque de água", "node_type": "water_tank", "zone": "supply"},
+            {"node_id": "P1", "label": "Bomba principal", "node_type": "pump", "zone": "process"},
+        ],
+        [
+            {"link_id": "L001", "from_node": "W", "to_node": "P1", "archetype": "bus_segment"},
+        ],
         [],
         {
             "blocker_count": 2,
@@ -789,6 +822,7 @@ def test_studio_focus_panel_embeds_status_and_runs_gate_context() -> None:
     panel_text = _collect_text_content(panel)
 
     assert "Este foco ainda convive com bloqueios antes de Runs." in panel_text
+    assert "Bomba principal é suprido por Tanque de água." in panel_text
     assert "Por que este foco importa" in panel_text
     assert "O cenário ainda tem 2 bloqueio(s) antes de Runs" in panel_text
     assert _find_component_by_id(panel, "studio-status-banner") is not None
@@ -808,6 +842,13 @@ def test_studio_focus_panel_prioritizes_recommended_action_for_invalid_edge() ->
             "from_label": "Bomba principal",
             "to_label": "Tanque de água",
         },
+        [
+            {"node_id": "W", "label": "Tanque de água", "node_type": "water_tank", "zone": "supply"},
+            {"node_id": "P1", "label": "Bomba principal", "node_type": "pump", "zone": "process"},
+        ],
+        [
+            {"link_id": "L900", "from_node": "P1", "to_node": "W", "archetype": "bus_segment"},
+        ],
         [],
     )
     panel_text = _collect_text_content(panel)
