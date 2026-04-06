@@ -133,3 +133,16 @@ wave_journal:
       ui_snapshot: docs/2026-04-06_phase_ux_refinement_wave5_ui_snapshot.json
       validation_command: "$env:PYTHONPATH='src;.'; .\\.venv\\Scripts\\python.exe -m pytest tests/decision_platform/test_ui_smoke.py -q -p no:cacheprovider --basetemp tests/_tmp/pytest-basetemp-ux-wave5-full"
       validation_result: "52 passed in 446.67s (0:07:26)"
+  - wave: 6
+    phase_id: ux_phase_2
+    status: completed
+    summary:
+      - studio focus now keeps readiness visible through a compact state line instead of a separate run-transition block
+      - node, edge and empty-selection summaries now carry short, state-specific next actions tied to editing mode
+      - the contextual cleanup stayed inside studio and avoided new copy or CTA changes in runs, decision or shell framing
+      - this wave emphasizes containment and maintainability over surface expansion
+    evidence:
+      handoff: docs/2026-04-06_phase_ux_refinement_wave6_handoff.md
+      ui_snapshot: docs/2026-04-06_phase_ux_refinement_wave6_ui_snapshot.json
+      validation_command: "$env:PYTHONPATH='src;.'; .\\.venv\\Scripts\\python.exe -m pytest tests/decision_platform/test_ui_smoke.py -q -p no:cacheprovider --basetemp tests/_tmp/pytest-basetemp-ux-wave6-full"
+      validation_result: "52 passed in 464.72s (0:07:44)"

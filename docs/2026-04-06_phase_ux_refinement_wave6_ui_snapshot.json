@@ -1,42 +1,25 @@
 {
-  "wave": "ux_phase_2_wave_2",
+  "wave": "ux_phase_2_wave_6",
   "validation": {
-    "targeted": "3 passed, 37 deselected in 0.61s",
-    "full": "40 passed in 403.39s"
+    "targeted": "6 passed, 46 deselected in 0.75s",
+    "full": "52 passed in 464.72s (0:07:44)"
   },
-  "studio_focus_surface": {
-    "primary_panel_ids": [
-      "studio-focus-panel",
-      "studio-connectivity-panel",
-      "node-studio-summary-panel",
-      "edge-studio-summary-panel",
-      "studio-editor-workbench"
-    ],
-    "markers": [
-      "Foco do canvas",
-      "Conectividade do grafo",
-      "Ações de edição do grafo"
-    ]
+  "visual_evidence": {
+    "type": "structured_ui_snapshot",
+    "screenshot_attempt": "not_retried_after_policy_block",
+    "note": "Structured Studio snapshot recorded because local screenshot capture remained blocked by policy."
   },
-  "selection_driven_context": {
-    "focus_metrics": [
-      "Nó em foco",
-      "Conexão em foco",
-      "Rotas ligadas ao nó"
-    ],
-    "connectivity_priority_marker": "Prioridade da seleção atual",
-    "selection_examples": [
-      "Tanque de água",
-      "Água para misturador"
-    ]
+  "scope": {
+    "surface": "studio_only",
+    "global_shell_touched": false,
+    "runs_decision_copy_touched": false
   },
-  "secondary_surface": {
-    "workbench_id": "studio-editor-workbench",
-    "technical_disclosure_ids": [
-      "node-studio-node-id",
-      "edge-studio-link-id",
-      "node-studio-summary",
-      "edge-studio-summary"
-    ]
+  "studio_context": {
+    "focus_text": "Foco do canvasSem alerta operacional no momento.Conexão em focoA conexão selecionada concentra o próximo ajuste do fluxo.Exige atençãoEste foco ainda convive com bloqueios antes de Runs.Problema ou oportunidadeUsar a seleção atual para validar conectividade, regras obrigatórias e readiness sem sair do canvas.Próxima açãoA conexão em foco já concentra a leitura deste trecho. Revise o fluxo no canvas e abra a bancada completa apenas se precisar ajustar comprimento, famílias ou direção.Nó em focoTanque de águaConexão em focoTap P1Rotas ligadas ao nó6ReadinessExige atençãoPor que este foco importaNó em foco: Tanque de água na superfície principal.Conexão em foco: Produto 1 -> Junção 1.Rotas deste foco: 4 obrigatória(s), 3 com dosagem, 6 com medição direta.Regra do foco: W não pode receber rotas entrando; use este ponto apenas como origem.Regra do foco: rotas com dosagem exigem medição direta compatível.O cenário ainda tem 2 bloqueio(s) antes de Runs, mesmo que este foco não concentre todos eles.Ações rápidas deste focoAção sugerida agoraA conexão em foco já concentra a leitura deste trecho. Revise o fluxo no canvas e abra a bancada completa apenas se precisar ajustar comprimento, famílias ou direção.Abrir bancada completaOutros atalhos rápidosMover à esquerdaMover acimaMover abaixoDuplicar nó em focoExcluir conexão em focoAbrir bancada completaPróxima açãoA conexão em foco já concentra a leitura deste trecho. Revise o fluxo no canvas e abra a bancada completa apenas se precisar ajustar comprimento, famílias ou direção.Confira comprimento e famílias sugeridas para a conexão L001.",
+    "connectivity_text": "Conectividade do grafoO que destrava o cenárioHá rotas com dosagem neste foco. Confirme medição direta antes de seguir para Runs.Antes de abrir RunsNão siga para Runs enquanto houver bloqueios estruturais ou rotas com dosagem sem medição direta.Bloqueios2Avisos0Rotas obrigatórias9Medição direta17Prioridade da seleção atualSeleção atualW só pode iniciar fluxo; nenhuma conexão ou rota deve terminar neste ponto.Rotas com dosagem exigem medição direta antes de seguir para Runs.Cenário inteiroHá conexões saindo de S no cenário; isso ainda bloqueia a passagem para Runs.Rotas em focoR001: W -> M (obrigatória, medição direta)R002: W -> I (obrigatória, medição direta)R003: W -> S (obrigatória, medição direta)R004: P1 -> M (obrigatória, medição direta)Próxima açãoFeche os bloqueios estruturais antes de enfileirar uma nova run.Salve e reabra o bundle canônico quando a revisão estiver pronta.",
+    "node_summary_text": "Seleção ativaTanque de águaTanque de águaSuperfície principalUse este resumo para preparar a edição do nó sem tirar o canvas do centro.Posição: x=0.05 m, y=0.42 mFonte principalPróxima açãoAjuste posição, rótulo e papel deste nó somente depois de confirmar se ele participa da rota que você está revisando.",
+    "edge_summary_text": "Seleção ativaTap P1Tomada de tanqueInterno ocultoUse este resumo para preparar a revisão desta conexão antes de abrir campos avançados.Fluxo principal: Produto 1 -> Junção 1Comprimento: 0.25 mFamílias: bus,hybridTap P1Próxima açãoRevise direção, comprimento e famílias sugeridas desta conexão antes de abrir os campos avançados.",
+    "empty_node_text": "Seleção ativaNenhuma entidade em foco.Próxima açãoSelecione um nó no canvas para preparar edição de posição, rótulo e papel operacional desta entidade.",
+    "empty_edge_text": "Seleção ativaNenhuma conexão em foco.Próxima açãoSelecione uma conexão no canvas para revisar fluxo, famílias sugeridas e impacto estrutural."
   }
 }

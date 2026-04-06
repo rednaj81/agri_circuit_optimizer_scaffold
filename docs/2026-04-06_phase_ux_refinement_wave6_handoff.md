@@ -1,42 +1,41 @@
-# Phase UX Refinement Wave 6 - Studio Focus-Driven Context
+# Phase UX Refinement Wave 6 - Studio-Only Context Containment
 
 ## Objective
 
-Make the current canvas selection drive the main Studio context so the operator can understand the selected node or connection, see the most relevant connectivity implications, and act from that focus before opening the secondary editing workbench.
+Keep `ux_phase_2` tightly contained inside Studio by making the contextual stack more cohesive without any new spillover into Runs, Decision, Audit, or the global shell.
 
 ## Delivered
 
-- Added a primary `Foco do canvas` panel to the Studio main rail, driven by the current node and connection selections already synchronized from Cytoscape.
-- Reworked the connectivity panel so it prioritizes routes linked to the current focus when possible, instead of behaving only as a generic scenario summary.
-- Moved the node and connection summaries into the secondary editing workbench so they support editing without competing with the main focus rail.
-- Kept the canvas, connectivity panel, and focus panel in the first fold while preserving the business-only graph and hidden internal nodes.
-- Preserved the secondary workbench and technical disclosure; the change is about hierarchy and prioritization, not backend behavior.
-- Extended smoke coverage to protect the new focus-driven context and the selection-aware prioritization inside the connectivity panel.
+- Reduced one more layer of redundancy in `Foco do canvas` by replacing the dedicated `Passagem para Runs` block with a shorter readiness line embedded directly into the contextual header.
+- Kept readiness explicit in the Studio focus area through a compact state chip plus a single contextual note, instead of repeating the transition logic in another competing card.
+- Refined `render_studio_selection_panel` so node, edge, and empty-selection states now each carry a short, specific next action tied to the editing mode, rather than sharing looser fallback language.
+- Preserved the current Studio layout and all non-Studio surfaces; this wave stayed within the contextual behavior of the Studio stack and did not re-anchor CTAs or copy in Runs or Decision.
+- Updated smoke coverage only where the Studio contextual hierarchy changed.
 
 ## Validation
 
 ```powershell
-$env:PYTHONPATH='src;.'; .\.venv\Scripts\python.exe -m pytest tests/decision_platform/test_ui_smoke.py -q -p no:cacheprovider -k "studio_tab_surfaces_readiness_and_selection_context or studio_connectivity_panel_surfaces_routes_and_measurement_near_canvas or studio_focus_panel_uses_canvas_selection_as_primary_context" --basetemp tests/_tmp/pytest-basetemp-ux-wave6-targeted
+$env:PYTHONPATH='src;.'; .\.venv\Scripts\python.exe -m pytest tests/decision_platform/test_ui_smoke.py -q -p no:cacheprovider -k "studio_focus_panel or studio_selection_panel or studio_tab_surfaces_readiness_and_selection_context or primary_surfaces_explain_empty_states_without_debug_language" --basetemp tests/_tmp/pytest-basetemp-ux-wave6-targeted
 $env:PYTHONPATH='src;.'; .\.venv\Scripts\python.exe -m pytest tests/decision_platform/test_ui_smoke.py -q -p no:cacheprovider --basetemp tests/_tmp/pytest-basetemp-ux-wave6-full
 ```
 
 Result:
 
-- `3 passed, 37 deselected in 0.61s`
-- `40 passed in 403.39s`
+- `6 passed, 46 deselected in 0.75s`
+- `52 passed in 464.72s (0:07:44)`
 
 ## Evidence
 
-- Structured Studio focus snapshot: `docs/2026-04-06_phase_ux_refinement_wave6_ui_snapshot.json`
+- Structured Studio snapshot: `docs/2026-04-06_phase_ux_refinement_wave6_ui_snapshot.json`
 
 ## Scope Guardrails
 
 - No architecture reopening.
 - No replacement of Dash or Cytoscape.
-- No change to Julia-only official execution, fail-closed behavior, or queue/runs contracts.
-- No change to solver, ranking, official decision logic, or `technical_tie`.
-- No reintroduction of technical entities, raw JSON, or logs as primary Studio UX.
+- No change to Runs, Decision, Audit, or global shell framing.
+- No change to Julia-only official execution, queue semantics, or backend optimization logic.
+- No change to `docs/05_data_contract.md`.
 
 ## Honest Handoff
 
-This wave improved the quality of Studio attention rather than adding another status block. The canvas selection now governs the main context rail, and the connectivity panel tries to talk first about what matters to the current focus. The editing workbench remains available, but it stopped competing with the canvas as the primary attention anchor.
+This wave was containment work, not expansion. The gain is smaller than the previous Studio waves, but it is disciplined: the contextual behavior is more concise and more state-specific, and the diff stayed inside Studio. Visual evidence remains structured rather than screenshot-based because local capture is still blocked by policy.

@@ -506,8 +506,8 @@ def test_studio_focus_panel_uses_canvas_selection_as_primary_context() -> None:
     assert "Rotas ligadas ao nó" in panel_text
     assert "Conexão em foco" in panel_text
     assert "Problema ou oportunidade" in panel_text
-    assert "Passagem para Runs" in panel_text
     assert "Por que este foco importa" in panel_text
+    assert "Exige atenção" in panel_text
     assert "Ações rápidas deste foco" in panel_text
     assert "Ação sugerida agora" in panel_text
     assert "W não pode receber rotas entrando" in panel_text
@@ -541,8 +541,7 @@ def test_studio_focus_panel_embeds_status_and_runs_gate_context() -> None:
     )
     panel_text = _collect_text_content(panel)
 
-    assert "Passagem para Runs" in panel_text
-    assert "Corrigir regras estruturais e rotas inválidas antes de enfileirar uma nova run." in panel_text
+    assert "Este foco ainda convive com bloqueios antes de Runs." in panel_text
     assert "Por que este foco importa" in panel_text
     assert "O cenário ainda tem 2 bloqueio(s) antes de Runs" in panel_text
     assert _find_component_by_id(panel, "studio-status-banner") is not None
@@ -691,8 +690,10 @@ def test_studio_selection_panel_distinguishes_node_and_edge_editing_guidance() -
 
     assert "Use este resumo para preparar a edição do nó" in node_text
     assert "Posição: x=0.4 m, y=0.2 m" in node_text
+    assert "Ajuste posição, rótulo e papel deste nó" in node_text
     assert "Use este resumo para preparar a revisão desta conexão" in edge_text
     assert "Fluxo principal: Bomba principal -> Misturador" in edge_text
+    assert "Revise direção, comprimento e famílias sugeridas" in edge_text
 
 
 def test_decision_flow_panel_makes_transition_and_next_action_explicit() -> None:

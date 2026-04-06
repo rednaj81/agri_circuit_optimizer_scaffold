@@ -1301,6 +1301,12 @@ def render_studio_focus_panel(
             + ([] if blocker_count > 0 else [runs_gate_text])
         )
     )
+    readiness_note = (
+        "Este foco ainda convive com bloqueios antes de Runs."
+        if blocker_count > 0
+        else ("Este foco ainda pede revisão antes de seguir para Runs." if warning_count > 0 else "Nada neste foco impede a passagem para Runs.")
+    )
+    readiness_background, readiness_color = _status_tone(readiness_summary.get("status") or "needs_attention")
     return html.Div(
         id="studio-focus-panel",
         children=[
@@ -1308,6 +1314,16 @@ def render_studio_focus_panel(
             html.Div(id="studio-status-banner", children=render_status_banner(status_text or "")),
             html.Div(selection_state_label, style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d", "marginTop": "8px"}),
             html.Div(selection_state_headline, style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"}),
+            html.Div(
+                style={"display": "flex", "alignItems": "center", "gap": "10px", "marginTop": "10px", "flexWrap": "wrap"},
+                children=[
+                    html.Span(
+                        _humanize_readiness_status(readiness_summary.get("status") or "needs_attention"),
+                        style={"padding": "6px 10px", "borderRadius": "999px", "background": readiness_background, "color": readiness_color, "fontWeight": 700},
+                    ),
+                    html.Span(readiness_note, style={"lineHeight": "1.5", "fontWeight": 700}),
+                ],
+            ),
             html.Div(
                 style={**UI_TWO_COLUMN_STYLE, "marginTop": "12px", "marginBottom": "12px"},
                 children=[
@@ -1326,11 +1342,6 @@ def render_studio_focus_panel(
             ),
             html.H4("Por que este foco importa", style={"marginBottom": "6px", "marginTop": "14px"}),
             _bullet_list(support_items + context_highlights[1:], "Sem foco atual registrado."),
-            html.H4("Passagem para Runs", style={"marginBottom": "6px", "marginTop": "14px"}),
-            html.Div(
-                style={**UI_MUTED_CARD_STYLE, "padding": "12px"},
-                children=[html.Div(runs_gate_text, style={"fontWeight": 700, "lineHeight": "1.5"})],
-            ),
             html.H4("Ações rápidas deste foco", style={"marginBottom": "6px", "marginTop": "14px"}),
             html.Div(
                 style={**UI_MUTED_CARD_STYLE, "padding": "14px", "marginTop": "8px"},
@@ -1419,6 +1430,13 @@ def render_studio_selection_panel(summary: dict[str, Any], selection_type: str) 
             html.Ul(
                 [html.Li(item) for item in preview if item],
                 style={"margin": "10px 0 0 18px", "lineHeight": "1.5"},
+            ),
+            html.H4("Próxima ação", style={"marginBottom": "6px", "marginTop": "14px"}),
+            html.Div(
+                "Ajuste posição, rótulo e papel deste nó somente depois de confirmar se ele participa da rota que você está revisando."
+                if selection_type == "node"
+                else "Revise direção, comprimento e famílias sugeridas desta conexão antes de abrir os campos avançados.",
+                style={"lineHeight": "1.6", "fontWeight": 700},
             ),
         ]
     )
