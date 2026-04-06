@@ -1,13 +1,13 @@
 {
   "wave": "ux_phase_1_wave_1",
   "validation": {
-    "targeted": "5 passed, 70 deselected in 0.73s",
-    "full": "75 passed in 431.35s (0:07:11)"
+    "targeted": "9 passed, 69 deselected in 1.41s",
+    "full": "78 passed in 428.22s (0:07:08)"
   },
   "visual_evidence": {
     "type": "structured_ui_snapshot",
     "screenshot_attempt": "not_attempted_in_this_wave_run",
-    "note": "Structured snapshot generated from the Dash layout and first-fold Studio render paths for the current wave 1 worktree state."
+    "note": "Structured snapshot generated from the Dash layout and first-fold workspace render paths for the current wave 1 worktree state."
   },
   "shell": {
     "visible_primary_spaces": [
@@ -16,57 +16,48 @@
       "Decisão",
       "Auditoria"
     ],
-    "journey_panel_id": "product-journey-panel",
-    "journey_card_ids": [
-      "product-journey-card-studio",
-      "product-journey-card-runs",
-      "product-journey-card-decision",
-      "product-journey-card-audit"
+    "layout_presence": {
+      "product-journey-panel": true,
+      "product-space-banner": true,
+      "studio-workspace-panel": true,
+      "studio-context-detailed-panels": true,
+      "runs-workspace-panel": true,
+      "runs-context-detailed-panels": true,
+      "decision-workspace-panel": true,
+      "decision-context-detailed-panels": true,
+      "audit-workspace-panel": true,
+      "audit-context-detailed-panels": true
+    }
+  },
+  "progressive_disclosure": {
+    "studio": [
+      "studio-context-detailed-panels"
     ],
-    "journey_link_ids": [
-      "product-journey-open-studio-link",
-      "product-journey-open-runs-link",
-      "product-journey-open-decision-link",
-      "product-journey-open-audit-link"
+    "runs": [
+      "runs-context-detailed-panels",
+      "runs-operations-details",
+      "runs-technical-audit-details"
     ],
-    "banner_id": "product-space-banner",
-    "banner_markers": [
-      "Espaço ativo",
-      "O que resolver aqui",
-      "Antes de sair desta área"
+    "decision": [
+      "decision-context-detailed-panels",
+      "decision-ranking-details",
+      "decision-comparison-details"
+    ],
+    "audit": [
+      "audit-context-detailed-panels",
+      "audit-bundle-tables-details",
+      "audit-json-details"
     ]
   },
-  "studio_first_fold": {
-    "panel_id": "studio-workspace-panel",
-    "details_panel_id": "studio-context-detailed-panels",
-    "workspace_markers": [
-      "Leitura do cenário",
-      "Foco atual",
-      "Passagem para Runs",
-      "O que precisa de atenção agora",
-      "Sinal de saída desta área"
-    ],
-    "workspace_text_preview": "Leitura do cenárioExige atençãoAinda há bloqueios estruturais impedindo a passagem segura para Runs.Foco atualTap P1Passagem para RunsAinda bloqueadaPróxima açãoCorrigir regras estruturais e rotas inválidas antes de enfileirar uma nova run.O que precisa de atenção agoraA conexão L011 sai de S, mas S deve aparecer apenas como destino final.Conexão em foco: Produto 1 -> Junção 1.Confira comprimento, direção e famílias sugeridas da conexão L001.Bloqueios2Impedem liberar a passagem para Runs.Avisos0Pedem revisão antes ",
-    "details_contains": {
-      "studio-readiness-panel": true,
-      "studio-projection-coverage-panel": true,
-      "studio-focus-panel": true,
-      "studio-connectivity-panel": true
-    },
-    "primary_ctas": [
-      "studio-workspace-open-workbench-button",
-      "studio-workspace-open-runs-button",
-      "studio-workspace-open-audit-link"
-    ]
+  "first_fold_previews": {
+    "studio": "Leitura do cenárioExige atençãoAinda há bloqueios estruturais impedindo a passagem segura para Runs.Foco atualTap P1Passagem para RunsAinda bloqueadaPróxima açãoCorrigir regras estruturais e rotas inválidas antes de enfileirar uma nova run.O que precisa de atenção agoraA conexão L011 sai de S, mas S deve aparecer apenas como destino final.Conexão em foco: Produto 1 -> Junção 1.Confira comprimento, direção e famílias ",
+    "runs": "Leitura operacional de RunsAguardando readiness do StudioAinda há bloqueios estruturais impedindo a passagem segura para Runs.Gate do cenárioAinda há bloqueios estruturais impedindo a passagem segura para Runs.Fila agoraNenhuma run registrada ainda.Próxima açãoVolte ao Studio para corrigir conectividade, regras obrigatórias e medição direta antes de abrir uma nova run.O que move a jornada agoraA passagem para Decisão",
+    "decision": "Leitura principal da decisãoSem decisão utilizávelAinda falta uma run utilizável para abrir winner, runner-up e contraste com segurança.Winner atualAinda sem winner oficial legívelRunner-upAinda sem runner-up comparávelPróxima açãoVolte para Runs, confirme uma execução concluída e retorne quando existir resultado comparável.O que esta decisão pede agoraAinda não existe winner legível; a prioridade continua sendo recu",
+    "audit": "Trilha avançadaProntoAuditoria permanece disponível como trilha avançada, sem competir com Studio, Runs ou Decisão.Quando entrar aquiQuando bundle canônico, YAMLs, persistência ou tabelas completas forem necessários para reconciliar a trilha técnica.Quando não entrar aquiQuando a próxima ação ainda for preparar o cenário, revisar a fila ou comparar winner e runner-up.Próxima açãoEntre aqui apenas quando a leitura pri"
   },
-  "layout_presence": {
-    "product_journey_panel": true,
-    "product_space_banner": true,
-    "studio_workspace_panel": true,
-    "studio_context_detailed_panels": true,
-    "hero_open_studio_link": true,
-    "hero_open_runs_link": true,
-    "hero_open_decision_link": true,
-    "hero_open_audit_link": true
+  "workspace_render_examples": {
+    "runs_ready_state": "Leitura operacional de RunsDecisão disponívelA última execução já gerou contexto suficiente para entrar em Decisão.Gate do cenárioCenário pronto para seguir para Runs.Fila agoraPróxima run pronta: run-003.Próxima açãoAbra a Decisão para confirmar winner, runner-up e sinais de risco antes de oficializar.O que move a jornada agoraJá existe um resultado utilizável; a passagem para Decisão está liberada.Próxima run pront",
+    "decision_technical_tie_state": "Leitura principal da decisãoEmpate técnicoWinner e runner-up seguem próximos o suficiente para exigir decisão humana assistida.Winner atualcand-01Runner-upcand-02Próxima açãoMantenha a comparação aberta, valide os sinais de risco e aprofunde a Auditoria apenas se precisar reconciliar a trilha técnica.O que esta decisão pede agoraTechnical tie explícito: mantenha winner e runner-up visíveis antes de qualquer oficializ",
+    "audit_advanced_path_state": "Trilha avançadaProntoAuditoria permanece disponível como trilha avançada, sem competir com Studio, Runs ou Decisão.Quando entrar aquiQuando bundle canônico, YAMLs, persistência ou tabelas completas forem necessários para reconciliar a trilha técnica.Quando não entrar aquiQuando a próxima ação ainda for preparar o cenário, revisar a fila ou comparar winner e runner-up.Próxima açãoEntre aqui apenas quando a leitura pri"
   }
 }

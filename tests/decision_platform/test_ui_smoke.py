@@ -38,9 +38,11 @@ from decision_platform.ui_dash.app import (
     render_execution_summary_panel,
     render_product_journey_panel,
     render_product_space_banner,
+    render_audit_workspace_panel,
     render_run_job_detail_panel,
     render_run_jobs_overview_panel,
     render_runs_flow_panel,
+    render_runs_workspace_panel,
     render_studio_canvas_guidance_panel,
     render_studio_connectivity_panel,
     render_studio_focus_panel,
@@ -48,6 +50,7 @@ from decision_platform.ui_dash.app import (
     render_studio_readiness_panel,
     render_studio_selection_panel,
     render_studio_workspace_panel,
+    render_decision_workspace_panel,
     move_node_studio_selection,
     rerank_catalog,
     save_and_reopen_local_bundle,
@@ -299,9 +302,9 @@ def test_product_space_banner_stays_aligned_with_navigation_resolution() -> None
     navigation_callback = _get_callback(app, input_id="studio-open-audit-button")
     banner_callback = _get_callback(app, output_prefix="product-space-banner.children")
 
-    runs_tab = navigation_callback("?tab=studio", 0, 40, 0, 0, 0, "studio")
-    decision_tab = navigation_callback("?tab=studio", 0, 0, 0, 50, 0, "runs")
-    audit_tab = navigation_callback("?tab=studio", 60, 0, 0, 0, 0, "decision")
+    runs_tab = navigation_callback("?tab=studio", 0, 40, 0, 0, 0, 0, "studio")
+    decision_tab = navigation_callback("?tab=studio", 0, 0, 0, 50, 0, 0, "runs")
+    audit_tab = navigation_callback("?tab=studio", 60, 0, 0, 0, 0, 0, "decision")
 
     assert "Runs" in _collect_text_content(banner_callback(runs_tab))
     assert "Decisão" in _collect_text_content(banner_callback(decision_tab))
@@ -512,12 +515,13 @@ def test_studio_discovery_callbacks_open_guide_and_audit_tab() -> None:
     open_navigation_callback = _get_callback(app, input_id="studio-open-audit-button")
 
     assert open_guide_callback(0, 1, False) is True
-    assert open_navigation_callback("?tab=runs", 30, 20, 0, 0, 10, "studio") == "audit"
-    assert open_navigation_callback("?tab=decision", 0, 40, 0, 0, 0, "studio") == "runs"
-    assert open_navigation_callback("?tab=studio", 0, 0, 50, 0, 0, "studio") == "runs"
-    assert open_navigation_callback("?tab=studio", 0, 0, 0, 50, 0, "runs") == "decision"
-    assert open_navigation_callback("?tab=decision", 0, 0, 0, 0, 50, "runs") == "decision"
-    assert open_navigation_callback("?tab=decision", 0, 0, 0, 0, 0, "studio") == "decision"
+    assert open_navigation_callback("?tab=runs", 30, 20, 0, 0, 0, 10, "studio") == "audit"
+    assert open_navigation_callback("?tab=decision", 0, 40, 0, 0, 0, 0, "studio") == "runs"
+    assert open_navigation_callback("?tab=studio", 0, 0, 50, 0, 0, 0, "studio") == "runs"
+    assert open_navigation_callback("?tab=studio", 0, 0, 0, 50, 0, 0, "runs") == "decision"
+    assert open_navigation_callback("?tab=decision", 0, 0, 0, 0, 50, 0, "runs") == "decision"
+    assert open_navigation_callback("?tab=decision", 0, 0, 0, 0, 0, 50, "runs") == "decision"
+    assert open_navigation_callback("?tab=decision", 0, 0, 0, 0, 0, 0, "studio") == "decision"
 
 
 def test_primary_tab_from_search_accepts_known_main_spaces() -> None:
@@ -534,18 +538,24 @@ def test_decision_tab_contains_advanced_sections_without_extra_primary_tabs() ->
 
     decision_tab = _find_tab_by_label(app.layout, "Decisão")
     assert decision_tab is not None
+    assert _find_component_by_id(decision_tab, "decision-workspace-panel") is not None
+    assert _find_component_by_id(decision_tab, "decision-context-detailed-panels") is not None
     assert _find_component_by_id(decision_tab, "decision-summary-panel") is not None
     assert _find_component_by_id(decision_tab, "decision-contrast-panel") is not None
     assert _find_component_by_id(decision_tab, "decision-signal-panel") is not None
     assert _find_component_by_id(decision_tab, "decision-flow-panel") is not None
     assert _find_component_by_id(decision_tab, "decision-flow-open-runs-link") is not None
     assert _find_component_by_id(decision_tab, "decision-flow-open-audit-link") is not None
+    assert _find_component_by_id(decision_tab, "decision-workspace-open-runs-link") is not None
+    assert _find_component_by_id(decision_tab, "decision-workspace-open-audit-link") is not None
     assert _find_component_by_id(decision_tab, "decision-open-runs-button") is None
     assert _find_component_by_id(decision_tab, "decision-open-audit-button") is None
     assert _find_component_by_id(decision_tab, "compare-candidates-dropdown") is not None
     assert _find_component_by_id(decision_tab, "comparison-figure") is not None
     assert _find_component_by_id(decision_tab, "selected-candidate-dropdown") is not None
     assert _find_component_by_id(decision_tab, "candidate-breakdown-panel") is not None
+    assert _find_component_by_id(decision_tab, "decision-ranking-details") is not None
+    assert _find_component_by_id(decision_tab, "decision-comparison-details") is not None
 
 
 def test_runs_tab_combines_queue_and_execution_summary() -> None:
@@ -554,16 +564,21 @@ def test_runs_tab_combines_queue_and_execution_summary() -> None:
 
     runs_tab = _find_tab_by_label(app.layout, "Runs")
     assert runs_tab is not None
+    assert _find_component_by_id(runs_tab, "runs-workspace-panel") is not None
+    assert _find_component_by_id(runs_tab, "runs-context-detailed-panels") is not None
     assert _find_component_by_id(runs_tab, "run-jobs-overview-panel") is not None
     assert _find_component_by_id(runs_tab, "runs-flow-panel") is not None
     assert _find_component_by_id(runs_tab, "runs-flow-open-studio-link") is not None
     assert _find_component_by_id(runs_tab, "runs-flow-open-decision-button") is not None
+    assert _find_component_by_id(runs_tab, "runs-workspace-open-studio-link") is not None
+    assert _find_component_by_id(runs_tab, "runs-workspace-open-decision-button") is not None
     assert _find_component_by_id(runs_tab, "execution-summary-panel") is not None
     assert _find_component_by_id(runs_tab, "run-jobs-status-banner") is not None
     assert _find_component_by_id(runs_tab, "runs-open-studio-button") is None
     assert _find_component_by_id(runs_tab, "runs-open-decision-button") is None
     assert _find_component_by_id(runs_tab, "execution-open-decision-button") is not None
     assert _find_component_by_id(runs_tab, "run-button") is not None
+    assert _find_component_by_id(runs_tab, "runs-operations-details") is not None
 
 
 def test_studio_readiness_panel_surfaces_runs_transition_with_real_readiness() -> None:
@@ -798,7 +813,7 @@ def test_runs_flow_panel_reflects_studio_gate_and_queue_state() -> None:
     )
     panel_text = _collect_text_content(panel)
 
-    assert "Passagem Studio -> Runs" in panel_text
+    assert "Camada detalhada de Runs" in panel_text
     assert "Objetivo desta área" in panel_text
     assert "Próxima ação" in panel_text
     assert "Estado do cenário" in panel_text
@@ -811,6 +826,39 @@ def test_runs_flow_panel_reflects_studio_gate_and_queue_state() -> None:
     assert "conectividade" in panel_text.lower()
     assert getattr(_find_component_by_id(panel, "runs-flow-open-studio-link"), "href", None) == "?tab=studio"
     assert getattr(_find_component_by_id(panel, "runs-flow-open-decision-button"), "disabled", None) is True
+
+
+def test_runs_workspace_panel_prioritizes_queue_focus_and_primary_transition() -> None:
+    panel = render_runs_workspace_panel(
+        {
+            "status": "ready",
+            "blocker_count": 0,
+            "warning_count": 0,
+            "readiness_headline": "Cenário pronto para seguir para Runs.",
+        },
+        {
+            "run_count": 3,
+            "next_queued_run_id": "run-003",
+            "active_run_ids": [],
+            "queued_run_ids": ["run-003"],
+            "latest_run_id": "run-002",
+            "status_counts": {"completed": 2, "failed": 0},
+        },
+        {
+            "selected_candidate_id": "cand-01",
+            "error": None,
+        },
+    )
+    panel_text = _collect_text_content(panel)
+
+    assert "Leitura operacional de Runs" in panel_text
+    assert "Gate do cenário" in panel_text
+    assert "Fila agora" in panel_text
+    assert "O que move a jornada agora" in panel_text
+    assert "Próxima run pronta: run-003." in panel_text
+    assert "Já existe um resultado utilizável" in panel_text
+    assert _find_component_by_id(panel, "runs-workspace-open-studio-link") is not None
+    assert getattr(_find_component_by_id(panel, "runs-workspace-open-decision-button"), "disabled", None) is False
 
 
 def test_primary_runs_panels_hide_raw_backend_keys_in_main_surface() -> None:
@@ -1023,6 +1071,31 @@ def test_decision_flow_panel_makes_transition_and_next_action_explicit() -> None
     assert "leitura humana assistida" in panel_text.lower()
     assert getattr(_find_component_by_id(panel, "decision-flow-open-runs-link"), "href", None) == "?tab=runs"
     assert getattr(_find_component_by_id(panel, "decision-flow-open-audit-link"), "href", None) == "?tab=audit"
+
+
+def test_decision_workspace_panel_makes_winner_runner_up_and_tie_legible() -> None:
+    panel = render_decision_workspace_panel(
+        {
+            "candidate_id": "cand-01",
+            "runner_up_candidate_id": "cand-02",
+            "decision_status": "technical_tie",
+            "technical_tie": True,
+            "topology_family": "hybrid_free",
+        },
+        {
+            "visible_candidate_count": 4,
+            "top_visible_family": "hybrid_free",
+        },
+    )
+    panel_text = _collect_text_content(panel)
+
+    assert "Leitura principal da decisão" in panel_text
+    assert "Winner atual" in panel_text
+    assert "Runner-up" in panel_text
+    assert "Technical tieExplícito" in panel_text
+    assert "Technical tie explícito" in panel_text
+    assert _find_component_by_id(panel, "decision-workspace-open-runs-link") is not None
+    assert _find_component_by_id(panel, "decision-workspace-open-audit-link") is not None
 
 
 def test_runs_flow_panel_enables_decision_only_with_usable_execution_result() -> None:
@@ -1317,6 +1390,28 @@ def test_audit_bundle_panel_preserves_technical_space_but_explains_next_step() -
     assert "Use este espaço quando precisar salvar, reabrir ou reconciliar o bundle canônico" in panel_text
 
 
+def test_audit_workspace_panel_relegates_auditoria_to_advanced_path() -> None:
+    panel = render_audit_workspace_panel(
+        {
+            "status": "idle",
+            "bundle_version": "2026.04",
+            "bundle_manifest": "data/decision_platform/maquete_v2/scenario_bundle.yaml",
+        },
+        {
+            "selected_candidate_id": "cand-01",
+            "error": None,
+        },
+    )
+    panel_text = _collect_text_content(panel)
+
+    assert "Trilha avançada" in panel_text
+    assert "Quando entrar aqui" in panel_text
+    assert "Quando não entrar aqui" in panel_text
+    assert "não bastar para reconciliar bundle" in panel_text.lower()
+    assert getattr(_find_component_by_id(panel, "audit-workspace-return-primary-link"), "href", None) == "?tab=decision"
+    assert getattr(_find_component_by_id(panel, "audit-workspace-open-studio-link"), "href", None) == "?tab=studio"
+
+
 def test_studio_projection_panel_explains_business_layer_boundary() -> None:
     panel = render_studio_projection_panel(
         {
@@ -1346,10 +1441,13 @@ def test_audit_tab_holds_bundle_editors_and_technical_surfaces() -> None:
 
     audit_tab = _find_tab_by_label(app.layout, "Auditoria")
     assert audit_tab is not None
+    assert _find_component_by_id(audit_tab, "audit-workspace-panel") is not None
+    assert _find_component_by_id(audit_tab, "audit-context-detailed-panels") is not None
     assert _find_component_by_id(audit_tab, "bundle-io-summary-panel") is not None
     assert _find_component_by_id(audit_tab, "topology-rules-editor") is not None
     assert _find_component_by_id(audit_tab, "scenario-settings-editor") is not None
     assert _find_component_by_id(audit_tab, "nodes-grid") is not None
+    assert _find_component_by_id(audit_tab, "audit-bundle-tables-details") is not None
 
 
 def test_primary_tabs_keep_debug_json_in_progressive_disclosure() -> None:

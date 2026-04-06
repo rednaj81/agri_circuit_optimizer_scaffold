@@ -39,6 +39,12 @@ def test_dash_app_exposes_structural_studio_controls() -> None:
     assert "studio-canvas-open-technical-guide-button" in layout_repr
     assert "studio-workspace-panel" in layout_repr
     assert "studio-context-detailed-panels" in layout_repr
+    assert "runs-workspace-panel" in layout_repr
+    assert "runs-context-detailed-panels" in layout_repr
+    assert "decision-workspace-panel" in layout_repr
+    assert "decision-context-detailed-panels" in layout_repr
+    assert "audit-workspace-panel" in layout_repr
+    assert "audit-context-detailed-panels" in layout_repr
 
 
 @pytest.mark.fast

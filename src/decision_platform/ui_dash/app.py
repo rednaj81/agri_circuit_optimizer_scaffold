@@ -2028,11 +2028,11 @@ def render_run_jobs_overview_panel(summary: dict[str, Any]) -> Any:
     )
 
 
-def render_runs_flow_panel(
+def _runs_primary_state(
     studio_summary: dict[str, Any],
     run_summary: dict[str, Any],
     execution_summary: dict[str, Any] | None = None,
-) -> Any:
+) -> dict[str, Any]:
     studio_status = str(studio_summary.get("status") or "needs_attention")
     run_count = int(run_summary.get("run_count", 0) or 0) if isinstance(run_summary, dict) else 0
     next_queued_run_id = run_summary.get("next_queued_run_id") if isinstance(run_summary, dict) else None
@@ -2098,34 +2098,128 @@ def render_runs_flow_panel(
         decision_gate = "A passagem para Decisão ainda depende da primeira execução utilizável."
         decision_button_label = "Enfileirar antes da Decisão"
         decision_enabled = False
+    return {
+        "studio_status": studio_status,
+        "run_count": run_count,
+        "next_queued_run_id": next_queued_run_id,
+        "queue_state": queue_state,
+        "active_run_ids": active_run_ids,
+        "failed_count": failed_count,
+        "readiness_note": readiness_note,
+        "flow_state": flow_state,
+        "headline": headline,
+        "next_action": next_action,
+        "decision_gate": decision_gate,
+        "decision_button_label": decision_button_label,
+        "decision_enabled": decision_enabled,
+    }
+
+
+def render_runs_workspace_panel(
+    studio_summary: dict[str, Any],
+    run_summary: dict[str, Any],
+    execution_summary: dict[str, Any] | None = None,
+) -> Any:
+    state = _runs_primary_state(studio_summary, run_summary, execution_summary)
+    active_run_ids = list(state["active_run_ids"])
+    next_queued_run_id = state["next_queued_run_id"]
+    latest_run_id = run_summary.get("latest_run_id") if isinstance(run_summary, dict) else None
+    queued_count = len(list((run_summary or {}).get("queued_run_ids", []))) if isinstance(run_summary, dict) else 0
+    if active_run_ids:
+        queue_focus = f"Execução em foco: {active_run_ids[0]}."
+    elif next_queued_run_id:
+        queue_focus = f"Próxima run pronta: {next_queued_run_id}."
+    elif latest_run_id:
+        queue_focus = f"Última run observada: {latest_run_id}."
+    else:
+        queue_focus = "Nenhuma run registrada ainda."
+    if state["decision_enabled"]:
+        decision_cta: Any = html.Button("Ir para Decisão", id="runs-workspace-open-decision-button", style=UI_BUTTON_STYLE, disabled=False)
+    else:
+        decision_cta = html.Button(state["decision_button_label"], id="runs-workspace-open-decision-button", style=UI_BUTTON_STYLE, disabled=True)
+    return html.Div(
+        children=[
+            html.Div("Leitura operacional de Runs", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+            html.Div(
+                style={"display": "flex", "alignItems": "center", "gap": "10px", "margin": "8px 0 12px", "flexWrap": "wrap"},
+                children=[
+                    html.Span(state["flow_state"], style=UI_PILL_STYLE),
+                    html.Span(state["headline"], style={"fontWeight": 700, "lineHeight": "1.5"}),
+                ],
+            ),
+            html.Div(
+                style={**UI_THREE_COLUMN_STYLE, "marginBottom": "12px"},
+                children=[
+                    _guidance_card("Gate do cenário", str(studio_summary.get("readiness_headline") or state["readiness_note"])),
+                    _guidance_card("Fila agora", queue_focus),
+                    _guidance_card("Próxima ação", state["next_action"]),
+                ],
+            ),
+            html.Div(
+                style={**UI_MUTED_CARD_STYLE, "padding": "12px", "marginBottom": "12px"},
+                children=[
+                    html.Div("O que move a jornada agora", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+                    html.Div(state["decision_gate"], style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"}),
+                    html.Div(queue_focus, style={"lineHeight": "1.6", "marginTop": "10px"}),
+                ],
+            ),
+            html.Div(
+                style=UI_THREE_COLUMN_STYLE,
+                children=[
+                    _metric_card("Estado dominante", state["flow_state"]),
+                    _metric_card("Runs locais", state["run_count"]),
+                    _metric_card("Na fila", queued_count),
+                    _metric_card("Em execução", len(active_run_ids)),
+                    _metric_card("Falhas recentes", state["failed_count"]),
+                    _metric_card("Próxima run", next_queued_run_id or "-"),
+                ],
+            ),
+            html.Div(
+                style={**UI_ACTION_ROW_STYLE, "marginTop": "12px"},
+                children=[
+                    _button_link("Voltar ao Studio", "?tab=studio", "runs-workspace-open-studio-link"),
+                    decision_cta,
+                    _button_link("Abrir Auditoria", "?tab=audit", "runs-workspace-open-audit-link"),
+                ],
+            ),
+        ]
+    )
+
+
+def render_runs_flow_panel(
+    studio_summary: dict[str, Any],
+    run_summary: dict[str, Any],
+    execution_summary: dict[str, Any] | None = None,
+) -> Any:
+    state = _runs_primary_state(studio_summary, run_summary, execution_summary)
     return html.Div(
         children=[
             _screen_opening_panel(
-                "Passagem Studio -> Runs",
-                headline,
+                "Camada detalhada de Runs",
+                state["headline"],
                 "Transformar readiness do Studio em uma leitura clara de fila, execução e próximo passo.",
-                next_action,
+                state["next_action"],
                 [
-                    ("Estado dominante", flow_state),
-                    ("Estado do cenário", str(studio_summary.get("readiness_headline") or readiness_note)),
-                    ("Entrada da Decisão", decision_gate),
+                    ("Estado dominante", state["flow_state"]),
+                    ("Estado do cenário", str(studio_summary.get("readiness_headline") or state["readiness_note"])),
+                    ("Entrada da Decisão", state["decision_gate"]),
                 ],
                 [
                     _button_link("Voltar ao Studio", "?tab=studio", "runs-flow-open-studio-link"),
-                    html.Button(decision_button_label, id="runs-flow-open-decision-button", style=UI_BUTTON_STYLE, disabled=not decision_enabled),
+                    html.Button(state["decision_button_label"], id="runs-flow-open-decision-button", style=UI_BUTTON_STYLE, disabled=not state["decision_enabled"]),
                 ],
             ),
             html.Div(
                 style={**UI_THREE_COLUMN_STYLE, "marginTop": "14px"},
                 children=[
-                    _metric_card("Estado dominante", flow_state, next_action),
-                    _metric_card("Readiness", _humanize_readiness_status(studio_status), readiness_note),
+                    _metric_card("Estado dominante", state["flow_state"], state["next_action"]),
+                    _metric_card("Readiness", _humanize_readiness_status(state["studio_status"]), state["readiness_note"]),
                     _metric_card("Bloqueios", studio_summary.get("blocker_count", 0)),
                     _metric_card("Avisos", studio_summary.get("warning_count", 0)),
-                    _metric_card("Runs locais", run_count),
-                    _metric_card("Próxima run", next_queued_run_id or "-"),
-                    _metric_card("Estado da fila", queue_state),
-                    _metric_card("Falhas recentes", failed_count),
+                    _metric_card("Runs locais", state["run_count"]),
+                    _metric_card("Próxima run", state["next_queued_run_id"] or "-"),
+                    _metric_card("Estado da fila", state["queue_state"]),
+                    _metric_card("Falhas recentes", state["failed_count"]),
                 ],
             ),
         ]
@@ -2273,6 +2367,60 @@ def render_bundle_io_panel(summary: dict[str, Any]) -> Any:
     )
 
 
+def render_audit_workspace_panel(
+    bundle_summary: dict[str, Any],
+    execution_summary: dict[str, Any] | None = None,
+) -> Any:
+    execution_summary = execution_summary or {}
+    status = str(bundle_summary.get("status") or "idle")
+    bundle_state = _humanize_audit_status(status)
+    decision_available = bool(execution_summary.get("selected_candidate_id") and not str(execution_summary.get("error") or "").strip())
+    if status == "error":
+        headline = "A trilha canônica exige correção antes de sustentar persistência ou reconciliação."
+        next_action = "Corrija o bloqueio do bundle antes de usar Auditoria como fonte confiável de explicabilidade."
+    else:
+        headline = "Auditoria permanece disponível como trilha avançada, sem competir com Studio, Runs ou Decisão."
+        next_action = "Entre aqui apenas quando a leitura principal não bastar para reconciliar bundle, YAMLs ou contrato técnico."
+    primary_return_label = "Voltar para Decisão" if decision_available else "Voltar para Runs"
+    primary_return_href = "?tab=decision" if decision_available else "?tab=runs"
+    return html.Div(
+        children=[
+            html.Div("Trilha avançada", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+            html.Div(
+                style={"display": "flex", "alignItems": "center", "gap": "10px", "margin": "8px 0 12px", "flexWrap": "wrap"},
+                children=[
+                    html.Span(bundle_state, style=UI_PILL_STYLE),
+                    html.Span(headline, style={"fontWeight": 700, "lineHeight": "1.5"}),
+                ],
+            ),
+            html.Div(
+                style={**UI_THREE_COLUMN_STYLE, "marginBottom": "12px"},
+                children=[
+                    _guidance_card("Quando entrar aqui", "Quando bundle canônico, YAMLs, persistência ou tabelas completas forem necessários para reconciliar a trilha técnica."),
+                    _guidance_card("Quando não entrar aqui", "Quando a próxima ação ainda for preparar o cenário, revisar a fila ou comparar winner e runner-up."),
+                    _guidance_card("Próxima ação", next_action),
+                ],
+            ),
+            html.Div(
+                style=UI_THREE_COLUMN_STYLE,
+                children=[
+                    _metric_card("Estado do bundle", bundle_state),
+                    _metric_card("Versão do bundle", bundle_summary.get("bundle_version") or "-"),
+                    _metric_card("Manifesto", "Disponível" if bundle_summary.get("bundle_manifest") else "Sem manifesto"),
+                    _metric_card("Resultado executivo", execution_summary.get("selected_candidate_id") or "Sem candidato"),
+                ],
+            ),
+            html.Div(
+                style={**UI_ACTION_ROW_STYLE, "marginTop": "12px"},
+                children=[
+                    _button_link(primary_return_label, primary_return_href, "audit-workspace-return-primary-link"),
+                    _button_link("Voltar ao Studio", "?tab=studio", "audit-workspace-open-studio-link"),
+                ],
+            ),
+        ]
+    )
+
+
 def render_catalog_state_panel(summary: dict[str, Any]) -> Any:
     visible_family_summary = summary.get("visible_family_summary") or []
     visible_candidate_count = int(summary.get("visible_candidate_count", 0) or 0)
@@ -2355,6 +2503,80 @@ def render_candidate_summary_panel(summary: dict[str, Any]) -> Any:
                     ("Engine de avaliação", summary.get("engine_used")),
                     ("Motivo de inviabilidade", _humanize_infeasibility_reason(summary.get("infeasibility_reason"))),
                 ]
+            ),
+        ]
+    )
+
+
+def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: dict[str, Any]) -> Any:
+    decision_state = _decision_primary_state(summary)
+    candidate_id = str(summary.get("candidate_id") or "").strip()
+    runner_up_id = str(summary.get("runner_up_candidate_id") or "").strip()
+    decision_status = str(summary.get("decision_status") or ("technical_tie" if summary.get("technical_tie") else "winner_clear"))
+    visible_candidate_count = int(catalog_summary.get("visible_candidate_count", 0) or 0) if isinstance(catalog_summary, dict) else 0
+    if not candidate_id:
+        state_background, state_color = _status_tone("needs_attention")
+        signal_text = "Ainda não existe winner legível; a prioridade continua sendo recuperar uma execução comparável em Runs."
+        runs_label = "Voltar para Runs"
+        audit_primary = False
+    elif decision_status == "technical_tie":
+        state_background, state_color = _status_tone("technical_tie")
+        signal_text = "Technical tie explícito: mantenha winner e runner-up visíveis antes de qualquer oficialização."
+        runs_label = "Revisar Runs"
+        audit_primary = True
+    elif summary.get("feasible") is False:
+        state_background, state_color = _status_tone("blocked")
+        signal_text = f"Winner ainda bloqueado por {_humanize_infeasibility_reason(summary.get('infeasibility_reason'))}."
+        runs_label = "Revisar Runs"
+        audit_primary = False
+    else:
+        state_background, state_color = _status_tone("ready")
+        signal_text = "Winner e runner-up já aparecem com leitura utilizável; aprofunde Auditoria só se precisar reconciliar a trilha técnica."
+        runs_label = "Voltar para Runs"
+        audit_primary = True
+    return html.Div(
+        children=[
+            html.Div("Leitura principal da decisão", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+            html.Div(
+                style={"display": "flex", "alignItems": "center", "gap": "10px", "margin": "8px 0 12px", "flexWrap": "wrap"},
+                children=[
+                    html.Span(decision_state["state_label"], style={"padding": "6px 10px", "borderRadius": "999px", "background": state_background, "color": state_color, "fontWeight": 700}),
+                    html.Span(decision_state["headline"], style={"fontWeight": 700, "lineHeight": "1.5"}),
+                ],
+            ),
+            html.Div(
+                style={**UI_THREE_COLUMN_STYLE, "marginBottom": "12px"},
+                children=[
+                    _guidance_card("Winner atual", candidate_id or "Ainda sem winner oficial legível"),
+                    _guidance_card("Runner-up", runner_up_id or "Ainda sem runner-up comparável"),
+                    _guidance_card("Próxima ação", decision_state["next_action"]),
+                ],
+            ),
+            html.Div(
+                style={**UI_MUTED_CARD_STYLE, "padding": "12px", "marginBottom": "12px"},
+                children=[
+                    html.Div("O que esta decisão pede agora", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+                    html.Div(signal_text, style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"}),
+                    html.Div(decision_state["contrast_state"], style={"lineHeight": "1.6", "marginTop": "10px"}),
+                ],
+            ),
+            html.Div(
+                style=UI_THREE_COLUMN_STYLE,
+                children=[
+                    _metric_card("Estado dominante", decision_state["state_label"]),
+                    _metric_card("Candidatos visíveis", visible_candidate_count),
+                    _metric_card("Technical tie", "Explícito" if decision_status == "technical_tie" else "Não ativo"),
+                    _metric_card("Winner", candidate_id or "-"),
+                    _metric_card("Runner-up", runner_up_id or "-"),
+                    _metric_card("Família líder", summary.get("topology_family") or catalog_summary.get("top_visible_family") or "-"),
+                ],
+            ),
+            html.Div(
+                style={**UI_ACTION_ROW_STYLE, "marginTop": "12px"},
+                children=[
+                    _button_link(runs_label, "?tab=runs", "decision-workspace-open-runs-link"),
+                    _button_link("Abrir Auditoria", "?tab=audit", "decision-workspace-open-audit-link", primary=audit_primary),
+                ],
             ),
         ]
     )
@@ -3049,27 +3271,45 @@ def build_app(
                                 action_hint="Escolha a próxima run, revise o estado atual e execute apenas o próximo passo necessário.",
                             ),
                             html.Div(
-                                id="runs-flow-panel",
-                                children=render_runs_flow_panel(
+                                id="runs-workspace-panel",
+                                children=render_runs_workspace_panel(
                                     initial_studio_readiness,
                                     initial_run_jobs_snapshot["summary"],
                                     _safe_json_loads(initial_execution_summary),
                                 ),
                                 style=UI_CARD_STYLE,
                             ),
-                            html.Div(
-                                style=UI_TWO_COLUMN_STYLE,
+                            html.Details(
+                                id="runs-context-detailed-panels",
+                                style=UI_MUTED_CARD_STYLE,
                                 children=[
-                                    html.Div(id="run-jobs-overview-panel", children=render_run_jobs_overview_panel(initial_run_jobs_snapshot["summary"]), style=UI_CARD_STYLE),
-                                    html.Div(id="execution-summary-panel", children=render_execution_summary_panel(_safe_json_loads(initial_execution_summary)), style=UI_MUTED_CARD_STYLE),
+                                    html.Summary("Contexto completo de Runs"),
+                                    html.Div(
+                                        id="runs-flow-panel",
+                                        children=render_runs_flow_panel(
+                                            initial_studio_readiness,
+                                            initial_run_jobs_snapshot["summary"],
+                                            _safe_json_loads(initial_execution_summary),
+                                        ),
+                                        style={**UI_CARD_STYLE, "marginTop": "12px"},
+                                    ),
+                                    html.Div(
+                                        style={**UI_TWO_COLUMN_STYLE, "marginTop": "12px"},
+                                        children=[
+                                            html.Div(id="run-jobs-overview-panel", children=render_run_jobs_overview_panel(initial_run_jobs_snapshot["summary"]), style=UI_CARD_STYLE),
+                                            html.Div(id="execution-summary-panel", children=render_execution_summary_panel(_safe_json_loads(initial_execution_summary)), style=UI_MUTED_CARD_STYLE),
+                                        ],
+                                    ),
+                                    html.Div(id="run-job-detail-panel", children=render_run_job_detail_panel(initial_run_jobs_snapshot["selected_run_detail"]), style={**UI_MUTED_CARD_STYLE, "marginTop": "12px"}),
                                 ],
                             ),
-                            html.Div(id="run-job-detail-panel", children=render_run_job_detail_panel(initial_run_jobs_snapshot["selected_run_detail"]), style=UI_MUTED_CARD_STYLE),
-                            html.Div(
-                                style=UI_TWO_COLUMN_STYLE,
+                            html.Details(
+                                id="runs-operations-details",
+                                style=UI_MUTED_CARD_STYLE,
                                 children=[
+                                    html.Summary("Operações da fila"),
                                     html.Div(
-                                        style=UI_CARD_STYLE,
+                                        style={**UI_CARD_STYLE, "marginTop": "12px"},
                                         children=[
                                             html.H3("Operações da fila", style={"marginTop": 0}),
                                             html.Div(style=UI_ACTION_ROW_STYLE, children=[html.Button("Enfileirar cenário atual", id="run-job-enqueue-button", style=UI_BUTTON_STYLE), html.Button("Executar próximo job", id="run-jobs-run-next-button", style=UI_BUTTON_STYLE), html.Button("Atualizar runs", id="run-jobs-refresh-button", style=UI_BUTTON_STYLE), html.Button("Cancelar run selecionada", id="run-job-cancel-button", style=UI_BUTTON_STYLE), html.Button("Reexecutar run selecionada", id="run-job-rerun-button", style=UI_BUTTON_STYLE), html.Button("Reexecutar pipeline", id="run-button", style=UI_BUTTON_STYLE)]),
@@ -3080,6 +3320,7 @@ def build_app(
                                 ],
                             ),
                             html.Details(
+                                id="runs-technical-audit-details",
                                 style=UI_MUTED_CARD_STYLE,
                                 children=[
                                     html.Summary("Auditoria técnica de runs"),
@@ -3108,68 +3349,88 @@ def build_app(
                                 state_hint="Camada principal: escolha oficial, comparação e circuito do candidato.",
                                 action_hint="Confirme winner versus runner-up, leia o technical tie quando houver e só depois aprofunde o racional técnico.",
                             ),
-                            html.Div(id="decision-flow-panel", children=render_decision_flow_panel(initial_official_summary), style=UI_CARD_STYLE),
                             html.Div(
-                                style=UI_TWO_COLUMN_STYLE,
-                                children=[
-                                    html.Div(id="decision-summary-panel", children=render_decision_summary_panel(initial_official_summary), style=UI_CARD_STYLE),
-                                    html.Div(id="decision-contrast-panel", children=render_decision_contrast_panel(initial_official_summary), style=UI_MUTED_CARD_STYLE),
-                                ],
-                            ),
-                            html.Div(
-                                style=UI_TWO_COLUMN_STYLE,
-                                children=[
-                                    html.Div(id="decision-signal-panel", children=render_decision_signal_panel(initial_official_summary), style=UI_CARD_STYLE),
-                                    html.Div(id="catalog-state-summary-panel", children=render_catalog_state_panel(_safe_json_loads(initial_catalog_summary)), style=UI_MUTED_CARD_STYLE),
-                                ],
-                            ),
-                            html.Div(
+                                id="decision-workspace-panel",
+                                children=render_decision_workspace_panel(initial_official_summary, _safe_json_loads(initial_catalog_summary)),
                                 style=UI_CARD_STYLE,
+                            ),
+                            html.Details(
+                                id="decision-context-detailed-panels",
+                                style=UI_MUTED_CARD_STYLE,
                                 children=[
-                                    html.H3("Filtros e ranking", style={"marginTop": 0}),
+                                    html.Summary("Contexto completo da decisão"),
+                                    html.Div(id="decision-flow-panel", children=render_decision_flow_panel(initial_official_summary), style={**UI_CARD_STYLE, "marginTop": "12px"}),
                                     html.Div(
-                                        style=UI_THREE_COLUMN_STYLE,
+                                        style={**UI_TWO_COLUMN_STYLE, "marginTop": "12px"},
                                         children=[
-                                            _field_block("Perfil", dcc.Dropdown(id="profile-dropdown", options=_profile_dropdown_options(bundle), value=profile_id, persistence=True, persistence_type="session")),
-                                            _field_block("Família", dcc.Dropdown(id="family-dropdown", options=family_options, value="ALL", persistence=True, persistence_type="session")),
-                                            _field_block("Fallback", dcc.Dropdown(id="fallback-filter-dropdown", options=[{"label": "Todos", "value": "ALL"}, {"label": "Sem fallback", "value": "NO_FALLBACK"}, {"label": "Com fallback", "value": "WITH_FALLBACK"}], value="ALL", persistence=True, persistence_type="session")),
-                                            _field_block("Motivo de inviabilidade", dcc.Dropdown(id="infeasibility-reason-dropdown", options=_infeasibility_reason_options(result), value="ALL", persistence=True, persistence_type="session")),
-                                            _field_block("Status", dcc.Checklist(id="feasible-only-checklist", options=[{"label": "Apenas viáveis", "value": "feasible_only"}], value=["feasible_only"] if bundle.scenario_settings["ranking"].get("keep_only_feasible", True) else [], persistence=True, persistence_type="session")),
-                                            _field_block("Top por família", dcc.Input(id="top-n-family-input", type="number", value=None, persistence=True, persistence_type="session", style={"width": "100%"})),
+                                            html.Div(id="decision-summary-panel", children=render_decision_summary_panel(initial_official_summary), style=UI_CARD_STYLE),
+                                            html.Div(id="decision-contrast-panel", children=render_decision_contrast_panel(initial_official_summary), style=UI_MUTED_CARD_STYLE),
                                         ],
                                     ),
                                     html.Div(
-                                        style=UI_THREE_COLUMN_STYLE,
+                                        style={**UI_TWO_COLUMN_STYLE, "marginTop": "12px"},
                                         children=[
-                                            _field_block("Custo máximo", dcc.Input(id="max-cost-input", type="number", value=None, persistence=True, persistence_type="session", style={"width": "100%"})),
-                                            _field_block("Qualidade mínima", dcc.Input(id="min-quality-input", type="number", value=None, persistence=True, persistence_type="session", style={"width": "100%"})),
-                                            _field_block("Vazão mínima", dcc.Input(id="min-flow-input", type="number", value=None, persistence=True, persistence_type="session", style={"width": "100%"})),
-                                            _field_block("Resiliência mínima", dcc.Input(id="min-resilience-input", type="number", value=None, persistence=True, persistence_type="session", style={"width": "100%"})),
-                                            _field_block("Cleaning mínimo", dcc.Input(id="min-cleaning-input", type="number", value=None, persistence=True, persistence_type="session", style={"width": "100%"})),
-                                            _field_block("Operabilidade mínima", dcc.Input(id="min-operability-input", type="number", value=None, persistence=True, persistence_type="session", style={"width": "100%"})),
+                                            html.Div(id="decision-signal-panel", children=render_decision_signal_panel(initial_official_summary), style=UI_CARD_STYLE),
+                                            html.Div(id="catalog-state-summary-panel", children=render_catalog_state_panel(_safe_json_loads(initial_catalog_summary)), style=UI_MUTED_CARD_STYLE),
                                         ],
                                     ),
-                                    html.Details(
-                                        style={**UI_MUTED_CARD_STYLE, "marginTop": "12px"},
-                                        children=[
-                                            html.Summary("Ajustar pesos dinâmicos"),
-                                            _weight_inputs(bundle),
-                                        ],
-                                    ),
-                                ],
-                            ),
-                            html.Div(
-                                style=UI_CARD_STYLE,
-                                children=[
-                                    html.H3("Catálogo visível", style={"marginTop": 0}),
-                                    _catalog_grid(initial_state["ranked_records"]),
-                                    html.H3("Resumo por família"),
-                                    _family_summary_grid(initial_state.get("family_summary_records", [])),
-                                    html.Button("Exportar catálogo ranqueado", id="export-catalog-button", style=UI_BUTTON_STYLE),
-                                    dcc.Download(id="catalog-download"),
                                 ],
                             ),
                             html.Details(
+                                id="decision-ranking-details",
+                                style=UI_MUTED_CARD_STYLE,
+                                children=[
+                                    html.Summary("Filtros, ranking e catálogo"),
+                                    html.Div(
+                                        style={**UI_CARD_STYLE, "marginTop": "12px"},
+                                        children=[
+                                            html.H3("Filtros e ranking", style={"marginTop": 0}),
+                                            html.Div(
+                                                style=UI_THREE_COLUMN_STYLE,
+                                                children=[
+                                                    _field_block("Perfil", dcc.Dropdown(id="profile-dropdown", options=_profile_dropdown_options(bundle), value=profile_id, persistence=True, persistence_type="session")),
+                                                    _field_block("Família", dcc.Dropdown(id="family-dropdown", options=family_options, value="ALL", persistence=True, persistence_type="session")),
+                                                    _field_block("Fallback", dcc.Dropdown(id="fallback-filter-dropdown", options=[{"label": "Todos", "value": "ALL"}, {"label": "Sem fallback", "value": "NO_FALLBACK"}, {"label": "Com fallback", "value": "WITH_FALLBACK"}], value="ALL", persistence=True, persistence_type="session")),
+                                                    _field_block("Motivo de inviabilidade", dcc.Dropdown(id="infeasibility-reason-dropdown", options=_infeasibility_reason_options(result), value="ALL", persistence=True, persistence_type="session")),
+                                                    _field_block("Status", dcc.Checklist(id="feasible-only-checklist", options=[{"label": "Apenas viáveis", "value": "feasible_only"}], value=["feasible_only"] if bundle.scenario_settings["ranking"].get("keep_only_feasible", True) else [], persistence=True, persistence_type="session")),
+                                                    _field_block("Top por família", dcc.Input(id="top-n-family-input", type="number", value=None, persistence=True, persistence_type="session", style={"width": "100%"})),
+                                                ],
+                                            ),
+                                            html.Div(
+                                                style=UI_THREE_COLUMN_STYLE,
+                                                children=[
+                                                    _field_block("Custo máximo", dcc.Input(id="max-cost-input", type="number", value=None, persistence=True, persistence_type="session", style={"width": "100%"})),
+                                                    _field_block("Qualidade mínima", dcc.Input(id="min-quality-input", type="number", value=None, persistence=True, persistence_type="session", style={"width": "100%"})),
+                                                    _field_block("Vazão mínima", dcc.Input(id="min-flow-input", type="number", value=None, persistence=True, persistence_type="session", style={"width": "100%"})),
+                                                    _field_block("Resiliência mínima", dcc.Input(id="min-resilience-input", type="number", value=None, persistence=True, persistence_type="session", style={"width": "100%"})),
+                                                    _field_block("Cleaning mínimo", dcc.Input(id="min-cleaning-input", type="number", value=None, persistence=True, persistence_type="session", style={"width": "100%"})),
+                                                    _field_block("Operabilidade mínima", dcc.Input(id="min-operability-input", type="number", value=None, persistence=True, persistence_type="session", style={"width": "100%"})),
+                                                ],
+                                            ),
+                                            html.Details(
+                                                style={**UI_MUTED_CARD_STYLE, "marginTop": "12px"},
+                                                children=[
+                                                    html.Summary("Ajustar pesos dinâmicos"),
+                                                    _weight_inputs(bundle),
+                                                ],
+                                            ),
+                                        ],
+                                    ),
+                                    html.Div(
+                                        style={**UI_CARD_STYLE, "marginTop": "12px"},
+                                        children=[
+                                            html.H3("Catálogo visível", style={"marginTop": 0}),
+                                            _catalog_grid(initial_state["ranked_records"]),
+                                            html.H3("Resumo por família"),
+                                            _family_summary_grid(initial_state.get("family_summary_records", [])),
+                                            html.Button("Exportar catálogo ranqueado", id="export-catalog-button", style=UI_BUTTON_STYLE),
+                                            dcc.Download(id="catalog-download"),
+                                        ],
+                                    ),
+                                ],
+                            ),
+                            html.Details(
+                                id="decision-comparison-details",
                                 style=UI_MUTED_CARD_STYLE,
                                 children=[
                                     html.Summary("Comparação aprofundada"),
@@ -3185,6 +3446,7 @@ def build_app(
                                 ],
                             ),
                             html.Details(
+                                id="decision-candidate-details",
                                 style=UI_MUTED_CARD_STYLE,
                                 children=[
                                     html.Summary("Circuito do candidato em foco"),
@@ -3228,6 +3490,7 @@ def build_app(
                                 ],
                             ),
                             html.Details(
+                                id="decision-justification-details",
                                 style=UI_MUTED_CARD_STYLE,
                                 children=[
                                     html.Summary("Justificativa detalhada"),
@@ -3252,6 +3515,7 @@ def build_app(
                                 ],
                             ),
                             html.Details(
+                                id="decision-technical-state-details",
                                 style=UI_MUTED_CARD_STYLE,
                                 children=[
                                     html.Summary("Resumo técnico do estado de decisão"),
@@ -3292,60 +3556,83 @@ def build_app(
                                 action_hint="Use esta área quando precisar reconciliar contrato, persistência ou estrutura técnica fora do fluxo principal.",
                             ),
                             html.Div(
-                                style=UI_TWO_COLUMN_STYLE,
-                                children=[
-                                    html.Div(
-                                        style=UI_CARD_STYLE,
-                                        children=[
-                                            html.H3("Bundle salvo e reabertura", style={"marginTop": 0}),
-                                            html.Div(id="bundle-io-summary-panel", children=render_bundle_io_panel(_safe_json_loads(initial_bundle_io_summary))),
-                                            _field_block("Diretório do bundle salvo", dcc.Input(id="bundle-output-dir-input", type="text", value=initial_bundle_output_dir, persistence=True, persistence_type="session", style={"width": "100%"})),
-                                            html.Button("Salvar e reabrir bundle", id="save-reopen-bundle-button", style=UI_BUTTON_STYLE),
-                                        ],
-                                    ),
-                                    html.Div(
-                                        style=UI_MUTED_CARD_STYLE,
-                                        children=[
-                                            html.H3("Textos canônicos", style={"marginTop": 0}),
-                                            html.H4("topology_rules.yaml"),
-                                            dcc.Textarea(
-                                                id="topology-rules-editor",
-                                                value=authoring_payload["topology_rules_text"],
-                                                style={"width": "100%", "height": "240px"},
-                                                persistence=True,
-                                                persistence_type="session",
-                                            ),
-                                            html.H4("scenario_settings.yaml"),
-                                            dcc.Textarea(
-                                                id="scenario-settings-editor",
-                                                value=authoring_payload["scenario_settings_text"],
-                                                style={"width": "100%", "height": "240px"},
-                                                persistence=True,
-                                                persistence_type="session",
-                                            ),
-                                        ],
-                                    ),
-                                ],
-                            ),
-                            html.Div(
+                                id="audit-workspace-panel",
+                                children=render_audit_workspace_panel(
+                                    _safe_json_loads(initial_bundle_io_summary),
+                                    _safe_json_loads(initial_execution_summary),
+                                ),
                                 style=UI_CARD_STYLE,
+                            ),
+                            html.Details(
+                                id="audit-context-detailed-panels",
+                                style=UI_MUTED_CARD_STYLE,
                                 children=[
-                                    html.H3("Tabelas do bundle", style={"marginTop": 0}),
-                                    html.H4("nodes.csv"),
-                                    _table("nodes-grid", bundle.nodes, editable=True),
-                                    html.H4("component_catalog.csv"),
-                                    _table("components-grid", bundle.components, editable=True),
-                                    html.H4("candidate_links.csv"),
-                                    _table("candidate-links-grid", bundle.candidate_links, editable=True),
-                                    html.H4("edge_component_rules.csv"),
-                                    _table("edge-component-rules-grid", bundle.edge_component_rules, editable=True),
-                                    html.H4("route_requirements.csv"),
-                                    _table("routes-grid", bundle.route_requirements, editable=True),
-                                    html.H4("layout_constraints.csv"),
-                                    _table("layout-constraints-grid", bundle.layout_constraints, editable=True),
+                                    html.Summary("Bundle canônico e textos completos"),
+                                    html.Div(
+                                        style={**UI_TWO_COLUMN_STYLE, "marginTop": "12px"},
+                                        children=[
+                                            html.Div(
+                                                style=UI_CARD_STYLE,
+                                                children=[
+                                                    html.H3("Bundle salvo e reabertura", style={"marginTop": 0}),
+                                                    html.Div(id="bundle-io-summary-panel", children=render_bundle_io_panel(_safe_json_loads(initial_bundle_io_summary))),
+                                                    _field_block("Diretório do bundle salvo", dcc.Input(id="bundle-output-dir-input", type="text", value=initial_bundle_output_dir, persistence=True, persistence_type="session", style={"width": "100%"})),
+                                                    html.Button("Salvar e reabrir bundle", id="save-reopen-bundle-button", style=UI_BUTTON_STYLE),
+                                                ],
+                                            ),
+                                            html.Div(
+                                                style=UI_MUTED_CARD_STYLE,
+                                                children=[
+                                                    html.H3("Textos canônicos", style={"marginTop": 0}),
+                                                    html.H4("topology_rules.yaml"),
+                                                    dcc.Textarea(
+                                                        id="topology-rules-editor",
+                                                        value=authoring_payload["topology_rules_text"],
+                                                        style={"width": "100%", "height": "240px"},
+                                                        persistence=True,
+                                                        persistence_type="session",
+                                                    ),
+                                                    html.H4("scenario_settings.yaml"),
+                                                    dcc.Textarea(
+                                                        id="scenario-settings-editor",
+                                                        value=authoring_payload["scenario_settings_text"],
+                                                        style={"width": "100%", "height": "240px"},
+                                                        persistence=True,
+                                                        persistence_type="session",
+                                                    ),
+                                                ],
+                                            ),
+                                        ],
+                                    ),
                                 ],
                             ),
                             html.Details(
+                                id="audit-bundle-tables-details",
+                                style=UI_MUTED_CARD_STYLE,
+                                children=[
+                                    html.Summary("Tabelas completas do bundle"),
+                                    html.Div(
+                                        style={**UI_CARD_STYLE, "marginTop": "12px"},
+                                        children=[
+                                            html.H3("Tabelas do bundle", style={"marginTop": 0}),
+                                            html.H4("nodes.csv"),
+                                            _table("nodes-grid", bundle.nodes, editable=True),
+                                            html.H4("component_catalog.csv"),
+                                            _table("components-grid", bundle.components, editable=True),
+                                            html.H4("candidate_links.csv"),
+                                            _table("candidate-links-grid", bundle.candidate_links, editable=True),
+                                            html.H4("edge_component_rules.csv"),
+                                            _table("edge-component-rules-grid", bundle.edge_component_rules, editable=True),
+                                            html.H4("route_requirements.csv"),
+                                            _table("routes-grid", bundle.route_requirements, editable=True),
+                                            html.H4("layout_constraints.csv"),
+                                            _table("layout-constraints-grid", bundle.layout_constraints, editable=True),
+                                        ],
+                                    ),
+                                ],
+                            ),
+                            html.Details(
+                                id="audit-json-details",
                                 style=UI_MUTED_CARD_STYLE,
                                 children=[
                                     html.Summary("JSON técnico do bundle"),
@@ -4543,6 +4830,7 @@ def build_app(
         Output("studio-workspace-panel", "children"),
         Output("studio-readiness-panel", "children"),
         Output("studio-projection-coverage-panel", "children"),
+        Output("runs-workspace-panel", "children"),
         Output("runs-flow-panel", "children"),
         Output("studio-focus-panel", "children"),
         Output("studio-connectivity-panel", "children"),
@@ -4566,10 +4854,12 @@ def build_app(
         node_summary_text: str | None,
         edge_summary_text: str | None,
         studio_status_text: str | None,
-    ) -> tuple[Any, Any, Any, Any, Any, Any, Any, Any, Any]:
+    ) -> tuple[Any, Any, Any, Any, Any, Any, Any, Any, Any, Any]:
         studio_readiness = build_studio_readiness_summary(nodes_rows or [], candidate_links_rows or [], route_rows or [])
         node_summary = _safe_json_loads(node_summary_text)
         edge_summary = _safe_json_loads(edge_summary_text)
+        run_jobs_summary = _safe_json_loads(run_jobs_summary_text)
+        execution_summary = _safe_json_loads(execution_summary_text)
         return (
             render_studio_canvas_guidance_panel(studio_readiness, node_summary, edge_summary),
             render_studio_workspace_panel(studio_readiness, node_summary, edge_summary, route_rows, studio_status_text),
@@ -4577,10 +4867,15 @@ def build_app(
             render_studio_projection_panel(
                 build_studio_projection_summary(nodes_rows or [], candidate_links_rows or [], route_rows or [])
             ),
+            render_runs_workspace_panel(
+                studio_readiness,
+                run_jobs_summary,
+                execution_summary,
+            ),
             render_runs_flow_panel(
                 studio_readiness,
-                _safe_json_loads(run_jobs_summary_text),
-                _safe_json_loads(execution_summary_text),
+                run_jobs_summary,
+                execution_summary,
             ),
             render_studio_focus_panel(node_summary, edge_summary, route_rows, studio_readiness, studio_status_text),
             render_studio_connectivity_panel(studio_readiness, node_summary, edge_summary, route_rows),
@@ -4606,6 +4901,7 @@ def build_app(
         Input("studio-open-audit-button", "n_clicks_timestamp"),
         Input("studio-open-runs-button", "n_clicks_timestamp"),
         Input("studio-workspace-open-runs-button", "n_clicks_timestamp"),
+        Input("runs-workspace-open-decision-button", "n_clicks_timestamp"),
         Input("runs-flow-open-decision-button", "n_clicks_timestamp"),
         Input("execution-open-decision-button", "n_clicks_timestamp"),
         State("primary-navigation-tabs", "value"),
@@ -4615,6 +4911,7 @@ def build_app(
         open_audit_ts: Any,
         open_runs_ts: Any,
         workspace_open_runs_ts: Any,
+        runs_workspace_open_decision_ts: Any,
         runs_flow_open_decision_ts: Any,
         execution_open_decision_ts: Any,
         current_tab: str | None,
@@ -4624,6 +4921,7 @@ def build_app(
                 (_timestamp_or_zero(open_audit_ts), "audit"),
                 (_timestamp_or_zero(open_runs_ts), "runs"),
                 (_timestamp_or_zero(workspace_open_runs_ts), "runs"),
+                (_timestamp_or_zero(runs_workspace_open_decision_ts), "decision"),
                 (_timestamp_or_zero(runs_flow_open_decision_ts), "decision"),
                 (_timestamp_or_zero(execution_open_decision_ts), "decision"),
             ],
@@ -4689,16 +4987,21 @@ def build_app(
     @app.callback(
         Output("execution-summary-panel", "children"),
         Output("bundle-io-summary-panel", "children"),
+        Output("audit-workspace-panel", "children"),
         Input("execution-summary", "children"),
         Input("bundle-io-summary", "children"),
     )
-    def _refresh_audit_panels(execution_text: str | None, bundle_text: str | None) -> tuple[Any, Any]:
+    def _refresh_audit_panels(execution_text: str | None, bundle_text: str | None) -> tuple[Any, Any, Any]:
+        execution_payload = _safe_json_loads(execution_text)
+        bundle_payload = _safe_json_loads(bundle_text)
         return (
-            render_execution_summary_panel(_safe_json_loads(execution_text)),
-            render_bundle_io_panel(_safe_json_loads(bundle_text)),
+            render_execution_summary_panel(execution_payload),
+            render_bundle_io_panel(bundle_payload),
+            render_audit_workspace_panel(bundle_payload, execution_payload),
         )
 
     @app.callback(
+        Output("decision-workspace-panel", "children"),
         Output("decision-summary-panel", "children"),
         Output("decision-summary-panel-extended", "children"),
         Output("decision-contrast-panel", "children"),
@@ -4717,15 +5020,17 @@ def build_app(
         catalog_text: str | None,
         candidate_text: str | None,
         breakdown_text: str | None,
-    ) -> tuple[Any, Any, Any, Any, Any, Any, Any, Any]:
+    ) -> tuple[Any, Any, Any, Any, Any, Any, Any, Any, Any]:
         official_payload = _safe_json_loads(official_text)
+        catalog_payload = _safe_json_loads(catalog_text)
         return (
+            render_decision_workspace_panel(official_payload, catalog_payload),
             render_decision_summary_panel(official_payload),
             render_decision_summary_panel(official_payload),
             render_decision_contrast_panel(official_payload),
             render_decision_signal_panel(official_payload),
             render_decision_flow_panel(official_payload),
-            render_catalog_state_panel(_safe_json_loads(catalog_text)),
+            render_catalog_state_panel(catalog_payload),
             render_candidate_summary_panel(_safe_json_loads(candidate_text)),
             render_candidate_breakdown_panel(_safe_json_loads(breakdown_text)),
         )
