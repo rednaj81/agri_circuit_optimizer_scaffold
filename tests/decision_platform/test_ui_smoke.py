@@ -212,6 +212,23 @@ def test_dash_app_surfaces_only_four_primary_product_spaces() -> None:
     assert _find_component_by_id(app.layout, "hero-open-audit-link") is not None
 
 
+def test_studio_primary_surface_exposes_business_command_center() -> None:
+    with diagnostic_runtime_test_mode():
+        app = build_app("data/decision_platform/maquete_v2")
+
+    assert _find_component_by_id(app.layout, "studio-command-center-panel") is not None
+    assert _find_component_by_id(app.layout, "studio-command-open-workbench-button") is not None
+    assert _find_component_by_id(app.layout, "studio-add-source-node-button") is not None
+    assert _find_component_by_id(app.layout, "studio-add-product-node-button") is not None
+    assert _find_component_by_id(app.layout, "studio-add-mixer-node-button") is not None
+    assert _find_component_by_id(app.layout, "studio-add-service-node-button") is not None
+    assert _find_component_by_id(app.layout, "studio-add-outlet-node-button") is not None
+    assert _find_component_by_id(app.layout, "studio-quick-link-source") is not None
+    assert _find_component_by_id(app.layout, "studio-quick-link-target") is not None
+    assert _find_component_by_id(app.layout, "studio-quick-link-archetype") is not None
+    assert _find_component_by_id(app.layout, "studio-quick-link-create-button") is not None
+
+
 def test_product_space_banner_uses_consistent_product_language_for_each_space() -> None:
     studio_banner = _collect_text_content(render_product_space_banner("studio"))
     runs_banner = _collect_text_content(render_product_space_banner("runs"))

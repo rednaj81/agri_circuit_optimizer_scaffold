@@ -9,6 +9,7 @@ from decision_platform.data_io.loader import load_scenario_bundle
 from decision_platform.data_io.storage import save_authored_scenario_bundle
 from decision_platform.ui_dash.app import (
     build_app,
+    create_business_node_studio_node,
     create_edge_studio_link,
     create_node_studio_node,
     delete_edge_studio_selection,
@@ -37,6 +38,15 @@ def test_dash_app_exposes_structural_studio_controls() -> None:
     assert "edge-studio-delete-button" in layout_repr
     assert "studio-canvas-open-workbench-button" in layout_repr
     assert "studio-canvas-open-technical-guide-button" in layout_repr
+    assert "studio-command-center-panel" in layout_repr
+    assert "studio-add-source-node-button" in layout_repr
+    assert "studio-add-product-node-button" in layout_repr
+    assert "studio-add-mixer-node-button" in layout_repr
+    assert "studio-add-service-node-button" in layout_repr
+    assert "studio-add-outlet-node-button" in layout_repr
+    assert "studio-quick-link-source" in layout_repr
+    assert "studio-quick-link-target" in layout_repr
+    assert "studio-quick-link-create-button" in layout_repr
     assert "studio-workspace-panel" in layout_repr
     assert "studio-context-detailed-panels" in layout_repr
     assert "runs-workspace-panel" in layout_repr
@@ -90,6 +100,35 @@ def test_studio_structure_helpers_create_duplicate_and_delete_items() -> None:
     assert next_link_id != created_link_id
     assert next_node_id in {str(row["node_id"]) for row in nodes_rows}
     assert next_node_id != duplicated_node_id
+
+
+@pytest.mark.fast
+def test_business_palette_presets_create_visible_business_nodes() -> None:
+    bundle = load_scenario_bundle("data/decision_platform/maquete_v2")
+
+    nodes_rows, source_node_id = create_business_node_studio_node(
+        bundle.nodes.to_dict("records"),
+        selected_node_id="W",
+        preset_key="source",
+    )
+    nodes_rows, outlet_node_id = create_business_node_studio_node(
+        nodes_rows,
+        selected_node_id=source_node_id,
+        preset_key="outlet",
+    )
+
+    created_source = next(row for row in nodes_rows if str(row["node_id"]) == source_node_id)
+    created_outlet = next(row for row in nodes_rows if str(row["node_id"]) == outlet_node_id)
+
+    assert created_source["zone"] == "supply"
+    assert created_source["node_type"] == "water_tank"
+    assert bool(created_source["allow_inbound"]) is False
+    assert bool(created_source["allow_outbound"]) is True
+    assert bool(created_source["is_candidate_hub"]) is False
+    assert created_outlet["zone"] == "outlet"
+    assert created_outlet["node_type"] == "external_outlet"
+    assert bool(created_outlet["allow_outbound"]) is False
+    assert "Criado pela paleta principal do Studio" in str(created_outlet["notes"])
 
 
 @pytest.mark.fast

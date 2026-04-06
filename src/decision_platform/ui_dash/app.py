@@ -872,6 +872,72 @@ EDGE_ARCHETYPE_LABELS = {
     "upper_bypass_segment": "Trecho do bypass superior",
     "vertical_link": "Conexão vertical",
 }
+BUSINESS_NODE_PRESETS = {
+    "source": {
+        "button_label": "Nova fonte",
+        "button_hint": "Entrada de água visível no Studio.",
+        "node_id_prefix": "SOURCE",
+        "node_type": "water_tank",
+        "default_label": "Nova fonte",
+        "zone": "supply",
+        "allow_inbound": False,
+        "allow_outbound": True,
+        "requires_mixing_service": False,
+    },
+    "product": {
+        "button_label": "Novo produto",
+        "button_hint": "Tanque ou ponto de produto de negócio.",
+        "node_id_prefix": "PRODUCT",
+        "node_type": "product_tank",
+        "default_label": "Novo produto",
+        "zone": "process",
+        "allow_inbound": True,
+        "allow_outbound": True,
+        "requires_mixing_service": False,
+    },
+    "mixer": {
+        "button_label": "Novo misturador",
+        "button_hint": "Etapa principal de mistura no fluxo.",
+        "node_id_prefix": "MIX",
+        "node_type": "mixer_tank",
+        "default_label": "Novo misturador",
+        "zone": "process",
+        "allow_inbound": True,
+        "allow_outbound": True,
+        "requires_mixing_service": False,
+    },
+    "service": {
+        "button_label": "Novo serviço",
+        "button_hint": "Ponto de serviço ou incorporador visível.",
+        "node_id_prefix": "SERVICE",
+        "node_type": "incorporator_tank",
+        "default_label": "Novo serviço",
+        "zone": "service",
+        "allow_inbound": True,
+        "allow_outbound": True,
+        "requires_mixing_service": True,
+    },
+    "outlet": {
+        "button_label": "Nova saída",
+        "button_hint": "Saída externa ou entrega principal.",
+        "node_id_prefix": "OUTLET",
+        "node_type": "external_outlet",
+        "default_label": "Nova saída",
+        "zone": "outlet",
+        "allow_inbound": True,
+        "allow_outbound": False,
+        "requires_mixing_service": False,
+    },
+}
+BUSINESS_EDGE_ARCHETYPE_OPTIONS = [
+    {"label": "Entrada de água", "value": "supply_tap"},
+    {"label": "Tomada de tanque", "value": "tank_tap"},
+    {"label": "Tomada de serviço", "value": "service_tap"},
+    {"label": "Trecho do barramento", "value": "bus_segment"},
+    {"label": "Trecho com ilha de bomba", "value": "pump_island_segment"},
+    {"label": "Conexão vertical", "value": "vertical_link"},
+    {"label": "Saída do circuito", "value": "outlet_tap"},
+]
 
 
 def _studio_node_business_label(row: dict[str, Any] | None) -> str:
@@ -892,6 +958,40 @@ def _studio_edge_role_label(row: dict[str, Any] | None) -> str:
     if not row:
         return "Conexão"
     return EDGE_ARCHETYPE_LABELS.get(str(row.get("archetype", "")).strip(), "Conexão do cenário")
+
+
+def _business_node_choice_options(nodes_rows: list[dict[str, Any]]) -> list[dict[str, str]]:
+    options = []
+    for row in _visible_studio_nodes(nodes_rows):
+        node_id = str(row.get("node_id", "")).strip()
+        if not node_id:
+            continue
+        options.append(
+            {
+                "label": f"{_studio_node_business_label(row)} ({_studio_node_role_label(row)})",
+                "value": node_id,
+            }
+        )
+    return options
+
+
+def _studio_quick_link_defaults(
+    nodes_rows: list[dict[str, Any]],
+    node_summary: dict[str, Any],
+    edge_summary: dict[str, Any],
+) -> tuple[str | None, str | None]:
+    options = [option["value"] for option in _business_node_choice_options(nodes_rows)]
+    if len(options) < 2:
+        return None, None
+    preferred_source = str(node_summary.get("selected_node_id") or edge_summary.get("selected_edge", {}).get("from_node") or "").strip()
+    preferred_target = str(edge_summary.get("selected_edge", {}).get("to_node") or "").strip()
+    source = preferred_source if preferred_source in options else options[0]
+    target_candidates = [candidate for candidate in options if candidate != source]
+    if preferred_target in target_candidates:
+        target = preferred_target
+    else:
+        target = target_candidates[0] if target_candidates else None
+    return source, target
 
 
 def _is_internal_studio_node(row: dict[str, Any] | None) -> bool:
@@ -1321,6 +1421,144 @@ def render_studio_workspace_panel(
                 ],
             ),
         ]
+    )
+
+
+def render_studio_command_center_panel(
+    studio_summary: dict[str, Any],
+    node_summary: dict[str, Any],
+    edge_summary: dict[str, Any],
+    nodes_rows: list[dict[str, Any]],
+    candidate_links_rows: list[dict[str, Any]],
+) -> Any:
+    options = _business_node_choice_options(nodes_rows)
+    quick_source, quick_target = _studio_quick_link_defaults(nodes_rows, node_summary, edge_summary)
+    selected_node_label = str(node_summary.get("business_label") or "").strip()
+    selected_edge_label = str(edge_summary.get("business_label") or "").strip()
+    selected_focus = selected_edge_label or selected_node_label or "Nenhuma entidade selecionada"
+    status = str(studio_summary.get("status") or "needs_attention")
+    runs_ready = status == "ready"
+    focus_hint = (
+        f"A conexão em foco é {selected_edge_label}. Revise este trecho e use a criação rápida apenas para completar o fluxo principal."
+        if selected_edge_label
+        else (
+            f"A entidade em foco é {selected_node_label}. Use a paleta para completar o fluxo a partir deste ponto."
+            if selected_node_label
+            else "Selecione uma entidade no canvas para que a criação e a conexão rápidas usem esse contexto."
+        )
+    )
+    palette_buttons = [
+        html.Button(
+            preset["button_label"],
+            id=f"studio-add-{preset_key}-node-button",
+            style=UI_BUTTON_STYLE,
+            title=preset["button_hint"],
+        )
+        for preset_key, preset in BUSINESS_NODE_PRESETS.items()
+    ]
+    return html.Div(
+        id="studio-command-center-panel",
+        children=[
+            html.Div("Command center do Studio", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+            html.Div("Monte o grafo de negócio sem abrir a trilha técnica", style={"fontWeight": 700, "fontSize": "22px", "lineHeight": "1.3", "marginTop": "8px"}),
+            html.P(
+                "A primeira dobra do Studio agora concentra criação de entidades, ligação entre pontos do negócio e leitura do foco atual. O workbench técnico continua disponível, mas saiu do papel de superfície principal.",
+                style={"lineHeight": "1.6", "marginTop": "10px"},
+            ),
+            html.Div(
+                style={**UI_THREE_COLUMN_STYLE, "marginBottom": "12px"},
+                children=[
+                    _guidance_card("Foco atual", selected_focus),
+                    _guidance_card("Como agir agora", focus_hint),
+                    _guidance_card("Passagem para Runs", "Liberada" if runs_ready else "Continue no Studio até fechar readiness e conectividade."),
+                ],
+            ),
+            html.Div(
+                style={**UI_MUTED_CARD_STYLE, "padding": "14px", "marginBottom": "12px"},
+                children=[
+                    html.Div("1. Adicionar entidades de negócio", style={"fontWeight": 700, "marginBottom": "8px"}),
+                    html.Div(
+                        "Crie fontes, produtos, mistura, serviço e saída diretamente daqui. Hubs internos continuam derivados e fora do canvas principal.",
+                        style={"lineHeight": "1.6", "marginBottom": "12px"},
+                    ),
+                    html.Div(style=UI_ACTION_ROW_STYLE, children=palette_buttons),
+                ],
+            ),
+            html.Div(
+                style={**UI_MUTED_CARD_STYLE, "padding": "14px", "marginBottom": "12px"},
+                children=[
+                    html.Div("2. Ligar entidades visíveis", style={"fontWeight": 700, "marginBottom": "8px"}),
+                    html.Div(
+                        "Use a ligação rápida para fechar o fluxo do cenário sem cair no editor completo de arestas.",
+                        style={"lineHeight": "1.6", "marginBottom": "12px"},
+                    ),
+                    html.Div(
+                        style=UI_THREE_COLUMN_STYLE,
+                        children=[
+                            _field_block(
+                                "De",
+                                dcc.Dropdown(
+                                    id="studio-quick-link-source",
+                                    options=options,
+                                    value=quick_source,
+                                    persistence=True,
+                                    persistence_type="session",
+                                ),
+                            ),
+                            _field_block(
+                                "Para",
+                                dcc.Dropdown(
+                                    id="studio-quick-link-target",
+                                    options=options,
+                                    value=quick_target,
+                                    persistence=True,
+                                    persistence_type="session",
+                                ),
+                            ),
+                            _field_block(
+                                "Tipo de conexão",
+                                dcc.Dropdown(
+                                    id="studio-quick-link-archetype",
+                                    options=BUSINESS_EDGE_ARCHETYPE_OPTIONS,
+                                    value="bus_segment",
+                                    persistence=True,
+                                    persistence_type="session",
+                                ),
+                            ),
+                        ],
+                    ),
+                    html.Div(
+                        style=UI_ACTION_ROW_STYLE,
+                        children=[
+                            html.Button("Criar conexão no canvas", id="studio-quick-link-create-button", style=UI_BUTTON_STYLE),
+                            html.Button("Abrir workbench avançado", id="studio-command-open-workbench-button", style=UI_BUTTON_STYLE),
+                        ],
+                    ),
+                ],
+            ),
+            html.Div(
+                style=UI_THREE_COLUMN_STYLE,
+                children=[
+                    _metric_card("Entidades de negócio", studio_summary.get("business_node_count", 0), "Só o que o usuário precisa editar."),
+                    _metric_card("Conexões visíveis", studio_summary.get("business_edge_count", 0), "Fluxo principal sem malha interna."),
+                    _metric_card("Internos ocultos", studio_summary.get("hidden_internal_node_count", 0), "Nós derivados e hubs fora da superfície principal."),
+                ],
+            ),
+            html.Div(
+                style={**UI_MUTED_CARD_STYLE, "padding": "14px", "marginTop": "12px"},
+                children=[
+                    html.Div("3. Guardrails do Studio", style={"fontWeight": 700, "marginBottom": "8px"}),
+                    _bullet_list(
+                        [
+                            "O Studio principal continua mostrando apenas entidades e conexões de negócio.",
+                            "Nós internos, hubs técnicos e JSON cru permanecem fora da primeira dobra.",
+                            "Se a conexão rápida não bastar, use o workbench avançado sem recolocar a trilha técnica na UI principal.",
+                        ],
+                        "Sem guardrail registrado.",
+                    ),
+                ],
+            ),
+        ],
     )
 
 
@@ -3090,8 +3328,19 @@ def build_app(
                                         ],
                                     ),
                                     html.Div(
-                                        style=UI_CARD_STYLE,
+                                        style=UI_SECTION_STYLE,
                                         children=[
+                                            html.Div(
+                                                id="studio-command-center-shell",
+                                                style=UI_CARD_STYLE,
+                                                children=render_studio_command_center_panel(
+                                                    initial_studio_readiness,
+                                                    _safe_json_loads(initial_node_studio_summary),
+                                                    _safe_json_loads(initial_edge_studio_summary),
+                                                    authoring_payload["nodes_rows"],
+                                                    authoring_payload["candidate_links_rows"],
+                                                ),
+                                            ),
                                             html.Div(
                                                 id="studio-workspace-panel",
                                                 children=render_studio_workspace_panel(
@@ -3101,6 +3350,7 @@ def build_app(
                                                     authoring_payload["route_rows"],
                                                     "",
                                                 ),
+                                                style=UI_CARD_STYLE,
                                             ),
                                         ],
                                     ),
@@ -3150,7 +3400,7 @@ def build_app(
                                 id="studio-editor-workbench",
                                 style=UI_MUTED_CARD_STYLE,
                                 children=[
-                                    html.Summary("Ações de edição do grafo"),
+                                    html.Summary("Workbench avançado do Studio"),
                                     html.Div(
                                         style=UI_TWO_COLUMN_STYLE,
                                         children=[
@@ -3969,6 +4219,46 @@ def build_app(
         Output("nodes-grid", "rowData", allow_duplicate=True),
         Output("node-studio-selected-id", "data", allow_duplicate=True),
         Output("studio-status-message", "data", allow_duplicate=True),
+        Input("studio-add-source-node-button", "n_clicks"),
+        Input("studio-add-product-node-button", "n_clicks"),
+        Input("studio-add-mixer-node-button", "n_clicks"),
+        Input("studio-add-service-node-button", "n_clicks"),
+        Input("studio-add-outlet-node-button", "n_clicks"),
+        State("nodes-grid", "rowData"),
+        State("node-studio-selected-id", "data"),
+        prevent_initial_call=True,
+    )
+    def _create_business_node_from_palette(
+        source_clicks: Any,
+        product_clicks: Any,
+        mixer_clicks: Any,
+        service_clicks: Any,
+        outlet_clicks: Any,
+        nodes_rows: list[dict[str, Any]] | None,
+        selected_node_id: str | None,
+    ) -> tuple[list[dict[str, Any]], str | None, str]:
+        click_map = {
+            "source": int(source_clicks or 0),
+            "product": int(product_clicks or 0),
+            "mixer": int(mixer_clicks or 0),
+            "service": int(service_clicks or 0),
+            "outlet": int(outlet_clicks or 0),
+        }
+        preset_key = max(click_map, key=click_map.get)
+        if click_map[preset_key] <= 0:
+            return nodes_rows or [], selected_node_id, ""
+        updated_rows, next_selected_id = create_business_node_studio_node(
+            nodes_rows or [],
+            selected_node_id=selected_node_id,
+            preset_key=preset_key,
+        )
+        status_message = f"{BUSINESS_NODE_PRESETS[preset_key]['button_label']} adicionada ao canvas principal."
+        return updated_rows, next_selected_id, status_message
+
+    @app.callback(
+        Output("nodes-grid", "rowData", allow_duplicate=True),
+        Output("node-studio-selected-id", "data", allow_duplicate=True),
+        Output("studio-status-message", "data", allow_duplicate=True),
         Input("node-studio-duplicate-button", "n_clicks"),
         Input("studio-focus-duplicate-node-button", "n_clicks"),
         State("nodes-grid", "rowData"),
@@ -4062,6 +4352,37 @@ def build_app(
         )
 
     @app.callback(
+        Output("studio-quick-link-source", "options"),
+        Output("studio-quick-link-source", "value"),
+        Output("studio-quick-link-target", "options"),
+        Output("studio-quick-link-target", "value"),
+        Input("nodes-grid", "rowData"),
+        Input("node-studio-summary", "children"),
+        Input("edge-studio-summary", "children"),
+        State("studio-quick-link-source", "value"),
+        State("studio-quick-link-target", "value"),
+    )
+    def _sync_quick_link_controls(
+        nodes_rows: list[dict[str, Any]] | None,
+        node_summary_text: str | None,
+        edge_summary_text: str | None,
+        current_source: str | None,
+        current_target: str | None,
+    ) -> tuple[list[dict[str, str]], str | None, list[dict[str, str]], str | None]:
+        business_options = _business_node_choice_options(nodes_rows or [])
+        option_values = [option["value"] for option in business_options]
+        node_summary = _safe_json_loads(node_summary_text)
+        edge_summary = _safe_json_loads(edge_summary_text)
+        default_source, default_target = _studio_quick_link_defaults(nodes_rows or [], node_summary, edge_summary)
+        source_value = current_source if current_source in option_values else default_source
+        target_candidates = [option for option in business_options if option["value"] != source_value]
+        target_values = [option["value"] for option in target_candidates]
+        target_value = current_target if current_target in target_values else default_target
+        if target_value == source_value:
+            target_value = target_values[0] if target_values else None
+        return business_options, source_value, target_candidates, target_value
+
+    @app.callback(
         Output("candidate-links-grid", "rowData", allow_duplicate=True),
         Output("edge-studio-selected-id", "data", allow_duplicate=True),
         Output("studio-status-message", "data", allow_duplicate=True),
@@ -4112,6 +4433,49 @@ def build_app(
         except ValueError as exc:
             return candidate_links_rows or [], selected_link_id, str(exc)
         return updated_rows, next_selected_link_id, ""
+
+    @app.callback(
+        Output("candidate-links-grid", "rowData", allow_duplicate=True),
+        Output("edge-studio-selected-id", "data", allow_duplicate=True),
+        Output("studio-status-message", "data", allow_duplicate=True),
+        Input("studio-quick-link-create-button", "n_clicks"),
+        State("candidate-links-grid", "rowData"),
+        State("edge-studio-selected-id", "data"),
+        State("studio-quick-link-source", "value"),
+        State("studio-quick-link-target", "value"),
+        State("studio-quick-link-archetype", "value"),
+        State("nodes-grid", "rowData"),
+        State("edge-component-rules-grid", "rowData"),
+        prevent_initial_call=True,
+    )
+    def _create_quick_business_link(
+        n_clicks: Any,
+        candidate_links_rows: list[dict[str, Any]] | None,
+        selected_link_id: str | None,
+        source_node_id: str | None,
+        target_node_id: str | None,
+        archetype: str | None,
+        nodes_rows: list[dict[str, Any]] | None,
+        edge_component_rules_rows: list[dict[str, Any]] | None,
+    ) -> tuple[list[dict[str, Any]], str | None, str]:
+        if not n_clicks:
+            return candidate_links_rows or [], selected_link_id, ""
+        try:
+            updated_rows, next_selected_link_id = create_edge_studio_link(
+                candidate_links_rows or [],
+                selected_link_id=selected_link_id,
+                from_node=source_node_id,
+                to_node=target_node_id,
+                archetype=archetype or "bus_segment",
+                length_m=0.18,
+                bidirectional=False,
+                family_hint=EDGE_ARCHETYPE_LABELS.get(str(archetype or "bus_segment"), "Conexão do cenário"),
+                nodes_rows=nodes_rows or [],
+                edge_component_rules_rows=edge_component_rules_rows or [],
+            )
+        except ValueError as exc:
+            return candidate_links_rows or [], selected_link_id, str(exc)
+        return updated_rows, next_selected_link_id, "Conexão de negócio criada no canvas principal."
 
     @app.callback(
         Output("candidate-links-grid", "rowData", allow_duplicate=True),
@@ -4198,6 +4562,7 @@ def build_app(
         Input("studio-canvas-open-workbench-button", "n_clicks"),
         Input("studio-readiness-open-workbench-button", "n_clicks"),
         Input("studio-workspace-open-workbench-button", "n_clicks"),
+        Input("studio-command-open-workbench-button", "n_clicks"),
         Input("studio-focus-recommended-open-workbench-button", "n_clicks"),
         Input("studio-focus-open-workbench-button", "n_clicks"),
         prevent_initial_call=True,
@@ -4206,10 +4571,18 @@ def build_app(
         canvas_n_clicks: Any,
         readiness_n_clicks: Any,
         workspace_n_clicks: Any,
-        recommended_n_clicks: Any,
-        n_clicks: Any,
+        command_center_n_clicks: Any = None,
+        recommended_n_clicks: Any = None,
+        n_clicks: Any = None,
     ) -> bool:
-        return bool(canvas_n_clicks or readiness_n_clicks or workspace_n_clicks or recommended_n_clicks or n_clicks)
+        return bool(
+            canvas_n_clicks
+            or readiness_n_clicks
+            or workspace_n_clicks
+            or command_center_n_clicks
+            or recommended_n_clicks
+            or n_clicks
+        )
 
     @app.callback(
         Output("run-jobs-summary", "children", allow_duplicate=True),
@@ -4827,6 +5200,7 @@ def build_app(
 
     @app.callback(
         Output("studio-canvas-guidance-panel", "children"),
+        Output("studio-command-center-shell", "children"),
         Output("studio-workspace-panel", "children"),
         Output("studio-readiness-panel", "children"),
         Output("studio-projection-coverage-panel", "children"),
@@ -4854,7 +5228,7 @@ def build_app(
         node_summary_text: str | None,
         edge_summary_text: str | None,
         studio_status_text: str | None,
-    ) -> tuple[Any, Any, Any, Any, Any, Any, Any, Any, Any, Any]:
+    ) -> tuple[Any, Any, Any, Any, Any, Any, Any, Any, Any, Any, Any]:
         studio_readiness = build_studio_readiness_summary(nodes_rows or [], candidate_links_rows or [], route_rows or [])
         node_summary = _safe_json_loads(node_summary_text)
         edge_summary = _safe_json_loads(edge_summary_text)
@@ -4862,6 +5236,13 @@ def build_app(
         execution_summary = _safe_json_loads(execution_summary_text)
         return (
             render_studio_canvas_guidance_panel(studio_readiness, node_summary, edge_summary),
+            render_studio_command_center_panel(
+                studio_readiness,
+                node_summary,
+                edge_summary,
+                nodes_rows or [],
+                candidate_links_rows or [],
+            ),
             render_studio_workspace_panel(studio_readiness, node_summary, edge_summary, route_rows, studio_status_text),
             render_studio_readiness_panel(studio_readiness),
             render_studio_projection_panel(
@@ -5583,6 +5964,53 @@ def create_node_studio_node(
         "zone": "internal",
         "is_candidate_hub": False,
         "notes": "Criado no studio",
+    }
+    return [*nodes_rows, new_row], next_node_id
+
+
+def create_business_node_studio_node(
+    nodes_rows: list[dict[str, Any]],
+    *,
+    selected_node_id: str | None,
+    preset_key: str,
+) -> tuple[list[dict[str, Any]], str]:
+    preset = BUSINESS_NODE_PRESETS.get(str(preset_key).strip())
+    if preset is None:
+        raise ValueError(f"Unknown Studio business preset: {preset_key}")
+    selected_id = _default_node_studio_selection(nodes_rows, preferred_node_id=selected_node_id)
+    selected_row = next(
+        (dict(row) for row in nodes_rows if str(row.get("node_id", "")).strip() == selected_id),
+        dict(nodes_rows[0]) if nodes_rows else {},
+    )
+    existing_ids = {
+        str(row.get("node_id", "")).strip()
+        for row in nodes_rows
+        if str(row.get("node_id", "")).strip()
+    }
+    next_node_id = _next_structural_identifier(existing_ids, str(preset.get("node_id_prefix") or "NODE"))
+    base_x = _coerce_node_coordinate(selected_row.get("x_m"), 0.15) if selected_row else 0.15
+    base_y = _coerce_node_coordinate(selected_row.get("y_m"), 0.18) if selected_row else 0.18
+    visible_same_type_count = sum(
+        1
+        for row in _visible_studio_nodes(nodes_rows)
+        if str(row.get("node_type", "")).strip() == str(preset.get("node_type", "")).strip()
+    )
+    label = str(preset.get("default_label") or "Nova entidade").strip()
+    if visible_same_type_count > 0:
+        label = f"{label} {visible_same_type_count + 1}"
+    new_row = {
+        **selected_row,
+        "node_id": next_node_id,
+        "node_type": str(preset["node_type"]),
+        "label": label,
+        "x_m": round(base_x + 0.05, 4),
+        "y_m": round(base_y + 0.04, 4),
+        "allow_inbound": bool(preset["allow_inbound"]),
+        "allow_outbound": bool(preset["allow_outbound"]),
+        "requires_mixing_service": bool(preset["requires_mixing_service"]),
+        "zone": str(preset["zone"]),
+        "is_candidate_hub": False,
+        "notes": "Criado pela paleta principal do Studio",
     }
     return [*nodes_rows, new_row], next_node_id
 
