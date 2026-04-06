@@ -197,6 +197,11 @@ def test_dash_app_surfaces_only_four_primary_product_spaces() -> None:
     assert _find_component_by_id(app.layout, "product-journey-open-decision-link") is not None
     assert _find_component_by_id(app.layout, "product-journey-open-audit-link") is not None
     assert _find_component_by_id(app.layout, "product-space-banner") is not None
+    assert _find_component_by_id(app.layout, "product-space-switcher-studio-link") is not None
+    assert _find_component_by_id(app.layout, "product-space-switcher-runs-link") is not None
+    assert _find_component_by_id(app.layout, "product-space-switcher-decision-link") is not None
+    assert _find_component_by_id(app.layout, "product-space-switcher-audit-link") is not None
+    assert getattr(_find_component_by_id(app.layout, "product-space-banner"), "style", {}).get("position") == "sticky"
     assert _find_component_by_id(app.layout, "hero-open-studio-link") is not None
     assert _find_component_by_id(app.layout, "hero-open-runs-link") is not None
     assert _find_component_by_id(app.layout, "hero-open-decision-link") is not None
@@ -210,15 +215,27 @@ def test_product_space_banner_uses_consistent_product_language_for_each_space() 
     audit_banner = _collect_text_content(render_product_space_banner("audit"))
 
     assert "Espaço ativo" in studio_banner
+    assert "Trocar espaço" in studio_banner
     assert "Studio" in studio_banner
-    assert "O que resolver aqui" in studio_banner
-    assert "Antes de sair desta área" in studio_banner
+    assert "O que esta área resolve" in studio_banner
+    assert "Condição de saída" in studio_banner
     assert "Runs" in runs_banner
     assert "Fila local e execução em foco" in runs_banner
     assert "Decisão" in decision_banner
     assert "Winner, runner-up e contraste com contexto" in decision_banner
     assert "Auditoria" in audit_banner
     assert "Trilha canônica e evidência técnica" in audit_banner
+
+
+def test_product_space_banner_exposes_shell_switcher_for_all_primary_spaces() -> None:
+    banner = render_product_space_banner("runs")
+    banner_text = _collect_text_content(banner)
+
+    assert "Trocar espaço" in banner_text
+    assert getattr(_find_component_by_id(banner, "product-space-switcher-studio-link"), "href", None) == "?tab=studio"
+    assert getattr(_find_component_by_id(banner, "product-space-switcher-runs-link"), "href", None) == "?tab=runs"
+    assert getattr(_find_component_by_id(banner, "product-space-switcher-decision-link"), "href", None) == "?tab=decision"
+    assert getattr(_find_component_by_id(banner, "product-space-switcher-audit-link"), "href", None) == "?tab=audit"
 
 
 def test_product_journey_panel_summarizes_all_primary_spaces() -> None:
@@ -272,6 +289,22 @@ def test_product_space_banner_callback_tracks_active_primary_tab() -> None:
     assert "Runs" in runs_text
     assert "Decisão" in decision_text
     assert "Auditoria" in audit_text
+
+
+def test_product_space_banner_stays_aligned_with_navigation_resolution() -> None:
+    with diagnostic_runtime_test_mode():
+        app = build_app("data/decision_platform/maquete_v2")
+
+    navigation_callback = _get_callback(app, input_id="studio-open-audit-button")
+    banner_callback = _get_callback(app, output_prefix="product-space-banner.children")
+
+    runs_tab = navigation_callback("?tab=studio", 0, 40, 0, 0, "studio")
+    decision_tab = navigation_callback("?tab=studio", 0, 0, 50, 0, "runs")
+    audit_tab = navigation_callback("?tab=studio", 60, 0, 0, 0, "decision")
+
+    assert "Runs" in _collect_text_content(banner_callback(runs_tab))
+    assert "Decisão" in _collect_text_content(banner_callback(decision_tab))
+    assert "Auditoria" in _collect_text_content(banner_callback(audit_tab))
 
 
 def test_product_journey_panel_callback_tracks_active_primary_tab_and_state() -> None:

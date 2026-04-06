@@ -137,6 +137,14 @@ UI_JOURNEY_CARD_ACTIVE_STYLE = {
     "color": "#f5f3ee",
     "boxShadow": "0 18px 36px rgba(16, 59, 53, 0.18)",
 }
+UI_PERSISTENT_BANNER_STYLE = {
+    **UI_CARD_STYLE,
+    "marginBottom": "18px",
+    "position": "sticky",
+    "top": "16px",
+    "zIndex": 10,
+    "backdropFilter": "blur(18px)",
+}
 UI_PILL_STYLE = {
     "display": "inline-flex",
     "alignItems": "center",
@@ -224,6 +232,26 @@ def _journey_card_status_pill(label: str, *, active: bool) -> Any:
     else:
         style = UI_PILL_STYLE
     return html.Span(label, style=style)
+
+
+def _space_switcher_link(label: str, space: str, active_space: str | None) -> Any:
+    is_active = str(active_space or "studio") == space
+    style = {
+        "display": "inline-flex",
+        "alignItems": "center",
+        "justifyContent": "center",
+        "padding": "8px 12px",
+        "borderRadius": "999px",
+        "border": "1px solid rgba(16, 59, 53, 0.12)",
+        "textDecoration": "none",
+        "fontWeight": 700,
+        "color": "#18322c",
+        "background": "#f4f8f5" if not is_active else "#103b35",
+    }
+    if is_active:
+        style["color"] = "#f5f3ee"
+        style["boxShadow"] = "0 8px 18px rgba(16, 59, 53, 0.18)"
+    return html.A(label, href=f"?tab={space}", id=f"product-space-switcher-{space}-link", style=style)
 
 
 def _screen_opening_panel(
@@ -456,18 +484,42 @@ def render_product_journey_panel(
 
 
 def render_product_space_banner(space: str | None) -> Any:
-    content = _product_space_content(space)
+    normalized = str(space or "studio").strip().lower()
+    content = _product_space_content(normalized)
     return html.Div(
         children=[
-            html.Div("Espaço ativo", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#47665d"}),
-            html.H2(content["label"], style={"margin": "8px 0 6px"}),
-            html.Div(content["headline"], style={"fontWeight": 700, "lineHeight": "1.5"}),
+            html.Div(
+                style={"display": "flex", "justifyContent": "space-between", "gap": "12px", "alignItems": "flex-start", "flexWrap": "wrap"},
+                children=[
+                    html.Div(
+                        children=[
+                            html.Div("Espaço ativo", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#47665d"}),
+                            html.H2(content["label"], style={"margin": "8px 0 6px"}),
+                            html.Div(content["headline"], style={"fontWeight": 700, "lineHeight": "1.5"}),
+                        ]
+                    ),
+                    html.Div(
+                        children=[
+                            html.Div("Trocar espaço", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#47665d", "marginBottom": "8px"}),
+                            html.Div(
+                                style={"display": "flex", "gap": "8px", "flexWrap": "wrap"},
+                                children=[
+                                    _space_switcher_link("Studio", "studio", normalized),
+                                    _space_switcher_link("Runs", "runs", normalized),
+                                    _space_switcher_link("Decisão", "decision", normalized),
+                                    _space_switcher_link("Auditoria", "audit", normalized),
+                                ],
+                            ),
+                        ]
+                    ),
+                ],
+            ),
             html.P(content["description"], style={"margin": "10px 0 0", "lineHeight": "1.6"}),
             html.Div(
                 style={**UI_TWO_COLUMN_STYLE, "marginTop": "14px"},
                 children=[
-                    _guidance_card("O que resolver aqui", content["objective"]),
-                    _guidance_card("Antes de sair desta área", content["next_action"]),
+                    _guidance_card("O que esta área resolve", content["objective"]),
+                    _guidance_card("Condição de saída", content["next_action"]),
                 ],
             ),
         ]
@@ -2638,7 +2690,7 @@ def build_app(
                     html.Div(
                         id="product-space-banner",
                         children=render_product_space_banner("studio"),
-                        style={**UI_CARD_STYLE, "marginBottom": "18px"},
+                        style=UI_PERSISTENT_BANNER_STYLE,
                     ),
                     dcc.Tabs(
                         id="primary-navigation-tabs",
