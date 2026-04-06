@@ -4,18 +4,55 @@
   "hero_headline": "Studio, runs e decisão numa jornada única",
   "validation": {
     "command": "$env:PYTHONPATH='src;.'; .\\.venv\\Scripts\\python.exe -m pytest tests/decision_platform/test_ui_smoke.py -q -p no:cacheprovider --basetemp tests/_tmp/pytest-basetemp-ux-wave1-full",
-    "result": "36 passed in 411.60s"
+    "result": "42 passed in 490.28s (0:08:10)"
   },
+  "visible_tab_labels": [
+    "Studio",
+    "Runs",
+    "Decisão",
+    "Auditoria"
+  ],
+  "hero_navigation_links": [
+    "hero-open-studio-link",
+    "hero-open-runs-link",
+    "hero-open-decision-link",
+    "hero-open-audit-link"
+  ],
   "visible_tabs": [
     {
       "label": "Studio",
       "value": "studio",
-      "key_panels": [
-        "studio-readiness-panel",
-        "node-studio-summary-panel",
-        "edge-studio-summary-panel"
-      ],
+      "contains": {
+        "intro": true,
+        "decision_flow_panel": false,
+        "runs_open_decision_button": false,
+        "execution_open_decision_button": false,
+        "decision_open_runs_button": false,
+        "decision_open_audit_button": false,
+        "studio_focus_recommended_move_right_button": true,
+        "studio_focus_recommended_delete_edge_button": false
+      },
       "details": [
+        {
+          "summary": "Outros atalhos rápidos",
+          "component_ids": []
+        },
+        {
+          "summary": "Ações de edição do grafo",
+          "component_ids": []
+        },
+        {
+          "summary": "Campos técnicos do nó",
+          "component_ids": []
+        },
+        {
+          "summary": "Campos técnicos da conexão",
+          "component_ids": []
+        },
+        {
+          "summary": "Onde está a trilha técnica",
+          "component_ids": []
+        },
         {
           "summary": "Auditoria técnica do Studio",
           "component_ids": [
@@ -28,11 +65,16 @@
     {
       "label": "Runs",
       "value": "runs",
-      "key_panels": [
-        "run-jobs-overview-panel",
-        "run-job-detail-panel",
-        "execution-summary-panel"
-      ],
+      "contains": {
+        "intro": true,
+        "decision_flow_panel": false,
+        "runs_open_decision_button": true,
+        "execution_open_decision_button": true,
+        "decision_open_runs_button": false,
+        "decision_open_audit_button": false,
+        "studio_focus_recommended_move_right_button": false,
+        "studio_focus_recommended_delete_edge_button": false
+      },
       "details": [
         {
           "summary": "Auditoria técnica de runs",
@@ -42,23 +84,21 @@
             "execution-summary"
           ]
         }
-      ],
-      "primary_copy_markers": [
-        "Resumo executivo",
-        "Gate oficial",
-        "Erro operacional",
-        "Próxima ação"
       ]
     },
     {
       "label": "Decisão",
       "value": "decision",
-      "key_panels": [
-        "decision-summary-panel",
-        "catalog-state-summary-panel",
-        "selected-candidate-summary-panel",
-        "candidate-breakdown-panel"
-      ],
+      "contains": {
+        "intro": true,
+        "decision_flow_panel": true,
+        "runs_open_decision_button": false,
+        "execution_open_decision_button": false,
+        "decision_open_runs_button": true,
+        "decision_open_audit_button": true,
+        "studio_focus_recommended_move_right_button": false,
+        "studio_focus_recommended_delete_edge_button": false
+      },
       "details": [
         {
           "summary": "Ajustar pesos dinâmicos",
@@ -100,20 +140,21 @@
             "catalog-state-summary"
           ]
         }
-      ],
-      "primary_copy_markers": [
-        "Engine de avaliação",
-        "Motivo de inviabilidade",
-        "Qualidade bruta",
-        "Próxima ação"
       ]
     },
     {
       "label": "Auditoria",
       "value": "audit",
-      "key_panels": [
-        "bundle-io-summary-panel"
-      ],
+      "contains": {
+        "intro": true,
+        "decision_flow_panel": false,
+        "runs_open_decision_button": false,
+        "execution_open_decision_button": false,
+        "decision_open_runs_button": false,
+        "decision_open_audit_button": false,
+        "studio_focus_recommended_move_right_button": false,
+        "studio_focus_recommended_delete_edge_button": false
+      },
       "details": [
         {
           "summary": "JSON técnico do bundle",
@@ -124,24 +165,18 @@
       ]
     }
   ],
-  "visible_tab_labels": [
-    "Studio",
-    "Runs",
-    "Decisão",
-    "Auditoria"
+  "product_transitions": {
+    "studio_to_runs": true,
+    "runs_to_decision": true,
+    "execution_to_decision": true,
+    "decision_to_runs": true,
+    "decision_to_audit": true,
+    "studio_to_audit": true
+  },
+  "decision_markers": [
+    "decision-flow-panel",
+    "decision-open-runs-button",
+    "decision-open-audit-button"
   ],
-  "details_component_count": 10,
-  "navigation_overlay": {
-    "deep_link_tabs_supported": [
-      "studio",
-      "runs",
-      "decision",
-      "audit"
-    ],
-    "studio_navigation_markers": [
-      "Onde está a trilha técnica",
-      "Abrir orientação técnica",
-      "Ir para Auditoria"
-    ]
-  }
+  "details_component_count": 15
 }

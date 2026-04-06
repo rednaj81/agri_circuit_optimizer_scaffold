@@ -92,6 +92,18 @@ UI_BUTTON_STYLE = {
     "background": "#f5f8f4",
     "cursor": "pointer",
 }
+UI_NAV_LINK_STYLE = {
+    "display": "inline-flex",
+    "alignItems": "center",
+    "justifyContent": "center",
+    "padding": "10px 14px",
+    "borderRadius": "999px",
+    "border": "1px solid rgba(255, 255, 255, 0.22)",
+    "background": "rgba(255, 255, 255, 0.12)",
+    "color": "#f5f3ee",
+    "fontWeight": 700,
+    "textDecoration": "none",
+}
 UI_PILL_STYLE = {
     "display": "inline-flex",
     "alignItems": "center",
@@ -139,6 +151,10 @@ def _journey_step_card(step: str, title: str, description: str) -> Any:
             html.Div(description, style={"fontSize": "14px", "lineHeight": "1.5", "marginTop": "6px"}),
         ],
     )
+
+
+def _hero_navigation_link(label: str, href: str, component_id: str) -> Any:
+    return html.A(label, href=href, id=component_id, style=UI_NAV_LINK_STYLE)
 
 
 def _section_intro(title: str, description: str, *, state_hint: str | None = None, action_hint: str | None = None) -> Any:
@@ -801,6 +817,41 @@ def render_studio_focus_panel(
         focus_rules.append("Regra do foco: S não pode originar rotas; use este ponto apenas como destino final.")
     if any(float(route.get("dose_min_l") or 0.0) > 0 for route in relevant_routes):
         focus_rules.append("Regra do foco: rotas com dosagem exigem medição direta compatível.")
+    edge_breaks_direction_rule = str(selected_edge.get("to_node") or "").strip() == "W" or str(selected_edge.get("from_node") or "").strip() == "S"
+    dosing_without_measurement = any(
+        float(route.get("dose_min_l") or 0.0) > 0 and not _coerce_truthy(route.get("measurement_required"))
+        for route in relevant_routes
+    )
+    if edge_breaks_direction_rule and selected_edge_present:
+        recommended_action_text = "A conexão em foco viola uma regra estrutural do Studio. Remova essa conexão inválida para liberar a revisão do cenário."
+        recommended_action_button = html.Button(
+            "Remover conexão inválida",
+            id="studio-focus-recommended-delete-edge-button",
+            style=UI_BUTTON_STYLE,
+            disabled=False,
+        )
+    elif dosing_without_measurement:
+        recommended_action_text = "A rota em foco depende de medição direta e exige revisão detalhada. Abra a bancada completa para corrigir a estrutura sem mascarar a regra."
+        recommended_action_button = html.Button(
+            "Abrir bancada completa",
+            id="studio-focus-recommended-open-workbench-button",
+            style=UI_BUTTON_STYLE,
+        )
+    elif selected_node_present:
+        recommended_action_text = "O foco atual permite ajuste rápido de posição no canvas. Reposicione o nó sem sair da primeira dobra e abra a bancada completa só se precisar aprofundar."
+        recommended_action_button = html.Button(
+            "Mover à direita",
+            id="studio-focus-recommended-move-right-button",
+            style=UI_BUTTON_STYLE,
+            disabled=False,
+        )
+    else:
+        recommended_action_text = "Selecione um nó ou uma conexão no canvas para destravar as ações rápidas deste foco."
+        recommended_action_button = html.Button(
+            "Abrir bancada completa",
+            id="studio-focus-recommended-open-workbench-button",
+            style=UI_BUTTON_STYLE,
+        )
     node_next_action = (
         f"Revise as rotas ligadas a {selected_node_id} antes de ajustar posição ou nome."
         if relevant_routes
@@ -836,25 +887,29 @@ def render_studio_focus_panel(
             html.H4("Regras deste foco", style={"marginBottom": "6px", "marginTop": "14px"}),
             _bullet_list(focus_rules, "Nenhuma regra estrutural adicional foi acionada neste foco."),
             html.H4("Ações rápidas deste foco", style={"marginBottom": "6px", "marginTop": "14px"}),
-            html.P(
-                "Use os atalhos abaixo para corrigir o foco atual sem abrir imediatamente a bancada completa. A edição detalhada continua disponível logo abaixo.",
-                style={"marginTop": 0, "lineHeight": "1.6"},
-            ),
             html.Div(
-                style=UI_ACTION_ROW_STYLE,
+                style={**UI_MUTED_CARD_STYLE, "padding": "14px", "marginTop": "8px"},
                 children=[
-                    html.Button("Mover à esquerda", id="studio-focus-move-left-button", style=UI_BUTTON_STYLE, disabled=not selected_node_present),
-                    html.Button("Mover à direita", id="studio-focus-move-right-button", style=UI_BUTTON_STYLE, disabled=not selected_node_present),
-                    html.Button("Mover acima", id="studio-focus-move-up-button", style=UI_BUTTON_STYLE, disabled=not selected_node_present),
-                    html.Button("Mover abaixo", id="studio-focus-move-down-button", style=UI_BUTTON_STYLE, disabled=not selected_node_present),
-                ],
-            ),
-            html.Div(
-                style={**UI_ACTION_ROW_STYLE, "marginTop": "10px"},
-                children=[
-                    html.Button("Duplicar nó em foco", id="studio-focus-duplicate-node-button", style=UI_BUTTON_STYLE, disabled=not selected_node_present),
-                    html.Button("Excluir conexão em foco", id="studio-focus-delete-edge-button", style=UI_BUTTON_STYLE, disabled=not selected_edge_present),
-                    html.Button("Abrir bancada completa", id="studio-focus-open-workbench-button", style=UI_BUTTON_STYLE),
+                    html.Div("Ação sugerida agora", style={"fontWeight": 700, "marginBottom": "6px"}),
+                    html.P(recommended_action_text, style={"marginTop": 0, "lineHeight": "1.6"}),
+                    html.Div(style=UI_ACTION_ROW_STYLE, children=[recommended_action_button]),
+                    html.Details(
+                        style={"marginTop": "10px"},
+                        children=[
+                            html.Summary("Outros atalhos rápidos"),
+                            html.Div(
+                                style={**UI_ACTION_ROW_STYLE, "marginTop": "10px"},
+                                children=[
+                                    html.Button("Mover à esquerda", id="studio-focus-move-left-button", style=UI_BUTTON_STYLE, disabled=not selected_node_present),
+                                    html.Button("Mover acima", id="studio-focus-move-up-button", style=UI_BUTTON_STYLE, disabled=not selected_node_present),
+                                    html.Button("Mover abaixo", id="studio-focus-move-down-button", style=UI_BUTTON_STYLE, disabled=not selected_node_present),
+                                    html.Button("Duplicar nó em foco", id="studio-focus-duplicate-node-button", style=UI_BUTTON_STYLE, disabled=not selected_node_present),
+                                    html.Button("Excluir conexão em foco", id="studio-focus-delete-edge-button", style=UI_BUTTON_STYLE, disabled=not selected_edge_present),
+                                    html.Button("Abrir bancada completa", id="studio-focus-open-workbench-button", style=UI_BUTTON_STYLE),
+                                ],
+                            ),
+                        ],
+                    ),
                 ],
             ),
             html.H4("Próxima ação", style={"marginBottom": "6px", "marginTop": "14px"}),
@@ -965,7 +1020,10 @@ def render_runs_flow_panel(studio_summary: dict[str, Any], run_summary: dict[str
             html.Div(next_action, style={"lineHeight": "1.6", "fontWeight": 700}),
             html.Div(
                 style=UI_ACTION_ROW_STYLE,
-                children=[html.Button("Voltar ao Studio", id="runs-open-studio-button", style=UI_BUTTON_STYLE)],
+                children=[
+                    html.Button("Voltar ao Studio", id="runs-open-studio-button", style=UI_BUTTON_STYLE),
+                    html.Button("Ir para Decisão", id="runs-open-decision-button", style=UI_BUTTON_STYLE),
+                ],
             ),
         ]
     )
@@ -1051,6 +1109,10 @@ def render_execution_summary_panel(summary: dict[str, Any]) -> Any:
             ),
             html.H4("Próxima ação", style={"marginBottom": "6px", "marginTop": "14px"}),
             html.Div(next_action, style={"lineHeight": "1.6", "fontWeight": 700}),
+            html.Div(
+                style=UI_ACTION_ROW_STYLE,
+                children=[html.Button("Ir para Decisão", id="execution-open-decision-button", style=UI_BUTTON_STYLE)],
+            ),
         ]
     )
 
@@ -1103,6 +1165,44 @@ def render_candidate_summary_panel(summary: dict[str, Any]) -> Any:
                 ]
             ),
         ]
+    )
+
+
+def render_decision_flow_panel(summary: dict[str, Any]) -> Any:
+    candidate_id = str(summary.get("candidate_id") or "").strip()
+    runner_up_id = str(summary.get("runner_up_candidate_id") or "").strip()
+    decision_status = str(summary.get("decision_status") or ("technical_tie" if summary.get("technical_tie") else "winner_clear"))
+    if not candidate_id:
+        headline = "Ainda falta uma run confiável para abrir a leitura principal de decisão."
+        next_action = "Volte para Runs, revise a execução em foco e só então retorne para a decisão humana assistida."
+    elif decision_status == "technical_tie":
+        headline = "Winner e runner-up seguem próximos o suficiente para exigir leitura humana assistida."
+        next_action = "Mantenha a comparação aprofundada aberta, valide riscos e use Auditoria apenas se precisar reconciliar a trilha técnica."
+    else:
+        headline = "A execução atual já entrega um winner legível e um runner-up de referência."
+        next_action = "Confirme os sinais de risco, compare o runner-up e siga para Auditoria apenas se precisar aprofundar evidências técnicas."
+    return html.Div(
+        children=[
+            html.H3("Passagem Runs -> Decisão", style={"marginTop": 0}),
+            html.Div(headline, style={"fontWeight": 700, "lineHeight": "1.5"}),
+            html.Div(
+                style={**UI_THREE_COLUMN_STYLE, "marginTop": "12px"},
+                children=[
+                    _metric_card("Winner", candidate_id or "-"),
+                    _metric_card("Runner-up", runner_up_id or "-"),
+                    _metric_card("Estado", "technical tie" if decision_status == "technical_tie" else "winner clear"),
+                ],
+            ),
+            html.H4("Próxima ação", style={"marginBottom": "6px", "marginTop": "14px"}),
+            html.Div(next_action, style={"lineHeight": "1.6", "fontWeight": 700}),
+            html.Div(
+                style=UI_ACTION_ROW_STYLE,
+                children=[
+                    html.Button("Voltar para Runs", id="decision-open-runs-button", style=UI_BUTTON_STYLE),
+                    html.Button("Abrir Auditoria", id="decision-open-audit-button", style=UI_BUTTON_STYLE),
+                ],
+            ),
+        ],
     )
 
 
@@ -1405,6 +1505,15 @@ def build_app(
                                     _journey_step_card("4", "Auditoria", "Abrir a trilha técnica apenas quando precisar aprofundar."),
                                 ],
                             ),
+                            html.Div(
+                                style={**UI_ACTION_ROW_STYLE, "marginTop": "18px"},
+                                children=[
+                                    _hero_navigation_link("Abrir Studio", "?tab=studio", "hero-open-studio-link"),
+                                    _hero_navigation_link("Abrir Runs", "?tab=runs", "hero-open-runs-link"),
+                                    _hero_navigation_link("Abrir Decisão", "?tab=decision", "hero-open-decision-link"),
+                                    _hero_navigation_link("Abrir Auditoria", "?tab=audit", "hero-open-audit-link"),
+                                ],
+                            ),
                         ],
                     ),
                     dcc.Tabs(
@@ -1663,9 +1772,10 @@ def build_app(
                                 style=UI_TWO_COLUMN_STYLE,
                                 children=[
                                     html.Div(id="decision-signal-panel", children=render_decision_signal_panel(initial_official_summary), style=UI_CARD_STYLE),
-                                    html.Div(id="catalog-state-summary-panel", children=render_catalog_state_panel(_safe_json_loads(initial_catalog_summary)), style=UI_MUTED_CARD_STYLE),
+                                    html.Div(id="decision-flow-panel", children=render_decision_flow_panel(initial_official_summary), style=UI_MUTED_CARD_STYLE),
                                 ],
                             ),
+                            html.Div(id="catalog-state-summary-panel", children=render_catalog_state_panel(_safe_json_loads(initial_catalog_summary)), style={**UI_MUTED_CARD_STYLE, "marginTop": "16px"}),
                             html.Div(
                                 style=UI_CARD_STYLE,
                                 children=[
@@ -2154,6 +2264,7 @@ def build_app(
         Output("node-studio-selected-id", "data", allow_duplicate=True),
         Output("studio-status-message", "data", allow_duplicate=True),
         Input("node-studio-move-button", "n_clicks"),
+        Input("studio-focus-recommended-move-right-button", "n_clicks_timestamp"),
         Input("studio-focus-move-left-button", "n_clicks_timestamp"),
         Input("studio-focus-move-right-button", "n_clicks_timestamp"),
         Input("studio-focus-move-up-button", "n_clicks_timestamp"),
@@ -2166,6 +2277,7 @@ def build_app(
     )
     def _move_node_studio_selection(
         n_clicks: Any,
+        recommended_move_right_ts: Any,
         move_left_ts: Any,
         move_right_ts: Any,
         move_up_ts: Any,
@@ -2176,8 +2288,8 @@ def build_app(
         step: Any,
     ) -> tuple[list[dict[str, Any]], str | None, str]:
         quick_move_timestamps = {
+            "right": max(_timestamp_or_zero(recommended_move_right_ts), _timestamp_or_zero(move_right_ts)),
             "left": _timestamp_or_zero(move_left_ts),
-            "right": _timestamp_or_zero(move_right_ts),
             "up": _timestamp_or_zero(move_up_ts),
             "down": _timestamp_or_zero(move_down_ts),
         }
@@ -2417,6 +2529,7 @@ def build_app(
         Output("edge-studio-selected-id", "data", allow_duplicate=True),
         Output("studio-status-message", "data", allow_duplicate=True),
         Input("edge-studio-delete-button", "n_clicks"),
+        Input("studio-focus-recommended-delete-edge-button", "n_clicks"),
         Input("studio-focus-delete-edge-button", "n_clicks"),
         State("candidate-links-grid", "rowData"),
         State("edge-studio-selected-id", "data"),
@@ -2427,10 +2540,14 @@ def build_app(
     ) -> tuple[list[dict[str, Any]], str | None, str]:
         if len(callback_args) == 3:
             n_clicks, candidate_links_rows, selected_link_id = callback_args
+            recommended_delete_clicks = 0
+            quick_delete_clicks = 0
+        elif len(callback_args) == 4:
+            n_clicks, recommended_delete_clicks, candidate_links_rows, selected_link_id = callback_args
             quick_delete_clicks = 0
         else:
-            n_clicks, quick_delete_clicks, candidate_links_rows, selected_link_id = callback_args
-        if not n_clicks and not quick_delete_clicks:
+            n_clicks, recommended_delete_clicks, quick_delete_clicks, candidate_links_rows, selected_link_id = callback_args
+        if not n_clicks and not recommended_delete_clicks and not quick_delete_clicks:
             return candidate_links_rows or [], selected_link_id, ""
         updated_rows, next_selected_link_id = delete_edge_studio_selection(
             candidate_links_rows or [],
@@ -2440,11 +2557,12 @@ def build_app(
 
     @app.callback(
         Output("studio-editor-workbench", "open"),
+        Input("studio-focus-recommended-open-workbench-button", "n_clicks"),
         Input("studio-focus-open-workbench-button", "n_clicks"),
         prevent_initial_call=True,
     )
-    def _open_studio_editor_workbench(n_clicks: Any) -> bool:
-        return bool(n_clicks)
+    def _open_studio_editor_workbench(recommended_n_clicks: Any, n_clicks: Any) -> bool:
+        return bool(recommended_n_clicks or n_clicks)
 
     @app.callback(
         Output("run-jobs-summary", "children", allow_duplicate=True),
@@ -3119,14 +3237,21 @@ def build_app(
         Input("studio-open-audit-button", "n_clicks_timestamp"),
         Input("studio-open-runs-button", "n_clicks_timestamp"),
         Input("runs-open-studio-button", "n_clicks_timestamp"),
+        Input("runs-open-decision-button", "n_clicks_timestamp"),
+        Input("execution-open-decision-button", "n_clicks_timestamp"),
+        Input("decision-open-runs-button", "n_clicks_timestamp"),
+        Input("decision-open-audit-button", "n_clicks_timestamp"),
         State("primary-navigation-tabs", "value"),
-        prevent_initial_call=True,
     )
     def _open_audit_from_studio(
         search: str | None,
         open_audit_ts: Any,
         open_runs_ts: Any,
         open_studio_ts: Any,
+        runs_open_decision_ts: Any,
+        execution_open_decision_ts: Any,
+        decision_open_runs_ts: Any,
+        decision_open_audit_ts: Any,
         current_tab: str | None,
     ) -> str:
         latest_click = max(
@@ -3134,6 +3259,10 @@ def build_app(
                 (_timestamp_or_zero(open_audit_ts), "audit"),
                 (_timestamp_or_zero(open_runs_ts), "runs"),
                 (_timestamp_or_zero(open_studio_ts), "studio"),
+                (_timestamp_or_zero(runs_open_decision_ts), "decision"),
+                (_timestamp_or_zero(execution_open_decision_ts), "decision"),
+                (_timestamp_or_zero(decision_open_runs_ts), "runs"),
+                (_timestamp_or_zero(decision_open_audit_ts), "audit"),
             ],
             key=lambda item: item[0],
         )
@@ -3179,6 +3308,7 @@ def build_app(
         Output("decision-summary-panel-extended", "children"),
         Output("decision-contrast-panel", "children"),
         Output("decision-signal-panel", "children"),
+        Output("decision-flow-panel", "children"),
         Output("catalog-state-summary-panel", "children"),
         Output("selected-candidate-summary-panel", "children"),
         Output("candidate-breakdown-panel", "children"),
@@ -3192,13 +3322,14 @@ def build_app(
         catalog_text: str | None,
         candidate_text: str | None,
         breakdown_text: str | None,
-    ) -> tuple[Any, Any, Any, Any, Any, Any, Any]:
+    ) -> tuple[Any, Any, Any, Any, Any, Any, Any, Any]:
         official_payload = _safe_json_loads(official_text)
         return (
             render_decision_summary_panel(official_payload),
             render_decision_summary_panel(official_payload),
             render_decision_contrast_panel(official_payload),
             render_decision_signal_panel(official_payload),
+            render_decision_flow_panel(official_payload),
             render_catalog_state_panel(_safe_json_loads(catalog_text)),
             render_candidate_summary_panel(_safe_json_loads(candidate_text)),
             render_candidate_breakdown_panel(_safe_json_loads(breakdown_text)),

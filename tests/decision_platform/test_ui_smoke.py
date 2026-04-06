@@ -27,6 +27,7 @@ from decision_platform.ui_dash.app import (
     render_candidate_breakdown_panel,
     render_candidate_summary_panel,
     render_decision_contrast_panel,
+    render_decision_flow_panel,
     render_decision_signal_panel,
     render_decision_summary_panel,
     render_execution_summary_panel,
@@ -175,6 +176,10 @@ def test_dash_app_surfaces_only_four_primary_product_spaces() -> None:
         app = build_app("data/decision_platform/maquete_v2")
 
     assert _visible_tab_labels(app.layout) == ["Studio", "Runs", "Decisão", "Auditoria"]
+    assert _find_component_by_id(app.layout, "hero-open-studio-link") is not None
+    assert _find_component_by_id(app.layout, "hero-open-runs-link") is not None
+    assert _find_component_by_id(app.layout, "hero-open-decision-link") is not None
+    assert _find_component_by_id(app.layout, "hero-open-audit-link") is not None
 
 
 def test_studio_tab_surfaces_readiness_and_selection_context() -> None:
@@ -197,8 +202,8 @@ def test_studio_tab_surfaces_readiness_and_selection_context() -> None:
     assert _find_component_by_id(studio_tab, "studio-open-technical-guide-button") is not None
     assert _find_component_by_id(studio_tab, "studio-open-audit-button") is not None
     assert _find_component_by_id(studio_tab, "studio-open-runs-button") is not None
+    assert _find_component_by_id(studio_tab, "studio-focus-recommended-move-right-button") is not None
     assert _find_component_by_id(studio_tab, "studio-focus-move-left-button") is not None
-    assert _find_component_by_id(studio_tab, "studio-focus-move-right-button") is not None
     assert _find_component_by_id(studio_tab, "studio-focus-duplicate-node-button") is not None
     assert _find_component_by_id(studio_tab, "studio-focus-delete-edge-button") is not None
     assert _find_component_by_id(studio_tab, "studio-focus-open-workbench-button") is not None
@@ -246,10 +251,14 @@ def test_studio_discovery_callbacks_open_guide_and_audit_tab() -> None:
     open_navigation_callback = _get_callback(app, input_id="studio-open-audit-button")
 
     assert open_guide_callback(1, False) is True
-    assert open_navigation_callback("?tab=runs", 30, 20, 10, "studio") == "audit"
-    assert open_navigation_callback("?tab=decision", 0, 40, 0, "studio") == "runs"
-    assert open_navigation_callback("?tab=decision", 0, 40, 50, "runs") == "studio"
-    assert open_navigation_callback("?tab=decision", 0, 0, 0, "studio") == "decision"
+    assert open_navigation_callback("?tab=runs", 30, 20, 10, 0, 0, 0, 0, "studio") == "audit"
+    assert open_navigation_callback("?tab=decision", 0, 40, 0, 0, 0, 0, 0, "studio") == "runs"
+    assert open_navigation_callback("?tab=decision", 0, 0, 50, 0, 0, 0, 0, "runs") == "studio"
+    assert open_navigation_callback("?tab=studio", 0, 0, 0, 60, 0, 0, 0, "runs") == "decision"
+    assert open_navigation_callback("?tab=studio", 0, 0, 0, 0, 70, 0, 0, "runs") == "decision"
+    assert open_navigation_callback("?tab=decision", 0, 0, 0, 0, 0, 80, 0, "decision") == "runs"
+    assert open_navigation_callback("?tab=decision", 0, 0, 0, 0, 0, 0, 90, "decision") == "audit"
+    assert open_navigation_callback("?tab=decision", 0, 0, 0, 0, 0, 0, 0, "studio") == "decision"
 
 
 def test_primary_tab_from_search_accepts_known_main_spaces() -> None:
@@ -269,6 +278,9 @@ def test_decision_tab_contains_advanced_sections_without_extra_primary_tabs() ->
     assert _find_component_by_id(decision_tab, "decision-summary-panel") is not None
     assert _find_component_by_id(decision_tab, "decision-contrast-panel") is not None
     assert _find_component_by_id(decision_tab, "decision-signal-panel") is not None
+    assert _find_component_by_id(decision_tab, "decision-flow-panel") is not None
+    assert _find_component_by_id(decision_tab, "decision-open-runs-button") is not None
+    assert _find_component_by_id(decision_tab, "decision-open-audit-button") is not None
     assert _find_component_by_id(decision_tab, "compare-candidates-dropdown") is not None
     assert _find_component_by_id(decision_tab, "comparison-figure") is not None
     assert _find_component_by_id(decision_tab, "selected-candidate-dropdown") is not None
@@ -285,6 +297,8 @@ def test_runs_tab_combines_queue_and_execution_summary() -> None:
     assert _find_component_by_id(runs_tab, "runs-flow-panel") is not None
     assert _find_component_by_id(runs_tab, "execution-summary-panel") is not None
     assert _find_component_by_id(runs_tab, "runs-open-studio-button") is not None
+    assert _find_component_by_id(runs_tab, "runs-open-decision-button") is not None
+    assert _find_component_by_id(runs_tab, "execution-open-decision-button") is not None
     assert _find_component_by_id(runs_tab, "run-button") is not None
 
 
@@ -372,16 +386,41 @@ def test_studio_focus_panel_uses_canvas_selection_as_primary_context() -> None:
     assert "Rotas ligadas ao nó" in panel_text
     assert "Regras deste foco" in panel_text
     assert "Ações rápidas deste foco" in panel_text
+    assert "Ação sugerida agora" in panel_text
     assert "W não pode receber rotas entrando" in panel_text
     assert "rotas com dosagem exigem medição direta compatível" in panel_text
     assert "Revise as rotas ligadas a W" in panel_text
+    assert _find_component_by_id(panel, "studio-focus-recommended-move-right-button") is not None
     assert _find_component_by_id(panel, "studio-focus-move-left-button") is not None
-    assert _find_component_by_id(panel, "studio-focus-move-right-button") is not None
     assert _find_component_by_id(panel, "studio-focus-move-up-button") is not None
     assert _find_component_by_id(panel, "studio-focus-move-down-button") is not None
     assert _find_component_by_id(panel, "studio-focus-duplicate-node-button") is not None
     assert _find_component_by_id(panel, "studio-focus-delete-edge-button") is not None
     assert _find_component_by_id(panel, "studio-focus-open-workbench-button") is not None
+
+
+def test_studio_focus_panel_prioritizes_recommended_action_for_invalid_edge() -> None:
+    panel = render_studio_focus_panel(
+        {
+            "selected_node_id": "P1",
+            "business_label": "Bomba principal",
+            "role_label": "Bomba principal",
+        },
+        {
+            "selected_link_id": "L900",
+            "business_label": "Ligação inválida",
+            "selected_edge": {"from_node": "P1", "to_node": "W"},
+            "from_label": "Bomba principal",
+            "to_label": "Tanque de água",
+        },
+        [],
+    )
+    panel_text = _collect_text_content(panel)
+
+    assert "Ação sugerida agora" in panel_text
+    assert "Remover conexão inválida" in panel_text
+    assert "viola uma regra estrutural" in panel_text
+    assert _find_component_by_id(panel, "studio-focus-recommended-delete-edge-button") is not None
 
 
 def test_runs_flow_panel_reflects_studio_gate_and_queue_state() -> None:
@@ -401,6 +440,7 @@ def test_runs_flow_panel_reflects_studio_gate_and_queue_state() -> None:
 
     assert "Passagem Studio -> Runs" in panel_text
     assert "Voltar ao Studio" in panel_text
+    assert "Ir para Decisão" in panel_text
     assert "run-003" in panel_text
     assert "conectividade" in panel_text.lower()
 
@@ -437,6 +477,26 @@ def test_primary_runs_panels_hide_raw_backend_keys_in_main_surface() -> None:
     assert "Erro operacional:" in execution_text
     assert "Próxima ação" in detail_text
     assert "Próxima ação" in execution_text
+    assert "Ir para Decisão" in execution_text
+
+
+def test_decision_flow_panel_makes_transition_and_next_action_explicit() -> None:
+    panel = render_decision_flow_panel(
+        {
+            "candidate_id": "cand-01",
+            "runner_up_candidate_id": "cand-02",
+            "decision_status": "technical_tie",
+            "technical_tie": True,
+        }
+    )
+    panel_text = _collect_text_content(panel)
+
+    assert "Passagem Runs -> Decisão" in panel_text
+    assert "cand-01" in panel_text
+    assert "cand-02" in panel_text
+    assert "Voltar para Runs" in panel_text
+    assert "Abrir Auditoria" in panel_text
+    assert "leitura humana assistida" in panel_text.lower()
 
 
 def test_primary_decision_panels_hide_raw_metric_keys_in_main_surface() -> None:
@@ -897,13 +957,15 @@ def test_studio_callbacks_round_trip_structural_edits_through_ui_flow() -> None:
 
         bundle = load_scenario_bundle(scenario_dir)
         create_node_callback = _get_callback(app, input_id="node-studio-create-button")
-        duplicate_node_callback = _get_callback(app, input_id="node-studio-duplicate-button")
+        quick_move_callback = _get_callback(app, input_id="studio-focus-recommended-move-right-button")
+        quick_duplicate_node_callback = _get_callback(app, input_id="studio-focus-duplicate-node-button")
         apply_node_callback = _get_callback(app, input_id="node-studio-apply-button")
         delete_node_callback = _get_callback(app, input_id="node-studio-delete-button")
         sync_node_callback = _get_callback(app, output_prefix="..node-studio-selected-id.data")
         create_edge_callback = _get_callback(app, input_id="edge-studio-create-button")
         apply_edge_callback = _get_callback(app, input_id="edge-studio-apply-button")
-        delete_edge_callback = _get_callback(app, input_id="edge-studio-delete-button")
+        quick_delete_edge_callback = _get_callback(app, input_id="studio-focus-recommended-delete-edge-button")
+        open_workbench_callback = _get_callback(app, input_id="studio-focus-open-workbench-button")
         sync_edge_callback = _get_callback(app, output_prefix="..edge-studio-selected-id.data")
         refresh_studio_callback = _get_callback(app, output_prefix="..node-studio-cytoscape.elements")
         save_callback = _get_callback(app, input_id="save-reopen-bundle-button")
@@ -939,7 +1001,24 @@ def test_studio_callbacks_round_trip_structural_edits_through_ui_flow() -> None:
         )
         assert status == ""
 
-        nodes_rows, duplicated_node_id, status = duplicate_node_callback(1, nodes_rows, created_node_id)
+        nodes_rows, moved_node_id, status = quick_move_callback(
+            0,
+            1,
+            0,
+            0,
+            0,
+            0,
+            nodes_rows,
+            created_node_id,
+            "right",
+            0.02,
+        )
+        assert status == ""
+        moved_row = next(row for row in nodes_rows if row["node_id"] == created_node_id)
+        assert moved_node_id == created_node_id
+        assert moved_row["x_m"] == pytest.approx(0.83)
+
+        nodes_rows, duplicated_node_id, status = quick_duplicate_node_callback(0, 1, nodes_rows, created_node_id)
         assert status == ""
         synced_duplicated_node = sync_node_callback(nodes_rows, {"id": duplicated_node_id}, created_node_id)
         assert synced_duplicated_node[0] == duplicated_node_id
@@ -997,6 +1076,7 @@ def test_studio_callbacks_round_trip_structural_edits_through_ui_flow() -> None:
         assert node_summary["selected_node_id"] != created_node_id
         assert edge_summary["selected_link_id"] == created_link_id
         assert any(str(element["data"].get("id", "")).startswith("route:") for element in elements if "source" in element["data"])
+        assert open_workbench_callback(0, 1) is True
 
         created_callback_result = save_callback(
             1,
@@ -1036,8 +1116,10 @@ def test_studio_callbacks_round_trip_structural_edits_through_ui_flow() -> None:
         assert blocked_selected_node_id == created_node_id
         assert "requires explicit reconciliation" in blocked_delete_status
 
-        candidate_links_rows, next_edge_selected_id, status = delete_edge_callback(
+        candidate_links_rows, next_edge_selected_id, status = quick_delete_edge_callback(
+            0,
             1,
+            0,
             created_callback_result[4],
             created_link_id,
         )

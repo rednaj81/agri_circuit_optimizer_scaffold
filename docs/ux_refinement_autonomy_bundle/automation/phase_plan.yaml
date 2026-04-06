@@ -1,0 +1,82 @@
+mode: ux_refinement
+max_waves: 10
+stop_after_consecutive_low_value: 3
+final_polish_cycles: 1
+
+phases:
+  - id: ux_phase_1
+    name: Navigation and information architecture cleanup
+    focus:
+      - main navigation
+      - screen purpose clarity
+      - reduction of noisy technical surfaces
+      - market-grade product shell
+    expected_outcomes:
+      - clearer IA
+      - fewer ambiguous entry points
+      - better main user path
+      - less console-like feel
+
+  - id: ux_phase_2
+    name: Studio refinement and connectivity-first workflow
+    focus:
+      - business graph only
+      - node/edge editing UX
+      - direct manipulation on canvas
+      - properties panel
+      - mandatory routes
+      - pre-run validation
+      - connectivity guidance
+    expected_outcomes:
+      - scenario readiness clarity
+      - fewer preventable invalid runs
+      - studio no longer exposes technical graph internals
+
+  - id: ux_phase_3
+    name: Runs queue and execution UX
+    focus:
+      - queue readability
+      - run statuses
+      - progress
+      - run detail view
+      - scenario/run separation
+    expected_outcomes:
+      - clean understanding of background processing
+
+  - id: ux_phase_4
+    name: Decision view and technical tie support
+    focus:
+      - official candidate
+      - runner-up
+      - side-by-side comparison
+      - technical tie
+      - manual final choice
+    expected_outcomes:
+      - clearer decision-making
+      - final view focused on business-relevant topology only
+
+  - id: ux_phase_5
+    name: Polish, consistency and documentation
+    focus:
+      - labels
+      - empty states
+      - consistency
+      - docs
+      - validation checklist
+    expected_outcomes:
+      - professional finish
+
+wave_journal:
+  - wave: 1
+    phase_id: ux_phase_1
+    status: completed
+    summary:
+      - four main product spaces reinforced with hero deep links and product-first tab hierarchy
+      - studio focus panel now prioritizes a single recommended action before exposing extra shortcuts
+      - runs and decision surfaces now expose explicit transitions instead of relying on tab discovery
+      - raw technical payloads remain behind disclosure blocks on the primary surfaces
+    evidence:
+      handoff: docs/2026-04-05_phase_ux_refinement_wave1_handoff.md
+      ui_snapshot: docs/2026-04-05_phase_ux_refinement_wave1_ui_snapshot.json
+      validation_command: "$env:PYTHONPATH='src;.'; .\\.venv\\Scripts\\python.exe -m pytest tests/decision_platform/test_ui_smoke.py -q -p no:cacheprovider --basetemp tests/_tmp/pytest-basetemp-ux-wave1-current"
+      validation_result: "42 passed in 480.30s (0:08:00)"
