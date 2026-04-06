@@ -119,6 +119,24 @@ UI_NAV_LINK_STYLE = {
     "fontWeight": 700,
     "textDecoration": "none",
 }
+UI_JOURNEY_PANEL_STYLE = {
+    **UI_CARD_STYLE,
+    "marginBottom": "18px",
+}
+UI_JOURNEY_CARD_STYLE = {
+    **UI_MUTED_CARD_STYLE,
+    "padding": "16px",
+    "display": "grid",
+    "gap": "10px",
+    "height": "100%",
+}
+UI_JOURNEY_CARD_ACTIVE_STYLE = {
+    **UI_JOURNEY_CARD_STYLE,
+    "background": "linear-gradient(135deg, rgba(16, 59, 53, 0.95) 0%, rgba(31, 92, 81, 0.92) 100%)",
+    "border": "1px solid rgba(16, 59, 53, 0.24)",
+    "color": "#f5f3ee",
+    "boxShadow": "0 18px 36px rgba(16, 59, 53, 0.18)",
+}
 UI_PILL_STYLE = {
     "display": "inline-flex",
     "alignItems": "center",
@@ -191,6 +209,23 @@ def _guidance_card(label: str, text: str) -> Any:
     )
 
 
+def _journey_card_status_pill(label: str, *, active: bool) -> Any:
+    if active:
+        style = {
+            "display": "inline-flex",
+            "alignItems": "center",
+            "padding": "6px 10px",
+            "borderRadius": "999px",
+            "fontSize": "12px",
+            "fontWeight": 700,
+            "background": "rgba(255, 255, 255, 0.14)",
+            "color": "#f5f3ee",
+        }
+    else:
+        style = UI_PILL_STYLE
+    return html.Span(label, style=style)
+
+
 def _screen_opening_panel(
     title: str,
     headline: str,
@@ -253,6 +288,171 @@ def _product_space_content(space: str | None) -> dict[str, str]:
         "objective": "Deixar o cenário claro o suficiente para seguir para Runs sem depender da trilha técnica como superfície principal.",
         "next_action": "Resolva readiness, projeção e foco do canvas antes de abrir a fila.",
     }
+
+
+def _journey_space_state(space: str, studio_summary: dict[str, Any], run_summary: dict[str, Any], decision_summary: dict[str, Any]) -> dict[str, str]:
+    if space == "studio":
+        status = str(studio_summary.get("status") or "needs_attention")
+        blocker_count = int(studio_summary.get("blocker_count", 0) or 0)
+        warning_count = int(studio_summary.get("warning_count", 0) or 0)
+        if status == "ready":
+            state_label = "Pronto para Runs"
+        elif blocker_count:
+            state_label = "Bloqueios no cenário"
+        elif warning_count:
+            state_label = "Readiness parcial"
+        else:
+            state_label = "Montagem em andamento"
+        return {
+            "purpose": "Montar o cenário no grafo de negócio e liberar o gate principal de readiness.",
+            "state_label": state_label,
+            "state_text": str(studio_summary.get("readiness_headline") or "A leitura principal ainda depende de revisão estrutural no Studio."),
+            "next_action": str((studio_summary.get("next_steps") or ["Revise o readiness e a projeção do cenário antes de abrir a fila."])[0]),
+            "href": "?tab=studio",
+        }
+    if space == "runs":
+        next_queued_run_id = str(run_summary.get("next_queued_run_id") or "").strip()
+        active_run_ids = [str(item) for item in run_summary.get("active_run_ids", []) if str(item).strip()]
+        failed_count = int((run_summary.get("status_counts") or {}).get("failed", 0) or 0)
+        run_count = int(run_summary.get("run_count", 0) or 0)
+        if active_run_ids:
+            state_label = "Execução em andamento"
+            state_text = f"Há uma run em andamento agora ({active_run_ids[0]})."
+            next_action = "Acompanhe a execução em foco antes de abrir outra rodada ou avançar para Decisão."
+        elif next_queued_run_id:
+            state_label = "Fila pronta"
+            state_text = f"A próxima run da fila é {next_queued_run_id}."
+            next_action = "Revise a fila e execute apenas a próxima rodada necessária."
+        elif failed_count and run_count:
+            state_label = "Histórico exige revisão"
+            state_text = "A fila está sem pendências, mas ainda há falhas recentes no histórico."
+            next_action = "Abra a run em foco e revise o bloqueio antes de reenfileirar."
+        elif run_count:
+            state_label = "Histórico disponível"
+            state_text = "A fila local está livre e já existe histórico suficiente para leitura operacional."
+            next_action = "Use a run em foco para decidir se já vale abrir a Decisão ou executar outra rodada."
+        else:
+            state_label = "Sem runs"
+            state_text = "Nenhuma run foi registrada ainda para este cenário."
+            next_action = "Enfileire o cenário atual quando o Studio estiver pronto."
+        return {
+            "purpose": "Ler fila, execução atual e último resumo executivo sem depender de logs brutos.",
+            "state_label": state_label,
+            "state_text": state_text,
+            "next_action": next_action,
+            "href": "?tab=runs",
+        }
+    if space == "decision":
+        decision_state = _decision_primary_state(decision_summary)
+        return {
+            "purpose": "Comparar winner, runner-up e technical tie com leitura humana assistida.",
+            "state_label": decision_state["state_label"],
+            "state_text": decision_state["headline"],
+            "next_action": decision_state["next_action"],
+            "href": "?tab=decision",
+        }
+    return {
+        "purpose": "Reconciliar bundle, contrato e trilha técnica fora da superfície principal.",
+        "state_label": "Trilha técnica",
+        "state_text": "Persistência do bundle, YAMLs e tabelas completas continuam preservadas para reconciliação.",
+        "next_action": "Abra esta área apenas quando a leitura principal de Studio, Runs ou Decisão não for suficiente.",
+        "href": "?tab=audit",
+    }
+
+
+def _journey_space_card(
+    *,
+    space: str,
+    title: str,
+    active_tab: str | None,
+    studio_summary: dict[str, Any],
+    run_summary: dict[str, Any],
+    decision_summary: dict[str, Any],
+) -> Any:
+    state = _journey_space_state(space, studio_summary, run_summary, decision_summary)
+    is_active = str(active_tab or "studio") == space
+    card_style = UI_JOURNEY_CARD_ACTIVE_STYLE if is_active else UI_JOURNEY_CARD_STYLE
+    muted_color = "#d9ece5" if is_active else "#5b756d"
+    return html.Div(
+        id=f"product-journey-card-{space}",
+        style=card_style,
+        children=[
+            html.Div(
+                style={"display": "flex", "justifyContent": "space-between", "gap": "10px", "alignItems": "center", "flexWrap": "wrap"},
+                children=[
+                    html.Div(title, style={"fontSize": "20px", "fontWeight": 700}),
+                    _journey_card_status_pill("Espaço ativo" if is_active else "Espaço principal", active=is_active),
+                ],
+            ),
+            html.Div(state["purpose"], style={"lineHeight": "1.6", "color": muted_color if is_active else "#496158"}),
+            html.Div("Estado atual", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": muted_color}),
+            html.Div(state["state_label"], style={"fontWeight": 700, "fontSize": "18px", "lineHeight": "1.4"}),
+            html.Div(state["state_text"], style={"lineHeight": "1.6"}),
+            html.Div("Próxima ação", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": muted_color}),
+            html.Div(state["next_action"], style={"lineHeight": "1.6", "fontWeight": 700}),
+            _button_link(
+                f"Abrir {title}",
+                state["href"],
+                f"product-journey-open-{space}-link",
+                primary=is_active,
+            ),
+        ],
+    )
+
+
+def render_product_journey_panel(
+    active_tab: str | None,
+    studio_summary: dict[str, Any],
+    run_summary: dict[str, Any],
+    decision_summary: dict[str, Any],
+) -> Any:
+    return html.Div(
+        children=[
+            html.Div("Jornada principal", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#47665d"}),
+            html.H2("Escolha a próxima área pelo estado do produto", style={"margin": "8px 0 6px"}),
+            html.P(
+                "A navegação principal agora mostra Studio, Runs, Decisão e Auditoria como uma jornada única. Cada área resume objetivo, estado atual e próxima ação antes dos detalhes técnicos.",
+                style={"margin": "0 0 14px", "lineHeight": "1.6"},
+            ),
+            html.Div(
+                style=UI_TWO_COLUMN_STYLE,
+                children=[
+                    _journey_space_card(
+                        space="studio",
+                        title="Studio",
+                        active_tab=active_tab,
+                        studio_summary=studio_summary,
+                        run_summary=run_summary,
+                        decision_summary=decision_summary,
+                    ),
+                    _journey_space_card(
+                        space="runs",
+                        title="Runs",
+                        active_tab=active_tab,
+                        studio_summary=studio_summary,
+                        run_summary=run_summary,
+                        decision_summary=decision_summary,
+                    ),
+                    _journey_space_card(
+                        space="decision",
+                        title="Decisão",
+                        active_tab=active_tab,
+                        studio_summary=studio_summary,
+                        run_summary=run_summary,
+                        decision_summary=decision_summary,
+                    ),
+                    _journey_space_card(
+                        space="audit",
+                        title="Auditoria",
+                        active_tab=active_tab,
+                        studio_summary=studio_summary,
+                        run_summary=run_summary,
+                        decision_summary=decision_summary,
+                    ),
+                ],
+            ),
+        ]
+    )
 
 
 def render_product_space_banner(space: str | None) -> Any:
@@ -1064,28 +1264,65 @@ def render_studio_canvas_guidance_panel(
     selected_edge_id = str(edge_summary.get("selected_link_id") or "").strip()
     selected_node_label = str(node_summary.get("business_label") or selected_node_id or "").strip()
     selected_edge_label = str(edge_summary.get("business_label") or selected_edge_id or "").strip()
+    blocker_count = int(summary.get("blocker_count", 0) or 0)
+    warning_count = int(summary.get("warning_count", 0) or 0)
+    selected_edge = edge_summary.get("selected_edge") or {}
     if selected_edge_id and selected_edge_label:
         current_focus = f"Conexão em foco: {selected_edge_label}."
         canvas_action = "Revise a conexão selecionada no canvas e abra a bancada completa só se precisar ajustar famílias, comprimento ou estrutura."
+        if str(selected_edge.get("to_node") or "").strip() == "W":
+            local_blocker = "Bloqueio local: esta conexão ainda entra em W e precisa ter a direção corrigida neste foco."
+        elif str(selected_edge.get("from_node") or "").strip() == "S":
+            local_blocker = "Bloqueio local: esta conexão ainda sai de S e precisa ter a direção corrigida neste foco."
+        elif blocker_count > 0:
+            local_blocker = "Bloqueio local: use esta conexão para destravar a conectividade principal antes de abrir Runs."
+        elif warning_count > 0:
+            local_blocker = "Aviso local: feche esta revisão no canvas antes de avançar para Runs."
+        else:
+            local_blocker = "Nada neste foco impede Runs; use a conexão para confirmar fluxo, comprimento e famílias sugeridas."
+        primary_button_label = "Abrir bancada desta conexão"
     elif selected_node_id and selected_node_label:
         current_focus = f"Entidade em foco: {selected_node_label}."
         canvas_action = "Use a entidade selecionada para reposicionar, revisar conectividade e validar o papel dela antes de abrir Runs."
+        if blocker_count > 0:
+            local_blocker = "Bloqueio local: este nó ajuda a localizar a próxima correção estrutural no grafo principal."
+        elif warning_count > 0:
+            local_blocker = "Aviso local: confirme as conexões deste nó antes de enfileirar uma nova run."
+        else:
+            local_blocker = "Este nó já pode ser usado como ponto de conferência final antes de abrir Runs."
+        primary_button_label = "Abrir bancada desta entidade"
     else:
         current_focus = "Nenhum foco ativo no canvas."
         canvas_action = "Clique em uma entidade ou conexão do grafo para abrir o contexto principal desta revisão."
+        local_blocker = "Sem foco local: selecione um trecho do grafo para destravar conectividade, completude e readiness a partir do canvas."
+        primary_button_label = "Abrir bancada completa"
+    runs_label = (
+        "Ir para Runs"
+        if str(summary.get("status") or "").strip().lower() == "ready"
+        else "Ir para Runs quando o cenário estiver pronto"
+    )
     return html.Div(
         style={**UI_MUTED_CARD_STYLE, "padding": "14px", "marginBottom": "14px"},
         children=[
             html.Div("Comece pelo canvas", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
             html.Div(current_focus, style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"}),
             html.Div(
-                style={**UI_TWO_COLUMN_STYLE, "marginTop": "12px"},
+                style={**UI_THREE_COLUMN_STYLE, "marginTop": "12px"},
                 children=[
                     _guidance_card("Ação principal agora", canvas_action),
+                    _guidance_card("Bloqueio ou liberação local", local_blocker),
                     _guidance_card(
                         "Gate para Runs",
                         str(summary.get("readiness_headline") or "Revise o readiness do cenário antes de abrir a fila."),
                     ),
+                ],
+            ),
+            html.Div(
+                style={**UI_ACTION_ROW_STYLE, "marginTop": "12px"},
+                children=[
+                    html.Button(primary_button_label, id="studio-canvas-open-workbench-button", style=UI_BUTTON_STYLE),
+                    html.Button("Abrir orientação deste foco", id="studio-canvas-open-technical-guide-button", style=UI_BUTTON_STYLE),
+                    _button_link(runs_label, "?tab=runs", "studio-canvas-open-runs-link", primary=str(summary.get("status") or "").strip().lower() == "ready"),
                 ],
             ),
         ],
@@ -2316,6 +2553,16 @@ def build_app(
                         ],
                     ),
                     html.Div(
+                        id="product-journey-panel",
+                        children=render_product_journey_panel(
+                            "studio",
+                            initial_studio_readiness,
+                            initial_run_jobs_snapshot["summary"],
+                            initial_official_summary,
+                        ),
+                        style=UI_JOURNEY_PANEL_STYLE,
+                    ),
+                    html.Div(
                         id="product-space-banner",
                         children=render_product_space_banner("studio"),
                         style={**UI_CARD_STYLE, "marginBottom": "18px"},
@@ -3369,12 +3616,13 @@ def build_app(
 
     @app.callback(
         Output("studio-editor-workbench", "open"),
+        Input("studio-canvas-open-workbench-button", "n_clicks"),
         Input("studio-focus-recommended-open-workbench-button", "n_clicks"),
         Input("studio-focus-open-workbench-button", "n_clicks"),
         prevent_initial_call=True,
     )
-    def _open_studio_editor_workbench(recommended_n_clicks: Any, n_clicks: Any) -> bool:
-        return bool(recommended_n_clicks or n_clicks)
+    def _open_studio_editor_workbench(canvas_n_clicks: Any, recommended_n_clicks: Any, n_clicks: Any) -> bool:
+        return bool(canvas_n_clicks or recommended_n_clicks or n_clicks)
 
     @app.callback(
         Output("run-jobs-summary", "children", allow_duplicate=True),
@@ -4034,12 +4282,13 @@ def build_app(
 
     @app.callback(
         Output("studio-technical-guide", "open"),
+        Input("studio-canvas-open-technical-guide-button", "n_clicks"),
         Input("studio-open-technical-guide-button", "n_clicks"),
         State("studio-technical-guide", "open"),
         prevent_initial_call=True,
     )
-    def _open_studio_technical_guide(n_clicks: Any, is_open: bool | None) -> bool:
-        if not n_clicks:
+    def _open_studio_technical_guide(canvas_n_clicks: Any, n_clicks: Any, is_open: bool | None) -> bool:
+        if not canvas_n_clicks and not n_clicks:
             return bool(is_open)
         return True
 
@@ -4071,6 +4320,31 @@ def build_app(
         if search:
             return _primary_tab_from_search(search, default=str(current_tab or "studio"))
         return str(current_tab or "studio")
+
+    @app.callback(
+        Output("product-journey-panel", "children"),
+        Input("primary-navigation-tabs", "value"),
+        Input("nodes-grid", "rowData"),
+        Input("candidate-links-grid", "rowData"),
+        Input("routes-grid", "rowData"),
+        Input("run-jobs-summary", "children"),
+        Input("official-candidate-summary", "children"),
+    )
+    def _refresh_product_journey_panel(
+        current_tab: str | None,
+        nodes_rows: list[dict[str, Any]] | None,
+        candidate_links_rows: list[dict[str, Any]] | None,
+        route_rows: list[dict[str, Any]] | None,
+        run_jobs_summary_text: str | None,
+        decision_summary_text: str | None,
+    ) -> Any:
+        studio_summary = build_studio_readiness_summary(nodes_rows or [], candidate_links_rows or [], route_rows or [])
+        return render_product_journey_panel(
+            current_tab,
+            studio_summary,
+            _safe_json_loads(run_jobs_summary_text),
+            _safe_json_loads(decision_summary_text),
+        )
 
     @app.callback(
         Output("product-space-banner", "children"),

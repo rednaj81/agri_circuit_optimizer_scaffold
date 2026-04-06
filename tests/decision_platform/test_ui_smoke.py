@@ -36,6 +36,7 @@ from decision_platform.ui_dash.app import (
     render_decision_signal_panel,
     render_decision_summary_panel,
     render_execution_summary_panel,
+    render_product_journey_panel,
     render_product_space_banner,
     render_run_job_detail_panel,
     render_run_jobs_overview_panel,
@@ -186,6 +187,15 @@ def test_dash_app_surfaces_only_four_primary_product_spaces() -> None:
         app = build_app("data/decision_platform/maquete_v2")
 
     assert _visible_tab_labels(app.layout) == ["Studio", "Runs", "Decisão", "Auditoria"]
+    assert _find_component_by_id(app.layout, "product-journey-panel") is not None
+    assert _find_component_by_id(app.layout, "product-journey-card-studio") is not None
+    assert _find_component_by_id(app.layout, "product-journey-card-runs") is not None
+    assert _find_component_by_id(app.layout, "product-journey-card-decision") is not None
+    assert _find_component_by_id(app.layout, "product-journey-card-audit") is not None
+    assert _find_component_by_id(app.layout, "product-journey-open-studio-link") is not None
+    assert _find_component_by_id(app.layout, "product-journey-open-runs-link") is not None
+    assert _find_component_by_id(app.layout, "product-journey-open-decision-link") is not None
+    assert _find_component_by_id(app.layout, "product-journey-open-audit-link") is not None
     assert _find_component_by_id(app.layout, "product-space-banner") is not None
     assert _find_component_by_id(app.layout, "hero-open-studio-link") is not None
     assert _find_component_by_id(app.layout, "hero-open-runs-link") is not None
@@ -211,6 +221,43 @@ def test_product_space_banner_uses_consistent_product_language_for_each_space() 
     assert "Trilha canônica e evidência técnica" in audit_banner
 
 
+def test_product_journey_panel_summarizes_all_primary_spaces() -> None:
+    panel_text = _collect_text_content(
+        render_product_journey_panel(
+            "runs",
+            {
+                "status": "ready",
+                "readiness_headline": "O cenário está pronto para seguir para Runs.",
+                "next_steps": ["Abra a fila para validar a próxima rodada."],
+            },
+            {
+                "run_count": 2,
+                "next_queued_run_id": "run-002",
+                "active_run_ids": [],
+                "status_counts": {"completed": 1, "failed": 0},
+            },
+            {
+                "candidate_id": "cand-01",
+                "runner_up_candidate_id": "cand-02",
+                "decision_status": "technical_tie",
+                "technical_tie": True,
+                "feasible": True,
+            },
+        )
+    )
+
+    assert "Jornada principal" in panel_text
+    assert "Escolha a próxima área pelo estado do produto" in panel_text
+    assert "Studio" in panel_text
+    assert "Pronto para Runs" in panel_text
+    assert "Runs" in panel_text
+    assert "Fila pronta" in panel_text
+    assert "Decisão" in panel_text
+    assert "Empate técnico" in panel_text
+    assert "Auditoria" in panel_text
+    assert "Trilha técnica" in panel_text
+
+
 def test_product_space_banner_callback_tracks_active_primary_tab() -> None:
     with diagnostic_runtime_test_mode():
         app = build_app("data/decision_platform/maquete_v2")
@@ -227,6 +274,28 @@ def test_product_space_banner_callback_tracks_active_primary_tab() -> None:
     assert "Auditoria" in audit_text
 
 
+def test_product_journey_panel_callback_tracks_active_primary_tab_and_state() -> None:
+    with diagnostic_runtime_test_mode():
+        app = build_app("data/decision_platform/maquete_v2")
+
+    callback = _get_callback(app, output_prefix="product-journey-panel.children")
+    journey_text = _collect_text_content(
+        callback(
+            "decision",
+            [{"node_id": "S", "node_type": "water_tank", "x_m": 0.0, "y_m": 0.0}],
+            [],
+            [],
+            json.dumps({"run_count": 0, "status_counts": {}, "active_run_ids": []}, ensure_ascii=False),
+            json.dumps({}, ensure_ascii=False),
+        )
+    )
+
+    assert "Espaço ativo" in journey_text
+    assert "Decisão" in journey_text
+    assert "Sem decisão utilizável" in journey_text
+    assert "Sem runs" in journey_text
+
+
 def test_studio_tab_surfaces_readiness_and_selection_context() -> None:
     with diagnostic_runtime_test_mode():
         app = build_app("data/decision_platform/maquete_v2")
@@ -234,6 +303,9 @@ def test_studio_tab_surfaces_readiness_and_selection_context() -> None:
     studio_tab = _find_tab_by_label(app.layout, "Studio")
     assert studio_tab is not None
     assert _find_component_by_id(studio_tab, "studio-canvas-guidance-panel") is not None
+    assert _find_component_by_id(studio_tab, "studio-canvas-open-workbench-button") is not None
+    assert _find_component_by_id(studio_tab, "studio-canvas-open-technical-guide-button") is not None
+    assert _find_component_by_id(studio_tab, "studio-canvas-open-runs-link") is not None
     assert _find_component_by_id(studio_tab, "studio-readiness-panel") is not None
     assert _find_component_by_id(studio_tab, "studio-status-banner") is not None
     assert _find_component_by_id(studio_tab, "studio-projection-coverage-panel") is not None
@@ -288,11 +360,40 @@ def test_studio_canvas_guidance_panel_keeps_canvas_as_primary_entry() -> None:
 
     assert "Comece pelo canvas" in without_focus_text
     assert "Nenhum foco ativo no canvas." in without_focus_text
+    assert "Bloqueio ou liberação local" in without_focus_text
     assert "Clique em uma entidade ou conexão do grafo" in without_focus_text
     assert "Gate para Runs" in without_focus_text
+    assert "Abrir bancada completa" in without_focus_text
     assert "Conexão em foco: Bomba -> Misturador." in with_edge_focus_text
     assert "abra a bancada completa só se precisar ajustar famílias" in with_edge_focus_text.lower()
+    assert "Abrir bancada desta conexão" in with_edge_focus_text
+    assert "Abrir orientação deste foco" in with_edge_focus_text
     assert "Cenário pronto para seguir para Runs." in with_edge_focus_text
+
+
+def test_studio_canvas_guidance_panel_surfaces_contextual_blocker_and_runs_gate() -> None:
+    panel = render_studio_canvas_guidance_panel(
+        {
+            "status": "needs_attention",
+            "blocker_count": 1,
+            "warning_count": 0,
+            "readiness_headline": "Ainda há bloqueios estruturais impedindo a passagem segura para Runs.",
+        },
+        {
+            "selected_node_id": "",
+            "business_label": "",
+        },
+        {
+            "selected_link_id": "L900",
+            "business_label": "Produto 1 -> W",
+            "selected_edge": {"from_node": "P1", "to_node": "W"},
+        },
+    )
+    panel_text = _collect_text_content(panel)
+
+    assert "Bloqueio local" in panel_text
+    assert "entra em W" in panel_text
+    assert "Ir para Runs quando o cenário estiver pronto" in panel_text
 
 
 def test_studio_primary_canvas_hides_internal_and_hub_nodes() -> None:
@@ -336,7 +437,7 @@ def test_studio_discovery_callbacks_open_guide_and_audit_tab() -> None:
     open_guide_callback = _get_callback(app, input_id="studio-open-technical-guide-button")
     open_navigation_callback = _get_callback(app, input_id="studio-open-audit-button")
 
-    assert open_guide_callback(1, False) is True
+    assert open_guide_callback(0, 1, False) is True
     assert open_navigation_callback("?tab=runs", 30, 20, 10, "studio") == "audit"
     assert open_navigation_callback("?tab=decision", 0, 40, 0, "studio") == "runs"
     assert open_navigation_callback("?tab=studio", 0, 0, 50, "runs") == "decision"
@@ -801,6 +902,14 @@ def test_studio_selection_panel_distinguishes_node_and_edge_editing_guidance() -
     assert "Use este resumo para preparar a revisão desta conexão" in edge_text
     assert "Fluxo principal: Bomba principal -> Misturador" in edge_text
     assert "Revise direção, comprimento e famílias sugeridas" in edge_text
+
+
+def test_canvas_context_button_opens_studio_workbench() -> None:
+    with diagnostic_runtime_test_mode():
+        app = build_app("data/decision_platform/maquete_v2")
+
+    callback = _get_callback(app, output_prefix="studio-editor-workbench.open")
+    assert callback(1, None, None) is True
 
 
 def test_decision_flow_panel_makes_transition_and_next_action_explicit() -> None:
@@ -1611,7 +1720,7 @@ def test_studio_callbacks_round_trip_structural_edits_through_ui_flow() -> None:
         assert node_summary["selected_node_id"] != created_node_id
         assert edge_summary["selected_link_id"] == created_link_id
         assert any(str(element["data"].get("id", "")).startswith("route:") for element in elements if "source" in element["data"])
-        assert open_workbench_callback(0, 1) is True
+        assert open_workbench_callback(0, 0, 1) is True
 
         created_callback_result = save_callback(
             1,
