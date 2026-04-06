@@ -1729,6 +1729,108 @@ def _studio_workspace_focus_summary(
     }
 
 
+def _studio_workspace_quick_edit_cards(node_summary: dict[str, Any], edge_summary: dict[str, Any]) -> list[Any]:
+    selected_node = node_summary.get("selected_node") or {}
+    selected_edge_row = edge_summary.get("selected_edge") or {}
+    selected_node_present = bool(str(node_summary.get("selected_node_id") or "").strip())
+    selected_edge_present = bool(edge_summary.get("selected_edge"))
+    return [
+        html.Div(
+            style={**UI_MUTED_CARD_STYLE, "padding": "14px"},
+            children=[
+                html.Div("Entidade em foco", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+                html.Div(
+                    "Atualize o rótulo visível desta entidade sem sair da leitura principal do Studio."
+                    if selected_node_present
+                    else "Selecione um nó no canvas para liberar a edição direta do rótulo principal.",
+                    style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"},
+                ),
+                _field_block(
+                    "Rótulo visível",
+                    dcc.Input(
+                        id="studio-focus-node-label",
+                        type="text",
+                        value=str(selected_node.get("label") or node_summary.get("business_label") or ""),
+                        disabled=not selected_node_present,
+                        persistence=True,
+                        persistence_type="session",
+                        style={"width": "100%"},
+                    ),
+                ),
+                html.Div(
+                    style=UI_ACTION_ROW_STYLE,
+                    children=[
+                        html.Button(
+                            "Aplicar rótulo direto no canvas",
+                            id="studio-focus-node-apply-button",
+                            style=UI_BUTTON_STYLE,
+                            disabled=not selected_node_present,
+                        ),
+                    ],
+                ),
+            ],
+        ),
+        html.Div(
+            style={**UI_MUTED_CARD_STYLE, "padding": "14px"},
+            children=[
+                html.Div("Conexão em foco", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+                html.Div(
+                    "Ajuste comprimento, famílias sugeridas ou direção sem abrir a bancada completa."
+                    if selected_edge_present
+                    else "Selecione uma conexão no canvas para liberar os ajustes rápidos deste trecho.",
+                    style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"},
+                ),
+                html.Div(
+                    style=UI_TWO_COLUMN_STYLE,
+                    children=[
+                        _field_block(
+                            "Comprimento (m)",
+                            dcc.Input(
+                                id="studio-focus-edge-length-m",
+                                type="number",
+                                value=selected_edge_row.get("length_m"),
+                                disabled=not selected_edge_present,
+                                persistence=True,
+                                persistence_type="session",
+                                style={"width": "100%"},
+                            ),
+                        ),
+                        _field_block(
+                            "Famílias sugeridas",
+                            dcc.Input(
+                                id="studio-focus-edge-family-hint",
+                                type="text",
+                                value=str(selected_edge_row.get("family_hint") or ""),
+                                disabled=not selected_edge_present,
+                                persistence=True,
+                                persistence_type="session",
+                                style={"width": "100%"},
+                            ),
+                        ),
+                    ],
+                ),
+                html.Div(
+                    style=UI_ACTION_ROW_STYLE,
+                    children=[
+                        html.Button(
+                            "Aplicar conexão",
+                            id="studio-focus-edge-apply-button",
+                            style=UI_BUTTON_STYLE,
+                            disabled=not selected_edge_present,
+                        ),
+                        html.Button(
+                            "Inverter direção",
+                            id="studio-focus-edge-reverse-button",
+                            style=UI_BUTTON_STYLE,
+                            disabled=not selected_edge_present,
+                        ),
+                    ],
+                ),
+            ],
+        ),
+    ]
+
+
 def render_studio_workspace_panel(
     studio_summary: dict[str, Any],
     node_summary: dict[str, Any],
@@ -1758,6 +1860,11 @@ def render_studio_workspace_panel(
         },
     )
     top_issue = issues[0] if issues else "Nenhum bloqueio ou aviso domina a leitura atual do cenário."
+    connection_lines = list(business_flow.get("connection_lines") or [])
+    connection_preview = connection_lines[0] if connection_lines else "Ainda não há trecho de suprimento legível na camada principal."
+    selected_node_present = bool(str(node_summary.get("selected_node_id") or "").strip())
+    selected_edge_present = bool(edge_summary.get("selected_edge"))
+    quick_edit_cards = _studio_workspace_quick_edit_cards(node_summary, edge_summary)
     runs_enabled = status == "ready"
     runs_button_label = "Ir para Runs" if runs_enabled else "Runs bloqueado neste estado"
     primary_actions: list[Any]
@@ -1784,8 +1891,9 @@ def render_studio_workspace_panel(
             html.Div(
                 style={**UI_THREE_COLUMN_STYLE, "marginBottom": "12px"},
                 children=[
-                    _guidance_card("Foco atual", focus_summary["label"]),
-                    _guidance_card("Passagem para Runs", "Liberada" if runs_enabled else "Ainda bloqueada"),
+                    _guidance_card("Seleção atual", focus_summary["headline"]),
+                    _guidance_card("Conectividade em foco", connection_preview),
+                    _guidance_card("Readiness local", top_issue),
                     _guidance_card("Próxima ação", str(studio_summary.get("primary_action") or focus_summary["recommended_action"])),
                 ],
             ),
@@ -1796,6 +1904,32 @@ def render_studio_workspace_panel(
                     html.Div(top_issue, style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"}),
                     html.Div(focus_summary["headline"], style={"lineHeight": "1.6", "marginTop": "10px"}),
                     html.Div(focus_summary["recommended_action"], style={"lineHeight": "1.6", "marginTop": "10px", "fontWeight": 700}),
+                ],
+            ),
+            html.Div(
+                id="studio-workspace-quick-edit-panel",
+                style={**UI_MUTED_CARD_STYLE, "padding": "12px", "marginBottom": "12px"},
+                children=[
+                    html.Div("Ajustes locais do canvas", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+                    html.Div(
+                        "Use estes controles rápidos para ajustes rotineiros sem abrir a bancada avançada."
+                        if selected_node_present or selected_edge_present
+                        else "Selecione um nó ou uma conexão no canvas para destravar os ajustes rápidos locais.",
+                        style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"},
+                    ),
+                    html.Div(style={**UI_TWO_COLUMN_STYLE, "marginTop": "12px"}, children=quick_edit_cards),
+                    html.Div(
+                        id="studio-workspace-local-actions-panel",
+                        style={**UI_ACTION_ROW_STYLE, "marginTop": "12px"},
+                        children=[
+                            html.Button("Mover à esquerda", id="studio-focus-move-left-button", style=UI_BUTTON_STYLE, disabled=not selected_node_present),
+                            html.Button("Mover acima", id="studio-focus-move-up-button", style=UI_BUTTON_STYLE, disabled=not selected_node_present),
+                            html.Button("Mover abaixo", id="studio-focus-move-down-button", style=UI_BUTTON_STYLE, disabled=not selected_node_present),
+                            html.Button("Duplicar nó em foco", id="studio-focus-duplicate-node-button", style=UI_BUTTON_STYLE, disabled=not selected_node_present),
+                            html.Button("Excluir conexão em foco", id="studio-focus-delete-edge-button", style=UI_BUTTON_STYLE, disabled=not selected_edge_present),
+                            html.Button("Abrir bancada completa", id="studio-focus-open-workbench-button", style=UI_BUTTON_STYLE),
+                        ],
+                    ),
                 ],
             ),
             html.Div(
@@ -2484,101 +2618,6 @@ def render_studio_focus_panel(
     readiness_background, readiness_color = _status_tone(readiness_summary.get("status") or "needs_attention")
     selected_node = node_summary.get("selected_node") or {}
     selected_edge_row = edge_summary.get("selected_edge") or {}
-    quick_edit_cards = [
-        html.Div(
-            style={**UI_MUTED_CARD_STYLE, "padding": "14px"},
-            children=[
-                html.Div("Entidade em foco", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
-                html.Div(
-                    "Atualize o rótulo visível desta entidade sem sair da primeira dobra."
-                    if selected_node_present
-                    else "Selecione um nó no canvas para liberar a edição direta do rótulo principal.",
-                    style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"},
-                ),
-                _field_block(
-                    "Rótulo visível",
-                    dcc.Input(
-                        id="studio-focus-node-label",
-                        type="text",
-                        value=str(selected_node.get("label") or node_summary.get("business_label") or ""),
-                        disabled=not selected_node_present,
-                        persistence=True,
-                        persistence_type="session",
-                        style={"width": "100%"},
-                    ),
-                ),
-                html.Div(
-                    style=UI_ACTION_ROW_STYLE,
-                    children=[
-                        html.Button(
-                            "Aplicar rótulo direto no canvas",
-                            id="studio-focus-node-apply-button",
-                            style=UI_BUTTON_STYLE,
-                            disabled=not selected_node_present,
-                        ),
-                    ],
-                ),
-            ],
-        ),
-        html.Div(
-            style={**UI_MUTED_CARD_STYLE, "padding": "14px"},
-            children=[
-                html.Div("Conexão em foco", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
-                html.Div(
-                    "Ajuste comprimento, famílias sugeridas ou direção sem abrir a bancada completa."
-                    if selected_edge_present
-                    else "Selecione uma conexão no canvas para liberar os ajustes rápidos deste trecho.",
-                    style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"},
-                ),
-                html.Div(
-                    style=UI_TWO_COLUMN_STYLE,
-                    children=[
-                        _field_block(
-                            "Comprimento (m)",
-                            dcc.Input(
-                                id="studio-focus-edge-length-m",
-                                type="number",
-                                value=selected_edge_row.get("length_m"),
-                                disabled=not selected_edge_present,
-                                persistence=True,
-                                persistence_type="session",
-                                style={"width": "100%"},
-                            ),
-                        ),
-                        _field_block(
-                            "Famílias sugeridas",
-                            dcc.Input(
-                                id="studio-focus-edge-family-hint",
-                                type="text",
-                                value=str(selected_edge_row.get("family_hint") or ""),
-                                disabled=not selected_edge_present,
-                                persistence=True,
-                                persistence_type="session",
-                                style={"width": "100%"},
-                            ),
-                        ),
-                    ],
-                ),
-                html.Div(
-                    style=UI_ACTION_ROW_STYLE,
-                    children=[
-                        html.Button(
-                            "Aplicar conexão",
-                            id="studio-focus-edge-apply-button",
-                            style=UI_BUTTON_STYLE,
-                            disabled=not selected_edge_present,
-                        ),
-                        html.Button(
-                            "Inverter direção",
-                            id="studio-focus-edge-reverse-button",
-                            style=UI_BUTTON_STYLE,
-                            disabled=not selected_edge_present,
-                        ),
-                    ],
-                ),
-            ],
-        ),
-    ]
     return html.Div(
         id="studio-focus-panel",
         children=[
@@ -2636,7 +2675,16 @@ def render_studio_focus_panel(
                 ],
             ),
             html.H4("Edição direta deste foco", style={"marginBottom": "6px", "marginTop": "14px"}),
-            html.Div(style={**UI_TWO_COLUMN_STYLE, "marginTop": "8px"}, children=quick_edit_cards),
+            html.Div(
+                style={**UI_MUTED_CARD_STYLE, "padding": "14px", "marginTop": "8px"},
+                children=[
+                    html.Div("Controles rápidos já estão no primeiro fold do Studio.", style={"fontWeight": 700, "lineHeight": "1.5"}),
+                    html.Div(
+                        "Use o painel local ao lado do canvas para editar rótulo, comprimento, famílias, direção e movimentos comuns sem abrir a bancada avançada.",
+                        style={"lineHeight": "1.6", "marginTop": "8px"},
+                    ),
+                ],
+            ),
             html.H4("Por que este foco importa", style={"marginBottom": "6px", "marginTop": "14px"}),
             _bullet_list(support_items + context_highlights[1:], "Sem foco atual registrado."),
             html.H4("Ações rápidas deste foco", style={"marginBottom": "6px", "marginTop": "14px"}),
@@ -2646,23 +2694,6 @@ def render_studio_focus_panel(
                     html.Div("Ação sugerida agora", style={"fontWeight": 700, "marginBottom": "6px"}),
                     html.P(recommended_action_text, style={"marginTop": 0, "lineHeight": "1.6"}),
                     html.Div(style=UI_ACTION_ROW_STYLE, children=[recommended_action_button]),
-                    html.Details(
-                        style={"marginTop": "10px"},
-                        children=[
-                            html.Summary("Outros atalhos rápidos"),
-                            html.Div(
-                                style={**UI_ACTION_ROW_STYLE, "marginTop": "10px"},
-                                children=[
-                                    html.Button("Mover à esquerda", id="studio-focus-move-left-button", style=UI_BUTTON_STYLE, disabled=not selected_node_present),
-                                    html.Button("Mover acima", id="studio-focus-move-up-button", style=UI_BUTTON_STYLE, disabled=not selected_node_present),
-                                    html.Button("Mover abaixo", id="studio-focus-move-down-button", style=UI_BUTTON_STYLE, disabled=not selected_node_present),
-                                    html.Button("Duplicar nó em foco", id="studio-focus-duplicate-node-button", style=UI_BUTTON_STYLE, disabled=not selected_node_present),
-                                    html.Button("Excluir conexão em foco", id="studio-focus-delete-edge-button", style=UI_BUTTON_STYLE, disabled=not selected_edge_present),
-                                    html.Button("Abrir bancada completa", id="studio-focus-open-workbench-button", style=UI_BUTTON_STYLE),
-                                ],
-                            ),
-                        ],
-                    ),
                 ],
             ),
             html.H4("Próxima ação", style={"marginBottom": "6px", "marginTop": "14px"}),

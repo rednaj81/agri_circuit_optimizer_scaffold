@@ -1,12 +1,12 @@
 {
-  "wave": "ux_phase_1_wave_1",
+  "wave": "ux_phase_2_wave_1",
   "validation": {
-    "full": "86 passed in 600.45s (0:10:00)"
+    "full": "87 passed in 491.58s (0:08:11)"
   },
   "visual_evidence": {
     "type": "structured_ui_snapshot",
     "screenshot_attempt": "not_attempted_in_this_wave_run",
-    "note": "Structured snapshot generated from the Dash layout, Studio focus panel and direct-edit callbacks for the current worktree state."
+    "note": "Structured snapshot generated from the current Dash layout plus workspace/focus direct-edit panels and quick-edit callbacks."
   },
   "shell": {
     "visible_primary_spaces": [
@@ -17,6 +17,8 @@
     ],
     "layout_presence": {
       "studio-workspace-panel": true,
+      "studio-workspace-quick-edit-panel": true,
+      "studio-workspace-local-actions-panel": true,
       "studio-context-detailed-panels": true,
       "studio-focus-node-label": true,
       "studio-focus-node-apply-button": true,
@@ -30,19 +32,17 @@
     }
   },
   "studio_first_fold": {
-    "quick_edit_controls": [
-      "studio-focus-node-label",
-      "studio-focus-node-apply-button",
-      "studio-focus-edge-length-m",
-      "studio-focus-edge-family-hint",
-      "studio-focus-edge-apply-button",
-      "studio-focus-edge-reverse-button"
+    "workspace_markers": [
+      "Ajustes locais do canvas",
+      "Use estes controles rápidos para ajustes rotineiros sem abrir a bancada avançada.",
+      "Quem supre quem na camada principal"
     ],
-    "panel_copy_markers": [
-      "Edição direta deste foco",
-      "Atualize o rótulo visível desta entidade sem sair da primeira dobra.",
-      "Ajuste comprimento, famílias sugeridas ou direção sem abrir a bancada completa."
-    ]
+    "focus_markers": [
+      "Controles rápidos já estão no primeiro fold do Studio.",
+      "Use o painel local ao lado do canvas para editar rótulo, comprimento, famílias, direção e movimentos comuns sem abrir a bancada avançada."
+    ],
+    "workspace_panel_text_excerpt": "Leitura do cenárioExige atençãoA conexão L900 termina em W e ainda bloqueia a passagem para Runs.Seleção atualConexão em foco: Tanque de água -> Bomba principal.Conectividade em focoProduto 1 supre Misturador (rota obrigatória, rotas R004).Readiness localA conexão L900 termina em W e ainda bloqueia a passagem para Runs.Próxima açãoCorrigir no canvasO que precisa de atenção agoraA conexão L900 termina em W e ainda bloqueia a passagem para Runs.Conexão em foco: Tanque de água -> Bomba principal.Confira comprimento, direção e famílias sugeridas da conexão L013.Ajustes locais do canvasUse estes controles rápidos para ajustes rotineiros sem abrir a bancada avançada.Entidade em focoAtualize o rótulo visível desta entidade sem sair da leitura principal do Studio.Rótulo visívelAplicar rótulo direto no canvasConexão em focoAjuste comprimento, famílias sugeridas ou direção sem abrir a bancada completa.Comprimento (m)Famílias sugeridasAplicar conexãoInverter direçãoMover à esquerdaMover acimaMover abaixoDuplicar nó em focoExcluir conexão em focoAbrir bancada completaQuem supre quem na camada principalProduto 1 é suprido por Incorporador e supre Misturador e Saída externa.Escopo desta leituraProduto 1É suprido porIncorporadorSupreMisturador e Saída externaTrechos de negócio já legíveisProduto 1 supre Misturador (rota obrigatória, rotas R004).Incorporador supre Produto 1 (rotas R010).Produto 1 supre Saída externa (rotas R014).Bloqueios1Impedem liberar a passagem para Runs.Avisos1Pedem revisão antes de enfileirar.Rotas obrigatórias2Base mínima da conectividade principal.Corrigir no canvasRuns bloqueado neste estadoAbrir AuditoriaSinal de saída desta áreaCorrija o fluxo principal antes de abrir Runs.Sem alerta operacional no momento.",
+    "focus_panel_text_excerpt": "Foco do canvasSem alerta operacional no momento.Conexão em focoA conexão selecionada concentra o próximo ajuste do fluxo.Exige atençãoEste foco ainda convive com bloqueios antes de Runs.Problema ou oportunidadeUsar a seleção atual para validar conectividade, regras obrigatórias e readiness sem sair do canvas.Próxima açãoA conexão em foco já concentra a leitura deste trecho. Revise o fluxo no canvas e abra a bancada completa apenas se precisar ajustar comprimento, famílias ou direção.Nó em focoBomba principalConexão em focoTanque de água para Bomba principalRotas ligadas ao nó3ReadinessExige atençãoRelações de negócio deste focoProduto 1 é suprido por Incorporador e supre Misturador e Saída externa.É suprido porIncorporadorSupreMisturador e Saída externaÓrfãos visíveisNenhum nó órfão domina a leitura principal.Trechos ligados a este focoProduto 1 supre Misturador (rota obrigatória, rotas R004).Incorporador supre Produto 1 (rotas R010).Produto 1 supre Saída externa (rotas R014).Edição direta deste focoControles rápidos já estão no primeiro fold do Studio.Use o painel local ao lado do canvas para editar rótulo, comprimento, famílias, direção e movimentos comuns sem abrir a bancada avançada.Por que este foco importaNó em foco: Tanque de produto na superfície principal.Conexão em foco: Tanque de água -> Bomba principal.Rotas deste foco: 1 obrigatória(s), 3 com dosagem, 3 com medição direta.Regra do foco: rotas com dosagem exigem medição direta compatível.Regra do foco: 1 rota(s) obrigatória(s) passam por esta leitura e precisam permanecer legíveis no canvas.O cenário ainda tem 1 bloqueio(s) antes de Runs, mesmo que este foco não concentre todos eles.Ações rápidas deste focoAção sugerida agoraA conexão em foco já concentra a leitura deste trecho. Revise o fluxo no canvas e abra a bancada completa apenas se precisar ajustar comprimento, famílias ou direção.Abrir bancada completaPróxima açãoA conexão em foco já concentra a leitura deste trecho. Revise o fluxo no canvas e abra a bancada completa apenas se precisar ajustar comprimento, famílias ou direção.Confira comprimento e famílias sugeridas para a conexão L013."
   },
   "callback_outcomes": {
     "node_quick_edit": {
@@ -65,6 +65,6 @@
   },
   "residual_risks": [
     "visual screenshot evidence is still unavailable because this wave used structured UI evidence only",
-    "the repository worktree still contains unrelated agent and supervisor overlay changes outside this implementation commit"
+    "the local workspace still contains unrelated agent/supervisor overlay changes outside this wave commit scope"
   ]
 }

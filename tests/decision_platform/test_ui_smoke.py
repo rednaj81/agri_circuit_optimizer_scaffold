@@ -416,6 +416,8 @@ def test_studio_tab_surfaces_readiness_and_selection_context() -> None:
     assert _find_component_by_id(studio_tab, "studio-canvas-open-technical-guide-button") is not None
     assert _find_component_by_id(studio_tab, "studio-canvas-open-runs-link") is not None
     assert _find_component_by_id(studio_tab, "studio-workspace-panel") is not None
+    assert _find_component_by_id(studio_tab, "studio-workspace-quick-edit-panel") is not None
+    assert _find_component_by_id(studio_tab, "studio-workspace-local-actions-panel") is not None
     assert _find_component_by_id(studio_tab, "studio-context-detailed-panels") is not None
     assert _find_component_by_id(studio_tab, "studio-workspace-open-workbench-button") is not None
     assert _find_component_by_id(studio_tab, "studio-workspace-open-runs-button") is not None
@@ -550,18 +552,29 @@ def test_studio_workspace_panel_unifies_focus_connectivity_and_runs_gate() -> No
     panel_text = _collect_text_content(panel)
 
     assert "Leitura do cenário" in panel_text
-    assert "Foco atual" in panel_text
-    assert "Passagem para Runs" in panel_text
-    assert "Ainda bloqueada" in panel_text
+    assert "Seleção atual" in panel_text
+    assert "Conectividade em foco" in panel_text
+    assert "Readiness local" in panel_text
     assert "A conexão L900 termina em W" in panel_text
     assert "Quem supre quem na camada principal" in panel_text
     assert "Bomba principal é suprido por Tanque de água e supre Misturador." in panel_text
     assert "Tanque de água supre Bomba principal." in panel_text
     assert "Bomba principal" in panel_text
+    assert "Ajustes locais do canvas" in panel_text
     assert "Corrigir no canvas" in panel_text
     assert "Runs bloqueado neste estado" in panel_text
     assert getattr(_find_component_by_id(panel, "studio-workspace-open-runs-button"), "disabled", None) is True
     assert _find_component_by_id(panel, "studio-business-flow-panel") is not None
+    assert _find_component_by_id(panel, "studio-focus-node-label") is not None
+    assert _find_component_by_id(panel, "studio-focus-node-apply-button") is not None
+    assert _find_component_by_id(panel, "studio-focus-edge-length-m") is not None
+    assert _find_component_by_id(panel, "studio-focus-edge-family-hint") is not None
+    assert _find_component_by_id(panel, "studio-focus-edge-apply-button") is not None
+    assert _find_component_by_id(panel, "studio-focus-edge-reverse-button") is not None
+    assert _find_component_by_id(panel, "studio-focus-move-left-button") is not None
+    assert _find_component_by_id(panel, "studio-focus-duplicate-node-button") is not None
+    assert _find_component_by_id(panel, "studio-focus-delete-edge-button") is not None
+    assert _find_component_by_id(panel, "studio-focus-open-workbench-button") is not None
 
 
 def test_studio_primary_canvas_hides_internal_and_hub_nodes() -> None:
@@ -836,8 +849,8 @@ def test_studio_focus_panel_uses_canvas_selection_as_primary_context() -> None:
     assert "Tanque de água supre Misturador (rota obrigatória, rotas R001)." in panel_text
     assert "Tanque de água supre Bomba principal." in panel_text
     assert "Edição direta deste foco" in panel_text
-    assert "Atualize o rótulo visível desta entidade sem sair da primeira dobra." in panel_text
-    assert "Ajuste comprimento, famílias sugeridas ou direção sem abrir a bancada completa." in panel_text
+    assert "Controles rápidos já estão no primeiro fold do Studio." in panel_text
+    assert "Use o painel local ao lado do canvas" in panel_text
     assert "Por que este foco importa" in panel_text
     assert "Exige atenção" in panel_text
     assert "Ações rápidas deste foco" in panel_text
@@ -847,18 +860,18 @@ def test_studio_focus_panel_uses_canvas_selection_as_primary_context() -> None:
     assert "Rotas deste foco: 2 obrigatória(s), 1 com dosagem, 1 com medição direta." in panel_text
     assert "Confira comprimento e famílias sugeridas para a conexão L001." in panel_text
     assert _find_component_by_id(panel, "studio-focus-recommended-open-workbench-button") is not None
-    assert _find_component_by_id(panel, "studio-focus-move-left-button") is not None
-    assert _find_component_by_id(panel, "studio-focus-move-up-button") is not None
-    assert _find_component_by_id(panel, "studio-focus-move-down-button") is not None
-    assert _find_component_by_id(panel, "studio-focus-node-label") is not None
-    assert _find_component_by_id(panel, "studio-focus-node-apply-button") is not None
-    assert _find_component_by_id(panel, "studio-focus-edge-length-m") is not None
-    assert _find_component_by_id(panel, "studio-focus-edge-family-hint") is not None
-    assert _find_component_by_id(panel, "studio-focus-edge-apply-button") is not None
-    assert _find_component_by_id(panel, "studio-focus-edge-reverse-button") is not None
-    assert _find_component_by_id(panel, "studio-focus-duplicate-node-button") is not None
-    assert _find_component_by_id(panel, "studio-focus-delete-edge-button") is not None
-    assert _find_component_by_id(panel, "studio-focus-open-workbench-button") is not None
+    assert _find_component_by_id(panel, "studio-focus-move-left-button") is None
+    assert _find_component_by_id(panel, "studio-focus-move-up-button") is None
+    assert _find_component_by_id(panel, "studio-focus-move-down-button") is None
+    assert _find_component_by_id(panel, "studio-focus-node-label") is None
+    assert _find_component_by_id(panel, "studio-focus-node-apply-button") is None
+    assert _find_component_by_id(panel, "studio-focus-edge-length-m") is None
+    assert _find_component_by_id(panel, "studio-focus-edge-family-hint") is None
+    assert _find_component_by_id(panel, "studio-focus-edge-apply-button") is None
+    assert _find_component_by_id(panel, "studio-focus-edge-reverse-button") is None
+    assert _find_component_by_id(panel, "studio-focus-duplicate-node-button") is None
+    assert _find_component_by_id(panel, "studio-focus-delete-edge-button") is None
+    assert _find_component_by_id(panel, "studio-focus-open-workbench-button") is None
 
 
 def test_studio_focus_panel_embeds_status_and_runs_gate_context() -> None:
