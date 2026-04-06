@@ -160,3 +160,17 @@ wave_journal:
       ui_snapshot: docs/2026-04-06_phase_ux_refinement_wave7_ui_snapshot.json
       validation_command: "$env:PYTHONPATH='src;.'; .\\.venv\\Scripts\\python.exe -m pytest tests/decision_platform/test_ui_smoke.py -q -p no:cacheprovider --basetemp tests/_tmp/pytest-basetemp-ux-wave7-full2"
       validation_result: "58 passed in 448.23s (0:07:28)"
+  - wave: 8
+    phase_id: ux_phase_4
+    status: completed
+    summary:
+      - decision now classifies no usable result, infeasible winner, technical tie and clear winner through a shared first-fold state model
+      - the opening decision flow now prioritizes winner, runner-up and explicit decision state instead of forcing the operator into dense comparison first
+      - winner explanations now keep infeasibility visible in product language even when the ranking summary exists
+      - runner-up contrast now distinguishes between no usable decision and no comparable runner-up, which makes the absence of comparison more honest
+      - technical evidence remains available, but the first reading of decision no longer depends on raw payloads or backend-oriented terminology
+    evidence:
+      handoff: docs/2026-04-06_phase_ux_refinement_wave8_handoff.md
+      ui_snapshot: docs/2026-04-06_phase_ux_refinement_wave8_ui_snapshot.json
+      validation_command: "$env:PYTHONPATH='src;.'; .\\.venv\\Scripts\\python.exe -m pytest tests/decision_platform/test_ui_smoke.py -q -p no:cacheprovider --basetemp tests/_tmp/pytest-basetemp-ux-wave8-full"
+      validation_result: "64 passed in 467.76s (0:07:47)"

@@ -766,9 +766,9 @@ def test_primary_surfaces_explain_empty_states_without_debug_language() -> None:
     assert "Nenhuma run registrada ainda." in _collect_text_content(runs_queue)
     assert "Ainda não existe uma run em foco" in _collect_text_content(run_detail)
     assert "Ainda não há resultado executivo suficiente" in _collect_text_content(execution)
-    assert "ainda não tem um winner legível" in _collect_text_content(decision).lower()
+    assert "ainda não existe decisão utilizável" in _collect_text_content(decision).lower()
     assert "Ainda não há candidato visível" in _collect_text_content(candidate)
-    assert "Ainda não existe runner-up suficiente" in _collect_text_content(contrast)
+    assert "Ainda não existe decisão utilizável" in _collect_text_content(contrast)
     assert "Ainda não há sinais consolidados" in _collect_text_content(signals)
     assert "Ainda não existe breakdown suficiente" in _collect_text_content(breakdown)
 
@@ -824,8 +824,9 @@ def test_decision_flow_panel_makes_transition_and_next_action_explicit() -> None
     assert "Saída do fluxo" in panel_text
     assert "cand-01" in panel_text
     assert "cand-02" in panel_text
-    assert "Candidato oficial" in panel_text
-    assert "Runner-up" in panel_text
+    assert "Winner oficial" in panel_text
+    assert "Runner-up de referência" in panel_text
+    assert "Estado da decisão" in panel_text
     assert "Empate técnico ativo" in panel_text
     assert "Empate técnico" in panel_text
     assert "Voltar para Runs" in panel_text
@@ -852,8 +853,17 @@ def test_decision_flow_panel_surfaces_contrast_risk_before_secondary_comparison(
 
     assert "Contraste fraco" in panel_text
     assert "margem curta" in panel_text
-    assert "cand-01 lidera a leitura atual" in panel_text
-    assert "cand-02 segue como contraste principal" in panel_text
+    assert "cand-01 lidera a leitura atual com contraste suficiente" in panel_text
+    assert "cand-02 segue como melhor alternativa comparável" in panel_text
+
+
+def test_decision_flow_panel_explains_when_no_usable_run_exists() -> None:
+    panel = render_decision_flow_panel({})
+    panel_text = _collect_text_content(panel)
+
+    assert "Sem decisão utilizável" in panel_text
+    assert "Ainda falta uma run utilizável" in panel_text
+    assert "confirme uma execução concluída" in panel_text
 
 
 def test_catalog_state_panel_explains_when_filters_hide_all_candidates() -> None:
@@ -888,6 +898,7 @@ def test_primary_decision_panels_hide_raw_metric_keys_in_main_surface() -> None:
     )
     contrast_panel = render_decision_contrast_panel(
         {
+            "candidate_id": "cand-01",
             "decision_status": "technical_tie",
             "technical_tie": True,
             "runner_up_candidate_id": "cand-02",
@@ -944,10 +955,11 @@ def test_primary_decision_panels_hide_raw_metric_keys_in_main_surface() -> None:
     breakdown_text = _collect_text_content(breakdown_panel)
 
     assert "Empate técnico" in decision_text
-    assert "Objetivo desta área" in decision_text
-    assert "Ação principal" in decision_text
-    assert "Sinal prioritário" in decision_text
-    assert "não oficialize sem manter o runner-up visível" in decision_text
+    assert "Status da decisão" in decision_text
+    assert "Por que esta leitura lidera" in decision_text
+    assert "Próxima ação" in decision_text
+    assert "winner oficial" in decision_text.lower()
+    assert "mantenha o runner-up visível" in decision_text
     assert "Runner-up e contraste" in contrast_text
     assert "cand-02" in contrast_text
     assert "Empate técnico" in contrast_text
@@ -963,6 +975,44 @@ def test_primary_decision_panels_hide_raw_metric_keys_in_main_surface() -> None:
     assert "Engine de avaliação:" in selected_text
     assert "rota obrigatória não conseguiu fechar" in selected_text
     assert "Qualidade bruta:" in breakdown_text
+
+
+def test_decision_summary_panel_surfaces_infeasible_winner_without_console_language() -> None:
+    panel = render_decision_summary_panel(
+        {
+            "candidate_id": "cand-01",
+            "decision_status": "winner_clear",
+            "technical_tie": False,
+            "feasible": False,
+            "infeasibility_reason": "mandatory_route_failure",
+            "topology_family": "hybrid_free",
+            "score_final": 91.2,
+            "total_cost": 10.5,
+            "winner_reason_summary": "O ranking segue liderado por custo total e cobertura mínima.",
+            "runner_up_candidate_id": "cand-02",
+        }
+    )
+    panel_text = _collect_text_content(panel)
+
+    assert "Winner inviável" in panel_text
+    assert "Inviável" in panel_text
+    assert "rota obrigatória não conseguiu fechar" in panel_text
+    assert "use o motivo de inviabilidade e o runner-up" in panel_text.lower()
+
+
+def test_decision_contrast_panel_guides_when_runner_up_is_missing() -> None:
+    panel = render_decision_contrast_panel(
+        {
+            "candidate_id": "cand-01",
+            "decision_status": "winner_clear",
+            "technical_tie": False,
+            "feasible": True,
+        }
+    )
+    panel_text = _collect_text_content(panel)
+
+    assert "winner, mas ainda não existe runner-up comparável" in panel_text.lower()
+    assert "Relaxe filtros ou recupere uma execução com contraste suficiente" in panel_text
 
 
 def test_candidate_summary_panel_surfaces_primary_blocker_and_next_action() -> None:

@@ -450,6 +450,60 @@ def _humanize_decision_status(status: Any) -> str:
     return normalized.replace("_", " ") or "-"
 
 
+def _decision_primary_state(summary: dict[str, Any]) -> dict[str, str]:
+    candidate_id = str(summary.get("candidate_id") or "").strip()
+    runner_up_id = str(summary.get("runner_up_candidate_id") or "").strip()
+    decision_status = str(summary.get("decision_status") or ("technical_tie" if summary.get("technical_tie") else "winner_clear"))
+    infeasibility_reason = _humanize_infeasibility_reason(summary.get("infeasibility_reason"))
+    if not candidate_id:
+        return {
+            "state_label": "Sem decisão utilizável",
+            "headline": "Ainda falta uma run utilizável para abrir winner, runner-up e contraste com segurança.",
+            "next_action": "Volte para Runs, confirme uma execução concluída e retorne quando existir resultado comparável.",
+            "contrast_state": "Sem winner e runner-up legíveis nesta leitura.",
+            "winner_guidance": "Nenhum candidato oficial apareceu a partir da execução atual.",
+            "runner_up_guidance": "Sem runner-up comparável até existir uma run utilizável.",
+        }
+    if not summary.get("feasible"):
+        return {
+            "state_label": "Winner inviável",
+            "headline": "Existe um winner visível, mas ele ainda não pode ser oficializado na leitura principal.",
+            "next_action": "Use o motivo de inviabilidade e o runner-up para decidir se vale revisar a run atual ou voltar ao cenário.",
+            "contrast_state": "A escolha oficial segue bloqueada; trate o runner-up como referência comparativa, não como liberação automática.",
+            "winner_guidance": f"{candidate_id} lidera o ranking atual, mas segue inviável porque {infeasibility_reason}.",
+            "runner_up_guidance": (
+                f"{runner_up_id} segue como melhor contraste enquanto o winner permanece bloqueado."
+                if runner_up_id
+                else "Ainda não existe runner-up comparável para apoiar a leitura do bloqueio."
+            ),
+        }
+    if decision_status == "technical_tie":
+        return {
+            "state_label": "Empate técnico",
+            "headline": "Winner e runner-up seguem próximos o suficiente para exigir decisão humana assistida.",
+            "next_action": "Mantenha a comparação aberta, valide os sinais de risco e aprofunde a Auditoria apenas se precisar reconciliar a trilha técnica.",
+            "contrast_state": "Empate técnico ativo; mantenha o runner-up visível antes de oficializar.",
+            "winner_guidance": f"{candidate_id} ocupa a dianteira atual, mas ainda sem separação confortável para oficialização imediata.",
+            "runner_up_guidance": (
+                f"{runner_up_id} permanece próximo o suficiente para sustentar o empate técnico."
+                if runner_up_id
+                else "Ainda falta um runner-up legível para sustentar o empate técnico com honestidade."
+            ),
+        }
+    return {
+        "state_label": "Winner claro",
+        "headline": "A execução atual já entrega um winner legível e um runner-up de referência para a decisão assistida.",
+        "next_action": "Confirme o runner-up e os sinais de risco antes de oficializar; abra Auditoria só se precisar aprofundar evidências técnicas.",
+        "contrast_state": "Winner claro; use o runner-up como contraste de referência antes de exportar.",
+        "winner_guidance": f"{candidate_id} lidera a leitura atual com contraste suficiente para sustentar a escolha principal.",
+        "runner_up_guidance": (
+            f"{runner_up_id} segue como melhor alternativa comparável abaixo da escolha oficial."
+            if runner_up_id
+            else "Ainda não há runner-up comparável, então trate a oficialização com cautela adicional."
+        ),
+    }
+
+
 def _coerce_float_or_none(value: Any) -> float | None:
     if value in (None, ""):
         return None
@@ -1810,13 +1864,17 @@ def render_candidate_summary_panel(summary: dict[str, Any]) -> Any:
 
 
 def render_decision_flow_panel(summary: dict[str, Any]) -> Any:
+    decision_state = _decision_primary_state(summary)
     candidate_id = str(summary.get("candidate_id") or "").strip()
     runner_up_id = str(summary.get("runner_up_candidate_id") or "").strip()
     decision_status = str(summary.get("decision_status") or ("technical_tie" if summary.get("technical_tie") else "winner_clear"))
     score_margin_delta = _coerce_float_or_none(summary.get("score_margin_delta"))
     winner_penalties = list(summary.get("winner_penalties", []))
     critical_routes = list(summary.get("critical_routes", []))
-    if decision_status == "technical_tie":
+    if not candidate_id:
+        signal_title = "Sem decisão utilizável"
+        signal_text = "Ainda não existe run comparável suficiente para mostrar winner, runner-up e technical tie com honestidade."
+    elif decision_status == "technical_tie":
         signal_title = "Empate técnico ativo"
         signal_text = "Winner e runner-up seguem próximos o suficiente para exigir leitura humana assistida antes da oficialização."
     elif not summary.get("feasible"):
@@ -1835,29 +1893,17 @@ def render_decision_flow_panel(summary: dict[str, Any]) -> Any:
     else:
         signal_title = "Contraste suficiente"
         signal_text = "Winner e runner-up já aparecem com separação legível para a decisão assistida."
-    if not candidate_id:
-        headline = "Ainda falta uma run confiável para abrir a leitura principal de decisão."
-        next_action = "Volte para Runs, revise a execução em foco e só então retorne para a decisão humana assistida."
-        contrast_state = "Sem winner e runner-up legíveis nesta leitura."
-    elif decision_status == "technical_tie":
-        headline = "Winner e runner-up seguem próximos o suficiente para exigir leitura humana assistida."
-        next_action = "Mantenha a comparação aprofundada aberta, valide riscos e use Auditoria apenas se precisar reconciliar a trilha técnica."
-        contrast_state = "Empate técnico ativo; mantenha o runner-up visível antes de oficializar."
-    else:
-        headline = "A execução atual já entrega um winner legível e um runner-up de referência."
-        next_action = "Confirme os sinais de risco, compare o runner-up e siga para Auditoria apenas se precisar aprofundar evidências técnicas."
-        contrast_state = "Winner claro; use o runner-up como contraste de referência antes de exportar."
     return html.Div(
         children=[
             _screen_opening_panel(
                 "Passagem Runs -> Decisão",
-                headline,
+                decision_state["headline"],
                 "Explicar se a execução atual já pode ser lida como decisão ou se ainda falta contexto.",
-                next_action,
+                decision_state["next_action"],
                 [
                     ("Winner atual", candidate_id or "Ainda sem candidato oficial legível."),
-                    ("Contraste atual", contrast_state),
-                    ("Saída do fluxo", next_action),
+                    ("Contraste atual", decision_state["contrast_state"]),
+                    ("Saída do fluxo", decision_state["next_action"]),
                 ],
                 [
                     _button_link("Voltar para Runs", "?tab=runs", "decision-flow-open-runs-link"),
@@ -1868,22 +1914,22 @@ def render_decision_flow_panel(summary: dict[str, Any]) -> Any:
                 style={**UI_THREE_COLUMN_STYLE, "marginTop": "14px"},
                 children=[
                     _guidance_card(
-                        "Candidato oficial",
+                        "Winner oficial",
                         (
-                            f"{candidate_id} lidera a leitura atual em {summary.get('topology_family') or '-'}."
+                            f"{decision_state['winner_guidance']} Família principal: {summary.get('topology_family') or '-'}."
                             if candidate_id
-                            else "Ainda não existe winner legível para esta leitura."
+                            else decision_state["winner_guidance"]
                         ),
                     ),
                     _guidance_card(
-                        "Runner-up",
+                        "Runner-up de referência",
                         (
-                            f"{runner_up_id} segue como contraste principal em {summary.get('runner_up_topology_family') or '-'}."
+                            f"{decision_state['runner_up_guidance']} Família comparável: {summary.get('runner_up_topology_family') or '-'}."
                             if runner_up_id
-                            else "Ainda não há runner-up legível para contrastar a escolha."
+                            else decision_state["runner_up_guidance"]
                         ),
                     ),
-                    _guidance_card(signal_title, signal_text),
+                    _guidance_card("Estado da decisão", f"{signal_title}. {signal_text}"),
                 ],
             ),
             html.Div(
@@ -1891,7 +1937,7 @@ def render_decision_flow_panel(summary: dict[str, Any]) -> Any:
                 children=[
                     _metric_card("Winner", candidate_id or "-"),
                     _metric_card("Runner-up", runner_up_id or "-"),
-                    _metric_card("Estado", _humanize_decision_status(decision_status)),
+                    _metric_card("Leitura atual", decision_state["state_label"] if candidate_id or summary else _humanize_decision_status(decision_status)),
                 ],
             ),
         ],
@@ -1899,14 +1945,16 @@ def render_decision_flow_panel(summary: dict[str, Any]) -> Any:
 
 
 def render_decision_summary_panel(summary: dict[str, Any]) -> Any:
-    if not summary:
+    candidate_id = str(summary.get("candidate_id") or "").strip()
+    if not summary or not candidate_id:
         return _guided_empty_state(
-            "Escolha oficial",
-            "A decisão humana assistida ainda não tem um winner legível neste momento.",
-            "Revise a última execução em Runs antes de tentar oficializar um candidato.",
+            "Winner oficial",
+            "Ainda não existe decisão utilizável para oficializar um winner nesta leitura.",
+            "Revise a última execução em Runs e retorne quando houver resultado comparável.",
         )
+    decision_state = _decision_primary_state(summary)
     decision_status = str(summary.get("decision_status") or ("technical_tie" if summary.get("technical_tie") else "winner_clear"))
-    decision_label = "Empate técnico" if decision_status == "technical_tie" else "Winner claro"
+    decision_label = decision_state["state_label"]
     feasibility_label = "Viável" if summary.get("feasible") else "Inviável"
     score_margin_delta = _coerce_float_or_none(summary.get("score_margin_delta"))
     if decision_status == "technical_tie":
@@ -1922,21 +1970,24 @@ def render_decision_summary_panel(summary: dict[str, Any]) -> Any:
         priority_signal = "A margem para o runner-up ainda é curta; trate esta escolha como contraste fraco."
     else:
         priority_signal = "O winner abriu contraste suficiente para orientar a decisão assistida."
+    winner_reason = str(summary.get("winner_reason_summary") or "Sem justificativa resumida.")
+    if not summary.get("feasible"):
+        winner_reason = f"{winner_reason} Bloqueio atual: {_humanize_infeasibility_reason(summary.get('infeasibility_reason'))}."
     return html.Div(
         children=[
-            html.H3("Escolha oficial", style={"marginTop": 0}),
+            html.H3("Winner oficial", style={"marginTop": 0}),
             html.Div(
                 style={**UI_THREE_COLUMN_STYLE, "marginBottom": "12px"},
                 children=[
-                    _guidance_card("Objetivo desta área", "Explicar por que o candidato oficial ocupa a liderança na leitura principal."),
-                    _guidance_card("Ação principal", "Valide runner-up e sinais de risco antes de oficializar a exportação." if summary.get("runner_up_candidate_id") else "Confirme se já existe contraste suficiente para seguir com a decisão."),
-                    _guidance_card("Sinal prioritário", priority_signal),
+                    _guidance_card("Status da decisão", decision_label),
+                    _guidance_card("Por que esta leitura lidera", winner_reason if winner_reason != "Sem justificativa resumida." else priority_signal),
+                    _guidance_card("Próxima ação", decision_state["next_action"]),
                 ],
             ),
             html.Div(
                 style={"display": "flex", "alignItems": "center", "gap": "10px", "flexWrap": "wrap"},
                 children=[
-                    html.Div(str(summary.get("candidate_id") or "-"), style={"fontSize": "28px", "fontWeight": 700}),
+                    html.Div(candidate_id or "-", style={"fontSize": "28px", "fontWeight": 700}),
                     html.Span(decision_label, style=UI_PILL_STYLE),
                     html.Span(feasibility_label, style=UI_PILL_STYLE),
                 ],
@@ -1951,17 +2002,13 @@ def render_decision_summary_panel(summary: dict[str, Any]) -> Any:
                 ],
             ),
             html.Div(
-                "Empate técnico detectado: mantenha a comparação lado a lado visível para suportar a decisão humana."
-                if decision_status == "technical_tie"
-                else "O candidato oficial abriu vantagem suficiente para aparecer como winner na leitura principal.",
+                decision_state["contrast_state"],
                 style={"marginTop": "12px", "fontWeight": 700, "lineHeight": "1.5"},
             ),
-            html.P(str(summary.get("winner_reason_summary") or "Sem justificativa resumida."), style={"lineHeight": "1.6"}),
+            html.P(winner_reason, style={"lineHeight": "1.6"}),
             html.H4("Próxima ação", style={"marginBottom": "6px"}),
             html.Div(
-                "Valide runner-up e sinais de risco antes de oficializar a exportação."
-                if summary.get("runner_up_candidate_id")
-                else "Confirme se já existe contraste suficiente para seguir com a decisão.",
+                decision_state["next_action"],
                 style={"lineHeight": "1.6", "fontWeight": 700},
             ),
         ]
@@ -1969,11 +2016,19 @@ def render_decision_summary_panel(summary: dict[str, Any]) -> Any:
 
 
 def render_decision_contrast_panel(summary: dict[str, Any]) -> Any:
-    if not summary:
+    candidate_id = str(summary.get("candidate_id") or "").strip()
+    runner_up_id = str(summary.get("runner_up_candidate_id") or "").strip()
+    if not summary or not candidate_id:
         return _guided_empty_state(
             "Runner-up e contraste",
-            "Ainda não existe runner-up suficiente para sustentar a comparação principal.",
-            "Gere ou recupere uma execução comparável antes de fechar a leitura de contraste.",
+            "Ainda não existe decisão utilizável para abrir a comparação principal.",
+            "Recupere uma execução comparável em Runs antes de fechar a leitura entre winner e runner-up.",
+        )
+    if not runner_up_id:
+        return _guided_empty_state(
+            "Runner-up e contraste",
+            "A leitura atual já mostra um winner, mas ainda não existe runner-up comparável para sustentar o contraste principal.",
+            "Relaxe filtros ou recupere uma execução com contraste suficiente antes de oficializar a escolha.",
         )
     decision_status = str(summary.get("decision_status") or ("technical_tie" if summary.get("technical_tie") else "winner_clear"))
     runner_up_cost = summary.get("runner_up_total_cost")
@@ -1994,7 +2049,7 @@ def render_decision_contrast_panel(summary: dict[str, Any]) -> Any:
     return html.Div(
         children=[
             html.H3("Runner-up e contraste", style={"marginTop": 0}),
-            html.Div(str(summary.get("runner_up_candidate_id") or "-"), style={"fontSize": "24px", "fontWeight": 700}),
+            html.Div(runner_up_id or "-", style={"fontSize": "24px", "fontWeight": 700}),
             html.Div(
                 style={"display": "flex", "gap": "8px", "flexWrap": "wrap", "marginTop": "8px"},
                 children=[

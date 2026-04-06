@@ -1,41 +1,41 @@
-# Phase UX Refinement Wave 8 - Studio Quick Actions from Canvas Focus
+# Phase UX Refinement Wave 8 - Decision Readability for Assisted Choice
 
 ## Objective
 
-Reduce dependence on the secondary Studio workbench by exposing quick, guided actions directly from the current canvas focus.
+Open `ux_phase_4` by making the Decision surface readable in the first fold: winner, runner-up, technical tie and no-result states should be legible without pushing the operator into dense comparison blocks or raw technical evidence.
 
 ## Delivered
 
-- Added a new `Ações rápidas deste foco` section to the Studio focus panel so the operator can act from the first fold instead of immediately dropping into the full workbench.
-- Exposed direct quick actions for the selected node and connection: move the focused node, duplicate the focused node, delete the focused connection, and open the full workbench when deeper editing is still necessary.
-- Reused the existing Studio editing logic and callbacks instead of inventing a parallel editor, preserving the current business-first hierarchy and technical audit trail.
-- Kept the secondary workbench available for full editing, but made it clearly a deeper layer rather than the only practical path for common Studio actions.
-- Extended smoke coverage so the first-fold quick actions stay visible on the Studio surface and the focus panel continues to communicate rules and next steps.
+- Added a dedicated `_decision_primary_state` helper in `src/decision_platform/ui_dash/app.py` so the Decision surface now classifies four primary product states consistently: no usable decision, infeasible winner, technical tie and clear winner.
+- Reframed `Passagem Runs -> Decisão` around `Winner oficial`, `Runner-up de referência` and `Estado da decisão`, which makes the assisted-choice story readable before the deeper comparison area.
+- Updated `Winner oficial` to explain both why the leading candidate is currently on top and why it may still be blocked, keeping infeasibility explicit in the product-language summary instead of hiding it behind technical details.
+- Tightened `Runner-up e contraste` so it now distinguishes between `no usable decision` and `winner exists but runner-up is missing`, instead of treating every missing contrast as the same generic fallback.
+- Extended smoke coverage for the Decision surface to protect no-run, infeasible-winner and missing-runner-up states in addition to technical tie and standard winner-versus-runner-up reading.
 
 ## Validation
 
 ```powershell
-$env:PYTHONPATH='src;.'; .\.venv\Scripts\python.exe -m pytest tests/decision_platform/test_ui_smoke.py -q -p no:cacheprovider -k "studio_tab_surfaces_readiness_and_selection_context or studio_focus_panel_uses_canvas_selection_as_primary_context or studio_connectivity_panel_surfaces_routes_and_measurement_near_canvas" --basetemp tests/_tmp/pytest-basetemp-ux-wave8-targeted
-$env:PYTHONPATH='src;.'; .\.venv\Scripts\python.exe -m pytest tests/decision_platform/test_ui_smoke.py -q -p no:cacheprovider --basetemp tests/_tmp/pytest-basetemp-ux-wave8-full-rerun
+$env:PYTHONPATH='src;.'; .\.venv\Scripts\python.exe -m pytest tests/decision_platform/test_ui_smoke.py -q -p no:cacheprovider -k "decision_flow_panel or primary_decision_panels_hide_raw_metric_keys_in_main_surface or decision_summary_panel_surfaces_infeasible_winner_without_console_language or decision_contrast_panel_guides_when_runner_up_is_missing or primary_surfaces_explain_empty_states_without_debug_language" --basetemp tests/_tmp/pytest-basetemp-ux-wave8-targeted
+$env:PYTHONPATH='src;.'; .\.venv\Scripts\python.exe -m pytest tests/decision_platform/test_ui_smoke.py -q -p no:cacheprovider --basetemp tests/_tmp/pytest-basetemp-ux-wave8-full
 ```
 
 Result:
 
-- `3 passed, 37 deselected in 0.55s`
-- `40 passed in 402.01s`
+- `7 passed, 57 deselected in 0.16s`
+- `64 passed in 467.76s (0:07:47)`
 
 ## Evidence
 
-- Structured Studio quick-action snapshot: `docs/2026-04-06_phase_ux_refinement_wave8_ui_snapshot.json`
+- Structured Decision snapshot: `docs/2026-04-06_phase_ux_refinement_wave8_ui_snapshot.json`
 
 ## Scope Guardrails
 
 - No architecture reopening.
 - No replacement of Dash or Cytoscape.
-- No change to Julia-only official execution, fail-closed behavior, queue/runs contracts, or backend decision logic.
-- No change to solver, ranking, winner selection, or `technical_tie`.
-- No reintroduction of raw JSON, logs, technical hubs, or form-led editing as the primary Studio surface.
+- No change to Julia-only official execution, queue backend, run semantics or decision algorithm.
+- No refactor of Studio, Runs, Audit or global shell.
+- No promotion of raw JSON, logs or dense technical payloads to the first fold of Decision.
 
 ## Honest Handoff
 
-This wave moved the Studio a step closer to direct manipulation without pretending the workbench no longer matters. The main gain is that common actions now start where the user is already looking: the canvas focus rail. The detailed editor remains intact for auditability and full structural changes, but it stopped being the only practical action surface for the most common adjustments.
+This wave finally gives the Decision screen a clearer assisted-choice hierarchy. The main gain is not new backend data; it is a more honest reading of what the current result actually supports. The operator can now tell faster whether there is no usable decision yet, whether the winner is visible but blocked, whether the result is still a technical tie, or whether the winner has enough separation to proceed. The dense comparison and technical trace remain available, but they no longer need to carry the burden of basic orientation.

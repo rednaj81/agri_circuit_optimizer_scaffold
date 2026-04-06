@@ -1,44 +1,39 @@
 {
-  "wave": "ux_phase_2_wave_4",
+  "wave": "ux_phase_4_wave_1",
   "validation": {
-    "targeted": "3 passed, 37 deselected in 0.55s",
-    "full": "40 passed in 402.01s"
+    "targeted": "7 passed, 57 deselected in 0.16s",
+    "full": "64 passed in 467.76s (0:07:47)"
   },
-  "studio_focus_surface": {
-    "panel_id": "studio-focus-panel",
+  "decision_surface": {
+    "panel_ids": [
+      "decision-flow-panel",
+      "decision-summary-panel",
+      "decision-contrast-panel",
+      "decision-signal-panel"
+    ],
     "markers": [
-      "Foco do canvas",
-      "Regras deste foco",
-      "Ações rápidas deste foco",
+      "Passagem Runs -> Decisão",
+      "Winner oficial",
+      "Runner-up de referência",
+      "Estado da decisão",
+      "Status da decisão",
+      "Por que esta leitura lidera",
       "Próxima ação"
     ]
   },
-  "quick_actions": {
-    "button_ids": [
-      "studio-focus-move-left-button",
-      "studio-focus-move-right-button",
-      "studio-focus-move-up-button",
-      "studio-focus-move-down-button",
-      "studio-focus-duplicate-node-button",
-      "studio-focus-delete-edge-button",
-      "studio-focus-open-workbench-button"
+  "primary_states": {
+    "supported": [
+      "Sem decisão utilizável",
+      "Winner inviável",
+      "Empate técnico",
+      "Winner claro"
     ],
-    "labels": [
-      "Mover à esquerda",
-      "Mover à direita",
-      "Mover acima",
-      "Mover abaixo",
-      "Duplicar nó em foco",
-      "Excluir conexão em foco",
-      "Abrir bancada completa"
-    ]
+    "runner_up_fallback": "A leitura atual já mostra um winner, mas ainda não existe runner-up comparável para sustentar o contraste principal."
   },
-  "hierarchy_preserved": {
-    "primary_surface_ids": [
-      "studio-focus-panel",
-      "studio-connectivity-panel"
-    ],
-    "secondary_surface_id": "studio-editor-workbench",
-    "business_only_canvas": true
-  }
+  "scope": {
+    "decision_only_diff": true,
+    "studio_or_runs_reframed": false,
+    "technical_payloads_primary": false
+  },
+  "visual_evidence_note": "Screenshot capture remains blocked by the local execution policy; this structured snapshot records the first-fold decision markers and state labels delivered in wave 8."
 }
