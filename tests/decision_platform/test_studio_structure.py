@@ -8,6 +8,8 @@ import yaml
 from decision_platform.data_io.loader import load_scenario_bundle
 from decision_platform.data_io.storage import save_authored_scenario_bundle
 from decision_platform.ui_dash.app import (
+    STUDIO_CONTEXT_MENU,
+    apply_studio_context_menu_action,
     build_app,
     create_business_node_studio_node,
     create_edge_studio_link,
@@ -129,6 +131,56 @@ def test_business_palette_presets_create_visible_business_nodes() -> None:
     assert created_outlet["node_type"] == "external_outlet"
     assert bool(created_outlet["allow_outbound"]) is False
     assert "Criado pela paleta principal do Studio" in str(created_outlet["notes"])
+
+
+@pytest.mark.fast
+def test_context_menu_action_creates_and_removes_business_elements() -> None:
+    bundle = load_scenario_bundle("data/decision_platform/maquete_v2")
+    nodes_rows = bundle.nodes.to_dict("records")
+    candidate_links_rows = bundle.candidate_links.to_dict("records")
+    route_rows = bundle.route_requirements.to_dict("records")
+
+    updated_nodes, updated_links, next_node_id, next_link_id, status, open_workbench = apply_studio_context_menu_action(
+        context_menu_data={"menuItemId": "add-product-node", "x": 420, "y": 180},
+        nodes_rows=nodes_rows,
+        candidate_links_rows=candidate_links_rows,
+        selected_node_id="P1",
+        selected_link_id="L013",
+        route_rows=route_rows,
+    )
+
+    created_node = next(row for row in updated_nodes if str(row["node_id"]) == next_node_id)
+    assert updated_links == candidate_links_rows
+    assert status == "Entidade de negócio adicionada pelo menu contextual."
+    assert open_workbench is False
+    assert created_node["node_type"] == "product_tank"
+    assert created_node["x_m"] == pytest.approx(0.42)
+    assert created_node["y_m"] == pytest.approx(0.3)
+
+    updated_nodes, updated_links, _, removed_link_id, status, open_workbench = apply_studio_context_menu_action(
+        context_menu_data={"menuItemId": "remove-edge", "elementId": "L013"},
+        nodes_rows=updated_nodes,
+        candidate_links_rows=updated_links,
+        selected_node_id=next_node_id,
+        selected_link_id="L013",
+        route_rows=route_rows,
+    )
+
+    assert all(str(row["link_id"]) != "L013" for row in updated_links)
+    assert removed_link_id != "L013"
+    assert status == "Conexão removida pelo menu contextual."
+    assert open_workbench is False
+
+
+@pytest.mark.fast
+def test_studio_context_menu_declares_business_first_actions() -> None:
+    menu_ids = {item["id"] for item in STUDIO_CONTEXT_MENU}
+    assert "add-product-node" in menu_ids
+    assert "add-mixer-node" in menu_ids
+    assert "add-outlet-node" in menu_ids
+    assert "duplicate-node" in menu_ids
+    assert "remove-edge" in menu_ids
+    assert "open-workbench" in menu_ids
 
 
 @pytest.mark.fast

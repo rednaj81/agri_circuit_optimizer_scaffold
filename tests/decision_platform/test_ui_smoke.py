@@ -227,6 +227,11 @@ def test_studio_primary_surface_exposes_business_command_center() -> None:
     assert _find_component_by_id(app.layout, "studio-quick-link-target") is not None
     assert _find_component_by_id(app.layout, "studio-quick-link-archetype") is not None
     assert _find_component_by_id(app.layout, "studio-quick-link-create-button") is not None
+    cytoscape = _find_component_by_id(app.layout, "node-studio-cytoscape")
+    context_menu = getattr(cytoscape, "contextMenu", None)
+    assert isinstance(context_menu, list)
+    assert any(item.get("id") == "add-product-node" for item in context_menu)
+    assert any(item.get("id") == "open-workbench" for item in context_menu)
 
 
 def test_product_space_banner_uses_consistent_product_language_for_each_space() -> None:

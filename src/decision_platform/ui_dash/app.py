@@ -938,6 +938,62 @@ BUSINESS_EDGE_ARCHETYPE_OPTIONS = [
     {"label": "Conexão vertical", "value": "vertical_link"},
     {"label": "Saída do circuito", "value": "outlet_tap"},
 ]
+STUDIO_CONTEXT_MENU = [
+    {
+        "id": "add-source-node",
+        "label": "Adicionar fonte aqui",
+        "availableOn": ["canvas"],
+        "tooltipText": "Cria uma fonte de água visível no Studio exatamente neste ponto.",
+    },
+    {
+        "id": "add-product-node",
+        "label": "Adicionar produto aqui",
+        "availableOn": ["canvas"],
+        "tooltipText": "Cria um tanque de produto na posição clicada.",
+    },
+    {
+        "id": "add-mixer-node",
+        "label": "Adicionar misturador aqui",
+        "availableOn": ["canvas"],
+        "tooltipText": "Cria uma etapa de mistura na posição clicada.",
+    },
+    {
+        "id": "add-service-node",
+        "label": "Adicionar serviço aqui",
+        "availableOn": ["canvas"],
+        "tooltipText": "Cria um ponto de serviço visível na posição clicada.",
+    },
+    {
+        "id": "add-outlet-node",
+        "label": "Adicionar saída aqui",
+        "availableOn": ["canvas"],
+        "tooltipText": "Cria uma saída principal na posição clicada.",
+    },
+    {
+        "id": "duplicate-node",
+        "label": "Duplicar entidade",
+        "availableOn": ["node"],
+        "tooltipText": "Duplica a entidade selecionada mantendo-a no canvas principal.",
+    },
+    {
+        "id": "remove-node",
+        "label": "Remover entidade",
+        "availableOn": ["node"],
+        "tooltipText": "Tenta remover a entidade selecionada da malha principal.",
+    },
+    {
+        "id": "remove-edge",
+        "label": "Remover conexão",
+        "availableOn": ["edge"],
+        "tooltipText": "Remove a conexão selecionada da superfície principal.",
+    },
+    {
+        "id": "open-workbench",
+        "label": "Abrir workbench avançado",
+        "availableOn": ["node", "edge", "canvas"],
+        "tooltipText": "Abre a bancada avançada sem recolocar a trilha técnica na primeira dobra.",
+    },
+]
 
 
 def _studio_node_business_label(row: dict[str, Any] | None) -> str:
@@ -3320,6 +3376,7 @@ def build_app(
                                                 elements=initial_node_studio_elements,
                                                 layout={"name": "preset"},
                                                 style={"width": "100%", "height": "560px"},
+                                                contextMenu=STUDIO_CONTEXT_MENU,
                                                 stylesheet=_build_node_studio_stylesheet(
                                                     initial_node_studio_selected_id,
                                                     initial_edge_studio_selected_id,
@@ -4476,6 +4533,38 @@ def build_app(
         except ValueError as exc:
             return candidate_links_rows or [], selected_link_id, str(exc)
         return updated_rows, next_selected_link_id, "Conexão de negócio criada no canvas principal."
+
+    @app.callback(
+        Output("nodes-grid", "rowData", allow_duplicate=True),
+        Output("candidate-links-grid", "rowData", allow_duplicate=True),
+        Output("node-studio-selected-id", "data", allow_duplicate=True),
+        Output("edge-studio-selected-id", "data", allow_duplicate=True),
+        Output("studio-status-message", "data", allow_duplicate=True),
+        Output("studio-editor-workbench", "open", allow_duplicate=True),
+        Input("node-studio-cytoscape", "contextMenuData"),
+        State("nodes-grid", "rowData"),
+        State("candidate-links-grid", "rowData"),
+        State("node-studio-selected-id", "data"),
+        State("edge-studio-selected-id", "data"),
+        State("routes-grid", "rowData"),
+        prevent_initial_call=True,
+    )
+    def _apply_studio_context_menu(
+        context_menu_data: dict[str, Any] | None,
+        nodes_rows: list[dict[str, Any]] | None,
+        candidate_links_rows: list[dict[str, Any]] | None,
+        selected_node_id: str | None,
+        selected_link_id: str | None,
+        route_rows: list[dict[str, Any]] | None,
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], str | None, str | None, str, bool]:
+        return apply_studio_context_menu_action(
+            context_menu_data=context_menu_data,
+            nodes_rows=nodes_rows or [],
+            candidate_links_rows=candidate_links_rows or [],
+            selected_node_id=selected_node_id,
+            selected_link_id=selected_link_id,
+            route_rows=route_rows or [],
+        )
 
     @app.callback(
         Output("candidate-links-grid", "rowData", allow_duplicate=True),
@@ -5973,6 +6062,8 @@ def create_business_node_studio_node(
     *,
     selected_node_id: str | None,
     preset_key: str,
+    x_m: float | None = None,
+    y_m: float | None = None,
 ) -> tuple[list[dict[str, Any]], str]:
     preset = BUSINESS_NODE_PRESETS.get(str(preset_key).strip())
     if preset is None:
@@ -6003,8 +6094,8 @@ def create_business_node_studio_node(
         "node_id": next_node_id,
         "node_type": str(preset["node_type"]),
         "label": label,
-        "x_m": round(base_x + 0.05, 4),
-        "y_m": round(base_y + 0.04, 4),
+        "x_m": round(float(x_m) if x_m is not None else base_x + 0.05, 4),
+        "y_m": round(float(y_m) if y_m is not None else base_y + 0.04, 4),
         "allow_inbound": bool(preset["allow_inbound"]),
         "allow_outbound": bool(preset["allow_outbound"]),
         "requires_mixing_service": bool(preset["requires_mixing_service"]),
@@ -6044,6 +6135,97 @@ def duplicate_node_studio_selection(
         "notes": f"{str(source_row.get('notes', '')).strip()} | duplicado no studio".strip(" |"),
     }
     return [*nodes_rows, duplicated_row], next_node_id
+
+
+def apply_studio_context_menu_action(
+    *,
+    context_menu_data: dict[str, Any] | None,
+    nodes_rows: list[dict[str, Any]],
+    candidate_links_rows: list[dict[str, Any]],
+    selected_node_id: str | None,
+    selected_link_id: str | None,
+    route_rows: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], str | None, str | None, str, bool]:
+    payload = context_menu_data or {}
+    menu_item_id = str(payload.get("menuItemId") or "").strip()
+    element_id = str(payload.get("elementId") or "").strip()
+    click_x = payload.get("x")
+    click_y = payload.get("y")
+    if not menu_item_id:
+        return nodes_rows, candidate_links_rows, selected_node_id, selected_link_id, "", False
+    next_node_selection = selected_node_id
+    next_edge_selection = selected_link_id
+    if menu_item_id.startswith("add-") and menu_item_id.endswith("-node"):
+        preset_key = menu_item_id.removeprefix("add-").removesuffix("-node")
+        x_m = round(float(click_x) / 1000.0, 4) if click_x is not None else None
+        y_m = round(float(click_y) / 600.0, 4) if click_y is not None else None
+        updated_nodes, next_node_selection = create_business_node_studio_node(
+            nodes_rows,
+            selected_node_id=element_id or selected_node_id,
+            preset_key=preset_key,
+            x_m=x_m,
+            y_m=y_m,
+        )
+        return (
+            updated_nodes,
+            candidate_links_rows,
+            next_node_selection,
+            next_edge_selection,
+            "Entidade de negócio adicionada pelo menu contextual.",
+            False,
+        )
+    if menu_item_id == "duplicate-node":
+        updated_nodes, next_node_selection = duplicate_node_studio_selection(
+            nodes_rows,
+            selected_node_id=element_id or selected_node_id,
+        )
+        return (
+            updated_nodes,
+            candidate_links_rows,
+            next_node_selection,
+            next_edge_selection,
+            "Entidade duplicada pelo menu contextual.",
+            False,
+        )
+    if menu_item_id == "remove-node":
+        try:
+            updated_nodes, next_node_selection = delete_node_studio_selection(
+                nodes_rows,
+                selected_node_id=element_id or selected_node_id,
+                candidate_links_rows=candidate_links_rows,
+                route_rows=route_rows,
+            )
+        except ValueError as exc:
+            return nodes_rows, candidate_links_rows, selected_node_id, selected_link_id, str(exc), False
+        return (
+            updated_nodes,
+            candidate_links_rows,
+            next_node_selection,
+            next_edge_selection,
+            "Entidade removida pelo menu contextual.",
+            False,
+        )
+    if menu_item_id == "remove-edge":
+        updated_links, next_edge_selection = delete_edge_studio_selection(
+            candidate_links_rows,
+            selected_link_id=element_id or selected_link_id,
+        )
+        return (
+            nodes_rows,
+            updated_links,
+            next_node_selection,
+            next_edge_selection,
+            "Conexão removida pelo menu contextual.",
+            False,
+        )
+    if menu_item_id == "open-workbench":
+        if element_id:
+            if any(str(row.get("node_id", "")).strip() == element_id for row in nodes_rows):
+                next_node_selection = element_id
+            if any(str(row.get("link_id", "")).strip() == element_id for row in candidate_links_rows):
+                next_edge_selection = element_id
+        return nodes_rows, candidate_links_rows, next_node_selection, next_edge_selection, "", True
+    return nodes_rows, candidate_links_rows, next_node_selection, next_edge_selection, "", False
 
 
 def delete_node_studio_selection(
