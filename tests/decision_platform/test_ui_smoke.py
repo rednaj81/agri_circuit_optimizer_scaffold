@@ -197,6 +197,11 @@ def test_studio_tab_surfaces_readiness_and_selection_context() -> None:
     assert _find_component_by_id(studio_tab, "studio-open-technical-guide-button") is not None
     assert _find_component_by_id(studio_tab, "studio-open-audit-button") is not None
     assert _find_component_by_id(studio_tab, "studio-open-runs-button") is not None
+    assert _find_component_by_id(studio_tab, "studio-focus-move-left-button") is not None
+    assert _find_component_by_id(studio_tab, "studio-focus-move-right-button") is not None
+    assert _find_component_by_id(studio_tab, "studio-focus-duplicate-node-button") is not None
+    assert _find_component_by_id(studio_tab, "studio-focus-delete-edge-button") is not None
+    assert _find_component_by_id(studio_tab, "studio-focus-open-workbench-button") is not None
 
 
 def test_studio_primary_canvas_hides_internal_and_hub_nodes() -> None:
@@ -366,9 +371,17 @@ def test_studio_focus_panel_uses_canvas_selection_as_primary_context() -> None:
     assert "Água para misturador" in panel_text
     assert "Rotas ligadas ao nó" in panel_text
     assert "Regras deste foco" in panel_text
+    assert "Ações rápidas deste foco" in panel_text
     assert "W não pode receber rotas entrando" in panel_text
     assert "rotas com dosagem exigem medição direta compatível" in panel_text
     assert "Revise as rotas ligadas a W" in panel_text
+    assert _find_component_by_id(panel, "studio-focus-move-left-button") is not None
+    assert _find_component_by_id(panel, "studio-focus-move-right-button") is not None
+    assert _find_component_by_id(panel, "studio-focus-move-up-button") is not None
+    assert _find_component_by_id(panel, "studio-focus-move-down-button") is not None
+    assert _find_component_by_id(panel, "studio-focus-duplicate-node-button") is not None
+    assert _find_component_by_id(panel, "studio-focus-delete-edge-button") is not None
+    assert _find_component_by_id(panel, "studio-focus-open-workbench-button") is not None
 
 
 def test_runs_flow_panel_reflects_studio_gate_and_queue_state() -> None:

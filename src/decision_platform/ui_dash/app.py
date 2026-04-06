@@ -793,6 +793,8 @@ def render_studio_focus_panel(
         and selected_node_id in {str(route.get("source") or "").strip(), str(route.get("sink") or "").strip()}
     ]
     focus_rules: list[str] = []
+    selected_node_present = selected_node_id not in {"", "-"}
+    selected_edge_present = bool(selected_edge)
     if selected_node_id == "W" or str(selected_edge.get("to_node") or "").strip() == "W":
         focus_rules.append("Regra do foco: W não pode receber rotas entrando; use este ponto apenas como origem.")
     if selected_node_id == "S" or str(selected_edge.get("from_node") or "").strip() == "S":
@@ -833,6 +835,28 @@ def render_studio_focus_panel(
             ),
             html.H4("Regras deste foco", style={"marginBottom": "6px", "marginTop": "14px"}),
             _bullet_list(focus_rules, "Nenhuma regra estrutural adicional foi acionada neste foco."),
+            html.H4("Ações rápidas deste foco", style={"marginBottom": "6px", "marginTop": "14px"}),
+            html.P(
+                "Use os atalhos abaixo para corrigir o foco atual sem abrir imediatamente a bancada completa. A edição detalhada continua disponível logo abaixo.",
+                style={"marginTop": 0, "lineHeight": "1.6"},
+            ),
+            html.Div(
+                style=UI_ACTION_ROW_STYLE,
+                children=[
+                    html.Button("Mover à esquerda", id="studio-focus-move-left-button", style=UI_BUTTON_STYLE, disabled=not selected_node_present),
+                    html.Button("Mover à direita", id="studio-focus-move-right-button", style=UI_BUTTON_STYLE, disabled=not selected_node_present),
+                    html.Button("Mover acima", id="studio-focus-move-up-button", style=UI_BUTTON_STYLE, disabled=not selected_node_present),
+                    html.Button("Mover abaixo", id="studio-focus-move-down-button", style=UI_BUTTON_STYLE, disabled=not selected_node_present),
+                ],
+            ),
+            html.Div(
+                style={**UI_ACTION_ROW_STYLE, "marginTop": "10px"},
+                children=[
+                    html.Button("Duplicar nó em foco", id="studio-focus-duplicate-node-button", style=UI_BUTTON_STYLE, disabled=not selected_node_present),
+                    html.Button("Excluir conexão em foco", id="studio-focus-delete-edge-button", style=UI_BUTTON_STYLE, disabled=not selected_edge_present),
+                    html.Button("Abrir bancada completa", id="studio-focus-open-workbench-button", style=UI_BUTTON_STYLE),
+                ],
+            ),
             html.H4("Próxima ação", style={"marginBottom": "6px", "marginTop": "14px"}),
             _bullet_list([node_next_action, edge_next_action], "Sem próxima ação registrada."),
         ],
@@ -2130,6 +2154,10 @@ def build_app(
         Output("node-studio-selected-id", "data", allow_duplicate=True),
         Output("studio-status-message", "data", allow_duplicate=True),
         Input("node-studio-move-button", "n_clicks"),
+        Input("studio-focus-move-left-button", "n_clicks_timestamp"),
+        Input("studio-focus-move-right-button", "n_clicks_timestamp"),
+        Input("studio-focus-move-up-button", "n_clicks_timestamp"),
+        Input("studio-focus-move-down-button", "n_clicks_timestamp"),
         State("nodes-grid", "rowData"),
         State("node-studio-selected-id", "data"),
         State("node-studio-move-direction", "value"),
@@ -2138,17 +2166,29 @@ def build_app(
     )
     def _move_node_studio_selection(
         n_clicks: Any,
+        move_left_ts: Any,
+        move_right_ts: Any,
+        move_up_ts: Any,
+        move_down_ts: Any,
         nodes_rows: list[dict[str, Any]] | None,
         selected_node_id: str | None,
         direction: str | None,
         step: Any,
     ) -> tuple[list[dict[str, Any]], str | None, str]:
-        if not n_clicks:
+        quick_move_timestamps = {
+            "left": _timestamp_or_zero(move_left_ts),
+            "right": _timestamp_or_zero(move_right_ts),
+            "up": _timestamp_or_zero(move_up_ts),
+            "down": _timestamp_or_zero(move_down_ts),
+        }
+        quick_direction = max(quick_move_timestamps, key=quick_move_timestamps.get)
+        resolved_direction = quick_direction if quick_move_timestamps[quick_direction] > 0 else direction
+        if not n_clicks and not any(quick_move_timestamps.values()):
             return nodes_rows or [], selected_node_id, ""
         updated_rows, next_selected_id = move_node_studio_selection(
             nodes_rows or [],
             selected_node_id=selected_node_id,
-            direction=direction,
+            direction=resolved_direction,
             step=step,
         )
         return updated_rows, next_selected_id, ""
@@ -2180,16 +2220,20 @@ def build_app(
         Output("node-studio-selected-id", "data", allow_duplicate=True),
         Output("studio-status-message", "data", allow_duplicate=True),
         Input("node-studio-duplicate-button", "n_clicks"),
+        Input("studio-focus-duplicate-node-button", "n_clicks"),
         State("nodes-grid", "rowData"),
         State("node-studio-selected-id", "data"),
         prevent_initial_call=True,
     )
     def _duplicate_node_studio_entry(
-        n_clicks: Any,
-        nodes_rows: list[dict[str, Any]] | None,
-        selected_node_id: str | None,
+        *callback_args: Any,
     ) -> tuple[list[dict[str, Any]], str | None, str]:
-        if not n_clicks:
+        if len(callback_args) == 3:
+            n_clicks, nodes_rows, selected_node_id = callback_args
+            quick_duplicate_clicks = 0
+        else:
+            n_clicks, quick_duplicate_clicks, nodes_rows, selected_node_id = callback_args
+        if not n_clicks and not quick_duplicate_clicks:
             return nodes_rows or [], selected_node_id, ""
         updated_rows, next_selected_id = duplicate_node_studio_selection(
             nodes_rows or [],
@@ -2373,22 +2417,34 @@ def build_app(
         Output("edge-studio-selected-id", "data", allow_duplicate=True),
         Output("studio-status-message", "data", allow_duplicate=True),
         Input("edge-studio-delete-button", "n_clicks"),
+        Input("studio-focus-delete-edge-button", "n_clicks"),
         State("candidate-links-grid", "rowData"),
         State("edge-studio-selected-id", "data"),
         prevent_initial_call=True,
     )
     def _delete_edge_studio_entry(
-        n_clicks: Any,
-        candidate_links_rows: list[dict[str, Any]] | None,
-        selected_link_id: str | None,
+        *callback_args: Any,
     ) -> tuple[list[dict[str, Any]], str | None, str]:
-        if not n_clicks:
+        if len(callback_args) == 3:
+            n_clicks, candidate_links_rows, selected_link_id = callback_args
+            quick_delete_clicks = 0
+        else:
+            n_clicks, quick_delete_clicks, candidate_links_rows, selected_link_id = callback_args
+        if not n_clicks and not quick_delete_clicks:
             return candidate_links_rows or [], selected_link_id, ""
         updated_rows, next_selected_link_id = delete_edge_studio_selection(
             candidate_links_rows or [],
             selected_link_id=selected_link_id,
         )
         return updated_rows, next_selected_link_id, ""
+
+    @app.callback(
+        Output("studio-editor-workbench", "open"),
+        Input("studio-focus-open-workbench-button", "n_clicks"),
+        prevent_initial_call=True,
+    )
+    def _open_studio_editor_workbench(n_clicks: Any) -> bool:
+        return bool(n_clicks)
 
     @app.callback(
         Output("run-jobs-summary", "children", allow_duplicate=True),

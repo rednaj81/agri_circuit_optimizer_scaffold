@@ -1,0 +1,44 @@
+{
+  "wave": "ux_phase_2_wave_4",
+  "validation": {
+    "targeted": "3 passed, 37 deselected in 0.55s",
+    "full": "40 passed in 402.01s"
+  },
+  "studio_focus_surface": {
+    "panel_id": "studio-focus-panel",
+    "markers": [
+      "Foco do canvas",
+      "Regras deste foco",
+      "Ações rápidas deste foco",
+      "Próxima ação"
+    ]
+  },
+  "quick_actions": {
+    "button_ids": [
+      "studio-focus-move-left-button",
+      "studio-focus-move-right-button",
+      "studio-focus-move-up-button",
+      "studio-focus-move-down-button",
+      "studio-focus-duplicate-node-button",
+      "studio-focus-delete-edge-button",
+      "studio-focus-open-workbench-button"
+    ],
+    "labels": [
+      "Mover à esquerda",
+      "Mover à direita",
+      "Mover acima",
+      "Mover abaixo",
+      "Duplicar nó em foco",
+      "Excluir conexão em foco",
+      "Abrir bancada completa"
+    ]
+  },
+  "hierarchy_preserved": {
+    "primary_surface_ids": [
+      "studio-focus-panel",
+      "studio-connectivity-panel"
+    ],
+    "secondary_surface_id": "studio-editor-workbench",
+    "business_only_canvas": true
+  }
+}
