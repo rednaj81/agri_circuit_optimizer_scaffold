@@ -107,3 +107,16 @@ wave_journal:
       ui_snapshot: docs/2026-04-05_phase_ux_refinement_wave3_ui_snapshot.json
       validation_command: "$env:PYTHONPATH='src;.'; .\\.venv\\Scripts\\python.exe -m pytest tests/decision_platform/test_ui_smoke.py -q -p no:cacheprovider --basetemp tests/_tmp/pytest-basetemp-ux-wave3-full"
       validation_result: "50 passed in 487.68s (0:08:07)"
+  - wave: 4
+    phase_id: ux_phase_2
+    status: completed
+    summary:
+      - studio focus now embeds edit feedback, readiness gate and current selection context in a single primary panel
+      - the main Studio to Runs transition now changes wording according to the real state of readiness instead of using one generic CTA
+      - selection, connectivity and run readiness now stay closer to the canvas and less dependent on secondary surfaces
+      - the Studio remains anchored in the business graph while advanced technical details stay behind progressive disclosure
+    evidence:
+      handoff: docs/2026-04-06_phase_ux_refinement_wave4_handoff.md
+      ui_snapshot: docs/2026-04-06_phase_ux_refinement_wave4_ui_snapshot.json
+      validation_command: "$env:PYTHONPATH='src;.'; .\\.venv\\Scripts\\python.exe -m pytest tests/decision_platform/test_ui_smoke.py -q -p no:cacheprovider --basetemp tests/_tmp/pytest-basetemp-ux-wave4-full"
+      validation_result: "51 passed in 413.47s (0:06:53)"

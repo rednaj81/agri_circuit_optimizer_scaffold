@@ -1,0 +1,25 @@
+{
+  "wave": "ux_phase_2_wave_4",
+  "validation": {
+    "targeted": "6 passed, 45 deselected in 0.60s",
+    "full": "51 passed in 413.47s (0:06:53)"
+  },
+  "visual_evidence": {
+    "type": "structured_ui_snapshot",
+    "screenshot_attempt": "not_retried_after_policy_block",
+    "note": "Structured Studio snapshot recorded because local screenshot capture had already been blocked by policy in the previous wave."
+  },
+  "studio_primary_surface": {
+    "panel_ids": [
+      "studio-canvas-guidance-panel",
+      "studio-readiness-panel",
+      "studio-focus-panel",
+      "studio-connectivity-panel"
+    ],
+    "canvas_guidance_text": "Comece pelo canvasConexão em foco: Tap P1.Ação principal agoraRevise a conexão selecionada no canvas e abra a bancada completa só se precisar ajustar famílias, comprimento ou estrutura.Gate para RunsAinda há bloqueios estruturais impedindo a passagem segura para Runs.",
+    "readiness_text": "Readiness do cenárioExige atençãoAinda há bloqueios estruturais impedindo a passagem segura para Runs.Objetivo desta áreaConfirmar se o cenário já pode sair do Studio sem depender da trilha técnica.Ação principalCorrigir regras estruturais e rotas inválidas antes de enfileirar uma nova run.Entidades visíveis9Fluxos projetados18Leitura primária do circuito de negócio.Internos ocultos9Hubs e nós técnicos fora do canvas principal.Rotas obrigatorias9Bloqueios2Impedem seguir direto para Runs.Avisos0Podem pedir revisão antes do enfileiramento.Passagem para RunsRemover bloqueiosQuando a camada principal estiver clara, siga para Runs para enfileirar ou revisar a fila. Se ainda houver bloqueios, termine a revisão no Studio antes de abrir uma nova rodada.Abrir Runs com bloqueiosBloqueiosA conexão L011 sai de S, mas S deve aparecer apenas como destino final.A conexão L012 sai de S, mas S deve aparecer apenas como destino final.AvisosSem aviso relevante neste momento.Proximos passosFeche os bloqueios estruturais antes de enfileirar uma nova run.Salve e reabra o bundle canônico quando a revisão estiver pronta.",
+    "focus_text": "Foco do canvasSem alerta operacional no momento.Objetivo desta leituraUsar a seleção atual para validar conectividade, regras obrigatórias e readiness sem sair do canvas.Próxima ação no canvasA conexão em foco já concentra a leitura deste trecho. Revise o fluxo no canvas e abra a bancada completa apenas se precisar ajustar comprimento, famílias ou direção.Passagem para RunsCorrigir regras estruturais e rotas inválidas antes de enfileirar uma nova run.Nó em focoTanque de águaConexão em focoTap P1Rotas ligadas ao nó6Impacto operacionalNó em foco: Tanque de água na superfície principal.Conexão em foco: Produto 1 -> Junção 1.Rotas deste foco: 4 obrigatória(s), 3 com dosagem, 6 com medição direta.Regras deste focoRegra do foco: W não pode receber rotas entrando; use este ponto apenas como origem.Regra do foco: rotas com dosagem exigem medição direta compatível.Regra do foco: 4 rota(s) obrigatória(s) passam por esta leitura e precisam permanecer legíveis no canvas.Readiness deste focoO cenário ainda tem 2 bloqueio(s) antes de Runs, mesmo que este foco não concentre todos eles.Ações rápidas deste focoAção sugerida agoraA conexão em foco já concentra a leitura deste trecho. Revise o fluxo no canvas e abra a bancada completa apenas se precisar ajustar comprimento, famílias ou direção.Abrir bancada completaOutros atalhos rápidosMover à esquerdaMover acimaMover abaixoDuplicar nó em focoExcluir conexão em focoAbrir bancada completaPróxima açãoRevise as rotas ligadas a W antes de ajustar posição ou nome.Confira comprimento e famílias sugeridas para a conexão L001.",
+    "connectivity_text": "Conectividade do grafoO que destrava o cenárioHá rotas com dosagem neste foco. Confirme medição direta antes de seguir para Runs.Antes de abrir RunsNão siga para Runs enquanto houver bloqueios estruturais ou rotas com dosagem sem medição direta.Bloqueios2Avisos0Rotas obrigatórias9Medição direta17Prioridade da seleção atualSeleção atualW só pode iniciar fluxo; nenhuma conexão ou rota deve terminar neste ponto.Rotas com dosagem exigem medição direta antes de seguir para Runs.Cenário inteiroHá conexões saindo de S no cenário; isso ainda bloqueia a passagem para Runs.Rotas em focoR001: W -> M (obrigatória, medição direta)R002: W -> I (obrigatória, medição direta)R003: W -> S (obrigatória, medição direta)R004: P1 -> M (obrigatória, medição direta)Próxima açãoFeche os bloqueios estruturais antes de enfileirar uma nova run.Salve e reabra o bundle canônico quando a revisão estiver pronta.",
+    "embedded_status_banner": true
+  }
+}

@@ -397,6 +397,7 @@ def test_studio_readiness_panel_surfaces_runs_transition_with_real_readiness() -
     assert "Ação principal" in panel_text
     assert "ainda não tem fluxo suficiente" in panel_text.lower()
     assert "Conectar o grafo principal" in panel_text
+    assert "Abrir Runs quando o cenário estiver pronto" in panel_text
     assert _find_component_by_id(panel, "studio-open-runs-button") is not None
 
 
@@ -423,7 +424,7 @@ def test_studio_readiness_panel_humanizes_primary_blockers_and_warnings() -> Non
     assert "A conexão L900 termina em W" in panel_text
     assert "Há rotas com dosagem sem medição direta compatível: R002." in panel_text
     assert "Ainda existem entidades sem conexão na leitura principal do grafo: P3." in panel_text
-    assert "Abrir Runs" in panel_text
+    assert "Abrir Runs com bloqueios" in panel_text
 
 
 def test_studio_connectivity_panel_surfaces_routes_and_measurement_near_canvas() -> None:
@@ -498,7 +499,9 @@ def test_studio_focus_panel_uses_canvas_selection_as_primary_context() -> None:
     assert "Rotas ligadas ao nó" in panel_text
     assert "Objetivo desta leitura" in panel_text
     assert "Próxima ação no canvas" in panel_text
+    assert "Passagem para Runs" in panel_text
     assert "Regras deste foco" in panel_text
+    assert "Readiness deste foco" in panel_text
     assert "Ações rápidas deste foco" in panel_text
     assert "Ação sugerida agora" in panel_text
     assert "W não pode receber rotas entrando" in panel_text
@@ -513,6 +516,31 @@ def test_studio_focus_panel_uses_canvas_selection_as_primary_context() -> None:
     assert _find_component_by_id(panel, "studio-focus-duplicate-node-button") is not None
     assert _find_component_by_id(panel, "studio-focus-delete-edge-button") is not None
     assert _find_component_by_id(panel, "studio-focus-open-workbench-button") is not None
+
+
+def test_studio_focus_panel_embeds_status_and_runs_gate_context() -> None:
+    panel = render_studio_focus_panel(
+        {
+            "selected_node_id": "P1",
+            "business_label": "Bomba principal",
+            "role_label": "Bomba principal",
+        },
+        {},
+        [],
+        {
+            "blocker_count": 2,
+            "warning_count": 0,
+            "primary_action": "Corrigir regras estruturais e rotas inválidas antes de enfileirar uma nova run.",
+        },
+        "Nó reposicionado com sucesso.",
+    )
+    panel_text = _collect_text_content(panel)
+
+    assert "Passagem para Runs" in panel_text
+    assert "Corrigir regras estruturais e rotas inválidas antes de enfileirar uma nova run." in panel_text
+    assert "Readiness deste foco" in panel_text
+    assert "O cenário ainda tem 2 bloqueio(s) antes de Runs" in panel_text
+    assert _find_component_by_id(panel, "studio-status-banner") is not None
 
 
 def test_studio_focus_panel_prioritizes_recommended_action_for_invalid_edge() -> None:

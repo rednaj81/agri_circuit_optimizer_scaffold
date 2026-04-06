@@ -92,6 +92,21 @@ UI_BUTTON_STYLE = {
     "background": "#f5f8f4",
     "cursor": "pointer",
 }
+UI_BUTTON_LINK_STYLE = {
+    **UI_BUTTON_STYLE,
+    "display": "inline-flex",
+    "alignItems": "center",
+    "justifyContent": "center",
+    "textDecoration": "none",
+    "color": "#18322c",
+    "fontWeight": 700,
+}
+UI_PRIMARY_BUTTON_LINK_STYLE = {
+    **UI_BUTTON_LINK_STYLE,
+    "background": "#103b35",
+    "border": "1px solid #103b35",
+    "color": "#f5f3ee",
+}
 UI_NAV_LINK_STYLE = {
     "display": "inline-flex",
     "alignItems": "center",
@@ -155,6 +170,15 @@ def _journey_step_card(step: str, title: str, description: str) -> Any:
 
 def _hero_navigation_link(label: str, href: str, component_id: str) -> Any:
     return html.A(label, href=href, id=component_id, style=UI_NAV_LINK_STYLE)
+
+
+def _button_link(label: str, href: str, component_id: str, *, primary: bool = False) -> Any:
+    return html.A(
+        label,
+        href=href,
+        id=component_id,
+        style=UI_PRIMARY_BUTTON_LINK_STYLE if primary else UI_BUTTON_LINK_STYLE,
+    )
 
 
 def _guidance_card(label: str, text: str) -> Any:
@@ -725,6 +749,14 @@ def build_studio_readiness_summary(
 def render_studio_readiness_panel(summary: dict[str, Any]) -> Any:
     status = str(summary.get("status") or "needs_attention")
     background, color = _status_tone(status)
+    blocker_count = int(summary.get("blocker_count", 0) or 0)
+    next_step = str((summary.get("next_steps") or ["Feche a leitura principal do Studio antes de seguir."])[0])
+    if blocker_count > 0:
+        runs_button_label = "Abrir Runs com bloqueios"
+    elif status != "ready":
+        runs_button_label = "Abrir Runs quando o cenário estiver pronto"
+    else:
+        runs_button_label = "Abrir Runs"
     return html.Div(
         children=[
             html.Div("Readiness do cenário", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
@@ -734,6 +766,22 @@ def render_studio_readiness_panel(summary: dict[str, Any]) -> Any:
                 children=[
                     _guidance_card("Objetivo desta área", "Confirmar se o cenário já pode sair do Studio sem depender da trilha técnica."),
                     _guidance_card("Ação principal", str(summary.get("primary_action") or "Revise a camada principal antes de abrir Runs.")),
+                ],
+            ),
+            html.H4("Fluxo principal", style={"marginBottom": "6px"}),
+            html.Div(
+                style={**UI_THREE_COLUMN_STYLE, "marginBottom": "12px"},
+                children=[
+                    _guidance_card("Agora no Studio", str(summary.get("readiness_stage") or "Revisar readiness")),
+                    _guidance_card("Sinal de passagem", str(summary.get("readiness_headline") or "Sem headline de readiness.")),
+                    _guidance_card("Destino seguinte", next_step),
+                ],
+            ),
+            html.Div(
+                style={**UI_ACTION_ROW_STYLE, "marginTop": "0", "marginBottom": "12px"},
+                children=[
+                    _button_link("Abrir Runs", "?tab=runs", "studio-readiness-open-runs-link", primary=True),
+                    _button_link("Abrir Auditoria", "?tab=audit", "studio-readiness-open-audit-link"),
                 ],
             ),
             html.Div(
@@ -756,7 +804,7 @@ def render_studio_readiness_panel(summary: dict[str, Any]) -> Any:
                     html.Div(
                         style=UI_ACTION_ROW_STYLE,
                         children=[
-                            html.Button("Abrir Runs", id="studio-open-runs-button", style=UI_BUTTON_STYLE),
+                            html.Button(runs_button_label, id="studio-open-runs-button", style=UI_BUTTON_STYLE),
                         ],
                     ),
                 ],
@@ -1074,8 +1122,11 @@ def render_studio_focus_panel(
     node_summary: dict[str, Any],
     edge_summary: dict[str, Any],
     route_rows: list[dict[str, Any]] | None,
+    readiness_summary: dict[str, Any] | None = None,
+    status_text: str | None = None,
 ) -> Any:
     route_rows = route_rows or []
+    readiness_summary = readiness_summary or {}
     selected_node_id = str(node_summary.get("selected_node_id") or "-")
     selected_edge = edge_summary.get("selected_edge") or {}
     selected_edge_id = str(edge_summary.get("selected_link_id") or "-")
@@ -1097,6 +1148,8 @@ def render_studio_focus_panel(
     mandatory_route_count = sum(1 for route in relevant_routes if _coerce_truthy(route.get("mandatory")))
     dosing_route_count = sum(1 for route in relevant_routes if float(route.get("dose_min_l") or 0.0) > 0)
     measurement_route_count = sum(1 for route in relevant_routes if _coerce_truthy(route.get("measurement_required")))
+    blocker_count = int(readiness_summary.get("blocker_count", 0) or 0)
+    warning_count = int(readiness_summary.get("warning_count", 0) or 0)
     if selected_node_id == "W" or str(selected_edge.get("to_node") or "").strip() == "W":
         focus_rules.append("Regra do foco: W não pode receber rotas entrando; use este ponto apenas como origem.")
     if selected_node_id == "S" or str(selected_edge.get("from_node") or "").strip() == "S":
@@ -1152,6 +1205,26 @@ def render_studio_focus_panel(
         if selected_node_present or selected_edge_present
         else "Começar pela seleção no canvas para abrir o contexto principal do cenário."
     )
+    runs_gate_text = (
+        str(readiness_summary.get("primary_action") or "Corrija bloqueios estruturais antes de abrir uma nova run.")
+        if blocker_count > 0
+        else (
+            str((readiness_summary.get("next_steps") or ["Feche os avisos principais e então siga para Runs."])[0])
+            if warning_count > 0
+            else str(readiness_summary.get("readiness_headline") or "Com o cenário pronto, siga para Runs.")
+        )
+    )
+    readiness_context = []
+    if edge_breaks_direction_rule:
+        readiness_context.append("Este foco ainda bloqueia a passagem para Runs até a direção da conexão ser corrigida.")
+    if dosing_without_measurement:
+        readiness_context.append("Há dosagem sem medição direta neste foco; a run oficial não deve seguir enquanto essa regra não estiver fechada.")
+    if blocker_count > 0 and not readiness_context:
+        readiness_context.append(f"O cenário ainda tem {blocker_count} bloqueio(s) antes de Runs, mesmo que este foco não concentre todos eles.")
+    if warning_count > 0 and not readiness_context:
+        readiness_context.append(f"O cenário ainda carrega {warning_count} aviso(s); revise este foco antes de enfileirar.")
+    if not readiness_context:
+        readiness_context.append("Nada neste foco impede a passagem para Runs neste momento.")
     node_next_action = (
         f"Revise as rotas ligadas a {selected_node_id} antes de ajustar posição ou nome."
         if relevant_routes
@@ -1166,11 +1239,13 @@ def render_studio_focus_panel(
         id="studio-focus-panel",
         children=[
             html.H3("Foco do canvas", style={"marginTop": 0}),
+            html.Div(id="studio-status-banner", children=render_status_banner(status_text or "")),
             html.Div(
-                style={**UI_TWO_COLUMN_STYLE, "marginBottom": "12px"},
+                style={**UI_THREE_COLUMN_STYLE, "marginBottom": "12px"},
                 children=[
                     _guidance_card("Objetivo desta leitura", focus_objective),
                     _guidance_card("Próxima ação no canvas", recommended_action_text),
+                    _guidance_card("Passagem para Runs", runs_gate_text),
                 ],
             ),
             html.Div(
@@ -1196,6 +1271,8 @@ def render_studio_focus_panel(
             ),
             html.H4("Regras deste foco", style={"marginBottom": "6px", "marginTop": "14px"}),
             _bullet_list(focus_rules, "Nenhuma regra estrutural adicional foi acionada neste foco."),
+            html.H4("Readiness deste foco", style={"marginBottom": "6px", "marginTop": "14px"}),
+            _bullet_list(readiness_context, "Sem observação adicional de readiness neste foco."),
             html.H4("Ações rápidas deste foco", style={"marginBottom": "6px", "marginTop": "14px"}),
             html.Div(
                 style={**UI_MUTED_CARD_STYLE, "padding": "14px", "marginTop": "8px"},
@@ -1318,6 +1395,7 @@ def render_runs_flow_panel(studio_summary: dict[str, Any], run_summary: dict[str
     studio_status = str(studio_summary.get("status") or "needs_attention")
     run_count = int(run_summary.get("run_count", 0) or 0) if isinstance(run_summary, dict) else 0
     next_queued_run_id = run_summary.get("next_queued_run_id") if isinstance(run_summary, dict) else None
+    queue_state = _humanize_run_status((run_summary or {}).get("queue_state", "idle")) if isinstance(run_summary, dict) else "Sem leitura"
     if studio_status == "ready":
         readiness_note = "O cenário já passou pelo gate principal de prontidão do Studio."
         next_action = (
@@ -1325,9 +1403,15 @@ def render_runs_flow_panel(studio_summary: dict[str, Any], run_summary: dict[str
             if next_queued_run_id
             else "Enfileire o cenário atual ou revise a última execução antes de avançar para Decisão."
         )
+        decision_gate = (
+            f"A fila ainda tem uma próxima run explícita ({next_queued_run_id}); confirme se vale executar antes de entrar em Decisão."
+            if next_queued_run_id
+            else ("Já existe histórico de runs para leitura; avance para Decisão quando o resumo executivo estiver claro." if run_count else "Ainda não há histórico de run; enfileire o cenário antes de abrir Decisão.")
+        )
     else:
         readiness_note = "O Studio ainda sinaliza bloqueios ou avisos relevantes para o enfileiramento."
         next_action = "Volte ao Studio para corrigir conectividade, regras obrigatórias e medição direta antes de abrir uma nova run."
+        decision_gate = "A passagem para Decisão continua secundária até o Studio liberar o gate principal de readiness."
     return html.Div(
         children=[
             html.H3("Passagem Studio -> Runs", style={"marginTop": 0}),
@@ -1336,6 +1420,15 @@ def render_runs_flow_panel(studio_summary: dict[str, Any], run_summary: dict[str
                 children=[
                     _guidance_card("Objetivo desta área", "Transformar readiness do Studio em uma leitura clara de fila, execução e próximo passo."),
                     _guidance_card("Ação principal", next_action),
+                ],
+            ),
+            html.H4("Fluxo principal", style={"marginBottom": "6px"}),
+            html.Div(
+                style={**UI_THREE_COLUMN_STYLE, "marginBottom": "12px"},
+                children=[
+                    _guidance_card("Entrada de Studio", str(studio_summary.get("readiness_headline") or readiness_note)),
+                    _guidance_card("Fila e operação", f"{queue_state}. {run_count} run(s) visível(is) na fila local."),
+                    _guidance_card("Saída para Decisão", decision_gate),
                 ],
             ),
             html.Div(
@@ -1354,6 +1447,8 @@ def render_runs_flow_panel(studio_summary: dict[str, Any], run_summary: dict[str
             html.Div(
                 style=UI_ACTION_ROW_STYLE,
                 children=[
+                    _button_link("Voltar ao Studio", "?tab=studio", "runs-flow-open-studio-link"),
+                    _button_link("Ir para Decisão", "?tab=decision", "runs-flow-open-decision-link", primary=True),
                     html.Button("Voltar ao Studio", id="runs-open-studio-button", style=UI_BUTTON_STYLE),
                     html.Button("Ir para Decisão", id="runs-open-decision-button", style=UI_BUTTON_STYLE),
                 ],
@@ -1996,11 +2091,12 @@ def build_app(
                                     html.Div(
                                         style={**UI_MUTED_CARD_STYLE, "display": "grid", "gap": "12px"},
                                         children=[
-                                            html.Div(id="studio-status-banner", children=render_status_banner("")),
                                             render_studio_focus_panel(
                                                 _safe_json_loads(initial_node_studio_summary),
                                                 _safe_json_loads(initial_edge_studio_summary),
                                                 authoring_payload["route_rows"],
+                                                initial_studio_readiness,
+                                                "",
                                             ),
                                             render_studio_connectivity_panel(
                                                 initial_studio_readiness,
@@ -3619,7 +3715,6 @@ def build_app(
         Output("studio-connectivity-panel", "children"),
         Output("node-studio-summary-panel", "children"),
         Output("edge-studio-summary-panel", "children"),
-        Output("studio-status-banner", "children"),
         Input("nodes-grid", "rowData"),
         Input("candidate-links-grid", "rowData"),
         Input("routes-grid", "rowData"),
@@ -3636,7 +3731,7 @@ def build_app(
         node_summary_text: str | None,
         edge_summary_text: str | None,
         studio_status_text: str | None,
-    ) -> tuple[Any, Any, Any, Any, Any, Any, Any, Any, Any]:
+    ) -> tuple[Any, Any, Any, Any, Any, Any, Any, Any]:
         studio_readiness = build_studio_readiness_summary(nodes_rows or [], candidate_links_rows or [], route_rows or [])
         node_summary = _safe_json_loads(node_summary_text)
         edge_summary = _safe_json_loads(edge_summary_text)
@@ -3647,11 +3742,10 @@ def build_app(
                 build_studio_projection_summary(nodes_rows or [], candidate_links_rows or [], route_rows or [])
             ),
             render_runs_flow_panel(studio_readiness, _safe_json_loads(run_jobs_summary_text)),
-            render_studio_focus_panel(node_summary, edge_summary, route_rows),
+            render_studio_focus_panel(node_summary, edge_summary, route_rows, studio_readiness, studio_status_text),
             render_studio_connectivity_panel(studio_readiness, node_summary, edge_summary, route_rows),
             render_studio_selection_panel(node_summary, "node"),
             render_studio_selection_panel(edge_summary, "edge"),
-            render_status_banner(studio_status_text),
         )
 
     @app.callback(
