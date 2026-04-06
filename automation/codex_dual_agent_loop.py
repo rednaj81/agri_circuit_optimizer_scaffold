@@ -180,6 +180,16 @@ def supervisor_guidance_path(repo_root: Path) -> Path:
     return runtime_dir(repo_root) / "supervisor_guidance.json"
 
 
+def fresh_instructions_dir(repo_root: Path) -> Path:
+    out = runtime_dir(repo_root) / "fresh_instructions"
+    out.mkdir(parents=True, exist_ok=True)
+    return out
+
+
+def role_fresh_instruction_path(repo_root: Path, role: str) -> Path:
+    return fresh_instructions_dir(repo_root) / f"{role}.md"
+
+
 def runtime_scratch_dir(repo_root: Path, run_id: str) -> Path:
     out = runtime_dir(repo_root) / "runs" / run_id
     out.mkdir(parents=True, exist_ok=True)
@@ -309,6 +319,43 @@ def current_supervisor_guidance(repo_root: Path) -> dict[str, Any]:
     return load_optional_json(supervisor_guidance_path(repo_root))
 
 
+def consume_role_fresh_instruction(
+    repo_root: Path,
+    role: str,
+    role_run_root: Path,
+) -> dict[str, str]:
+    instruction_path = role_fresh_instruction_path(repo_root, role)
+    if not instruction_path.exists():
+        return {}
+    content = instruction_path.read_text(encoding="utf-8-sig").strip()
+    if not content:
+        return {}
+    consumed_at = now_iso()
+    consumed_path = role_run_root / f"{role}.fresh-instruction.md"
+    metadata_path = role_run_root / f"{role}.fresh-instruction.json"
+    write_utf8(consumed_path, content.strip() + "\n")
+    metadata_path.write_text(
+        json.dumps(
+            {
+                "role": role,
+                "source_path": str(instruction_path),
+                "consumed_at": consumed_at,
+                "consumed_copy_path": str(consumed_path),
+            },
+            indent=2,
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    instruction_path.write_text("", encoding="utf-8")
+    return {
+        "content": content,
+        "source_path": str(instruction_path),
+        "consumed_at": consumed_at,
+        "consumed_copy_path": str(consumed_path),
+    }
+
+
 def compose_initial_prompt(
     *,
     repo_root: Path,
@@ -319,7 +366,9 @@ def compose_initial_prompt(
     state: LoopState | None,
     handoff_payload: str,
     output_model: type[BaseModel],
+    fresh_instruction_payload: dict[str, str] | None = None,
 ) -> str:
+    fresh_instruction_payload = fresh_instruction_payload or {}
     sections = [
         read_text(repo_root / "AGENTS.md"),
         read_text(role_template_path),
@@ -329,6 +378,16 @@ def compose_initial_prompt(
         "Receba apenas o handoff explicito do papel anterior; nao reabra o escopo conceitual.",
         f"CONTEXTO DO REPOSITORIO\n{repo_context_text(repo_root, phase_id, wave_index, state)}",
         f"ONDA ANTERIOR\n{previous_wave_summary(state)}",
+        (
+            "INSTRUCOES FRESCAS EXTERNAS\n"
+            f"source_path: {fresh_instruction_payload.get('source_path', '')}\n"
+            f"consumed_at: {fresh_instruction_payload.get('consumed_at', '')}\n"
+            "Consuma estas instrucoes nesta onda, trate-as como correcao de curso explicita do supervisor, "
+            "e nao reutilize instrucoes antigas fora deste bloco.\n\n"
+            f"{fresh_instruction_payload.get('content', '').strip()}"
+        )
+        if fresh_instruction_payload.get("content")
+        else "",
         f"HANDOFF RECEBIDO\n{handoff_payload.strip()}",
         "FORMATO DE RESPOSTA\n"
         f"Responda apenas com um objeto JSON valido compativel com este schema:\n{json.dumps(output_model.model_json_schema(), indent=2, ensure_ascii=False)}",
@@ -343,7 +402,9 @@ def compose_resume_prompt(
     wave_index: int,
     handoff_payload: str,
     output_model: type[BaseModel],
+    fresh_instruction_payload: dict[str, str] | None = None,
 ) -> str:
+    fresh_instruction_payload = fresh_instruction_payload or {}
     return "\n\n".join(
         [
             f"CONTINUE SUA SESSAO DO PAPEL {role.upper()}",
@@ -351,6 +412,15 @@ def compose_resume_prompt(
             f"wave_index: {wave_index}",
             "Use o mesmo codebase local como fonte de verdade.",
             "Receba apenas o handoff abaixo e responda sem recap global desnecessario.",
+            (
+                "INSTRUCOES FRESCAS EXTERNAS\n"
+                f"source_path: {fresh_instruction_payload.get('source_path', '')}\n"
+                f"consumed_at: {fresh_instruction_payload.get('consumed_at', '')}\n"
+                "Consuma estas instrucoes nesta onda e trate-as como correcao de curso explicita do supervisor.\n\n"
+                f"{fresh_instruction_payload.get('content', '').strip()}"
+            )
+            if fresh_instruction_payload.get("content")
+            else "",
             f"HANDOFF RECEBIDO\n{handoff_payload.strip()}",
             "FORMATO DE RESPOSTA\n"
             f"Responda apenas com um objeto JSON valido compativel com este schema:\n{json.dumps(output_model.model_json_schema(), indent=2, ensure_ascii=False)}",
@@ -858,6 +928,7 @@ def run_loop(
                 ensure_ascii=False,
             )
             architect_run_root = wave_run_root / "architect"
+            architect_fresh_instruction = consume_role_fresh_instruction(repo_root, "architect", architect_run_root)
             architect_prompt = (
                 compose_resume_prompt(
                     role="architect",
@@ -865,6 +936,7 @@ def run_loop(
                     wave_index=wave_index,
                     handoff_payload=architect_handoff_payload,
                     output_model=ArchitectOutput,
+                    fresh_instruction_payload=architect_fresh_instruction,
                 )
                 if architect_session.session_id
                 else compose_initial_prompt(
@@ -876,6 +948,7 @@ def run_loop(
                     state=state,
                     handoff_payload=architect_handoff_payload,
                     output_model=ArchitectOutput,
+                    fresh_instruction_payload=architect_fresh_instruction,
                 )
             )
             persist_handoff(
@@ -915,6 +988,7 @@ def run_loop(
                 ensure_ascii=False,
             )
             developer_run_root = wave_run_root / "developer"
+            developer_fresh_instruction = consume_role_fresh_instruction(repo_root, "developer", developer_run_root)
             developer_prompt = (
                 compose_resume_prompt(
                     role="developer",
@@ -922,6 +996,7 @@ def run_loop(
                     wave_index=wave_index,
                     handoff_payload=developer_handoff_payload,
                     output_model=DeveloperOutput,
+                    fresh_instruction_payload=developer_fresh_instruction,
                 )
                 if developer_session.session_id
                 else compose_initial_prompt(
@@ -933,6 +1008,7 @@ def run_loop(
                     state=state,
                     handoff_payload=developer_handoff_payload,
                     output_model=DeveloperOutput,
+                    fresh_instruction_payload=developer_fresh_instruction,
                 )
             )
             state.active_role = "developer"
@@ -971,6 +1047,7 @@ def run_loop(
                 ensure_ascii=False,
             )
             auditor_run_root = wave_run_root / "auditor"
+            auditor_fresh_instruction = consume_role_fresh_instruction(repo_root, "auditor", auditor_run_root)
             auditor_prompt = (
                 compose_resume_prompt(
                     role="auditor",
@@ -978,6 +1055,7 @@ def run_loop(
                     wave_index=wave_index,
                     handoff_payload=auditor_handoff_payload,
                     output_model=AuditorOutput,
+                    fresh_instruction_payload=auditor_fresh_instruction,
                 )
                 if auditor_session.session_id
                 else compose_initial_prompt(
@@ -989,6 +1067,7 @@ def run_loop(
                     state=state,
                     handoff_payload=auditor_handoff_payload,
                     output_model=AuditorOutput,
+                    fresh_instruction_payload=auditor_fresh_instruction,
                 )
             )
             state.active_role = "auditor"

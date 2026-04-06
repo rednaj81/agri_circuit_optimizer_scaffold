@@ -7,9 +7,9 @@ param(
     [string]$Backend = 'codex-exec-external',
     [int]$MaxWaves = 10,
     [string]$Model = 'gpt-5.4',
-    [string]$ReasoningEffort = 'high',
+    [string]$ReasoningEffort = '',
     [int]$ConsecutiveLowValueStop = 3,
-    [int]$StallTimeoutSeconds = 900,
+    [int]$StallTimeoutSeconds = 1800,
     [int]$BootstrapGraceSeconds = 180,
     [switch]$RestartOnTerminalStop
 )

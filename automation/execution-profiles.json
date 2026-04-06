@@ -21,17 +21,20 @@
         "architect": {
           "mode": "agent",
           "entrypoint": "architect",
-          "model": "gpt-5.4"
+          "model": "gpt-5.4",
+          "reasoning_effort": "high"
         },
         "developer": {
           "mode": "agent",
           "entrypoint": "developer",
-          "model": "gpt-5.4"
+          "model": "gpt-5.4",
+          "reasoning_effort": "medium"
         },
         "auditor": {
           "mode": "agent",
           "entrypoint": "auditor",
-          "model": "gpt-5.4"
+          "model": "gpt-5.4",
+          "reasoning_effort": "high"
         }
       },
       "notes": "Perfil padrão para o loop Architect -> Developer -> Auditor via Codex CLI externo."
@@ -55,17 +58,20 @@
         "architect": {
           "mode": "agent",
           "entrypoint": "architect",
-          "model": "gpt-5.4-mini"
+          "model": "gpt-5.4-mini",
+          "reasoning_effort": "medium"
         },
         "developer": {
           "mode": "agent",
           "entrypoint": "developer",
-          "model": "gpt-5.4-mini"
+          "model": "gpt-5.4-mini",
+          "reasoning_effort": "low"
         },
         "auditor": {
           "mode": "agent",
           "entrypoint": "auditor",
-          "model": "gpt-5.4"
+          "model": "gpt-5.4",
+          "reasoning_effort": "high"
         }
       },
       "notes": "Perfil para preflight e iteração curta. Mantém o auditor mais forte."

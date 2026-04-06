@@ -16,7 +16,7 @@ from urllib.parse import parse_qs, urlparse
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8787
-DEFAULT_STALL_TIMEOUT_SECONDS = 900
+DEFAULT_STALL_TIMEOUT_SECONDS = 1800
 DEFAULT_BOOTSTRAP_GRACE_SECONDS = 180
 
 
@@ -516,7 +516,7 @@ class SupervisorHandler(BaseHTTPRequestHandler):
         backend = str(body.get("backend") or "codex-exec-external")
         max_waves = int(body.get("max_waves") or 10)
         model = str(body.get("model") or "gpt-5.4")
-        reasoning_effort = str(body.get("reasoning_effort") or "high")
+        reasoning_effort = str(body["reasoning_effort"]) if "reasoning_effort" in body else ""
 
         if parsed.path == "/preflight":
             payload = self.service.run_preflight(

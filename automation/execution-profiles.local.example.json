@@ -6,6 +6,17 @@
       "defaults": {
         "model": "gpt-5.4",
         "reasoning_effort": "medium"
+      },
+      "roles": {
+        "architect": {
+          "reasoning_effort": "high"
+        },
+        "developer": {
+          "reasoning_effort": "medium"
+        },
+        "auditor": {
+          "reasoning_effort": "high"
+        }
       }
     }
   }

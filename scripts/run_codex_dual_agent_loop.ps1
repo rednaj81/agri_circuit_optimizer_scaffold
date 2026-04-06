@@ -4,7 +4,7 @@ param(
     [int]$MaxWaves = 10,
     [string]$Backend = "codex-exec-external",
     [string]$Model = "gpt-5.4",
-    [string]$ReasoningEffort = "high",
+    [string]$ReasoningEffort = "",
     [switch]$PreflightOnly
 )
 
@@ -28,7 +28,7 @@ Write-Host "phase: $Phase"
 Write-Host "max-waves: $MaxWaves"
 Write-Host "backend: $Backend"
 Write-Host "model: $Model"
-Write-Host "reasoning-effort: $ReasoningEffort"
+Write-Host "reasoning-effort: $(if ([string]::IsNullOrWhiteSpace($ReasoningEffort)) { '<profile-default>' } else { $ReasoningEffort })"
 
 $argsList = @(
     $loopScript,
@@ -37,9 +37,12 @@ $argsList = @(
     "--run-id", $RunId,
     "--max-waves", $MaxWaves,
     "--backend", $Backend,
-    "--model", $Model,
-    "--reasoning-effort", $ReasoningEffort
+    "--model", $Model
 )
+
+if (-not [string]::IsNullOrWhiteSpace($ReasoningEffort)) {
+    $argsList += @("--reasoning-effort", $ReasoningEffort)
+}
 
 if ($PreflightOnly) {
     $argsList += "--preflight-only"
