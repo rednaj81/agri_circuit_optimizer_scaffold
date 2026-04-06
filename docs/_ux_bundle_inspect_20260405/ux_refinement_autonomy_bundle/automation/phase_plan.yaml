@@ -1,0 +1,61 @@
+mode: ux_refinement
+max_waves: 10
+stop_after_consecutive_low_value: 3
+final_polish_cycles: 1
+
+phases:
+  - id: ux_phase_1
+    name: Navigation and information architecture cleanup
+    focus:
+      - main navigation
+      - screen purpose clarity
+      - reduction of noisy technical surfaces
+    expected_outcomes:
+      - clearer IA
+      - fewer ambiguous entry points
+      - better main user path
+
+  - id: ux_phase_2
+    name: Studio refinement and connectivity-first workflow
+    focus:
+      - node/edge editing UX
+      - properties panel
+      - mandatory routes
+      - pre-run validation
+      - connectivity guidance
+    expected_outcomes:
+      - scenario readiness clarity
+      - fewer preventable invalid runs
+
+  - id: ux_phase_3
+    name: Runs queue and execution UX
+    focus:
+      - queue readability
+      - run statuses
+      - progress
+      - run detail view
+      - scenario/run separation
+    expected_outcomes:
+      - clean understanding of background processing
+
+  - id: ux_phase_4
+    name: Decision view and technical tie support
+    focus:
+      - official candidate
+      - runner-up
+      - side-by-side comparison
+      - technical tie
+      - manual final choice
+    expected_outcomes:
+      - clearer decision-making
+
+  - id: ux_phase_5
+    name: Polish, consistency and documentation
+    focus:
+      - labels
+      - empty states
+      - consistency
+      - docs
+      - validation checklist
+    expected_outcomes:
+      - professional finish

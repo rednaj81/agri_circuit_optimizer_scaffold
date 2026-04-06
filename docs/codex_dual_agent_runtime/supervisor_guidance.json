@@ -1,100 +1,113 @@
 {
-    "updated_at":  "2026-04-05T08:25:31.9924171Z",
-    "phase_id":  "phase_3",
-    "phase_assessment":  "continue_phase",
-    "recommended_next_phase":  "phase_3",
-    "current_focus":  {
-                          "active_wave_index":  14,
-                          "active_role":  "",
-                          "waves_completed":  15,
-                          "last_updated_at":  "2026-04-05T08:13:26.383903+00:00",
-                          "health_state":  "phase_3_serial_queue_active",
-                          "latest_commit":  "2305da132a18bfbf75ca0d86ec5aef811cc6c006"
-                      },
-    "recent_wave_objectives":  [
-                                   "Open phase_3 with the serial queue MVP.",
-                                   "Add queued-job cancel, explicit rerun, and individual run inspection.",
-                                   "Realign governance so phase_3 is the only active functional phase."
-                               ],
-    "recent_wave_verdicts":  [
-                                 "significant_progress",
-                                 "significant_progress",
-                                 "operational_alignment"
-                             ],
-    "recent_commit_subjects":  [
-                                   "wave13 record phase3 stop freeze",
-                                   "wave12 stabilize phase3 runs bootstrap",
-                                   "wave11 centralize phase3 queue summary refresh",
-                                   "wave10 harden phase3 queue summary consistency",
-                                   "wave9 persist phase3 queue summary",
-                                   "wave8 add phase3 queue lineage summary",
-                                   "wave7 harden phase3 run evidence inspection",
-                                   "wave6 freeze phase3 governance sync"
-                               ],
-    "directives":  [
-                       "Treat phase_1 and phase_2 as closed baselines.",
-                       "Use tests/decision_platform/test_phase3_queue_acceptance.py as the current functional acceptance gate.",
-                       "Keep the worker serial and avoid opening parallel orchestration in this wave."
-                   ],
-    "rationale":  [
-                      "The codebase already opened the minimum serial queue slice of phase_3.",
-                      "Governance must reflect the active functional phase to keep gates and continuity auditable."
-                  ],
-    "current_phase_gate":  {
-                               "manifest":  "docs/codex_dual_agent_runtime/phase_0_validation_manifest.json",
-                               "manifest_block":  "phase_3_current_validation",
-                               "handoff":  "docs/2026-04-05_phase3_wave1_queue_open_handoff.md",
-                               "phase_plan":  "docs/codex_dual_agent_hydraulic_autonomy_bundle/automation/phase_plan.yaml",
-                               "tests":  [
-                                             "tests/decision_platform/test_phase3_queue_acceptance.py",
-                                             "tests/decision_platform/test_phase3_runs_ui_smoke.py"
-                                         ],
-                               "signals":  [
-                                               "run_job local persistence",
-                                               "serial worker only",
-                                               "queued cancel",
-                                               "explicit rerun",
-                                               "individual run inspection"
-                                           ]
+    "updated_at":  "2026-04-06T08:00:59.4649794Z",
+    "mode":  "ux_refinement",
+    "source_bundle":  "docs/ux_refinement_autonomy_bundle",
+    "source_zip":  "docs/ux_refinement_autonomy_bundle.zip",
+    "phase_plan":  "docs/ux_refinement_autonomy_bundle/automation/phase_plan.yaml",
+    "bootstrap_prompt":  "docs/ux_refinement_autonomy_bundle/prompts/PROMPT_SHORT_BOOTSTRAP_UI_REFINEMENT.md",
+    "full_prompt":  "docs/ux_refinement_autonomy_bundle/prompts/PROMPT_FULL_AUTONOMOUS_UI_REFINEMENT.md",
+    "current_repo_head":  "cb16f11a8d3a80a4496489c808cbbcc745647b16",
+    "current_branch":  "codex/new-architecture-platform",
+    "active_ux_phase_id":  "ux_phase_1",
+    "active_ux_phase":  {
+                            "id":  "ux_phase_1",
+                            "name":  "Navigation and information architecture cleanup",
+                            "focus":  [
+                                          "main navigation",
+                                          "screen purpose clarity",
+                                          "reduction of noisy technical surfaces",
+                                          "market-grade product shell"
+                                      ],
+                            "expected_outcomes":  [
+                                                      "clearer IA",
+                                                      "fewer ambiguous entry points",
+                                                      "better main user path",
+                                                      "less console-like feel"
+                                                  ]
+                        },
+    "next_ux_phase_id":  "ux_phase_2",
+    "phase_sequence":  [
+                           {
+                               "id":  "ux_phase_1",
+                               "name":  "Navigation and information architecture cleanup"
                            },
-    "phase_1_exit_evidence":  {
-                                  "manifest":  "docs/codex_dual_agent_runtime/phase_0_validation_manifest.json",
-                                  "manifest_block":  "phase_1_exit_validation",
-                                  "handoff":  "docs/2026-04-05_phase1_wave5_exit_handoff.md",
-                                  "phase_plan":  "docs/codex_dual_agent_hydraulic_autonomy_bundle/automation/phase_plan.yaml",
-                                  "tests":  [
-                                                "tests/decision_platform/test_scenario_settings_contract.py",
-                                                "tests/decision_platform/test_scenario_persistence.py",
-                                                "tests/decision_platform/test_phase1_exit_acceptance.py",
-                                                "tests/decision_platform/test_phase1_exit_artifacts.py"
-                                            ],
-                                  "signals":  [
-                                                  "scenario_bundle.yaml",
-                                                  "component_catalog.csv",
-                                                  "scenario_settings.storage canonical mapping",
-                                                  "save -\u003e reopen -\u003e run provenance"
-                                              ]
-                              },
-    "phase_1_continuation_policy":  {
-                                        "additional_functional_waves_allowed":  false,
-                                        "final_operational_correction_wave":  7,
-                                        "next_functional_phase":  "phase_2"
-                                    },
-    "closed_phases":  {
-                          "phase_1":  {
-                                          "status":  "closed",
-                                          "handoff":  "docs/2026-04-05_phase1_wave5_exit_handoff.md"
-                                      },
-                          "phase_2":  {
-                                          "status":  "closed",
-                                          "handoff":  "docs/2026-04-05_phase2_exit.md",
-                                          "acceptance_target":  "tests/decision_platform/test_phase2_exit_acceptance.py"
-                                      }
+                           {
+                               "id":  "ux_phase_2",
+                               "name":  "Studio refinement and connectivity-first workflow"
+                           },
+                           {
+                               "id":  "ux_phase_3",
+                               "name":  "Runs queue and execution UX"
+                           },
+                           {
+                               "id":  "ux_phase_4",
+                               "name":  "Decision view and technical tie support"
+                           },
+                           {
+                               "id":  "ux_phase_5",
+                               "name":  "Polish, consistency and documentation"
+                           }
+                       ],
+    "current_focus":  {
+                          "active_wave_index":  4,
+                          "active_role":  "developer",
+                          "waves_completed":  3,
+                          "health_state":  "running",
+                          "run_id":  "run-20260406-042100",
+                          "stop_reason":  ""
                       },
-    "out_of_scope_for_phase_1":  [
-                                     "tests/decision_platform/test_studio_structure.py",
-                                     "structural node or edge creation, duplication, or deletion",
-                                     "queue and background runs",
-                                     "ranking, scoring, and decision UI expansion"
-                                 ]
+    "directives":  [
+                       "Do not reopen architecture or replace the current Dash/Cytoscape stack.",
+                       "Use decision_platform as the product surface and preserve Julia-only official execution.",
+                       "Treat Studio, Runs, Decision and Audit as the main product spaces.",
+                       "Keep the Studio focused on the business graph only; technical internal hubs and derived nodes must stay hidden from the primary surface.",
+                       "Prefer direct manipulation on the canvas over fragmented raw forms whenever the Studio changes.",
+                       "Reduce html.Pre and raw JSON as primary UI surfaces; use progressive disclosure instead.",
+                       "Do not allow orphan nodes or technical clutter in the main final visualization.",
+                       "Prioritize user-facing flow clarity over backend-only refinements.",
+                       "Require meaningful UX progress in every wave and stop after three low-value waves.",
+                       "Push the product toward market-grade UX instead of a cleaned-up engineering console."
+                   ],
+    "product_baseline":  [
+                             "selected_candidate",
+                             "selected_candidate_explanation",
+                             "engine_comparison",
+                             "technical_tie",
+                             "studio nodes/edges",
+                             "queue/run model"
+                         ],
+    "acceptance_targets":  [
+                               "navigation clarity",
+                               "scenario readiness feedback",
+                               "queue/runs readability",
+                               "winner vs runner-up visibility",
+                               "technical tie explicitness",
+                               "clear infeasibility reasons"
+                           ],
+    "evidence_requirements":  [
+                                  "commit per meaningful phase",
+                                  "docs updated with honest handoff",
+                                  "tests updated where UI behavior changes",
+                                  "visual evidence via screenshot or structured UI snapshot when possible"
+                              ],
+    "recent_commit_subjects":  [
+                                   "wave1 align primary workspace hierarchy",
+                                   "wave1 clarify studio first-fold journey",
+                                   "wave3 persist active shell framing",
+                                   "wave2 clarify first-fold product states",
+                                   "wave10 finalize ux refinement stabilization",
+                                   "wave1 clarify primary product journey",
+                                   "wave9 harmonize product language and state labels",
+                                   "wave8 clarify decision assisted choice states"
+                               ],
+    "repo_overlay":  {
+                         "root_agents":  "AGENTS.md",
+                         "ux_bundle_root":  "docs/ux_refinement_autonomy_bundle",
+                         "installed_agents":  [
+                                                  ".codex/agents/ux_architect.md",
+                                                  ".codex/agents/product_flow_engineer.md",
+                                                  ".codex/agents/ux_auditor.md"
+                                              ],
+                         "installed_skill":  ".codex/skills/ux_refinement/SKILL.md"
+                     }
 }

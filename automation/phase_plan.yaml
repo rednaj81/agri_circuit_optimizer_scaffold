@@ -37,3 +37,11 @@ phase_6:
     - "bugs críticos resolvidos"
     - "testes/execução documentados"
     - "harden final"
+phase_ux_refinement:
+  target: "Refinar UX e fluxo guiado da decision_platform sem reabrir arquitetura"
+  exit_criteria:
+    - "navegação principal mais clara"
+    - "studio com readiness/prevenção mais explícitos"
+    - "runs/fila compreensíveis sem logs brutos"
+    - "decisão com winner, runner-up e technical_tie legíveis"
+    - "menos ruído técnico nas superfícies primárias"
