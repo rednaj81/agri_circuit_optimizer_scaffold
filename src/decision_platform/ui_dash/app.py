@@ -780,6 +780,12 @@ def render_studio_readiness_panel(summary: dict[str, Any]) -> Any:
     background, color = _status_tone(status)
     blocker_count = int(summary.get("blocker_count", 0) or 0)
     next_step = str((summary.get("next_steps") or ["Feche a leitura principal do Studio antes de seguir."])[0])
+    if summary.get("blockers"):
+        primary_blocker = _humanize_readiness_issue(list(summary.get("blockers", []))[0])
+    elif summary.get("warnings"):
+        primary_blocker = _humanize_readiness_issue(list(summary.get("warnings", []))[0])
+    else:
+        primary_blocker = "Nenhum bloqueio ou aviso domina a passagem atual para Runs."
     if blocker_count > 0:
         runs_button_label = "Abrir Runs com bloqueios"
     elif status != "ready":
@@ -791,10 +797,11 @@ def render_studio_readiness_panel(summary: dict[str, Any]) -> Any:
             html.Div("Readiness do cenário", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
             html.Div(style={"display": "flex", "alignItems": "center", "gap": "10px", "margin": "8px 0 14px", "flexWrap": "wrap"}, children=[html.Span(_humanize_readiness_status(status), style={"padding": "6px 10px", "borderRadius": "999px", "background": background, "color": color, "fontWeight": 700}), html.Span(str(summary.get("readiness_headline") or ("Pronto para rodar" if status == "ready" else "Ainda exige atencao estrutural")), style={"fontWeight": 700, "lineHeight": "1.5"})]),
             html.Div(
-                style={**UI_TWO_COLUMN_STYLE, "marginBottom": "12px"},
+                style={**UI_THREE_COLUMN_STYLE, "marginBottom": "12px"},
                 children=[
                     _guidance_card("Objetivo desta área", "Confirmar se o cenário já pode sair do Studio sem depender da trilha técnica."),
                     _guidance_card("Ação principal", str(summary.get("primary_action") or "Revise a camada principal antes de abrir Runs.")),
+                    _guidance_card("Bloqueio principal", primary_blocker),
                 ],
             ),
             html.H4("Fluxo principal", style={"marginBottom": "6px"}),
@@ -1446,15 +1453,32 @@ def render_run_jobs_overview_panel(summary: dict[str, Any]) -> Any:
     status_counts = summary.get("status_counts", {}) if isinstance(summary, dict) else {}
     run_count = int(summary.get("run_count", 0) or 0) if isinstance(summary, dict) else 0
     next_queued_run_id = summary.get("next_queued_run_id") if isinstance(summary, dict) else None
-    if next_queued_run_id:
-        queue_guidance = f"Ha uma run pronta na fila: {next_queued_run_id}. Revise a run em foco ou execute o proximo job."
+    active_run_ids = list(summary.get("active_run_ids", [])) if isinstance(summary, dict) else []
+    queued_run_ids = list(summary.get("queued_run_ids", [])) if isinstance(summary, dict) else []
+    latest_run_id = summary.get("latest_run_id") if isinstance(summary, dict) else None
+    latest_updated_at = summary.get("latest_updated_at") if isinstance(summary, dict) else None
+    failed_count = int(status_counts.get("failed", 0) or 0)
+    completed_count = int(status_counts.get("completed", 0) or 0)
+    queue_state = _humanize_run_status(summary.get("queue_state", "idle")) if isinstance(summary, dict) else "Sem leitura"
+    if active_run_ids:
+        queue_headline = "Execução em andamento"
+        queue_guidance = f"Há run em andamento agora ({active_run_ids[0]}). Acompanhe essa execução antes de decidir se vale abrir outra rodada."
+    elif next_queued_run_id:
+        queue_headline = "Fila pronta para a próxima rodada"
+        queue_guidance = f"Há uma run pronta na fila: {next_queued_run_id}. Revise a run em foco ou execute o próximo job."
+    elif failed_count and not completed_count:
+        queue_headline = "Histórico ainda exige revisão"
+        queue_guidance = "A fila não tem pendências, mas as últimas execuções falharam. Revise a run em foco antes de reenfileirar."
     elif run_count:
-        queue_guidance = "A fila esta sem pendencias no momento. Use a run em foco para revisar o ultimo estado antes de decidir o proximo passo."
+        queue_headline = "Histórico recente disponível"
+        queue_guidance = "A fila está sem pendências no momento. Use a run em foco para revisar o último estado antes de decidir o próximo passo."
     else:
-        queue_guidance = "Nenhuma run registrada ainda. Enfileire o cenario atual para iniciar a trilha operacional."
+        queue_headline = "Nenhuma execução registrada"
+        queue_guidance = "Nenhuma run registrada ainda. Enfileire o cenário atual para iniciar a trilha operacional."
     return html.Div(
         children=[
             html.H3("Resumo da fila", style={"marginTop": 0}),
+            html.Div(queue_headline, style={"fontWeight": 700, "lineHeight": "1.5", "marginBottom": "10px"}),
             html.Div(
                 style={**UI_TWO_COLUMN_STYLE, "marginBottom": "12px"},
                 children=[
@@ -1466,12 +1490,32 @@ def render_run_jobs_overview_panel(summary: dict[str, Any]) -> Any:
                 style=UI_THREE_COLUMN_STYLE,
                 children=[
                     _metric_card("Runs", summary.get("run_count", 0), "Total observavel na fila local."),
-                    _metric_card("Estado", _humanize_run_status(summary.get("queue_state", "idle")), "fila serial local"),
-                    _metric_card("Proxima run", summary.get("next_queued_run_id") or "-", "Entrada seguinte da fila"),
+                    _metric_card("Estado da fila", queue_state, "fila serial local"),
+                    _metric_card("Em execução", len(active_run_ids)),
+                    _metric_card("Na fila", len(queued_run_ids)),
+                    _metric_card("Concluídas", completed_count),
+                    _metric_card("Falhas", failed_count),
+                    _metric_card("Próxima run", summary.get("next_queued_run_id") or "-", "Entrada seguinte da fila"),
                 ],
             ),
-            html.H4("Estado atual", style={"marginBottom": "6px", "marginTop": "14px"}),
-            html.Div(queue_guidance, style={"fontWeight": 700, "lineHeight": "1.5"}),
+            html.H4("Fila agora", style={"marginBottom": "6px", "marginTop": "14px"}),
+            _bullet_list(
+                [
+                    f"Em execução: {', '.join(active_run_ids[:2])}" if active_run_ids else "",
+                    f"Próxima a rodar: {next_queued_run_id}" if next_queued_run_id else "",
+                    f"Worker local: {summary.get('worker_mode') or '-'}",
+                ],
+                "Sem run ativa ou aguardando nesta leitura.",
+            ),
+            html.H4("Histórico recente", style={"marginBottom": "6px", "marginTop": "14px"}),
+            _bullet_list(
+                [
+                    f"Última run conhecida: {latest_run_id}" if latest_run_id else "",
+                    f"Última atualização observada: {latest_updated_at}" if latest_updated_at else "",
+                    f"Runs terminais registradas: {len(summary.get('terminal_run_ids', []))}" if isinstance(summary, dict) else "",
+                ],
+                "Ainda não há histórico recente para leitura.",
+            ),
             html.H4("Status por quantidade", style={"marginBottom": "6px", "marginTop": "14px"}),
             _bullet_list([f"{_humanize_run_status(status)}: {count}" for status, count in status_counts.items()], "Ainda não há histórico suficiente para distribuir a fila por status."),
         ]
@@ -1483,17 +1527,19 @@ def render_runs_flow_panel(studio_summary: dict[str, Any], run_summary: dict[str
     run_count = int(run_summary.get("run_count", 0) or 0) if isinstance(run_summary, dict) else 0
     next_queued_run_id = run_summary.get("next_queued_run_id") if isinstance(run_summary, dict) else None
     queue_state = _humanize_run_status((run_summary or {}).get("queue_state", "idle")) if isinstance(run_summary, dict) else "Sem leitura"
+    active_run_ids = list((run_summary or {}).get("active_run_ids", [])) if isinstance(run_summary, dict) else []
+    failed_count = int((run_summary or {}).get("status_counts", {}).get("failed", 0) or 0) if isinstance(run_summary, dict) else 0
     if studio_status == "ready":
         readiness_note = "O cenário já passou pelo gate principal de prontidão do Studio."
         next_action = (
             f"Há uma run pronta na fila ({next_queued_run_id}). Revise a run em foco ou execute o próximo job."
             if next_queued_run_id
-            else "Enfileire o cenário atual ou revise a última execução antes de avançar para Decisão."
+            else ("Acompanhe a run em andamento antes de abrir uma nova rodada." if active_run_ids else "Enfileire o cenário atual ou revise a última execução antes de avançar para Decisão.")
         )
         decision_gate = (
             f"A fila ainda tem uma próxima run explícita ({next_queued_run_id}); confirme se vale executar antes de entrar em Decisão."
             if next_queued_run_id
-            else ("Já existe histórico de runs para leitura; avance para Decisão quando o resumo executivo estiver claro." if run_count else "Ainda não há histórico de run; enfileire o cenário antes de abrir Decisão.")
+            else ("Uma run ainda está em execução; espere o resultado utilizável antes de seguir para Decisão." if active_run_ids else ("Já existe histórico de runs para leitura; avance para Decisão quando o resumo executivo estiver claro." if run_count else "Ainda não há histórico de run; enfileire o cenário antes de abrir Decisão."))
         )
     else:
         readiness_note = "O Studio ainda sinaliza bloqueios ou avisos relevantes para o enfileiramento."
@@ -1507,9 +1553,9 @@ def render_runs_flow_panel(studio_summary: dict[str, Any], run_summary: dict[str
                 "Transformar readiness do Studio em uma leitura clara de fila, execução e próximo passo.",
                 next_action,
                 [
-                    ("Entrada de Studio", str(studio_summary.get("readiness_headline") or readiness_note)),
-                    ("Fila e operação", f"{queue_state}. {run_count} run(s) visível(is) na fila local."),
-                    ("Saída para Decisão", decision_gate),
+                    ("Estado do cenário", str(studio_summary.get("readiness_headline") or readiness_note)),
+                    ("Estado das runs", f"{queue_state}. {run_count} run(s) visível(is), {len(active_run_ids)} em execução e {failed_count} falha(s) recente(s)."),
+                    ("Próximo passo", decision_gate),
                 ],
                 [
                     _button_link("Voltar ao Studio", "?tab=studio", "runs-flow-open-studio-link"),
@@ -1547,8 +1593,12 @@ def render_run_job_detail_panel(detail: dict[str, Any]) -> Any:
         gate_label = "Gate oficial não informado"
     if status == "queued":
         next_action = "Execute o próximo job quando o cenário estiver pronto, ou cancele a fila se a preparação ainda estiver incompleta."
+    elif status == "preparing":
+        next_action = "A run já saiu da fila e está preparando artefatos. Aguarde essa etapa antes de avaliar resultado."
     elif status == "running":
         next_action = "Acompanhe a execução em foco e evite abrir uma nova run até este job concluir."
+    elif status == "exporting":
+        next_action = "A run já concluiu o cálculo principal e está finalizando artefatos. Aguarde a consolidação antes de abrir Decisão."
     elif status == "completed":
         next_action = "Leia o resumo executivo e siga para Decisão se a run já gerou um candidato oficial confiável."
     elif status in {"failed", "canceled"}:
@@ -1597,6 +1647,7 @@ def render_execution_summary_panel(summary: dict[str, Any]) -> Any:
         )
     error = str(summary.get("error") or "").strip()
     has_selected_candidate = bool(summary.get("selected_candidate_id"))
+    can_open_decision = bool(has_selected_candidate and not error)
     if error:
         headline = "Última execução exige revisão"
         next_action = "Corrija o bloqueio operacional antes de confiar em qualquer leitura de ranking ou candidato oficial."
@@ -1606,6 +1657,7 @@ def render_execution_summary_panel(summary: dict[str, Any]) -> Any:
     else:
         headline = "Ainda sem candidato oficial"
         next_action = "Reexecute o pipeline quando o cenário estiver pronto para gerar uma leitura comparável."
+    decision_button_label = "Abrir Decisão desta execução" if can_open_decision else "Decisão indisponível nesta execução"
     return html.Div(
         children=[
             html.H3("Resumo executivo", style={"marginTop": 0}),
@@ -1629,7 +1681,7 @@ def render_execution_summary_panel(summary: dict[str, Any]) -> Any:
             html.Div(next_action, style={"lineHeight": "1.6", "fontWeight": 700}),
             html.Div(
                 style=UI_ACTION_ROW_STYLE,
-                children=[html.Button("Abrir Decisão desta execução", id="execution-open-decision-button", style=UI_BUTTON_STYLE)],
+                children=[html.Button(decision_button_label, id="execution-open-decision-button", style=UI_BUTTON_STYLE, disabled=not can_open_decision)],
             ),
         ]
     )
@@ -1701,11 +1753,34 @@ def render_candidate_summary_panel(summary: dict[str, Any]) -> Any:
         )
     total_cost = round(float(summary.get("install_cost") or 0.0) + float(summary.get("fallback_cost") or 0.0), 3)
     feasibility_label = "Viável" if summary.get("feasible") else "Inviável"
+    infeasibility_reason = str(summary.get("infeasibility_reason") or "").strip()
+    if infeasibility_reason:
+        primary_blocker = f"Inviavel agora: {_humanize_infeasibility_reason(infeasibility_reason)}."
+        next_action = "Use o runner-up e os sinais de risco para decidir se vale revisar o cenário antes de oficializar."
+    elif summary.get("critical_routes"):
+        top_route = list(summary.get("critical_routes", []))[0]
+        route_id = str(top_route.get("route_id") or "-")
+        route_reason = _humanize_route_issue(top_route.get("reason"))
+        primary_blocker = f"Rota critica {route_id}: {route_reason}."
+        next_action = "Confirme se a rota critica ainda sustenta a escolha antes de exportar o candidato."
+    elif int(summary.get("fallback_component_count") or 0) > 0:
+        primary_blocker = "A alternativa continua viavel, mas depende de fallback para fechar a composicao."
+        next_action = "Compare com o runner-up antes de oficializar uma alternativa dependente de fallback."
+    else:
+        primary_blocker = "Nenhum bloqueio principal domina a leitura deste candidato."
+        next_action = "Use o circuito primario e o contraste com o runner-up para confirmar a escolha final."
     return html.Div(
         children=[
             html.H3("Candidato em foco", style={"marginTop": 0}),
             html.Div(str(summary.get("candidate_id") or "-"), style={"fontSize": "22px", "fontWeight": 700}),
             html.Div(style={"display": "flex", "gap": "8px", "flexWrap": "wrap", "marginTop": "8px"}, children=[html.Span(str(summary.get("topology_family") or "-"), style=UI_PILL_STYLE), html.Span(feasibility_label, style=UI_PILL_STYLE)]),
+            html.Div(
+                style={**UI_TWO_COLUMN_STYLE, "marginBottom": "12px", "marginTop": "12px"},
+                children=[
+                    _guidance_card("Bloqueio principal", primary_blocker),
+                    _guidance_card("Proxima acao", next_action),
+                ],
+            ),
             html.Div(
                 style=UI_THREE_COLUMN_STYLE,
                 children=[
@@ -2442,6 +2517,10 @@ def build_app(
                                 style=UI_MUTED_CARD_STYLE,
                                 children=[
                                     html.Summary("Circuito do candidato em foco"),
+                                    html.P(
+                                        "Esta leitura mantem somente a camada primaria do circuito, com rotas de negocio e sem hubs internos como superficie principal.",
+                                        style={"lineHeight": "1.6"},
+                                    ),
                                     html.Div(
                                         style=UI_TWO_COLUMN_STYLE,
                                         children=[
@@ -5497,8 +5576,28 @@ def _build_cytoscape_stylesheet(
     critical_component_ids: list[str],
 ) -> list[dict[str, Any]]:
     stylesheet = [
-        {"selector": "node", "style": {"background-color": "#1f77b4", "label": "data(id)", "color": "#ffffff"}},
+        {
+            "selector": "node",
+            "style": {
+                "background-color": "#1f77b4",
+                "label": "data(label)",
+                "color": "#ffffff",
+                "font-size": "12px",
+                "text-wrap": "wrap",
+                "text-max-width": "120px",
+            },
+        },
         {"selector": "edge", "style": {"line-color": "#9aa4af", "width": 3, "curve-style": "bezier"}},
+        {
+            "selector": ".route-projection",
+            "style": {
+                "line-style": "dashed",
+                "line-color": "#2d6a5a",
+                "target-arrow-color": "#2d6a5a",
+                "target-arrow-shape": "triangle",
+                "width": 5,
+            },
+        },
     ]
     for component_id in critical_component_ids:
         stylesheet.append(
@@ -5516,6 +5615,12 @@ def _build_cytoscape_stylesheet(
                 "style": {"line-color": "#d94f04", "width": 7, "target-arrow-color": "#d94f04"},
             }
         )
+    stylesheet.append(
+        {
+            "selector": f'edge[route_id = "{route_id}"]',
+            "style": {"line-color": "#d94f04", "width": 7, "target-arrow-color": "#d94f04"},
+        }
+    )
     return stylesheet
 
 

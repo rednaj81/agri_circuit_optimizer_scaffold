@@ -1,41 +1,21 @@
-# Phase UX Refinement Wave 5 - Studio Context Stack Simplification
+# Wave 5 handoff
 
-## Objective
-
-Deepen `ux_phase_2` by simplifying the Studio contextual stack: reduce repeated cards and messages while keeping the canvas as the primary entry point and preserving honest readiness feedback.
-
-## Delivered
-
-- Simplified `Foco do canvas` so it now reads as a shorter contextual flow: selection state, current problem or opportunity, why that focus matters, transition to Runs, and quick actions.
-- Removed duplicated sections that previously split the same idea across `Impacto operacional`, `Regras deste foco`, and `Readiness deste foco`; the new hierarchy keeps those signals in a single contextual read.
-- Differentiated secondary selection guidance for node editing, edge editing, and empty selection, replacing the old shared fallback text with specific next-step language for each case.
-- Kept the Studio anchored to the business graph and to the current selection, without adding new panels or promoting technical disclosures.
-- Updated smoke coverage to protect the simplified hierarchy of the contextual stack and the distinct guidance for node, edge, and no-selection states.
-
-## Validation
-
-```powershell
-$env:PYTHONPATH='src;.'; .\.venv\Scripts\python.exe -m pytest tests/decision_platform/test_ui_smoke.py -q -p no:cacheprovider -k "studio_focus_panel or studio_selection_panel or primary_surfaces_explain_empty_states_without_debug_language" --basetemp tests/_tmp/pytest-basetemp-ux-wave5-targeted
-$env:PYTHONPATH='src;.'; .\.venv\Scripts\python.exe -m pytest tests/decision_platform/test_ui_smoke.py -q -p no:cacheprovider --basetemp tests/_tmp/pytest-basetemp-ux-wave5-full
-```
-
-Result:
-
-- `5 passed, 47 deselected in 0.63s`
-- `52 passed in 446.67s (0:07:26)`
-
-## Evidence
-
-- Structured Studio snapshot: `docs/2026-04-06_phase_ux_refinement_wave5_ui_snapshot.json`
-
-## Scope Guardrails
-
-- No architecture reopening.
-- No replacement of Dash or Cytoscape.
-- No change to Julia-only official execution, queue semantics, or backend optimization logic.
-- No change to `docs/05_data_contract.md`.
-- No exposure of technical hubs or derived nodes on the Studio primary surface.
-
-## Honest Handoff
-
-This wave focused on subtraction, not expansion. The contextual stack is now shorter and more state-specific, especially around empty selection versus node or edge editing. The remaining limitation is still visual capture: the wave uses a structured snapshot instead of a screenshot because local capture remained blocked by policy.
+- Objetivo entregue: limpar a visualizacao primaria do circuito e subir a causa principal de bloqueio para a superficie principal de Studio e Decisao.
+- Delta funcional em codigo:
+  - `src/decision_platform/rendering/circuit.py`
+    - remove nos orfaos e hubs internos da superficie principal;
+    - preserva apenas nos de negocio conectados ao candidato ou as extremidades de rotas viaveis;
+    - quando o caminho instalado passa apenas por hubs internos, troca a leitura tecnica por projecao de rota em linguagem de negocio.
+  - `src/decision_platform/ui_dash/app.py`
+    - `render_studio_readiness_panel` agora destaca `Bloqueio principal` antes das listas detalhadas;
+    - `render_candidate_summary_panel` agora destaca `Bloqueio principal` e `Proxima acao` antes da leitura operacional;
+    - o detalhe do circuito do candidato deixa explicito que a leitura principal esconde hubs internos.
+  - `tests/decision_platform/test_ui_smoke.py`
+    - cobre o novo resumo de bloqueio no Studio;
+    - cobre o novo resumo de bloqueio no candidato em foco;
+    - cobre o render payload de circuito limpo quando a topologia depende de hubs internos.
+- Validacao executada:
+  - recorte alvo: `5 passed, 50 deselected in 0.26s`
+  - smoke completo: `55 passed in 460.64s (0:07:40)`
+- Risco residual:
+  - o render principal agora prioriza clareza de negocio sobre fidelidade topologica interna; a trilha tecnica continua disponivel fora da superficie primaria.

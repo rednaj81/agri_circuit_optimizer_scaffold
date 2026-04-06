@@ -2,13 +2,16 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, Callable
 
 import pytest
+import pandas as pd
 import yaml
 
 from decision_platform.api.run_pipeline import OfficialRuntimeConfigError
 from decision_platform.data_io.loader import load_scenario_bundle
+from decision_platform.rendering.circuit import build_render_payload
 from decision_platform.ui_dash._compat import DASH_AVAILABLE
 from decision_platform.ui_dash.app import (
     _primary_tab_from_search,
@@ -434,6 +437,31 @@ def test_studio_readiness_panel_humanizes_primary_blockers_and_warnings() -> Non
     assert "Abrir Runs com bloqueios" in panel_text
 
 
+def test_studio_readiness_panel_surfaces_primary_blocker_before_detailed_lists() -> None:
+    panel = render_studio_readiness_panel(
+        {
+            "status": "needs_attention",
+            "readiness_headline": "Ainda ha bloqueios estruturais impedindo a passagem segura para Runs.",
+            "readiness_stage": "Remover bloqueios",
+            "primary_action": "Corrija a principal restricao antes de revisar o restante do cenario.",
+            "business_node_count": 8,
+            "business_edge_count": 6,
+            "hidden_internal_node_count": 2,
+            "mandatory_route_count": 2,
+            "blocker_count": 1,
+            "warning_count": 1,
+            "blockers": ["Rotas com dosagem sem medicao direta: R002"],
+            "warnings": ["Nos sem conexao no grafo visivel: P3"],
+            "next_steps": ["Feche o bloqueio principal antes de abrir Runs."],
+        }
+    )
+    panel_text = _collect_text_content(panel)
+
+    assert "Bloqueio principal" in panel_text
+    assert "Há rotas com dosagem sem medição direta compatível: R002." in panel_text
+    assert "Feche o bloqueio principal antes de abrir Runs." in panel_text
+
+
 def test_studio_connectivity_panel_surfaces_routes_and_measurement_near_canvas() -> None:
     panel = render_studio_connectivity_panel(
         {
@@ -582,16 +610,18 @@ def test_runs_flow_panel_reflects_studio_gate_and_queue_state() -> None:
         {
             "run_count": 3,
             "next_queued_run_id": "run-003",
+            "active_run_ids": [],
+            "status_counts": {"failed": 1},
         },
     )
     panel_text = _collect_text_content(panel)
 
     assert "Passagem Studio -> Runs" in panel_text
-    assert "Estado atual" in panel_text
     assert "Objetivo desta área" in panel_text
     assert "Próxima ação" in panel_text
-    assert "Entrada de Studio" in panel_text
-    assert "Saída para Decisão" in panel_text
+    assert "Estado do cenário" in panel_text
+    assert "Estado das runs" in panel_text
+    assert "Próximo passo" in panel_text
     assert "Exige atenção" in panel_text
     assert "Voltar ao Studio" in panel_text
     assert "Ir para Decisão" in panel_text
@@ -638,6 +668,56 @@ def test_primary_runs_panels_hide_raw_backend_keys_in_main_surface() -> None:
     assert "Próxima ação" in detail_text
     assert "Próxima ação" in execution_text
     assert "Abrir Decisão desta execução" in execution_text
+
+
+def test_run_jobs_overview_panel_clarifies_queue_now_vs_recent_history() -> None:
+    panel = render_run_jobs_overview_panel(
+        {
+            "run_count": 4,
+            "queue_state": "running",
+            "worker_mode": "serial",
+            "next_queued_run_id": "run-004",
+            "active_run_ids": ["run-003"],
+            "queued_run_ids": ["run-004"],
+            "terminal_run_ids": ["run-001", "run-002"],
+            "latest_run_id": "run-003",
+            "latest_updated_at": "2026-04-06T04:00:00Z",
+            "status_counts": {
+                "queued": 1,
+                "running": 1,
+                "completed": 1,
+                "failed": 1,
+            },
+        }
+    )
+    panel_text = _collect_text_content(panel)
+
+    assert "Execução em andamento" in panel_text
+    assert "Fila agora" in panel_text
+    assert "Histórico recente" in panel_text
+    assert "Em execução: run-003" in panel_text
+    assert "Próxima a rodar: run-004" in panel_text
+    assert "Última run conhecida: run-003" in panel_text
+    assert "Falhas" in panel_text
+
+
+def test_execution_summary_panel_only_opens_decision_with_usable_result() -> None:
+    panel = render_execution_summary_panel(
+        {
+            "candidate_count": 0,
+            "feasible_count": 0,
+            "selected_candidate_id": None,
+            "default_profile_id": "balanced",
+            "scenario_bundle_root": "data/decision_platform/maquete_v2",
+            "error": None,
+        }
+    )
+    panel_text = _collect_text_content(panel)
+    decision_button = _find_component_by_id(panel, "execution-open-decision-button")
+
+    assert "Ainda sem candidato oficial" in panel_text
+    assert "Decisão indisponível nesta execução" in panel_text
+    assert getattr(decision_button, "disabled", None) is True
 
 
 def test_primary_surfaces_explain_empty_states_without_debug_language() -> None:
@@ -828,6 +908,74 @@ def test_primary_decision_panels_hide_raw_metric_keys_in_main_surface() -> None:
     assert "Engine de avaliação:" in selected_text
     assert "rota obrigatória não conseguiu fechar" in selected_text
     assert "Qualidade bruta:" in breakdown_text
+
+
+def test_candidate_summary_panel_surfaces_primary_blocker_and_next_action() -> None:
+    panel = render_candidate_summary_panel(
+        {
+            "candidate_id": "cand-01",
+            "topology_family": "hybrid_free",
+            "feasible": False,
+            "install_cost": 10.0,
+            "fallback_cost": 0.5,
+            "score_final": 91.2,
+            "fallback_component_count": 1,
+            "engine_used": "julia",
+            "infeasibility_reason": "mandatory_route_failure",
+        }
+    )
+    panel_text = _collect_text_content(panel)
+
+    assert "Bloqueio principal" in panel_text
+    assert "Inviavel agora" in panel_text
+    assert "rota obrigatória não conseguiu fechar" in panel_text
+    assert "Proxima acao" in panel_text
+
+
+def test_build_render_payload_keeps_only_business_circuit_surface_when_internal_hubs_dominate() -> None:
+    bundle = SimpleNamespace(
+        nodes=pd.DataFrame(
+            [
+                {"node_id": "W", "label": "Tanque de agua", "node_type": "water_tank", "x_m": 0.1, "y_m": 0.9, "zone": ""},
+                {"node_id": "P1", "label": "Produto 1", "node_type": "product_tank", "x_m": 0.9, "y_m": 0.8, "zone": ""},
+                {"node_id": "P3", "label": "Produto 3", "node_type": "product_tank", "x_m": 0.8, "y_m": 0.2, "zone": ""},
+                {"node_id": "HS", "label": "Hub estrela sucao", "node_type": "junction", "x_m": 0.4, "y_m": 0.5, "zone": "hub"},
+                {"node_id": "HD", "label": "Hub estrela descarga", "node_type": "junction", "x_m": 0.6, "y_m": 0.5, "zone": "hub"},
+            ]
+        ),
+        route_requirements=pd.DataFrame(
+            [
+                {"route_id": "R001", "source": "W", "sink": "P1", "mandatory": True, "measurement_required": False, "notes": "Abastecer produto 1"},
+            ]
+        ),
+    )
+    candidate = {
+        "installed_link_ids": ["L1", "L2", "L3"],
+        "installed_links": {
+            "L1": {"from_node": "W", "to_node": "HS", "archetype": "star_tap"},
+            "L2": {"from_node": "HS", "to_node": "HD", "archetype": "star_trunk"},
+            "L3": {"from_node": "HD", "to_node": "P1", "archetype": "star_tap"},
+        },
+    }
+    metrics = {"route_metrics": [{"route_id": "R001", "feasible": True, "path_link_ids": ["L1", "L2", "L3"]}]}
+
+    payload = build_render_payload(candidate, bundle, metrics)
+    element_ids = {element["data"]["id"] for element in payload["cytoscape_elements"]}
+    node_labels = {
+        element["data"]["id"]: element["data"].get("label")
+        for element in payload["cytoscape_elements"]
+        if "source" not in element["data"]
+    }
+
+    assert "W" in element_ids
+    assert "P1" in element_ids
+    assert "route:R001" in element_ids
+    assert "P3" not in element_ids
+    assert "HS" not in element_ids
+    assert "HD" not in element_ids
+    assert "L1" not in element_ids
+    assert node_labels["W"] == "Tanque de agua"
+    assert payload["route_highlights"]["R001"] == ["L1", "L2", "L3"]
 
 
 def test_audit_bundle_panel_preserves_technical_space_but_explains_next_step() -> None:
