@@ -334,14 +334,10 @@ def test_studio_discovery_callbacks_open_guide_and_audit_tab() -> None:
     open_navigation_callback = _get_callback(app, input_id="studio-open-audit-button")
 
     assert open_guide_callback(1, False) is True
-    assert open_navigation_callback("?tab=runs", 30, 20, 10, 0, 0, 0, 0, "studio") == "audit"
-    assert open_navigation_callback("?tab=decision", 0, 40, 0, 0, 0, 0, 0, "studio") == "runs"
-    assert open_navigation_callback("?tab=decision", 0, 0, 50, 0, 0, 0, 0, "runs") == "studio"
-    assert open_navigation_callback("?tab=studio", 0, 0, 0, 60, 0, 0, 0, "runs") == "decision"
-    assert open_navigation_callback("?tab=studio", 0, 0, 0, 0, 70, 0, 0, "runs") == "decision"
-    assert open_navigation_callback("?tab=decision", 0, 0, 0, 0, 0, 80, 0, "decision") == "runs"
-    assert open_navigation_callback("?tab=decision", 0, 0, 0, 0, 0, 0, 90, "decision") == "audit"
-    assert open_navigation_callback("?tab=decision", 0, 0, 0, 0, 0, 0, 0, "studio") == "decision"
+    assert open_navigation_callback("?tab=runs", 30, 20, 10, "studio") == "audit"
+    assert open_navigation_callback("?tab=decision", 0, 40, 0, "studio") == "runs"
+    assert open_navigation_callback("?tab=studio", 0, 0, 50, "runs") == "decision"
+    assert open_navigation_callback("?tab=decision", 0, 0, 0, "studio") == "decision"
 
 
 def test_primary_tab_from_search_accepts_known_main_spaces() -> None:
@@ -364,8 +360,8 @@ def test_decision_tab_contains_advanced_sections_without_extra_primary_tabs() ->
     assert _find_component_by_id(decision_tab, "decision-flow-panel") is not None
     assert _find_component_by_id(decision_tab, "decision-flow-open-runs-link") is not None
     assert _find_component_by_id(decision_tab, "decision-flow-open-audit-link") is not None
-    assert _find_component_by_id(decision_tab, "decision-open-runs-button") is not None
-    assert _find_component_by_id(decision_tab, "decision-open-audit-button") is not None
+    assert _find_component_by_id(decision_tab, "decision-open-runs-button") is None
+    assert _find_component_by_id(decision_tab, "decision-open-audit-button") is None
     assert _find_component_by_id(decision_tab, "compare-candidates-dropdown") is not None
     assert _find_component_by_id(decision_tab, "comparison-figure") is not None
     assert _find_component_by_id(decision_tab, "selected-candidate-dropdown") is not None
@@ -383,8 +379,8 @@ def test_runs_tab_combines_queue_and_execution_summary() -> None:
     assert _find_component_by_id(runs_tab, "runs-flow-open-studio-link") is not None
     assert _find_component_by_id(runs_tab, "runs-flow-open-decision-link") is not None
     assert _find_component_by_id(runs_tab, "execution-summary-panel") is not None
-    assert _find_component_by_id(runs_tab, "runs-open-studio-button") is not None
-    assert _find_component_by_id(runs_tab, "runs-open-decision-button") is not None
+    assert _find_component_by_id(runs_tab, "runs-open-studio-button") is None
+    assert _find_component_by_id(runs_tab, "runs-open-decision-button") is None
     assert _find_component_by_id(runs_tab, "execution-open-decision-button") is not None
     assert _find_component_by_id(runs_tab, "run-button") is not None
 
@@ -508,18 +504,16 @@ def test_studio_focus_panel_uses_canvas_selection_as_primary_context() -> None:
     assert "Tanque de água" in panel_text
     assert "Água para misturador" in panel_text
     assert "Rotas ligadas ao nó" in panel_text
-    assert "Objetivo desta leitura" in panel_text
-    assert "Próxima ação no canvas" in panel_text
+    assert "Conexão em foco" in panel_text
+    assert "Problema ou oportunidade" in panel_text
     assert "Passagem para Runs" in panel_text
-    assert "Regras deste foco" in panel_text
-    assert "Readiness deste foco" in panel_text
+    assert "Por que este foco importa" in panel_text
     assert "Ações rápidas deste foco" in panel_text
     assert "Ação sugerida agora" in panel_text
     assert "W não pode receber rotas entrando" in panel_text
     assert "rotas com dosagem exigem medição direta compatível" in panel_text
-    assert "2 rota(s) obrigatória(s)" in panel_text
     assert "Rotas deste foco: 2 obrigatória(s), 1 com dosagem, 1 com medição direta." in panel_text
-    assert "Revise as rotas ligadas a W" in panel_text
+    assert "Confira comprimento e famílias sugeridas para a conexão L001." in panel_text
     assert _find_component_by_id(panel, "studio-focus-recommended-open-workbench-button") is not None
     assert _find_component_by_id(panel, "studio-focus-move-left-button") is not None
     assert _find_component_by_id(panel, "studio-focus-move-up-button") is not None
@@ -549,7 +543,7 @@ def test_studio_focus_panel_embeds_status_and_runs_gate_context() -> None:
 
     assert "Passagem para Runs" in panel_text
     assert "Corrigir regras estruturais e rotas inválidas antes de enfileirar uma nova run." in panel_text
-    assert "Readiness deste foco" in panel_text
+    assert "Por que este foco importa" in panel_text
     assert "O cenário ainda tem 2 bloqueio(s) antes de Runs" in panel_text
     assert _find_component_by_id(panel, "studio-status-banner") is not None
 
@@ -594,9 +588,9 @@ def test_runs_flow_panel_reflects_studio_gate_and_queue_state() -> None:
     panel_text = _collect_text_content(panel)
 
     assert "Passagem Studio -> Runs" in panel_text
+    assert "Estado atual" in panel_text
     assert "Objetivo desta área" in panel_text
-    assert "Ação principal" in panel_text
-    assert "Fluxo principal" in panel_text
+    assert "Próxima ação" in panel_text
     assert "Entrada de Studio" in panel_text
     assert "Saída para Decisão" in panel_text
     assert "Exige atenção" in panel_text
@@ -644,11 +638,12 @@ def test_primary_runs_panels_hide_raw_backend_keys_in_main_surface() -> None:
     assert "Ação principal" in execution_text
     assert "Próxima ação" in detail_text
     assert "Próxima ação" in execution_text
-    assert "Abrir Decisão" in execution_text
+    assert "Abrir Decisão desta execução" in execution_text
 
 
 def test_primary_surfaces_explain_empty_states_without_debug_language() -> None:
     studio_selection = render_studio_selection_panel({}, "node")
+    edge_selection = render_studio_selection_panel({}, "edge")
     runs_queue = render_run_jobs_overview_panel({})
     run_detail = render_run_job_detail_panel({})
     execution = render_execution_summary_panel({})
@@ -659,7 +654,9 @@ def test_primary_surfaces_explain_empty_states_without_debug_language() -> None:
     breakdown = render_candidate_breakdown_panel({})
 
     assert "Nenhuma entidade em foco." in _collect_text_content(studio_selection)
-    assert "Selecione um nó ou uma conexão no canvas" in _collect_text_content(studio_selection)
+    assert "Selecione um nó no canvas" in _collect_text_content(studio_selection)
+    assert "Nenhuma conexão em foco." in _collect_text_content(edge_selection)
+    assert "Selecione uma conexão no canvas" in _collect_text_content(edge_selection)
     assert "Nenhuma run registrada ainda." in _collect_text_content(runs_queue)
     assert "Ainda não existe uma run em foco" in _collect_text_content(run_detail)
     assert "Ainda não há resultado executivo suficiente" in _collect_text_content(execution)
@@ -668,6 +665,34 @@ def test_primary_surfaces_explain_empty_states_without_debug_language() -> None:
     assert "Ainda não existe runner-up suficiente" in _collect_text_content(contrast)
     assert "Ainda não há sinais consolidados" in _collect_text_content(signals)
     assert "Ainda não existe breakdown suficiente" in _collect_text_content(breakdown)
+
+
+def test_studio_selection_panel_distinguishes_node_and_edge_editing_guidance() -> None:
+    node_panel = render_studio_selection_panel(
+        {
+            "business_label": "Bomba principal",
+            "role_label": "Bomba principal",
+            "selected_node": {"x_m": 0.4, "y_m": 0.2, "notes": "Node note"},
+        },
+        "node",
+    )
+    edge_panel = render_studio_selection_panel(
+        {
+            "business_label": "Ligação principal",
+            "role_label": "Conexão principal",
+            "from_label": "Bomba principal",
+            "to_label": "Misturador",
+            "selected_edge": {"length_m": 1.2, "family_hint": "loop", "notes": "Edge note"},
+        },
+        "edge",
+    )
+    node_text = _collect_text_content(node_panel)
+    edge_text = _collect_text_content(edge_panel)
+
+    assert "Use este resumo para preparar a edição do nó" in node_text
+    assert "Posição: x=0.4 m, y=0.2 m" in node_text
+    assert "Use este resumo para preparar a revisão desta conexão" in edge_text
+    assert "Fluxo principal: Bomba principal -> Misturador" in edge_text
 
 
 def test_decision_flow_panel_makes_transition_and_next_action_explicit() -> None:
@@ -682,9 +707,9 @@ def test_decision_flow_panel_makes_transition_and_next_action_explicit() -> None
     panel_text = _collect_text_content(panel)
 
     assert "Passagem Runs -> Decisão" in panel_text
+    assert "Estado atual" in panel_text
     assert "Objetivo desta área" in panel_text
-    assert "Ação principal" in panel_text
-    assert "Fluxo principal" in panel_text
+    assert "Próxima ação" in panel_text
     assert "Winner atual" in panel_text
     assert "Saída do fluxo" in panel_text
     assert "cand-01" in panel_text

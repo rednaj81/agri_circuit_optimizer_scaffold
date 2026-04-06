@@ -191,6 +191,35 @@ def _guidance_card(label: str, text: str) -> Any:
     )
 
 
+def _screen_opening_panel(
+    title: str,
+    headline: str,
+    objective: str,
+    next_action: str,
+    flow_cards: list[tuple[str, str]],
+    ctas: list[Any],
+) -> Any:
+    return html.Div(
+        children=[
+            html.H3(title, style={"marginTop": 0}),
+            html.Div("Estado atual", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+            html.Div(headline, style={"fontWeight": 700, "lineHeight": "1.5", "margin": "6px 0 14px"}),
+            html.Div(
+                style={**UI_TWO_COLUMN_STYLE, "marginBottom": "12px"},
+                children=[
+                    _guidance_card("Objetivo desta área", objective),
+                    _guidance_card("Próxima ação", next_action),
+                ],
+            ),
+            html.Div(
+                style=UI_THREE_COLUMN_STYLE,
+                children=[_guidance_card(label, text) for label, text in flow_cards],
+            ),
+            html.Div(style={**UI_ACTION_ROW_STYLE, "marginTop": "14px"}, children=ctas),
+        ]
+    )
+
+
 def _product_space_content(space: str | None) -> dict[str, str]:
     normalized = str(space or "studio").strip().lower()
     if normalized == "runs":
@@ -1454,43 +1483,29 @@ def render_runs_flow_panel(studio_summary: dict[str, Any], run_summary: dict[str
         decision_gate = "A passagem para Decisão continua secundária até o Studio liberar o gate principal de readiness."
     return html.Div(
         children=[
-            html.H3("Passagem Studio -> Runs", style={"marginTop": 0}),
-            html.Div(
-                style={**UI_TWO_COLUMN_STYLE, "marginBottom": "12px"},
-                children=[
-                    _guidance_card("Objetivo desta área", "Transformar readiness do Studio em uma leitura clara de fila, execução e próximo passo."),
-                    _guidance_card("Ação principal", next_action),
+            _screen_opening_panel(
+                "Passagem Studio -> Runs",
+                str(studio_summary.get("readiness_headline") or readiness_note),
+                "Transformar readiness do Studio em uma leitura clara de fila, execução e próximo passo.",
+                next_action,
+                [
+                    ("Entrada de Studio", str(studio_summary.get("readiness_headline") or readiness_note)),
+                    ("Fila e operação", f"{queue_state}. {run_count} run(s) visível(is) na fila local."),
+                    ("Saída para Decisão", decision_gate),
+                ],
+                [
+                    _button_link("Voltar ao Studio", "?tab=studio", "runs-flow-open-studio-link"),
+                    _button_link("Ir para Decisão", "?tab=decision", "runs-flow-open-decision-link", primary=True),
                 ],
             ),
-            html.H4("Fluxo principal", style={"marginBottom": "6px"}),
             html.Div(
-                style={**UI_THREE_COLUMN_STYLE, "marginBottom": "12px"},
-                children=[
-                    _guidance_card("Entrada de Studio", str(studio_summary.get("readiness_headline") or readiness_note)),
-                    _guidance_card("Fila e operação", f"{queue_state}. {run_count} run(s) visível(is) na fila local."),
-                    _guidance_card("Saída para Decisão", decision_gate),
-                ],
-            ),
-            html.Div(
-                style=UI_THREE_COLUMN_STYLE,
+                style={**UI_THREE_COLUMN_STYLE, "marginTop": "14px"},
                 children=[
                     _metric_card("Readiness", _humanize_readiness_status(studio_status), readiness_note),
                     _metric_card("Bloqueios", studio_summary.get("blocker_count", 0)),
                     _metric_card("Avisos", studio_summary.get("warning_count", 0)),
                     _metric_card("Runs locais", run_count),
                     _metric_card("Próxima run", next_queued_run_id or "-"),
-                ],
-            ),
-            html.Div(str(studio_summary.get("readiness_headline") or ""), style={"marginTop": "10px", "fontWeight": 700, "lineHeight": "1.5"}),
-            html.H4("Próxima ação", style={"marginBottom": "6px", "marginTop": "14px"}),
-            html.Div(next_action, style={"lineHeight": "1.6", "fontWeight": 700}),
-            html.Div(
-                style=UI_ACTION_ROW_STYLE,
-                children=[
-                    _button_link("Voltar ao Studio", "?tab=studio", "runs-flow-open-studio-link"),
-                    _button_link("Ir para Decisão", "?tab=decision", "runs-flow-open-decision-link", primary=True),
-                    html.Button("Voltar ao Studio", id="runs-open-studio-button", style=UI_BUTTON_STYLE),
-                    html.Button("Ir para Decisão", id="runs-open-decision-button", style=UI_BUTTON_STYLE),
                 ],
             ),
         ]
@@ -1596,7 +1611,7 @@ def render_execution_summary_panel(summary: dict[str, Any]) -> Any:
             html.Div(next_action, style={"lineHeight": "1.6", "fontWeight": 700}),
             html.Div(
                 style=UI_ACTION_ROW_STYLE,
-                children=[html.Button("Abrir Decisão", id="execution-open-decision-button", style=UI_BUTTON_STYLE)],
+                children=[html.Button("Abrir Decisão desta execução", id="execution-open-decision-button", style=UI_BUTTON_STYLE)],
             ),
         ]
     )
@@ -1710,41 +1725,27 @@ def render_decision_flow_panel(summary: dict[str, Any]) -> Any:
         contrast_state = "Winner claro; use o runner-up como contraste de referência antes de exportar."
     return html.Div(
         children=[
-            html.H3("Passagem Runs -> Decisão", style={"marginTop": 0}),
-            html.Div(
-                style={**UI_TWO_COLUMN_STYLE, "marginBottom": "12px"},
-                children=[
-                    _guidance_card("Objetivo desta área", "Explicar se a execução atual já pode ser lida como decisão ou se ainda falta contexto."),
-                    _guidance_card("Ação principal", next_action),
+            _screen_opening_panel(
+                "Passagem Runs -> Decisão",
+                headline,
+                "Explicar se a execução atual já pode ser lida como decisão ou se ainda falta contexto.",
+                next_action,
+                [
+                    ("Winner atual", candidate_id or "Ainda sem candidato oficial legível."),
+                    ("Contraste atual", contrast_state),
+                    ("Saída do fluxo", next_action),
+                ],
+                [
+                    _button_link("Voltar para Runs", "?tab=runs", "decision-flow-open-runs-link"),
+                    _button_link("Abrir Auditoria", "?tab=audit", "decision-flow-open-audit-link", primary=True),
                 ],
             ),
-            html.H4("Fluxo principal", style={"marginBottom": "6px"}),
             html.Div(
-                style={**UI_THREE_COLUMN_STYLE, "marginBottom": "12px"},
-                children=[
-                    _guidance_card("Winner atual", candidate_id or "Ainda sem candidato oficial legível."),
-                    _guidance_card("Contraste atual", contrast_state),
-                    _guidance_card("Saída do fluxo", next_action),
-                ],
-            ),
-            html.Div(headline, style={"fontWeight": 700, "lineHeight": "1.5"}),
-            html.Div(
-                style={**UI_THREE_COLUMN_STYLE, "marginTop": "12px"},
+                style={**UI_THREE_COLUMN_STYLE, "marginTop": "14px"},
                 children=[
                     _metric_card("Winner", candidate_id or "-"),
                     _metric_card("Runner-up", runner_up_id or "-"),
                     _metric_card("Estado", _humanize_decision_status(decision_status)),
-                ],
-            ),
-            html.H4("Próxima ação", style={"marginBottom": "6px", "marginTop": "14px"}),
-            html.Div(next_action, style={"lineHeight": "1.6", "fontWeight": 700}),
-            html.Div(
-                style=UI_ACTION_ROW_STYLE,
-                children=[
-                    _button_link("Voltar para Runs", "?tab=runs", "decision-flow-open-runs-link"),
-                    _button_link("Abrir Auditoria", "?tab=audit", "decision-flow-open-audit-link", primary=True),
-                    html.Button("Voltar para Runs", id="decision-open-runs-button", style=UI_BUTTON_STYLE),
-                    html.Button("Abrir Auditoria", id="decision-open-audit-button", style=UI_BUTTON_STYLE),
                 ],
             ),
         ],
@@ -3818,33 +3819,21 @@ def build_app(
         Input("ui-location", "search"),
         Input("studio-open-audit-button", "n_clicks_timestamp"),
         Input("studio-open-runs-button", "n_clicks_timestamp"),
-        Input("runs-open-studio-button", "n_clicks_timestamp"),
-        Input("runs-open-decision-button", "n_clicks_timestamp"),
         Input("execution-open-decision-button", "n_clicks_timestamp"),
-        Input("decision-open-runs-button", "n_clicks_timestamp"),
-        Input("decision-open-audit-button", "n_clicks_timestamp"),
         State("primary-navigation-tabs", "value"),
     )
     def _resolve_primary_navigation(
         search: str | None,
         open_audit_ts: Any,
         open_runs_ts: Any,
-        open_studio_ts: Any,
-        runs_open_decision_ts: Any,
         execution_open_decision_ts: Any,
-        decision_open_runs_ts: Any,
-        decision_open_audit_ts: Any,
         current_tab: str | None,
     ) -> str:
         latest_click = max(
             [
                 (_timestamp_or_zero(open_audit_ts), "audit"),
                 (_timestamp_or_zero(open_runs_ts), "runs"),
-                (_timestamp_or_zero(open_studio_ts), "studio"),
-                (_timestamp_or_zero(runs_open_decision_ts), "decision"),
                 (_timestamp_or_zero(execution_open_decision_ts), "decision"),
-                (_timestamp_or_zero(decision_open_runs_ts), "runs"),
-                (_timestamp_or_zero(decision_open_audit_ts), "audit"),
             ],
             key=lambda item: item[0],
         )
