@@ -1195,6 +1195,135 @@ def render_studio_readiness_panel(summary: dict[str, Any]) -> Any:
     )
 
 
+def _studio_workspace_focus_summary(
+    node_summary: dict[str, Any],
+    edge_summary: dict[str, Any],
+    route_rows: list[dict[str, Any]] | None,
+    studio_summary: dict[str, Any],
+) -> dict[str, str]:
+    route_rows = route_rows or []
+    if edge_summary.get("selected_link_id"):
+        from_label = str(edge_summary.get("from_label") or edge_summary.get("selected_edge", {}).get("from_node") or "-")
+        to_label = str(edge_summary.get("to_label") or edge_summary.get("selected_edge", {}).get("to_node") or "-")
+        to_node = str(edge_summary.get("selected_edge", {}).get("to_node") or "").strip()
+        from_node = str(edge_summary.get("selected_edge", {}).get("from_node") or "").strip()
+        label = str(edge_summary.get("business_label") or edge_summary.get("selected_link_id") or "Conexão em foco")
+        if to_node == "W":
+            recommended_action = "Remova ou redirecione esta conexão: W não deve receber rotas entrando na superfície principal."
+        elif from_node == "S":
+            recommended_action = "Remova ou redirecione esta conexão: S não deve iniciar fluxo na superfície principal."
+        else:
+            recommended_action = f"Confira comprimento, direção e famílias sugeridas da conexão {edge_summary.get('selected_link_id') or label}."
+        return {
+            "label": label,
+            "headline": f"Conexão em foco: {from_label} -> {to_label}.",
+            "recommended_action": recommended_action,
+        }
+    if node_summary.get("selected_node_id"):
+        label = str(node_summary.get("business_label") or node_summary.get("selected_node_id") or "Entidade em foco")
+        blocker_count = int(studio_summary.get("blocker_count", 0) or 0)
+        connected_routes = [
+            row
+            for row in route_rows
+            if str(row.get("source") or "").strip() == str(node_summary.get("selected_node_id") or "").strip()
+            or str(row.get("sink") or "").strip() == str(node_summary.get("selected_node_id") or "").strip()
+        ]
+        if blocker_count:
+            recommended_action = "Use este foco para fechar o principal bloqueio estrutural antes de liberar a passagem para Runs."
+        elif connected_routes:
+            recommended_action = f"Confirme o papel de {label} nas rotas obrigatórias antes de seguir para Runs."
+        else:
+            recommended_action = f"Ajuste posição, rótulo e papel de {label} direto no canvas antes de avançar."
+        return {
+            "label": label,
+            "headline": f"Entidade em foco: {label}.",
+            "recommended_action": recommended_action,
+        }
+    return {
+        "label": "Sem foco ativo",
+        "headline": "Selecione uma entidade ou conexão do grafo para abrir o contexto principal do Studio.",
+        "recommended_action": "Clique no canvas para abrir um foco de edição antes de tentar liberar a passagem para Runs.",
+    }
+
+
+def render_studio_workspace_panel(
+    studio_summary: dict[str, Any],
+    node_summary: dict[str, Any],
+    edge_summary: dict[str, Any],
+    route_rows: list[dict[str, Any]] | None,
+    studio_status_text: str | None,
+) -> Any:
+    status = str(studio_summary.get("status") or "needs_attention")
+    background, color = _status_tone(status)
+    blocker_count = int(studio_summary.get("blocker_count", 0) or 0)
+    warning_count = int(studio_summary.get("warning_count", 0) or 0)
+    focus_summary = _studio_workspace_focus_summary(node_summary, edge_summary, route_rows, studio_summary)
+    issues = [
+        _humanize_readiness_issue(item)
+        for item in [*(studio_summary.get("blockers") or []), *(studio_summary.get("warnings") or [])]
+    ]
+    top_issue = issues[0] if issues else "Nenhum bloqueio ou aviso domina a leitura atual do cenário."
+    runs_enabled = status == "ready"
+    runs_button_label = "Ir para Runs" if runs_enabled else "Runs bloqueado neste estado"
+    primary_actions: list[Any]
+    if runs_enabled:
+        primary_actions = [
+            html.Button(runs_button_label, id="studio-workspace-open-runs-button", style=UI_BUTTON_STYLE, disabled=False),
+            html.Button("Revisar no canvas", id="studio-workspace-open-workbench-button", style=UI_BUTTON_STYLE),
+        ]
+    else:
+        primary_actions = [
+            html.Button("Corrigir no canvas", id="studio-workspace-open-workbench-button", style=UI_BUTTON_STYLE),
+            html.Button(runs_button_label, id="studio-workspace-open-runs-button", style=UI_BUTTON_STYLE, disabled=True),
+        ]
+    return html.Div(
+        children=[
+            html.Div("Leitura do cenário", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+            html.Div(
+                style={"display": "flex", "alignItems": "center", "gap": "10px", "margin": "8px 0 12px", "flexWrap": "wrap"},
+                children=[
+                    html.Span(_humanize_readiness_status(status), style={"padding": "6px 10px", "borderRadius": "999px", "background": background, "color": color, "fontWeight": 700}),
+                    html.Span(str(studio_summary.get("readiness_headline") or "Sem leitura principal do cenário."), style={"fontWeight": 700, "lineHeight": "1.5"}),
+                ],
+            ),
+            html.Div(
+                style={**UI_THREE_COLUMN_STYLE, "marginBottom": "12px"},
+                children=[
+                    _guidance_card("Foco atual", focus_summary["label"]),
+                    _guidance_card("Passagem para Runs", "Liberada" if runs_enabled else "Ainda bloqueada"),
+                    _guidance_card("Próxima ação", str(studio_summary.get("primary_action") or focus_summary["recommended_action"])),
+                ],
+            ),
+            html.Div(
+                style={**UI_MUTED_CARD_STYLE, "padding": "12px", "marginBottom": "12px"},
+                children=[
+                    html.Div("O que precisa de atenção agora", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+                    html.Div(top_issue, style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"}),
+                    html.Div(focus_summary["headline"], style={"lineHeight": "1.6", "marginTop": "10px"}),
+                    html.Div(focus_summary["recommended_action"], style={"lineHeight": "1.6", "marginTop": "10px", "fontWeight": 700}),
+                ],
+            ),
+            html.Div(
+                style=UI_THREE_COLUMN_STYLE,
+                children=[
+                    _metric_card("Bloqueios", blocker_count, "Impedem liberar a passagem para Runs."),
+                    _metric_card("Avisos", warning_count, "Pedem revisão antes de enfileirar."),
+                    _metric_card("Rotas obrigatórias", studio_summary.get("mandatory_route_count", 0), "Base mínima da conectividade principal."),
+                ],
+            ),
+            html.Div(style={**UI_ACTION_ROW_STYLE, "marginTop": "12px"}, children=[*primary_actions, _button_link("Abrir Auditoria", "?tab=audit", "studio-workspace-open-audit-link")]),
+            html.Div(
+                style={**UI_MUTED_CARD_STYLE, "padding": "12px", "marginTop": "12px"},
+                children=[
+                    html.Div("Sinal de saída desta área", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+                    html.Div(str((studio_summary.get("next_steps") or ["Feche a leitura principal do Studio antes de sair."])[0]), style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"}),
+                    render_status_banner(studio_status_text),
+                ],
+            ),
+        ]
+    )
+
+
 def build_studio_projection_summary(
     nodes_rows: list[dict[str, Any]],
     candidate_links_rows: list[dict[str, Any]],
@@ -2710,13 +2839,6 @@ def build_app(
                             html.Div(
                                 style=UI_TWO_COLUMN_STYLE,
                                 children=[
-                                    html.Div(id="studio-readiness-panel", children=render_studio_readiness_panel(initial_studio_readiness), style=UI_CARD_STYLE),
-                                    html.Div(children=render_studio_projection_panel(initial_studio_projection), style=UI_CARD_STYLE),
-                                ],
-                            ),
-                            html.Div(
-                                style=UI_TWO_COLUMN_STYLE,
-                                children=[
                                     html.Div(
                                         style=UI_CARD_STYLE,
                                         children=[
@@ -2746,20 +2868,57 @@ def build_app(
                                         ],
                                     ),
                                     html.Div(
-                                        style={**UI_MUTED_CARD_STYLE, "display": "grid", "gap": "12px"},
+                                        style=UI_CARD_STYLE,
                                         children=[
-                                            render_studio_focus_panel(
-                                                _safe_json_loads(initial_node_studio_summary),
-                                                _safe_json_loads(initial_edge_studio_summary),
-                                                authoring_payload["route_rows"],
-                                                initial_studio_readiness,
-                                                "",
+                                            html.Div(
+                                                id="studio-workspace-panel",
+                                                children=render_studio_workspace_panel(
+                                                    initial_studio_readiness,
+                                                    _safe_json_loads(initial_node_studio_summary),
+                                                    _safe_json_loads(initial_edge_studio_summary),
+                                                    authoring_payload["route_rows"],
+                                                    "",
+                                                ),
                                             ),
-                                            render_studio_connectivity_panel(
-                                                initial_studio_readiness,
-                                                _safe_json_loads(initial_node_studio_summary),
-                                                _safe_json_loads(initial_edge_studio_summary),
-                                                authoring_payload["route_rows"],
+                                        ],
+                                    ),
+                                ],
+                            ),
+                            html.Details(
+                                id="studio-context-detailed-panels",
+                                style=UI_MUTED_CARD_STYLE,
+                                children=[
+                                    html.Summary("Contexto completo do Studio"),
+                                    html.Div(
+                                        style={**UI_TWO_COLUMN_STYLE, "marginTop": "12px"},
+                                        children=[
+                                            html.Div(id="studio-readiness-panel", children=render_studio_readiness_panel(initial_studio_readiness), style=UI_CARD_STYLE),
+                                            html.Div(id="studio-projection-coverage-panel", children=render_studio_projection_panel(initial_studio_projection), style=UI_CARD_STYLE),
+                                        ],
+                                    ),
+                                    html.Div(
+                                        style={**UI_TWO_COLUMN_STYLE, "marginTop": "12px"},
+                                        children=[
+                                            html.Div(
+                                                id="studio-focus-panel",
+                                                children=render_studio_focus_panel(
+                                                    _safe_json_loads(initial_node_studio_summary),
+                                                    _safe_json_loads(initial_edge_studio_summary),
+                                                    authoring_payload["route_rows"],
+                                                    initial_studio_readiness,
+                                                    "",
+                                                ),
+                                                style=UI_CARD_STYLE,
+                                            ),
+                                            html.Div(
+                                                id="studio-connectivity-panel",
+                                                children=render_studio_connectivity_panel(
+                                                    initial_studio_readiness,
+                                                    _safe_json_loads(initial_node_studio_summary),
+                                                    _safe_json_loads(initial_edge_studio_summary),
+                                                    authoring_payload["route_rows"],
+                                                ),
+                                                style=UI_CARD_STYLE,
                                             ),
                                         ],
                                     ),
@@ -3751,6 +3910,7 @@ def build_app(
         Output("studio-editor-workbench", "open"),
         Input("studio-canvas-open-workbench-button", "n_clicks"),
         Input("studio-readiness-open-workbench-button", "n_clicks"),
+        Input("studio-workspace-open-workbench-button", "n_clicks"),
         Input("studio-focus-recommended-open-workbench-button", "n_clicks"),
         Input("studio-focus-open-workbench-button", "n_clicks"),
         prevent_initial_call=True,
@@ -3758,10 +3918,11 @@ def build_app(
     def _open_studio_editor_workbench(
         canvas_n_clicks: Any,
         readiness_n_clicks: Any,
+        workspace_n_clicks: Any,
         recommended_n_clicks: Any,
         n_clicks: Any,
     ) -> bool:
-        return bool(canvas_n_clicks or readiness_n_clicks or recommended_n_clicks or n_clicks)
+        return bool(canvas_n_clicks or readiness_n_clicks or workspace_n_clicks or recommended_n_clicks or n_clicks)
 
     @app.callback(
         Output("run-jobs-summary", "children", allow_duplicate=True),
@@ -4379,6 +4540,7 @@ def build_app(
 
     @app.callback(
         Output("studio-canvas-guidance-panel", "children"),
+        Output("studio-workspace-panel", "children"),
         Output("studio-readiness-panel", "children"),
         Output("studio-projection-coverage-panel", "children"),
         Output("runs-flow-panel", "children"),
@@ -4404,12 +4566,13 @@ def build_app(
         node_summary_text: str | None,
         edge_summary_text: str | None,
         studio_status_text: str | None,
-    ) -> tuple[Any, Any, Any, Any, Any, Any, Any, Any]:
+    ) -> tuple[Any, Any, Any, Any, Any, Any, Any, Any, Any]:
         studio_readiness = build_studio_readiness_summary(nodes_rows or [], candidate_links_rows or [], route_rows or [])
         node_summary = _safe_json_loads(node_summary_text)
         edge_summary = _safe_json_loads(edge_summary_text)
         return (
             render_studio_canvas_guidance_panel(studio_readiness, node_summary, edge_summary),
+            render_studio_workspace_panel(studio_readiness, node_summary, edge_summary, route_rows, studio_status_text),
             render_studio_readiness_panel(studio_readiness),
             render_studio_projection_panel(
                 build_studio_projection_summary(nodes_rows or [], candidate_links_rows or [], route_rows or [])
@@ -4442,6 +4605,7 @@ def build_app(
         Input("ui-location", "search"),
         Input("studio-open-audit-button", "n_clicks_timestamp"),
         Input("studio-open-runs-button", "n_clicks_timestamp"),
+        Input("studio-workspace-open-runs-button", "n_clicks_timestamp"),
         Input("runs-flow-open-decision-button", "n_clicks_timestamp"),
         Input("execution-open-decision-button", "n_clicks_timestamp"),
         State("primary-navigation-tabs", "value"),
@@ -4450,6 +4614,7 @@ def build_app(
         search: str | None,
         open_audit_ts: Any,
         open_runs_ts: Any,
+        workspace_open_runs_ts: Any,
         runs_flow_open_decision_ts: Any,
         execution_open_decision_ts: Any,
         current_tab: str | None,
@@ -4458,6 +4623,7 @@ def build_app(
             [
                 (_timestamp_or_zero(open_audit_ts), "audit"),
                 (_timestamp_or_zero(open_runs_ts), "runs"),
+                (_timestamp_or_zero(workspace_open_runs_ts), "runs"),
                 (_timestamp_or_zero(runs_flow_open_decision_ts), "decision"),
                 (_timestamp_or_zero(execution_open_decision_ts), "decision"),
             ],

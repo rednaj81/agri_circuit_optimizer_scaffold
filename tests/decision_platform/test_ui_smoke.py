@@ -47,6 +47,7 @@ from decision_platform.ui_dash.app import (
     render_studio_projection_panel,
     render_studio_readiness_panel,
     render_studio_selection_panel,
+    render_studio_workspace_panel,
     move_node_studio_selection,
     rerank_catalog,
     save_and_reopen_local_bundle,
@@ -298,9 +299,9 @@ def test_product_space_banner_stays_aligned_with_navigation_resolution() -> None
     navigation_callback = _get_callback(app, input_id="studio-open-audit-button")
     banner_callback = _get_callback(app, output_prefix="product-space-banner.children")
 
-    runs_tab = navigation_callback("?tab=studio", 0, 40, 0, 0, "studio")
-    decision_tab = navigation_callback("?tab=studio", 0, 0, 50, 0, "runs")
-    audit_tab = navigation_callback("?tab=studio", 60, 0, 0, 0, "decision")
+    runs_tab = navigation_callback("?tab=studio", 0, 40, 0, 0, 0, "studio")
+    decision_tab = navigation_callback("?tab=studio", 0, 0, 0, 50, 0, "runs")
+    audit_tab = navigation_callback("?tab=studio", 60, 0, 0, 0, 0, "decision")
 
     assert "Runs" in _collect_text_content(banner_callback(runs_tab))
     assert "Decisão" in _collect_text_content(banner_callback(decision_tab))
@@ -339,6 +340,10 @@ def test_studio_tab_surfaces_readiness_and_selection_context() -> None:
     assert _find_component_by_id(studio_tab, "studio-canvas-open-workbench-button") is not None
     assert _find_component_by_id(studio_tab, "studio-canvas-open-technical-guide-button") is not None
     assert _find_component_by_id(studio_tab, "studio-canvas-open-runs-link") is not None
+    assert _find_component_by_id(studio_tab, "studio-workspace-panel") is not None
+    assert _find_component_by_id(studio_tab, "studio-context-detailed-panels") is not None
+    assert _find_component_by_id(studio_tab, "studio-workspace-open-workbench-button") is not None
+    assert _find_component_by_id(studio_tab, "studio-workspace-open-runs-button") is not None
     assert _find_component_by_id(studio_tab, "studio-readiness-panel") is not None
     assert _find_component_by_id(studio_tab, "studio-status-banner") is not None
     assert _find_component_by_id(studio_tab, "studio-projection-coverage-panel") is not None
@@ -429,6 +434,42 @@ def test_studio_canvas_guidance_panel_surfaces_contextual_blocker_and_runs_gate(
     assert "Ir para Runs quando o cenário estiver pronto" in panel_text
 
 
+def test_studio_workspace_panel_unifies_focus_connectivity_and_runs_gate() -> None:
+    panel = render_studio_workspace_panel(
+        {
+            "status": "needs_attention",
+            "readiness_headline": "Ainda há bloqueios estruturais impedindo a passagem segura para Runs.",
+            "primary_action": "Corrigir regras estruturais e rotas inválidas antes de enfileirar uma nova run.",
+            "blocker_count": 2,
+            "warning_count": 1,
+            "mandatory_route_count": 2,
+            "blockers": ["L900 entra em W", "Rotas com dosagem sem medicao direta: R002"],
+            "warnings": ["Nos sem conexao no grafo visivel: P3"],
+            "next_steps": ["Feche os bloqueios estruturais antes de enfileirar uma nova run."],
+        },
+        {
+            "selected_node_id": "P1",
+            "business_label": "Bomba principal",
+        },
+        {},
+        [
+            {"route_id": "R001", "source": "P1", "sink": "M", "mandatory": True},
+        ],
+        "Nó reposicionado com sucesso.",
+    )
+    panel_text = _collect_text_content(panel)
+
+    assert "Leitura do cenário" in panel_text
+    assert "Foco atual" in panel_text
+    assert "Passagem para Runs" in panel_text
+    assert "Ainda bloqueada" in panel_text
+    assert "A conexão L900 termina em W" in panel_text
+    assert "Bomba principal" in panel_text
+    assert "Corrigir no canvas" in panel_text
+    assert "Runs bloqueado neste estado" in panel_text
+    assert getattr(_find_component_by_id(panel, "studio-workspace-open-runs-button"), "disabled", None) is True
+
+
 def test_studio_primary_canvas_hides_internal_and_hub_nodes() -> None:
     with diagnostic_runtime_test_mode():
         app = build_app("data/decision_platform/maquete_v2")
@@ -471,11 +512,12 @@ def test_studio_discovery_callbacks_open_guide_and_audit_tab() -> None:
     open_navigation_callback = _get_callback(app, input_id="studio-open-audit-button")
 
     assert open_guide_callback(0, 1, False) is True
-    assert open_navigation_callback("?tab=runs", 30, 20, 0, 10, "studio") == "audit"
-    assert open_navigation_callback("?tab=decision", 0, 40, 0, 0, "studio") == "runs"
-    assert open_navigation_callback("?tab=studio", 0, 0, 50, 0, "runs") == "decision"
-    assert open_navigation_callback("?tab=decision", 0, 0, 0, 50, "runs") == "decision"
-    assert open_navigation_callback("?tab=decision", 0, 0, 0, 0, "studio") == "decision"
+    assert open_navigation_callback("?tab=runs", 30, 20, 0, 0, 10, "studio") == "audit"
+    assert open_navigation_callback("?tab=decision", 0, 40, 0, 0, 0, "studio") == "runs"
+    assert open_navigation_callback("?tab=studio", 0, 0, 50, 0, 0, "studio") == "runs"
+    assert open_navigation_callback("?tab=studio", 0, 0, 0, 50, 0, "runs") == "decision"
+    assert open_navigation_callback("?tab=decision", 0, 0, 0, 0, 50, "runs") == "decision"
+    assert open_navigation_callback("?tab=decision", 0, 0, 0, 0, 0, "studio") == "decision"
 
 
 def test_primary_tab_from_search_accepts_known_main_spaces() -> None:
@@ -947,7 +989,7 @@ def test_canvas_context_button_opens_studio_workbench() -> None:
         app = build_app("data/decision_platform/maquete_v2")
 
     callback = _get_callback(app, output_prefix="studio-editor-workbench.open")
-    assert callback(1, None, None, None) is True
+    assert callback(1, None, None, None, None) is True
 
 
 def test_decision_flow_panel_makes_transition_and_next_action_explicit() -> None:
@@ -1785,7 +1827,7 @@ def test_studio_callbacks_round_trip_structural_edits_through_ui_flow() -> None:
         assert node_summary["selected_node_id"] != created_node_id
         assert edge_summary["selected_link_id"] == created_link_id
         assert any(str(element["data"].get("id", "")).startswith("route:") for element in elements if "source" in element["data"])
-        assert open_workbench_callback(0, 0, 0, 1) is True
+        assert open_workbench_callback(0, 0, 0, 0, 1) is True
 
         created_callback_result = save_callback(
             1,

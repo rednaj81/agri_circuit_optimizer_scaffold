@@ -2,39 +2,40 @@
 
 ## Objective
 
-Open `ux_phase_1` by making the product shell clearer on first contact: Studio, Runs, Decisão and Auditoria should read as one guided journey, with explicit purpose, current state and next action before the operator needs to open technical detail.
+Execute `ux_phase_1` without reopening architecture: make the main product journey clearer, reinforce Studio, Runs, Decisão and Auditoria as the four primary spaces, and reduce first-fold dependence on raw technical panels.
 
 ## Delivered
 
-- Added a new top-level `Jornada principal` panel in `src/decision_platform/ui_dash/app.py` to frame the four primary product spaces as one guided flow instead of a loose set of tabs.
-- Wired the journey panel to live Studio readiness, run queue state and decision state so the shell now shows current status and the next recommended move for each primary area.
-- Kept `Studio`, `Runs`, `Decisão` and `Auditoria` as the only visible top-level product spaces and preserved raw technical payloads inside progressive disclosure instead of promoting them into the main shell.
-- Extended smoke coverage in `tests/decision_platform/test_ui_smoke.py` to protect the new journey panel structure, its callback refresh behavior and the top-level navigation links.
-- Regenerated the structured UI snapshot for wave 1 with the new journey panel markers and validation evidence.
+- Kept the product shell centered on the four primary spaces and preserved the guided shell already present in `src/decision_platform/ui_dash/app.py`.
+- Added a new first-fold `studio-workspace-panel` that consolidates readiness, current focus, Runs gate and next action into one primary Studio reading instead of forcing the operator into multiple secondary cards.
+- Moved the broader Studio context into `studio-context-detailed-panels`, so readiness, projection coverage, focus and connectivity remain available but no longer dominate the first fold as separate primary surfaces.
+- Extended Studio navigation so the new workspace panel can open the workbench, open Runs when readiness allows and keep Auditoria accessible as progressive depth.
+- Updated smoke and structural tests in `tests/decision_platform/test_ui_smoke.py` and `tests/decision_platform/test_studio_structure.py` to lock the new hierarchy, CTA wiring and progressive disclosure structure.
+- Regenerated structured evidence in `docs/2026-04-06_phase_ux_refinement_wave1_ui_snapshot.json` for the current worktree state.
 
 ## Validation
 
 ```powershell
-$env:PYTHONPATH='src;.'; .\.venv\Scripts\python.exe -m pytest tests/decision_platform/test_ui_smoke.py -q -p no:cacheprovider -k "surfaces_only_four_primary_product_spaces or product_space_banner_uses_consistent_product_language_for_each_space or product_journey_panel_summarizes_all_primary_spaces or product_space_banner_callback_tracks_active_primary_tab or product_journey_panel_callback_tracks_active_primary_tab_and_state or studio_discovery_callbacks_open_guide_and_audit_tab" --basetemp tests/_tmp/pytest-basetemp-ux-wave1-targeted
-$env:PYTHONPATH='src;.'; .\.venv\Scripts\python.exe -m pytest tests/decision_platform/test_ui_smoke.py tests/decision_platform/test_studio_structure.py -q -p no:cacheprovider --basetemp tests/_tmp/pytest-basetemp-ux-wave1-full
+$env:PYTHONPATH='src;.'; .\.venv\Scripts\python.exe -m pytest tests/decision_platform/test_ui_smoke.py tests/decision_platform/test_studio_structure.py -q -p no:cacheprovider -k "dash_app_surfaces_only_four_primary_product_spaces or product_space_banner_uses_consistent_product_language_for_each_space or studio_tab_surfaces_readiness_and_selection_context or studio_workspace_panel_unifies_focus_connectivity_and_runs_gate or dash_app_exposes_structural_studio_controls" --basetemp tests\_tmp\pytest-basetemp-ux-wave1-targeted-current
+$env:PYTHONPATH='src;.'; .\.venv\Scripts\python.exe -m pytest tests/decision_platform/test_ui_smoke.py tests/decision_platform/test_studio_structure.py -q -p no:cacheprovider --basetemp tests\_tmp\pytest-basetemp-ux-wave1-dev
 ```
 
 Result:
 
-- `6 passed, 60 deselected in 1.38s`
-- `71 passed in 494.74s (0:08:14)`
+- `5 passed, 70 deselected in 0.73s`
+- `75 passed in 431.35s (0:07:11)`
 
 ## Evidence
 
-- Structured shell snapshot: `docs/2026-04-06_phase_ux_refinement_wave1_ui_snapshot.json`
+- Structured shell and Studio snapshot: `docs/2026-04-06_phase_ux_refinement_wave1_ui_snapshot.json`
 
 ## Scope Guardrails
 
 - No architecture reopening.
 - No replacement of Dash or Cytoscape.
-- No change to Julia-only official execution, queue semantics or decision algorithm.
-- No promotion of raw JSON, logs or technical internal entities to the primary shell.
+- No change to Julia-only official execution, fail-closed behavior, queue semantics or backend decision logic.
+- No reintroduction of raw JSON, logs or technical internal graph entities as the primary Studio surface.
 
 ## Honest Handoff
 
-This wave materially improves the product shell, not the backend behavior. The operator now gets a single journey-oriented reading above the tabs, with explicit purpose and next action for each main space. The result is a clearer entry path from Studio to Runs to Decisão, while Auditoria stays available as secondary depth instead of competing for first-fold attention. The shell is still dense below the fold, but the top-level navigation no longer feels like a set of disconnected technical surfaces.
+This wave now does more than a cosmetic tab cleanup. The shell still frames the product as one journey across Studio, Runs, Decisão and Auditoria, but the main user gain is inside Studio: the first fold now answers what is in focus, whether Runs is unlocked and what to do next before the operator needs to open detailed technical context. The dense technical surfaces still exist and remain auditable, but they were pushed behind progressive disclosure instead of competing with the primary reading of the product.

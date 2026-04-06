@@ -1,8 +1,13 @@
 {
   "wave": "ux_phase_1_wave_1",
   "validation": {
-    "targeted": "6 passed, 60 deselected in 1.38s",
-    "full": "71 passed in 494.74s (0:08:14)"
+    "targeted": "5 passed, 70 deselected in 0.73s",
+    "full": "75 passed in 431.35s (0:07:11)"
+  },
+  "visual_evidence": {
+    "type": "structured_ui_snapshot",
+    "screenshot_attempt": "not_attempted_in_this_wave_run",
+    "note": "Structured snapshot generated from the Dash layout and first-fold Studio render paths for the current wave 1 worktree state."
   },
   "shell": {
     "visible_primary_spaces": [
@@ -24,24 +29,44 @@
       "product-journey-open-decision-link",
       "product-journey-open-audit-link"
     ],
+    "banner_id": "product-space-banner",
     "banner_markers": [
       "Espaço ativo",
       "O que resolver aqui",
       "Antes de sair desta área"
     ]
   },
-  "journey_preview": {
-    "studio": "Jornada principalEscolha a próxima área pelo estado do produtoA navegação principal agora mostra Studio, Runs, Decisão e Auditoria como uma jornada única. Cada área resume objetivo, estado atual e próxima ação antes dos detalhes técnicos.StudioEspaço ativoMontar o cenário no grafo de negócio e liberar o gate principal de readiness.Estado atualPronto para RunsO cenário está pronto para seguir para Runs.Próxima açãoAbr",
-    "banner_runs": "Espaço ativoRunsFila local e execução em focoAqui a jornada sai do preparo do cenário e vira leitura operacional da fila, da run em foco e do último resultado.O que resolver aquiDecidir se ainda falta corrigir o cenário, executar a próxima rodada ou já abrir a"
+  "studio_first_fold": {
+    "panel_id": "studio-workspace-panel",
+    "details_panel_id": "studio-context-detailed-panels",
+    "workspace_markers": [
+      "Leitura do cenário",
+      "Foco atual",
+      "Passagem para Runs",
+      "O que precisa de atenção agora",
+      "Sinal de saída desta área"
+    ],
+    "workspace_text_preview": "Leitura do cenárioExige atençãoAinda há bloqueios estruturais impedindo a passagem segura para Runs.Foco atualTap P1Passagem para RunsAinda bloqueadaPróxima açãoCorrigir regras estruturais e rotas inválidas antes de enfileirar uma nova run.O que precisa de atenção agoraA conexão L011 sai de S, mas S deve aparecer apenas como destino final.Conexão em foco: Produto 1 -> Junção 1.Confira comprimento, direção e famílias sugeridas da conexão L001.Bloqueios2Impedem liberar a passagem para Runs.Avisos0Pedem revisão antes ",
+    "details_contains": {
+      "studio-readiness-panel": true,
+      "studio-projection-coverage-panel": true,
+      "studio-focus-panel": true,
+      "studio-connectivity-panel": true
+    },
+    "primary_ctas": [
+      "studio-workspace-open-workbench-button",
+      "studio-workspace-open-runs-button",
+      "studio-workspace-open-audit-link"
+    ]
   },
   "layout_presence": {
     "product_journey_panel": true,
     "product_space_banner": true,
+    "studio_workspace_panel": true,
+    "studio_context_detailed_panels": true,
     "hero_open_studio_link": true,
     "hero_open_runs_link": true,
     "hero_open_decision_link": true,
     "hero_open_audit_link": true
-  },
-  "visual_evidence_note": "Structured snapshot generated from the Dash layout because local screenshot capture is not part of this wave run."
+  }
 }
-
