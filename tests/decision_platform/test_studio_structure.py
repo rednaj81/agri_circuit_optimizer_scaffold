@@ -60,6 +60,7 @@ def test_dash_app_exposes_structural_studio_controls() -> None:
     assert "studio-focus-edge-family-hint" in layout_repr
     assert "studio-focus-edge-apply-button" in layout_repr
     assert "studio-focus-edge-reverse-button" in layout_repr
+    assert "studio-focus-edge-flow-preview" in layout_repr
     assert "studio-context-detailed-panels" in layout_repr
     assert "runs-workspace-panel" in layout_repr
     assert "runs-context-detailed-panels" in layout_repr
@@ -209,8 +210,36 @@ def test_studio_context_menu_declares_business_first_actions() -> None:
     assert "add-mixer-node" in menu_ids
     assert "add-outlet-node" in menu_ids
     assert "duplicate-node" in menu_ids
+    assert "reverse-edge" in menu_ids
     assert "remove-edge" in menu_ids
     assert "open-workbench" in menu_ids
+
+
+@pytest.mark.fast
+def test_context_menu_action_reverses_edge_and_reports_readiness_change() -> None:
+    bundle = load_scenario_bundle("data/decision_platform/maquete_v2")
+    candidate_links_rows = bundle.candidate_links.to_dict("records")
+    original_link = next(row for row in candidate_links_rows if str(row["link_id"]) == "L013")
+
+    updated_nodes, updated_links, next_node_id, next_link_id, status, open_workbench = apply_studio_context_menu_action(
+        context_menu_data={"menuItemId": "reverse-edge", "elementId": "L013"},
+        nodes_rows=bundle.nodes.to_dict("records"),
+        candidate_links_rows=candidate_links_rows,
+        selected_node_id="P1",
+        selected_link_id="L013",
+        route_rows=bundle.route_requirements.to_dict("records"),
+    )
+
+    reversed_link = next(row for row in updated_links if str(row["link_id"]) == "L013")
+    assert updated_nodes == bundle.nodes.to_dict("records")
+    assert next_node_id == "P1"
+    assert next_link_id == "L013"
+    assert reversed_link["from_node"] == original_link["to_node"]
+    assert reversed_link["to_node"] == original_link["from_node"]
+    assert "Conexão invertida pelo menu contextual." in status
+    assert "Agora" in status
+    assert "Runs" in status
+    assert open_workbench is False
 
 
 @pytest.mark.fast

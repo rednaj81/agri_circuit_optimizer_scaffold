@@ -231,6 +231,7 @@ def test_studio_primary_surface_exposes_business_command_center() -> None:
     context_menu = getattr(cytoscape, "contextMenu", None)
     assert isinstance(context_menu, list)
     assert any(item.get("id") == "add-product-node" for item in context_menu)
+    assert any(item.get("id") == "reverse-edge" for item in context_menu)
     assert any(item.get("id") == "open-workbench" for item in context_menu)
 
 
@@ -486,7 +487,7 @@ def test_studio_canvas_guidance_panel_keeps_canvas_as_primary_entry() -> None:
     assert "Gate para Runs" in without_focus_text
     assert "Abrir bancada completa" in without_focus_text
     assert "Conexão em foco: Bomba -> Misturador." in with_edge_focus_text
-    assert "abra a bancada completa só se precisar ajustar famílias" in with_edge_focus_text.lower()
+    assert "inverta a direção direto no primeiro fold" in with_edge_focus_text.lower()
     assert "Abrir bancada desta conexão" in with_edge_focus_text
     assert "Abrir orientação deste foco" in with_edge_focus_text
     assert "Cenário pronto para seguir para Runs." in with_edge_focus_text
@@ -561,6 +562,8 @@ def test_studio_workspace_panel_unifies_focus_connectivity_and_runs_gate() -> No
     assert "Tanque de água supre Bomba principal." in panel_text
     assert "Bomba principal" in panel_text
     assert "Ajustes locais do canvas" in panel_text
+    assert "Fluxo atual" in panel_text
+    assert "Impacto previsto" in panel_text
     assert "Corrigir no canvas" in panel_text
     assert "Runs bloqueado neste estado" in panel_text
     assert getattr(_find_component_by_id(panel, "studio-workspace-open-runs-button"), "disabled", None) is True
@@ -571,6 +574,7 @@ def test_studio_workspace_panel_unifies_focus_connectivity_and_runs_gate() -> No
     assert _find_component_by_id(panel, "studio-focus-edge-family-hint") is not None
     assert _find_component_by_id(panel, "studio-focus-edge-apply-button") is not None
     assert _find_component_by_id(panel, "studio-focus-edge-reverse-button") is not None
+    assert _find_component_by_id(panel, "studio-focus-edge-flow-preview") is not None
     assert _find_component_by_id(panel, "studio-focus-move-left-button") is not None
     assert _find_component_by_id(panel, "studio-focus-duplicate-node-button") is not None
     assert _find_component_by_id(panel, "studio-focus-delete-edge-button") is not None
@@ -798,6 +802,11 @@ def test_studio_connectivity_panel_surfaces_routes_and_measurement_near_canvas()
     assert "Conectividade do grafo" in panel_text
     assert "O que destrava o cenário" in panel_text
     assert "Antes de abrir Runs" in panel_text
+    assert "Trecho acionável no canvas" in panel_text
+    assert "Origem do trecho" in panel_text
+    assert "Destino do trecho" in panel_text
+    assert "Se inverter no canvas" in panel_text
+    assert "Rotas tocadas" in panel_text
     assert "R001: W -> M (obrigatória)" in panel_text
     assert "Prioridade da seleção atual" in panel_text
     assert "Seleção atual" in panel_text
@@ -806,6 +815,52 @@ def test_studio_connectivity_panel_surfaces_routes_and_measurement_near_canvas()
     assert "R002 usa dosagem sem medição direta compatível" in panel_text
     assert "Há conexões entrando em W no cenário" in panel_text
     assert "Corrigir bloqueios estruturais" in panel_text
+
+
+def test_studio_connectivity_panel_previews_reverse_action_in_business_language() -> None:
+    nodes_rows = [
+        {"node_id": "W", "label": "Tanque de água", "node_type": "water_tank", "zone": "supply"},
+        {"node_id": "P1", "label": "Bomba principal", "node_type": "pump", "zone": "process"},
+    ]
+    candidate_links_rows = [
+        {"link_id": "L900", "from_node": "P1", "to_node": "W", "archetype": "bus_segment", "length_m": 0.3, "family_hint": "loop"},
+    ]
+    panel = render_studio_connectivity_panel(
+        {
+            "blocker_count": 1,
+            "warning_count": 0,
+            "mandatory_route_count": 0,
+            "measurement_route_count": 0,
+            "blockers": ["L900 entra em W"],
+            "warnings": [],
+            "next_steps": ["Corrija a direção antes de abrir Runs."],
+        },
+        {
+            "selected_node_id": "P1",
+            "business_label": "Bomba principal",
+        },
+        {
+            "selected_link_id": "L900",
+            "selected_edge": {"from_node": "P1", "to_node": "W", "archetype": "bus_segment", "length_m": 0.3, "family_hint": "loop"},
+            "from_label": "Bomba principal",
+            "to_label": "Tanque de água",
+            "business_label": "Bomba principal -> Tanque de água",
+        },
+        [],
+        nodes_rows,
+        candidate_links_rows,
+    )
+    panel_text = _collect_text_content(panel)
+
+    assert "Trecho acionável no canvas" in panel_text
+    assert "Bomba principal supre Tanque de água." in panel_text
+    assert "Impacto agora" in panel_text
+    assert "A conexão em foco entra em W; ajuste a direção antes de continuar." in panel_text
+    assert "Se inverter agora, Tanque de água passa a suprir Bomba principal." in panel_text
+    assert "A inversão reduz os bloqueios de readiness do cenário." in panel_text
+    assert "Rotas tocadas" in panel_text
+    assert "Nenhuma rota obrigatória ou de dosagem está ligada a este trecho agora." in panel_text
+    assert "Abra o menu contextual desta conexão e use Inverter direção" in panel_text
 
 
 def test_studio_focus_panel_uses_canvas_selection_as_primary_context() -> None:
@@ -1258,6 +1313,7 @@ def test_focus_edge_reverse_callback_swaps_flow_without_workbench() -> None:
         bundle.candidate_links.to_dict("records"),
         "L013",
         bundle.nodes.to_dict("records"),
+        bundle.route_requirements.to_dict("records"),
         bundle.edge_component_rules.to_dict("records"),
     )
 
@@ -1265,7 +1321,9 @@ def test_focus_edge_reverse_callback_swaps_flow_without_workbench() -> None:
     assert next_selected_link_id == "L013"
     assert updated_row["from_node"] == original_row["to_node"]
     assert updated_row["to_node"] == original_row["from_node"]
-    assert status == "Direção da conexão invertida direto no foco do canvas."
+    assert "Conexão invertida direto no foco do canvas." in status
+    assert "Agora" in status
+    assert "A inversão" in status or "Runs" in status
 
 
 def test_decision_flow_panel_makes_transition_and_next_action_explicit() -> None:

@@ -1,33 +1,33 @@
-# Phase UX Refinement Wave 1 - Studio Direct Editing On The Main Surface
+# Phase UX Refinement Wave 1 - Direct Edge Correction On The Studio Canvas
 
 ## Objective
 
-Execute the approved Studio wave without reopening architecture: keep the business graph as the primary surface, move routine edits into the main workspace around the canvas, make supply relationships readable in business language, and keep the advanced workbench as secondary support.
+Close a remaining gap in the approved wave without reopening architecture: keep the existing business-first shell intact, but let the operator understand and correct edge direction directly from the Studio canvas and immediate connectivity guidance instead of falling back to the advanced workbench.
 
 ## Delivered
 
-- Preserved the current `decision_platform` shell and Dash/Cytoscape stack while keeping Studio, Runs, Decisão and Auditoria as the only primary product spaces.
-- Moved the quick-edit path into the Studio workspace first fold in `src/decision_platform/ui_dash/app.py` through `studio-workspace-quick-edit-panel` and `studio-workspace-local-actions-panel`, so routine node and edge changes live beside the main canvas instead of inside the detailed focus area.
-- Kept direct node label editing available through `studio-focus-node-label` and `studio-focus-node-apply-button`, now surfaced from the local canvas workspace rather than as the main payload of the focus panel.
-- Kept direct edge adjustments on the primary Studio surface through `studio-focus-edge-length-m`, `studio-focus-edge-family-hint`, `studio-focus-edge-apply-button` and `studio-focus-edge-reverse-button`, alongside move, duplicate and delete shortcuts that reduce routine dependence on the advanced workbench.
-- Reinforced first-fold supply-chain readability in the workspace with explicit business-flow language under "Quem supre quem na camada principal" and a local readiness readout near the quick-edit controls.
-- Simplified `render_studio_focus_panel` so it now explains why the selection matters and points the operator back to the first-fold workspace controls instead of duplicating the full editing surface.
-- Updated `tests/decision_platform/test_studio_structure.py` and `tests/decision_platform/test_ui_smoke.py` to lock the new workspace quick-edit panels, preserve the business-first reading of the Studio surface, and validate the direct-edit callbacks for node label update, edge length/family update and edge direction reversal.
-- Refreshed the structured evidence artifact in `docs/2026-04-06_phase_ux_refinement_wave1_ui_snapshot.json` to match the current workspace-first quick-edit flow and the latest validation results.
+- Preserved the current `decision_platform` shell and the four primary product spaces already present in the branch baseline: Studio, Runs, Decisão and Auditoria.
+- Added the `reverse-edge` action to the Studio canvas context menu in `src/decision_platform/ui_dash/app.py`, so an operator can invert a selected connection directly on the business graph.
+- Extended `render_studio_connectivity_panel(...)` with a local action card that explains the active business flow in plain language, previews what changes if the edge is reversed, and summarizes the readiness impact before the user acts.
+- Passed `nodes_rows` and `candidate_links_rows` into the initial Studio connectivity render, so the same local edge-action guidance is available from first paint and not only after callbacks refresh the panel.
+- Updated `apply_studio_context_menu_action(...)` to execute the new canvas action, preserve selection, and report whether the inversion reduces blockers, keeps the scenario ready, or changes the gate to Runs.
+- Hardened `reverse_edge_studio_selection(...)` so edge reversal fails closed on blank endpoints, self-loops or unknown nodes instead of masking invalid graph state.
+- Updated `tests/decision_platform/test_studio_structure.py` and `tests/decision_platform/test_ui_smoke.py` to lock the new context-menu action, the readiness-aware status message and the business-language preview in the Studio connectivity panel.
+- Refreshed the structured evidence artifact in `docs/2026-04-06_phase_ux_refinement_wave1_ui_snapshot.json` to match the current canvas-first edge-correction flow and the latest validation count.
 
 ## Validation
 
 ```powershell
-$env:PYTHONPATH='src;.'; .\.venv\Scripts\python.exe -m pytest tests/decision_platform/test_studio_structure.py tests/decision_platform/test_ui_smoke.py -q -p no:cacheprovider --basetemp tests/_tmp/pytest-basetemp-dev-wave1-full
+$env:PYTHONPATH='src;.'; .\.venv\Scripts\python.exe -m pytest tests/decision_platform/test_studio_structure.py tests/decision_platform/test_ui_smoke.py -q -p no:cacheprovider --basetemp tests/_tmp/pytest-basetemp-dev-wave1-reverse
 ```
 
 Result:
 
-- `87 passed in 491.58s (0:08:11)`
+- `89 passed in 614.52s (0:10:14)`
 
 ## Evidence
 
-- Structured Studio workspace snapshot: `docs/2026-04-06_phase_ux_refinement_wave1_ui_snapshot.json`
+- Structured Studio connectivity snapshot: `docs/2026-04-06_phase_ux_refinement_wave1_ui_snapshot.json`
 
 ## Scope Guardrails
 
@@ -38,4 +38,4 @@ Result:
 
 ## Honest Handoff
 
-The main Studio quick-edit implementation was already present in the local worktree when this session started. I treated that worktree state as authoritative, validated it against the approved wave intent, updated the UI tests that now describe the workspace-first direct-edit path, and refreshed the handoff plus structured evidence so they match the actual product surface. This wave now gives the Studio a real routine-editing path on the main business graph surface, but visual screenshot evidence is still missing and the worktree still carries unrelated agent/supervisor overlay edits outside this wave scope.
+The navigation cleanup and workspace-first Studio shell were already present on the branch baseline when this wave started; I did not reopen or rework those surfaces. This wave concentrated on one specific UX gap that still forced users toward advanced paths: correcting edge direction. The result is a direct canvas action with readiness-aware guidance and tests to keep it stable. Evidence is still structured rather than screenshot-based, and the repository still contains unrelated dirty files outside this wave scope.

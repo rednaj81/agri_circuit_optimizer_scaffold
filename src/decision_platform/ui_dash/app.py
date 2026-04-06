@@ -1148,6 +1148,12 @@ STUDIO_CONTEXT_MENU = [
         "tooltipText": "Tenta remover a entidade selecionada da malha principal.",
     },
     {
+        "id": "reverse-edge",
+        "label": "Inverter direção",
+        "availableOn": ["edge"],
+        "tooltipText": "Inverte a direção da conexão selecionada sem abrir a bancada avançada.",
+    },
+    {
         "id": "remove-edge",
         "label": "Remover conexão",
         "availableOn": ["edge"],
@@ -1729,11 +1735,165 @@ def _studio_workspace_focus_summary(
     }
 
 
-def _studio_workspace_quick_edit_cards(node_summary: dict[str, Any], edge_summary: dict[str, Any]) -> list[Any]:
+def _edge_reverse_impact_text(before_summary: dict[str, Any], after_summary: dict[str, Any]) -> str:
+    before_blockers = int(before_summary.get("blocker_count", 0) or 0)
+    after_blockers = int(after_summary.get("blocker_count", 0) or 0)
+    before_status = str(before_summary.get("status") or "").strip()
+    after_status = str(after_summary.get("status") or "").strip()
+    if after_blockers < before_blockers:
+        return "A inversão reduz os bloqueios de readiness do cenário."
+    if after_blockers > before_blockers:
+        return "A inversão aumenta os bloqueios de readiness do cenário."
+    if after_status == "ready" and before_status != "ready":
+        return "A inversão libera a passagem para Runs."
+    if after_status == "ready":
+        return "A inversão mantém o cenário pronto para Runs."
+    return str(after_summary.get("readiness_headline") or "A inversão mantém a leitura atual da readiness.")
+
+
+def _build_studio_edge_reverse_preview(
+    edge_summary: dict[str, Any],
+    studio_summary: dict[str, Any],
+    route_rows: list[dict[str, Any]] | None,
+    nodes_rows: list[dict[str, Any]] | None = None,
+    candidate_links_rows: list[dict[str, Any]] | None = None,
+) -> dict[str, str]:
+    route_rows = route_rows or []
+    nodes_rows = nodes_rows or []
+    candidate_links_rows = candidate_links_rows or []
+    selected_edge = edge_summary.get("selected_edge") or {}
+    selected_link_id = str(edge_summary.get("selected_link_id") or selected_edge.get("link_id") or "").strip()
+    if not selected_edge or not selected_link_id:
+        return {
+            "current_flow": "Selecione uma conexão no canvas para abrir o trecho de suprimento desta edição.",
+            "reverse_preview": "Sem conexão em foco para inverter agora.",
+            "current_effect": "Sem conexão em foco: primeiro selecione um trecho do grafo principal.",
+            "reverse_impact": "O impacto da inversão aparece aqui assim que uma conexão visível for selecionada.",
+            "route_scope": "Nenhuma rota em foco neste momento.",
+        }
+
+    from_node_id = str(selected_edge.get("from_node") or "").strip()
+    to_node_id = str(selected_edge.get("to_node") or "").strip()
+    from_label = str(edge_summary.get("from_label") or from_node_id or "-")
+    to_label = str(edge_summary.get("to_label") or to_node_id or "-")
+    focus_node_ids = {node_id for node_id in (from_node_id, to_node_id) if node_id}
+    prioritized_routes = [
+        route
+        for route in route_rows
+        if str(route.get("source") or "").strip() in focus_node_ids or str(route.get("sink") or "").strip() in focus_node_ids
+    ]
+    focused_dosing_routes = [
+        route
+        for route in prioritized_routes
+        if float(route.get("dose_min_l") or 0.0) > 0
+    ]
+    local_violations: list[str] = []
+    if to_node_id == "W":
+        local_violations.append("A conexão em foco entra em W; ajuste a direção antes de continuar.")
+    if from_node_id == "S":
+        local_violations.append("A conexão em foco sai de S; corrija a direção para manter a regra estrutural.")
+    for route in prioritized_routes:
+        route_id = str(route.get("route_id") or "ROTA")
+        if str(route.get("sink") or "").strip() == "W":
+            local_violations.append(f"{route_id} tenta terminar em W; essa rota precisa ser redirecionada.")
+        if str(route.get("source") or "").strip() == "S":
+            local_violations.append(f"{route_id} tenta sair de S; essa rota precisa ser revista.")
+        if float(route.get("dose_min_l") or 0.0) > 0 and not _coerce_truthy(route.get("measurement_required")):
+            local_violations.append(f"{route_id} usa dosagem sem medição direta compatível.")
+
+    if local_violations:
+        current_effect = local_violations[0]
+    elif focused_dosing_routes:
+        current_effect = "Há rotas com dosagem ligadas a este trecho; confirme medição direta antes de seguir para Runs."
+    elif int(studio_summary.get("blocker_count", 0) or 0) > 0:
+        current_effect = "Este trecho convive com outros bloqueios estruturais no cenário e merece revisão antes da fila."
+    else:
+        current_effect = "Este trecho não aciona bloqueio estrutural imediato na readiness."
+
+    route_scope = (
+        f"Este trecho toca {len(prioritized_routes)} rota(s) em foco."
+        if prioritized_routes
+        else "Nenhuma rota obrigatória ou de dosagem está ligada a este trecho agora."
+    )
+    reverse_preview = f"Se inverter agora, {to_label} passa a suprir {from_label}."
+    reverse_impact = "O impacto da inversão ainda depende de dados completos do cenário."
+    if nodes_rows and candidate_links_rows:
+        try:
+            reversed_links, _ = reverse_edge_studio_selection(
+                candidate_links_rows,
+                selected_link_id=selected_link_id,
+                nodes_rows=nodes_rows,
+            )
+            before_summary = build_studio_readiness_summary(nodes_rows, candidate_links_rows, route_rows)
+            after_summary = build_studio_readiness_summary(nodes_rows, reversed_links, route_rows)
+            reverse_impact = _edge_reverse_impact_text(before_summary, after_summary)
+        except ValueError as exc:
+            reverse_impact = str(exc)
+
+    return {
+        "current_flow": f"{from_label} supre {to_label}.",
+        "reverse_preview": reverse_preview,
+        "current_effect": current_effect,
+        "reverse_impact": reverse_impact,
+        "route_scope": route_scope,
+    }
+
+
+def _reverse_edge_with_feedback(
+    candidate_links_rows: list[dict[str, Any]],
+    *,
+    selected_link_id: str | None,
+    nodes_rows: list[dict[str, Any]] | None,
+    route_rows: list[dict[str, Any]] | None,
+    message_prefix: str,
+    edge_component_rules_rows: list[dict[str, Any]] | None = None,
+) -> tuple[list[dict[str, Any]], str | None, str]:
+    route_rows = route_rows or []
+    before_summary = build_studio_readiness_summary(nodes_rows or [], candidate_links_rows, route_rows)
+    updated_links, next_edge_selection = reverse_edge_studio_selection(
+        candidate_links_rows,
+        selected_link_id=selected_link_id,
+        nodes_rows=nodes_rows or [],
+        edge_component_rules_rows=edge_component_rules_rows or [],
+    )
+    after_summary = build_studio_readiness_summary(nodes_rows or [], updated_links, route_rows)
+    node_lookup = {
+        str(row.get("node_id", "")).strip(): dict(row)
+        for row in _visible_studio_nodes(nodes_rows or [])
+        if str(row.get("node_id", "")).strip()
+    }
+    reversed_row = next(
+        (
+            row
+            for row in updated_links
+            if str(row.get("link_id", "")).strip() == str(next_edge_selection or selected_link_id or "").strip()
+        ),
+        {},
+    )
+    flow_line = _studio_edge_business_label(reversed_row, node_lookup)
+    impact = _edge_reverse_impact_text(before_summary, after_summary)
+    return updated_links, next_edge_selection, f"{message_prefix} Agora {flow_line}. {impact}"
+
+
+def _studio_workspace_quick_edit_cards(
+    node_summary: dict[str, Any],
+    edge_summary: dict[str, Any],
+    studio_summary: dict[str, Any],
+    route_rows: list[dict[str, Any]] | None,
+    nodes_rows: list[dict[str, Any]] | None = None,
+    candidate_links_rows: list[dict[str, Any]] | None = None,
+) -> list[Any]:
     selected_node = node_summary.get("selected_node") or {}
     selected_edge_row = edge_summary.get("selected_edge") or {}
     selected_node_present = bool(str(node_summary.get("selected_node_id") or "").strip())
     selected_edge_present = bool(edge_summary.get("selected_edge"))
+    reverse_preview = _build_studio_edge_reverse_preview(
+        edge_summary,
+        studio_summary,
+        route_rows,
+        nodes_rows=nodes_rows,
+        candidate_links_rows=candidate_links_rows,
+    )
     return [
         html.Div(
             style={**UI_MUTED_CARD_STYLE, "padding": "14px"},
@@ -1826,6 +1986,17 @@ def _studio_workspace_quick_edit_cards(node_summary: dict[str, Any], edge_summar
                         ),
                     ],
                 ),
+                html.Div(
+                    id="studio-focus-edge-flow-preview",
+                    style={**UI_THREE_COLUMN_STYLE, "marginTop": "12px"},
+                    children=[
+                        _guidance_card("Fluxo atual", reverse_preview["current_flow"]),
+                        _guidance_card("Se inverter agora", reverse_preview["reverse_preview"]),
+                        _guidance_card("Impacto previsto", reverse_preview["reverse_impact"]),
+                        _guidance_card("Rotas tocadas", reverse_preview["route_scope"]),
+                    ],
+                ),
+                html.Div(reverse_preview["current_effect"], style={"marginTop": "10px", "lineHeight": "1.6", "fontWeight": 700}),
             ],
         ),
     ]
@@ -1864,7 +2035,14 @@ def render_studio_workspace_panel(
     connection_preview = connection_lines[0] if connection_lines else "Ainda não há trecho de suprimento legível na camada principal."
     selected_node_present = bool(str(node_summary.get("selected_node_id") or "").strip())
     selected_edge_present = bool(edge_summary.get("selected_edge"))
-    quick_edit_cards = _studio_workspace_quick_edit_cards(node_summary, edge_summary)
+    quick_edit_cards = _studio_workspace_quick_edit_cards(
+        node_summary,
+        edge_summary,
+        studio_summary,
+        route_rows,
+        nodes_rows=nodes_rows,
+        candidate_links_rows=candidate_links_rows,
+    )
     runs_enabled = status == "ready"
     runs_button_label = "Ir para Runs" if runs_enabled else "Runs bloqueado neste estado"
     primary_actions: list[Any]
@@ -2249,7 +2427,7 @@ def render_studio_canvas_guidance_panel(
     selected_edge = edge_summary.get("selected_edge") or {}
     if selected_edge_id and selected_edge_label:
         current_focus = f"Conexão em foco: {selected_edge_label}."
-        canvas_action = "Revise a conexão selecionada no canvas e abra a bancada completa só se precisar ajustar famílias, comprimento ou estrutura."
+        canvas_action = "Revise a conexão selecionada, ajuste comprimento ou famílias e inverta a direção direto no primeiro fold quando isso destravar o fluxo."
         if str(selected_edge.get("to_node") or "").strip() == "W":
             local_blocker = "Bloqueio local: esta conexão ainda entra em W e precisa ter a direção corrigida neste foco."
         elif str(selected_edge.get("from_node") or "").strip() == "S":
@@ -2314,7 +2492,11 @@ def render_studio_connectivity_panel(
     node_summary: dict[str, Any],
     edge_summary: dict[str, Any],
     route_rows: list[dict[str, Any]] | None,
+    nodes_rows: list[dict[str, Any]] | None = None,
+    candidate_links_rows: list[dict[str, Any]] | None = None,
 ) -> Any:
+    nodes_rows = nodes_rows or []
+    candidate_links_rows = candidate_links_rows or []
     route_rows = route_rows or []
     focus_node_ids = {
         str(node_summary.get("selected_node_id") or "").strip(),
@@ -2333,6 +2515,7 @@ def render_studio_connectivity_panel(
     selected_edge = edge_summary.get("selected_edge") or {}
     selected_node_present = bool(str(node_summary.get("selected_node_id") or "").strip())
     selected_edge_present = bool(selected_edge)
+    edge_action_panel: Any = None
     if "W" in focus_node_ids:
         local_rules.append("W só pode iniciar fluxo; nenhuma conexão ou rota deve terminar neste ponto.")
     if "S" in focus_node_ids:
@@ -2402,6 +2585,43 @@ def render_studio_connectivity_panel(
         if int(summary.get("blocker_count", 0) or 0) > 0
         else str((summary.get("next_steps") or ["Com o cenário consistente, siga para Runs para enfileirar a próxima rodada."])[0])
     )
+    if selected_edge_present:
+        reverse_preview = _build_studio_edge_reverse_preview(
+            edge_summary,
+            summary,
+            route_rows,
+            nodes_rows=nodes_rows,
+            candidate_links_rows=candidate_links_rows,
+        )
+        menu_actions = [
+            "Abra o menu contextual desta conexão e use Inverter direção para corrigir o fluxo sem abrir o workbench.",
+            "Use Remover conexão no mesmo menu apenas se este trecho não fizer mais parte do fluxo principal.",
+        ]
+        if prioritized_routes:
+            menu_actions.insert(
+                1,
+                f"{reverse_preview['route_scope']} Revise a leitura de origem, destino e medição direta logo após a ação.",
+            )
+        edge_action_panel = html.Div(
+            id="studio-connectivity-edge-action-panel",
+            style={**UI_MUTED_CARD_STYLE, "padding": "14px", "marginTop": "12px", "marginBottom": "12px"},
+            children=[
+                html.Div("Trecho acionável no canvas", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+                html.Div(reverse_preview["current_flow"], style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"}),
+                html.Div(
+                    style={**UI_THREE_COLUMN_STYLE, "marginTop": "12px"},
+                    children=[
+                        _guidance_card("Origem do trecho", str(edge_summary.get("from_label") or "-")),
+                        _guidance_card("Destino do trecho", str(edge_summary.get("to_label") or "-")),
+                        _guidance_card("Impacto agora", reverse_preview["current_effect"]),
+                        _guidance_card("Se inverter no canvas", f"{reverse_preview['reverse_preview']} {reverse_preview['reverse_impact']}"),
+                        _guidance_card("Rotas tocadas", reverse_preview["route_scope"]),
+                    ],
+                ),
+                html.Div("Ações diretas no menu desta conexão", style={"fontWeight": 700, "marginTop": "12px", "marginBottom": "6px"}),
+                _bullet_list(menu_actions, "Abra o menu contextual da conexão para agir diretamente no canvas."),
+            ],
+        )
     return html.Div(
         id="studio-connectivity-panel",
         children=[
@@ -2422,6 +2642,7 @@ def render_studio_connectivity_panel(
                     _metric_card("Medição direta", summary.get("measurement_route_count", 0)),
                 ],
             ),
+            edge_action_panel,
             html.Div(
                 "Prioridade da seleção atual"
                 if prioritized_routes
@@ -4022,6 +4243,8 @@ def build_app(
                                                     _safe_json_loads(initial_node_studio_summary),
                                                     _safe_json_loads(initial_edge_studio_summary),
                                                     authoring_payload["route_rows"],
+                                                    authoring_payload["nodes_rows"],
+                                                    authoring_payload["candidate_links_rows"],
                                                 ),
                                                 style=UI_CARD_STYLE,
                                             ),
@@ -5171,6 +5394,7 @@ def build_app(
         State("candidate-links-grid", "rowData"),
         State("edge-studio-selected-id", "data"),
         State("nodes-grid", "rowData"),
+        State("routes-grid", "rowData"),
         State("edge-component-rules-grid", "rowData"),
         prevent_initial_call=True,
     )
@@ -5179,21 +5403,24 @@ def build_app(
         candidate_links_rows: list[dict[str, Any]] | None,
         selected_link_id: str | None,
         nodes_rows: list[dict[str, Any]] | None,
+        route_rows: list[dict[str, Any]] | None,
         edge_component_rules_rows: list[dict[str, Any]] | None,
     ) -> tuple[list[dict[str, Any]], str | None, str]:
         if not n_clicks:
             return candidate_links_rows or [], selected_link_id, ""
         selected_id = _default_edge_studio_selection(candidate_links_rows or [], preferred_link_id=selected_link_id)
         try:
-            updated_rows, next_selected_link_id = reverse_edge_studio_selection(
+            updated_rows, next_selected_link_id, status = _reverse_edge_with_feedback(
                 candidate_links_rows or [],
                 selected_link_id=selected_id,
                 nodes_rows=nodes_rows or [],
+                route_rows=route_rows or [],
                 edge_component_rules_rows=edge_component_rules_rows or [],
+                message_prefix="Conexão invertida direto no foco do canvas.",
             )
         except ValueError as exc:
             return candidate_links_rows or [], selected_link_id, str(exc)
-        return updated_rows, next_selected_link_id, "Direção da conexão invertida direto no foco do canvas."
+        return updated_rows, next_selected_link_id, status
 
     @app.callback(
         Output("candidate-links-grid", "rowData", allow_duplicate=True),
@@ -6068,7 +6295,14 @@ def build_app(
                 studio_readiness,
                 studio_status_text,
             ),
-            render_studio_connectivity_panel(studio_readiness, node_summary, edge_summary, route_rows),
+            render_studio_connectivity_panel(
+                studio_readiness,
+                node_summary,
+                edge_summary,
+                route_rows,
+                nodes_rows,
+                candidate_links_rows,
+            ),
             render_studio_selection_panel(node_summary, "node"),
             render_studio_selection_panel(edge_summary, "edge"),
         )
@@ -6956,6 +7190,25 @@ def apply_studio_context_menu_action(
             "Conexão removida pelo menu contextual.",
             False,
         )
+    if menu_item_id == "reverse-edge":
+        try:
+            updated_links, next_edge_selection, status_message = _reverse_edge_with_feedback(
+                candidate_links_rows,
+                selected_link_id=element_id or selected_link_id,
+                nodes_rows=nodes_rows,
+                route_rows=route_rows,
+                message_prefix="Conexão invertida pelo menu contextual.",
+            )
+        except ValueError as exc:
+            return nodes_rows, candidate_links_rows, selected_node_id, selected_link_id, str(exc), False
+        return (
+            nodes_rows,
+            updated_links,
+            next_node_selection,
+            next_edge_selection,
+            status_message,
+            False,
+        )
     if menu_item_id == "open-workbench":
         if element_id:
             if any(str(row.get("node_id", "")).strip() == element_id for row in nodes_rows):
@@ -7215,19 +7468,34 @@ def reverse_edge_studio_selection(
     )
     if selected_row is None:
         return candidate_links_rows, None
-    return apply_edge_studio_edit(
-        candidate_links_rows,
-        selected_link_id=selected_id,
-        link_id=str(selected_row.get("link_id") or selected_id),
-        from_node=str(selected_row.get("to_node") or ""),
-        to_node=str(selected_row.get("from_node") or ""),
-        archetype=str(selected_row.get("archetype") or ""),
-        length_m=selected_row.get("length_m"),
-        bidirectional=bool(selected_row.get("bidirectional")),
-        family_hint=str(selected_row.get("family_hint") or ""),
-        nodes_rows=nodes_rows or [],
-        edge_component_rules_rows=edge_component_rules_rows or [],
-    )
+    target_from_node = str(selected_row.get("to_node") or "").strip()
+    target_to_node = str(selected_row.get("from_node") or "").strip()
+    if not target_from_node or not target_to_node:
+        raise ValueError(
+            "candidate_links.csv requires non-blank from_node and to_node values for "
+            f"edge '{selected_id}'."
+        )
+    if target_from_node == target_to_node:
+        raise ValueError(
+            "candidate_links.csv contains self-loop edges with from_node == to_node: "
+            f"['{selected_id}']"
+        )
+    node_ids = {
+        str(row.get("node_id", "")).strip()
+        for row in (nodes_rows or [])
+        if str(row.get("node_id", "")).strip()
+    }
+    unknown_nodes = sorted({node_id for node_id in (target_from_node, target_to_node) if node_ids and node_id not in node_ids})
+    if unknown_nodes:
+        raise ValueError(f"candidate_links.csv references unknown nodes: {unknown_nodes}")
+    updated_rows: list[dict[str, Any]] = []
+    for row in candidate_links_rows:
+        updated_row = dict(row)
+        if str(row.get("link_id", "")).strip() == selected_id:
+            updated_row["from_node"] = target_from_node
+            updated_row["to_node"] = target_to_node
+        updated_rows.append(updated_row)
+    return updated_rows, selected_id
 
 
 def build_node_studio_elements(

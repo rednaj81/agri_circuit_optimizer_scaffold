@@ -1,7 +1,7 @@
 {
   "wave": "ux_phase_2_wave_1",
   "validation": {
-    "full": "87 passed in 491.58s (0:08:11)"
+    "full": "89 passed in 614.52s (0:10:14)"
   },
   "visual_evidence": {
     "type": "structured_ui_snapshot",
@@ -19,6 +19,7 @@
       "studio-workspace-panel": true,
       "studio-workspace-quick-edit-panel": true,
       "studio-workspace-local-actions-panel": true,
+      "studio-connectivity-edge-action-panel": true,
       "studio-context-detailed-panels": true,
       "studio-focus-node-label": true,
       "studio-focus-node-apply-button": true,
@@ -26,6 +27,7 @@
       "studio-focus-edge-family-hint": true,
       "studio-focus-edge-apply-button": true,
       "studio-focus-edge-reverse-button": true,
+      "node-studio-cytoscape.contextMenu.reverse-edge": true,
       "runs-workspace-panel": true,
       "decision-workspace-panel": true,
       "audit-workspace-panel": true
@@ -41,8 +43,17 @@
       "Controles rápidos já estão no primeiro fold do Studio.",
       "Use o painel local ao lado do canvas para editar rótulo, comprimento, famílias, direção e movimentos comuns sem abrir a bancada avançada."
     ],
+    "connectivity_markers": [
+      "Trecho acionável no canvas",
+      "Origem do trecho",
+      "Destino do trecho",
+      "Impacto agora",
+      "Se inverter no canvas",
+      "Ações diretas no menu desta conexão"
+    ],
     "workspace_panel_text_excerpt": "Leitura do cenárioExige atençãoA conexão L900 termina em W e ainda bloqueia a passagem para Runs.Seleção atualConexão em foco: Tanque de água -> Bomba principal.Conectividade em focoProduto 1 supre Misturador (rota obrigatória, rotas R004).Readiness localA conexão L900 termina em W e ainda bloqueia a passagem para Runs.Próxima açãoCorrigir no canvasO que precisa de atenção agoraA conexão L900 termina em W e ainda bloqueia a passagem para Runs.Conexão em foco: Tanque de água -> Bomba principal.Confira comprimento, direção e famílias sugeridas da conexão L013.Ajustes locais do canvasUse estes controles rápidos para ajustes rotineiros sem abrir a bancada avançada.Entidade em focoAtualize o rótulo visível desta entidade sem sair da leitura principal do Studio.Rótulo visívelAplicar rótulo direto no canvasConexão em focoAjuste comprimento, famílias sugeridas ou direção sem abrir a bancada completa.Comprimento (m)Famílias sugeridasAplicar conexãoInverter direçãoMover à esquerdaMover acimaMover abaixoDuplicar nó em focoExcluir conexão em focoAbrir bancada completaQuem supre quem na camada principalProduto 1 é suprido por Incorporador e supre Misturador e Saída externa.Escopo desta leituraProduto 1É suprido porIncorporadorSupreMisturador e Saída externaTrechos de negócio já legíveisProduto 1 supre Misturador (rota obrigatória, rotas R004).Incorporador supre Produto 1 (rotas R010).Produto 1 supre Saída externa (rotas R014).Bloqueios1Impedem liberar a passagem para Runs.Avisos1Pedem revisão antes de enfileirar.Rotas obrigatórias2Base mínima da conectividade principal.Corrigir no canvasRuns bloqueado neste estadoAbrir AuditoriaSinal de saída desta áreaCorrija o fluxo principal antes de abrir Runs.Sem alerta operacional no momento.",
-    "focus_panel_text_excerpt": "Foco do canvasSem alerta operacional no momento.Conexão em focoA conexão selecionada concentra o próximo ajuste do fluxo.Exige atençãoEste foco ainda convive com bloqueios antes de Runs.Problema ou oportunidadeUsar a seleção atual para validar conectividade, regras obrigatórias e readiness sem sair do canvas.Próxima açãoA conexão em foco já concentra a leitura deste trecho. Revise o fluxo no canvas e abra a bancada completa apenas se precisar ajustar comprimento, famílias ou direção.Nó em focoBomba principalConexão em focoTanque de água para Bomba principalRotas ligadas ao nó3ReadinessExige atençãoRelações de negócio deste focoProduto 1 é suprido por Incorporador e supre Misturador e Saída externa.É suprido porIncorporadorSupreMisturador e Saída externaÓrfãos visíveisNenhum nó órfão domina a leitura principal.Trechos ligados a este focoProduto 1 supre Misturador (rota obrigatória, rotas R004).Incorporador supre Produto 1 (rotas R010).Produto 1 supre Saída externa (rotas R014).Edição direta deste focoControles rápidos já estão no primeiro fold do Studio.Use o painel local ao lado do canvas para editar rótulo, comprimento, famílias, direção e movimentos comuns sem abrir a bancada avançada.Por que este foco importaNó em foco: Tanque de produto na superfície principal.Conexão em foco: Tanque de água -> Bomba principal.Rotas deste foco: 1 obrigatória(s), 3 com dosagem, 3 com medição direta.Regra do foco: rotas com dosagem exigem medição direta compatível.Regra do foco: 1 rota(s) obrigatória(s) passam por esta leitura e precisam permanecer legíveis no canvas.O cenário ainda tem 1 bloqueio(s) antes de Runs, mesmo que este foco não concentre todos eles.Ações rápidas deste focoAção sugerida agoraA conexão em foco já concentra a leitura deste trecho. Revise o fluxo no canvas e abra a bancada completa apenas se precisar ajustar comprimento, famílias ou direção.Abrir bancada completaPróxima açãoA conexão em foco já concentra a leitura deste trecho. Revise o fluxo no canvas e abra a bancada completa apenas se precisar ajustar comprimento, famílias ou direção.Confira comprimento e famílias sugeridas para a conexão L013."
+    "focus_panel_text_excerpt": "Foco do canvasSem alerta operacional no momento.Conexão em focoA conexão selecionada concentra o próximo ajuste do fluxo.Exige atençãoEste foco ainda convive com bloqueios antes de Runs.Problema ou oportunidadeUsar a seleção atual para validar conectividade, regras obrigatórias e readiness sem sair do canvas.Próxima açãoA conexão em foco já concentra a leitura deste trecho. Revise o fluxo no canvas e abra a bancada completa apenas se precisar ajustar comprimento, famílias ou direção.Nó em focoBomba principalConexão em focoTanque de água para Bomba principalRotas ligadas ao nó3ReadinessExige atençãoRelações de negócio deste focoProduto 1 é suprido por Incorporador e supre Misturador e Saída externa.É suprido porIncorporadorSupreMisturador e Saída externaÓrfãos visíveisNenhum nó órfão domina a leitura principal.Trechos ligados a este focoProduto 1 supre Misturador (rota obrigatória, rotas R004).Incorporador supre Produto 1 (rotas R010).Produto 1 supre Saída externa (rotas R014).Edição direta deste focoControles rápidos já estão no primeiro fold do Studio.Use o painel local ao lado do canvas para editar rótulo, comprimento, famílias, direção e movimentos comuns sem abrir a bancada avançada.Por que este foco importaNó em foco: Tanque de produto na superfície principal.Conexão em foco: Tanque de água -> Bomba principal.Rotas deste foco: 1 obrigatória(s), 3 com dosagem, 3 com medição direta.Regra do foco: rotas com dosagem exigem medição direta compatível.Regra do foco: 1 rota(s) obrigatória(s) passam por esta leitura e precisam permanecer legíveis no canvas.O cenário ainda tem 1 bloqueio(s) antes de Runs, mesmo que este foco não concentre todos eles.Ações rápidas deste focoAção sugerida agoraA conexão em foco já concentra a leitura deste trecho. Revise o fluxo no canvas e abra a bancada completa apenas se precisar ajustar comprimento, famílias ou direção.Abrir bancada completaPróxima açãoA conexão em foco já concentra a leitura deste trecho. Revise o fluxo no canvas e abra a bancada completa apenas se precisar ajustar comprimento, famílias ou direção.Confira comprimento e famílias sugeridas para a conexão L013.",
+    "connectivity_panel_text_excerpt": "Conectividade do grafoO que destrava o cenárioA conexão em foco entra em W; ajuste a direção antes de continuar.Antes de abrir RunsNão siga para Runs enquanto houver bloqueios estruturais ou rotas com dosagem sem medição direta.Bloqueios1Avisos0Rotas obrigatórias0Medição direta0Trecho acionável no canvasBomba principal supre Tanque de água.Origem do trechoBomba principalDestino do trechoTanque de águaImpacto agoraA conexão em foco entra em W; ajuste a direção antes de continuar.Se inverter no canvasSe inverter agora, Tanque de água passa a suprir Bomba principal. A inversão reduz os bloqueios de readiness do cenário.Ações diretas no menu desta conexãoAbra o menu contextual desta conexão e use Inverter direção para corrigir o fluxo sem abrir o workbench.Use Remover conexão no mesmo menu apenas se este trecho não fizer mais parte do fluxo principal."
   },
   "callback_outcomes": {
     "node_quick_edit": {
@@ -60,7 +71,7 @@
       "selected_id": "L013",
       "from_node": "J2",
       "to_node": "J1",
-      "status": "Direção da conexão invertida direto no foco do canvas."
+      "status": "Conexão invertida pelo menu contextual. Agora J2 supre J1."
     }
   },
   "residual_risks": [
