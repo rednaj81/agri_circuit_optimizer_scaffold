@@ -1,0 +1,48 @@
+{
+  "wave": "ux_phase_2_wave_3",
+  "validation": {
+    "targeted": "3 passed, 37 deselected in 0.66s",
+    "full": "40 passed in 409.80s"
+  },
+  "studio_primary_surface": {
+    "panel_ids": [
+      "studio-focus-panel",
+      "studio-connectivity-panel",
+      "studio-editor-workbench"
+    ],
+    "markers": [
+      "Foco do canvas",
+      "Conectividade do grafo",
+      "Seleção atual",
+      "Cenário inteiro"
+    ]
+  },
+  "focus_rule_clarity": {
+    "focus_rules": [
+      "Regra do foco: W não pode receber rotas entrando; use este ponto apenas como origem.",
+      "Regra do foco: S não pode originar rotas; use este ponto apenas como destino final.",
+      "Regra do foco: rotas com dosagem exigem medição direta compatível."
+    ],
+    "local_violation_examples": [
+      "A conexão em foco entra em W; ajuste a direção antes de continuar.",
+      "R002 usa dosagem sem medição direta compatível."
+    ]
+  },
+  "global_readiness_visibility": {
+    "global_marker": "Cenário inteiro",
+    "global_examples": [
+      "Há conexões entrando em W no cenário; isso ainda bloqueia a passagem para Runs.",
+      "Há conexões saindo de S no cenário; isso ainda bloqueia a passagem para Runs.",
+      "Rotas com dosagem ainda sem medição direta: R002."
+    ]
+  },
+  "secondary_surface": {
+    "workbench_id": "studio-editor-workbench",
+    "technical_disclosure_ids": [
+      "node-studio-summary-panel",
+      "edge-studio-summary-panel",
+      "node-studio-summary",
+      "edge-studio-summary"
+    ]
+  }
+}

@@ -682,6 +682,54 @@ def render_studio_connectivity_panel(
         for route in route_rows
         if str(route.get("source") or "").strip() in focus_node_ids or str(route.get("sink") or "").strip() in focus_node_ids
     ]
+    local_rules: list[str] = []
+    local_violations: list[str] = []
+    global_highlights: list[str] = []
+    selected_edge = edge_summary.get("selected_edge") or {}
+    if "W" in focus_node_ids:
+        local_rules.append("W só pode iniciar fluxo; nenhuma conexão ou rota deve terminar neste ponto.")
+    if "S" in focus_node_ids:
+        local_rules.append("S é ponto terminal; nenhuma conexão ou rota deve sair deste ponto.")
+    focused_dosing_routes = [
+        route
+        for route in prioritized_routes
+        if float(route.get("dose_min_l") or 0.0) > 0
+    ]
+    if focused_dosing_routes:
+        local_rules.append("Rotas com dosagem exigem medição direta antes de seguir para Runs.")
+    if str(selected_edge.get("to_node") or "").strip() == "W":
+        local_violations.append("A conexão em foco entra em W; ajuste a direção antes de continuar.")
+    if str(selected_edge.get("from_node") or "").strip() == "S":
+        local_violations.append("A conexão em foco sai de S; corrija a direção para manter a regra estrutural.")
+    for route in prioritized_routes:
+        route_id = str(route.get("route_id") or "ROTA")
+        if str(route.get("sink") or "").strip() == "W":
+            local_violations.append(f"{route_id} tenta terminar em W; essa rota precisa ser redirecionada.")
+        if str(route.get("source") or "").strip() == "S":
+            local_violations.append(f"{route_id} tenta sair de S; essa rota precisa ser revista.")
+        if float(route.get("dose_min_l") or 0.0) > 0 and not _coerce_truthy(route.get("measurement_required")):
+            local_violations.append(f"{route_id} usa dosagem sem medição direta compatível.")
+    for blocker in list(summary.get("blockers", []))[:4]:
+        blocker_text = str(blocker)
+        if "entra em W" in blocker_text:
+            global_highlights.append("Há conexões entrando em W no cenário; isso ainda bloqueia a passagem para Runs.")
+        elif "sai de S" in blocker_text:
+            global_highlights.append("Há conexões saindo de S no cenário; isso ainda bloqueia a passagem para Runs.")
+        elif blocker_text.startswith("Rotas com dosagem sem medicao direta:"):
+            route_ids = blocker_text.split(":", 1)[1].strip()
+            global_highlights.append(f"Rotas com dosagem ainda sem medição direta: {route_ids}.")
+        elif "referencia source inexistente" in blocker_text:
+            global_highlights.append("Há rota apontando para uma origem que não está disponível no grafo principal.")
+        elif "referencia sink inexistente" in blocker_text:
+            global_highlights.append("Há rota apontando para um destino que não está disponível no grafo principal.")
+        else:
+            global_highlights.append(blocker_text)
+    for warning in list(summary.get("warnings", []))[:2]:
+        warning_text = str(warning)
+        if warning_text.startswith("Nos sem conexao no grafo visivel:"):
+            global_highlights.append("Ainda existem nós sem conexão no grafo visível; a readiness geral continua incompleta.")
+        else:
+            global_highlights.append(warning_text)
     route_lines = []
     for route in (prioritized_routes or route_rows)[:4]:
         route_id = str(route.get("route_id") or "ROTA")
@@ -704,12 +752,22 @@ def render_studio_connectivity_panel(
                     _metric_card("Bloqueios", summary.get("blocker_count", 0)),
                     _metric_card("Avisos", summary.get("warning_count", 0)),
                     _metric_card("Rotas obrigatórias", summary.get("mandatory_route_count", 0)),
-            _metric_card("Medição direta", summary.get("measurement_route_count", 0)),
-        ],
-    ),
+                    _metric_card("Medição direta", summary.get("measurement_route_count", 0)),
+                ],
+            ),
             html.Div(
                 "Prioridade da seleção atual" if prioritized_routes else "Prioridade geral do cenário",
                 style={"marginTop": "10px", "fontWeight": 700, "lineHeight": "1.5"},
+            ),
+            html.H4("Seleção atual", style={"marginBottom": "6px"}),
+            _bullet_list(
+                list(dict.fromkeys(local_violations + local_rules))[:4],
+                "Nenhuma regra crítica acionada para a seleção atual.",
+            ),
+            html.H4("Cenário inteiro", style={"marginBottom": "6px", "marginTop": "14px"}),
+            _bullet_list(
+                list(dict.fromkeys(global_highlights))[:4],
+                "Nenhum bloqueio sistêmico impede a readiness neste momento.",
             ),
             html.H4("Rotas em foco", style={"marginBottom": "6px"}),
             _bullet_list(route_lines, "Sem rotas registradas para esta leitura."),
@@ -734,6 +792,13 @@ def render_studio_focus_panel(
         if selected_node_id not in {"", "-"}
         and selected_node_id in {str(route.get("source") or "").strip(), str(route.get("sink") or "").strip()}
     ]
+    focus_rules: list[str] = []
+    if selected_node_id == "W" or str(selected_edge.get("to_node") or "").strip() == "W":
+        focus_rules.append("Regra do foco: W não pode receber rotas entrando; use este ponto apenas como origem.")
+    if selected_node_id == "S" or str(selected_edge.get("from_node") or "").strip() == "S":
+        focus_rules.append("Regra do foco: S não pode originar rotas; use este ponto apenas como destino final.")
+    if any(float(route.get("dose_min_l") or 0.0) > 0 for route in relevant_routes):
+        focus_rules.append("Regra do foco: rotas com dosagem exigem medição direta compatível.")
     node_next_action = (
         f"Revise as rotas ligadas a {selected_node_id} antes de ajustar posição ou nome."
         if relevant_routes
@@ -766,6 +831,8 @@ def render_studio_focus_panel(
                 ],
                 "Sem foco atual registrado.",
             ),
+            html.H4("Regras deste foco", style={"marginBottom": "6px", "marginTop": "14px"}),
+            _bullet_list(focus_rules, "Nenhuma regra estrutural adicional foi acionada neste foco."),
             html.H4("Próxima ação", style={"marginBottom": "6px", "marginTop": "14px"}),
             _bullet_list([node_next_action, edge_next_action], "Sem próxima ação registrada."),
         ],

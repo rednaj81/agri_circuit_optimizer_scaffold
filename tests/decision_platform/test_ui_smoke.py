@@ -304,6 +304,13 @@ def test_studio_connectivity_panel_surfaces_routes_and_measurement_near_canvas()
             "warning_count": 2,
             "mandatory_route_count": 3,
             "measurement_route_count": 1,
+            "blockers": [
+                "L900 entra em W",
+                "Rotas com dosagem sem medicao direta: R002",
+            ],
+            "warnings": [
+                "Nos sem conexao no grafo visivel: P3",
+            ],
             "next_steps": [
                 "Corrigir bloqueios estruturais antes de enfileirar uma nova run.",
                 "Salvar e reabrir o bundle canonico quando a revisao estiver pronta.",
@@ -317,7 +324,7 @@ def test_studio_connectivity_panel_surfaces_routes_and_measurement_near_canvas()
         },
         [
             {"route_id": "R001", "source": "W", "sink": "M", "mandatory": True, "measurement_required": False},
-            {"route_id": "R002", "source": "I", "sink": "M", "mandatory": True, "measurement_required": True},
+            {"route_id": "R002", "source": "W", "sink": "M", "mandatory": True, "measurement_required": False, "dose_min_l": 2.0},
         ],
     )
     panel_text = _collect_text_content(panel)
@@ -325,6 +332,11 @@ def test_studio_connectivity_panel_surfaces_routes_and_measurement_near_canvas()
     assert "Conectividade do grafo" in panel_text
     assert "R001: W -> M (obrigatória)" in panel_text
     assert "Prioridade da seleção atual" in panel_text
+    assert "Seleção atual" in panel_text
+    assert "Cenário inteiro" in panel_text
+    assert "W só pode iniciar fluxo" in panel_text
+    assert "R002 usa dosagem sem medição direta compatível" in panel_text
+    assert "Há conexões entrando em W no cenário" in panel_text
     assert "Corrigir bloqueios estruturais" in panel_text
 
 
@@ -343,7 +355,7 @@ def test_studio_focus_panel_uses_canvas_selection_as_primary_context() -> None:
             "to_label": "Misturador",
         },
         [
-            {"route_id": "R001", "source": "W", "sink": "M", "mandatory": True},
+            {"route_id": "R001", "source": "W", "sink": "M", "mandatory": True, "dose_min_l": 2.0, "measurement_required": True},
             {"route_id": "R002", "source": "P1", "sink": "M", "mandatory": True},
         ],
     )
@@ -353,6 +365,9 @@ def test_studio_focus_panel_uses_canvas_selection_as_primary_context() -> None:
     assert "Tanque de água" in panel_text
     assert "Água para misturador" in panel_text
     assert "Rotas ligadas ao nó" in panel_text
+    assert "Regras deste foco" in panel_text
+    assert "W não pode receber rotas entrando" in panel_text
+    assert "rotas com dosagem exigem medição direta compatível" in panel_text
     assert "Revise as rotas ligadas a W" in panel_text
 
 
