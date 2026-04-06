@@ -382,6 +382,7 @@ def test_runs_tab_combines_queue_and_execution_summary() -> None:
     assert _find_component_by_id(runs_tab, "runs-flow-open-studio-link") is not None
     assert _find_component_by_id(runs_tab, "runs-flow-open-decision-link") is not None
     assert _find_component_by_id(runs_tab, "execution-summary-panel") is not None
+    assert _find_component_by_id(runs_tab, "run-jobs-status-banner") is not None
     assert _find_component_by_id(runs_tab, "runs-open-studio-button") is None
     assert _find_component_by_id(runs_tab, "runs-open-decision-button") is None
     assert _find_component_by_id(runs_tab, "execution-open-decision-button") is not None
@@ -670,6 +671,32 @@ def test_primary_runs_panels_hide_raw_backend_keys_in_main_surface() -> None:
     assert "Abrir Decisão desta execução" in execution_text
 
 
+def test_run_job_detail_panel_covers_preparing_and_exporting_states() -> None:
+    preparing_panel = render_run_job_detail_panel(
+        {
+            "selected_run_id": "run-010",
+            "status": "preparing",
+            "requested_execution_mode": "official",
+            "official_gate_valid": True,
+        }
+    )
+    exporting_panel = render_run_job_detail_panel(
+        {
+            "selected_run_id": "run-011",
+            "status": "exporting",
+            "requested_execution_mode": "official",
+            "official_gate_valid": True,
+        }
+    )
+    preparing_text = _collect_text_content(preparing_panel)
+    exporting_text = _collect_text_content(exporting_panel)
+
+    assert "preparando artefatos" in preparing_text.lower()
+    assert "Run em foco" in preparing_text
+    assert "finalizando artefatos" in exporting_text.lower()
+    assert "Concluída" not in exporting_text
+
+
 def test_run_jobs_overview_panel_clarifies_queue_now_vs_recent_history() -> None:
     panel = render_run_jobs_overview_panel(
         {
@@ -783,6 +810,8 @@ def test_decision_flow_panel_makes_transition_and_next_action_explicit() -> None
             "runner_up_candidate_id": "cand-02",
             "decision_status": "technical_tie",
             "technical_tie": True,
+            "topology_family": "hybrid_free",
+            "runner_up_topology_family": "hybrid_loop",
         }
     )
     panel_text = _collect_text_content(panel)
@@ -795,12 +824,36 @@ def test_decision_flow_panel_makes_transition_and_next_action_explicit() -> None
     assert "Saída do fluxo" in panel_text
     assert "cand-01" in panel_text
     assert "cand-02" in panel_text
+    assert "Candidato oficial" in panel_text
+    assert "Runner-up" in panel_text
+    assert "Empate técnico ativo" in panel_text
     assert "Empate técnico" in panel_text
     assert "Voltar para Runs" in panel_text
     assert "Abrir Auditoria" in panel_text
     assert "leitura humana assistida" in panel_text.lower()
     assert getattr(_find_component_by_id(panel, "decision-flow-open-runs-link"), "href", None) == "?tab=runs"
     assert getattr(_find_component_by_id(panel, "decision-flow-open-audit-link"), "href", None) == "?tab=audit"
+
+
+def test_decision_flow_panel_surfaces_contrast_risk_before_secondary_comparison() -> None:
+    panel = render_decision_flow_panel(
+        {
+            "candidate_id": "cand-01",
+            "runner_up_candidate_id": "cand-02",
+            "decision_status": "winner_clear",
+            "technical_tie": False,
+            "feasible": True,
+            "topology_family": "hybrid_free",
+            "runner_up_topology_family": "hybrid_loop",
+            "score_margin_delta": 0.2,
+        }
+    )
+    panel_text = _collect_text_content(panel)
+
+    assert "Contraste fraco" in panel_text
+    assert "margem curta" in panel_text
+    assert "cand-01 lidera a leitura atual" in panel_text
+    assert "cand-02 segue como contraste principal" in panel_text
 
 
 def test_catalog_state_panel_explains_when_filters_hide_all_candidates() -> None:
@@ -893,6 +946,8 @@ def test_primary_decision_panels_hide_raw_metric_keys_in_main_surface() -> None:
     assert "Empate técnico" in decision_text
     assert "Objetivo desta área" in decision_text
     assert "Ação principal" in decision_text
+    assert "Sinal prioritário" in decision_text
+    assert "não oficialize sem manter o runner-up visível" in decision_text
     assert "Runner-up e contraste" in contrast_text
     assert "cand-02" in contrast_text
     assert "Empate técnico" in contrast_text

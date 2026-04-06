@@ -450,6 +450,15 @@ def _humanize_decision_status(status: Any) -> str:
     return normalized.replace("_", " ") or "-"
 
 
+def _coerce_float_or_none(value: Any) -> float | None:
+    if value in (None, ""):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def _humanize_readiness_issue(issue: Any) -> str:
     text = str(issue or "").strip()
     if not text:
@@ -1804,6 +1813,28 @@ def render_decision_flow_panel(summary: dict[str, Any]) -> Any:
     candidate_id = str(summary.get("candidate_id") or "").strip()
     runner_up_id = str(summary.get("runner_up_candidate_id") or "").strip()
     decision_status = str(summary.get("decision_status") or ("technical_tie" if summary.get("technical_tie") else "winner_clear"))
+    score_margin_delta = _coerce_float_or_none(summary.get("score_margin_delta"))
+    winner_penalties = list(summary.get("winner_penalties", []))
+    critical_routes = list(summary.get("critical_routes", []))
+    if decision_status == "technical_tie":
+        signal_title = "Empate técnico ativo"
+        signal_text = "Winner e runner-up seguem próximos o suficiente para exigir leitura humana assistida antes da oficialização."
+    elif not summary.get("feasible"):
+        signal_title = "Winner ainda bloqueado"
+        signal_text = f"A leitura principal ainda carrega inviabilidade: {_humanize_infeasibility_reason(summary.get('infeasibility_reason'))}."
+    elif critical_routes:
+        top_route = critical_routes[0]
+        signal_title = "Risco principal"
+        signal_text = f"Rota crítica {top_route.get('route_id') or '-'}: {_humanize_route_issue(top_route.get('reason'))}."
+    elif winner_penalties:
+        signal_title = "Risco principal"
+        signal_text = f"A escolha oficial ainda carrega penalidade relevante: {winner_penalties[0]}."
+    elif score_margin_delta is not None and score_margin_delta <= 0.5:
+        signal_title = "Contraste fraco"
+        signal_text = "Winner e runner-up estão separados por margem curta; confirme o contraste antes de oficializar."
+    else:
+        signal_title = "Contraste suficiente"
+        signal_text = "Winner e runner-up já aparecem com separação legível para a decisão assistida."
     if not candidate_id:
         headline = "Ainda falta uma run confiável para abrir a leitura principal de decisão."
         next_action = "Volte para Runs, revise a execução em foco e só então retorne para a decisão humana assistida."
@@ -1836,6 +1867,28 @@ def render_decision_flow_panel(summary: dict[str, Any]) -> Any:
             html.Div(
                 style={**UI_THREE_COLUMN_STYLE, "marginTop": "14px"},
                 children=[
+                    _guidance_card(
+                        "Candidato oficial",
+                        (
+                            f"{candidate_id} lidera a leitura atual em {summary.get('topology_family') or '-'}."
+                            if candidate_id
+                            else "Ainda não existe winner legível para esta leitura."
+                        ),
+                    ),
+                    _guidance_card(
+                        "Runner-up",
+                        (
+                            f"{runner_up_id} segue como contraste principal em {summary.get('runner_up_topology_family') or '-'}."
+                            if runner_up_id
+                            else "Ainda não há runner-up legível para contrastar a escolha."
+                        ),
+                    ),
+                    _guidance_card(signal_title, signal_text),
+                ],
+            ),
+            html.Div(
+                style={**UI_THREE_COLUMN_STYLE, "marginTop": "14px"},
+                children=[
                     _metric_card("Winner", candidate_id or "-"),
                     _metric_card("Runner-up", runner_up_id or "-"),
                     _metric_card("Estado", _humanize_decision_status(decision_status)),
@@ -1855,14 +1908,29 @@ def render_decision_summary_panel(summary: dict[str, Any]) -> Any:
     decision_status = str(summary.get("decision_status") or ("technical_tie" if summary.get("technical_tie") else "winner_clear"))
     decision_label = "Empate técnico" if decision_status == "technical_tie" else "Winner claro"
     feasibility_label = "Viável" if summary.get("feasible") else "Inviável"
+    score_margin_delta = _coerce_float_or_none(summary.get("score_margin_delta"))
+    if decision_status == "technical_tie":
+        priority_signal = "Empate técnico ativo; não oficialize sem manter o runner-up visível."
+    elif not summary.get("feasible"):
+        priority_signal = f"O winner ainda está bloqueado por {_humanize_infeasibility_reason(summary.get('infeasibility_reason'))}."
+    elif summary.get("critical_routes"):
+        top_route = list(summary.get("critical_routes", []))[0]
+        priority_signal = f"Rota crítica {top_route.get('route_id') or '-'} segue pedindo revisão antes da exportação."
+    elif summary.get("winner_penalties"):
+        priority_signal = f"Há penalidade relevante no winner: {list(summary.get('winner_penalties', []))[0]}."
+    elif score_margin_delta is not None and score_margin_delta <= 0.5:
+        priority_signal = "A margem para o runner-up ainda é curta; trate esta escolha como contraste fraco."
+    else:
+        priority_signal = "O winner abriu contraste suficiente para orientar a decisão assistida."
     return html.Div(
         children=[
             html.H3("Escolha oficial", style={"marginTop": 0}),
             html.Div(
-                style={**UI_TWO_COLUMN_STYLE, "marginBottom": "12px"},
+                style={**UI_THREE_COLUMN_STYLE, "marginBottom": "12px"},
                 children=[
                     _guidance_card("Objetivo desta área", "Explicar por que o candidato oficial ocupa a liderança na leitura principal."),
                     _guidance_card("Ação principal", "Valide runner-up e sinais de risco antes de oficializar a exportação." if summary.get("runner_up_candidate_id") else "Confirme se já existe contraste suficiente para seguir com a decisão."),
+                    _guidance_card("Sinal prioritário", priority_signal),
                 ],
             ),
             html.Div(
@@ -2388,13 +2456,7 @@ def build_app(
                                     html.Div(id="execution-summary-panel", children=render_execution_summary_panel(_safe_json_loads(initial_execution_summary)), style=UI_MUTED_CARD_STYLE),
                                 ],
                             ),
-                            html.Div(
-                                style=UI_TWO_COLUMN_STYLE,
-                                children=[
-                                    html.Div(id="run-job-detail-panel", children=render_run_job_detail_panel(initial_run_jobs_snapshot["selected_run_detail"]), style=UI_MUTED_CARD_STYLE),
-                                    html.Div(id="run-jobs-status-banner", children=render_status_banner(""), style=UI_MUTED_CARD_STYLE),
-                                ],
-                            ),
+                            html.Div(id="run-job-detail-panel", children=render_run_job_detail_panel(initial_run_jobs_snapshot["selected_run_detail"]), style=UI_MUTED_CARD_STYLE),
                             html.Div(
                                 style=UI_TWO_COLUMN_STYLE,
                                 children=[
@@ -2404,6 +2466,7 @@ def build_app(
                                             html.H3("Operações da fila", style={"marginTop": 0}),
                                             html.Div(style=UI_ACTION_ROW_STYLE, children=[html.Button("Enfileirar cenário atual", id="run-job-enqueue-button", style=UI_BUTTON_STYLE), html.Button("Executar próximo job", id="run-jobs-run-next-button", style=UI_BUTTON_STYLE), html.Button("Atualizar runs", id="run-jobs-refresh-button", style=UI_BUTTON_STYLE), html.Button("Cancelar run selecionada", id="run-job-cancel-button", style=UI_BUTTON_STYLE), html.Button("Reexecutar run selecionada", id="run-job-rerun-button", style=UI_BUTTON_STYLE), html.Button("Reexecutar pipeline", id="run-button", style=UI_BUTTON_STYLE)]),
                                             _field_block("Run selecionada", dcc.Dropdown(id="run-job-selected-id", options=initial_run_job_options, value=initial_run_job_selected_id, persistence=True, persistence_type="session")),
+                                            html.Div(id="run-jobs-status-banner", children=render_status_banner(""), style={**UI_MUTED_CARD_STYLE, "marginTop": "12px"}),
                                         ],
                                     ),
                                 ],

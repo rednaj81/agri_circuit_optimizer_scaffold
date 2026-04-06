@@ -146,3 +146,17 @@ wave_journal:
       ui_snapshot: docs/2026-04-06_phase_ux_refinement_wave6_ui_snapshot.json
       validation_command: "$env:PYTHONPATH='src;.'; .\\.venv\\Scripts\\python.exe -m pytest tests/decision_platform/test_ui_smoke.py -q -p no:cacheprovider --basetemp tests/_tmp/pytest-basetemp-ux-wave6-full"
       validation_result: "52 passed in 464.72s (0:07:44)"
+  - wave: 7
+    phase_id: ux_phase_3
+    status: completed
+    summary:
+      - runs now separates queue-now, active execution and recent history more clearly on the first fold
+      - the transition from studio readiness to run lifecycle is explicit through distinct scenario and execution state framing
+      - run detail now covers intermediate statuses like preparing and exporting in product language
+      - the primary decision CTA inside runs is now honest about executions that still have no usable result
+      - payloads and technical traces remain secondary while queue and run status gain product-language readability
+    evidence:
+      handoff: docs/2026-04-06_phase_ux_refinement_wave7_handoff.md
+      ui_snapshot: docs/2026-04-06_phase_ux_refinement_wave7_ui_snapshot.json
+      validation_command: "$env:PYTHONPATH='src;.'; .\\.venv\\Scripts\\python.exe -m pytest tests/decision_platform/test_ui_smoke.py -q -p no:cacheprovider --basetemp tests/_tmp/pytest-basetemp-ux-wave7-full2"
+      validation_result: "58 passed in 448.23s (0:07:28)"

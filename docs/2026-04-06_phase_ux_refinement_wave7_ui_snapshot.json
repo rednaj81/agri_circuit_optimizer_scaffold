@@ -1,48 +1,29 @@
 {
-  "wave": "ux_phase_2_wave_3",
+  "wave": "ux_phase_3_wave_7",
   "validation": {
-    "targeted": "3 passed, 37 deselected in 0.66s",
-    "full": "40 passed in 409.80s"
+    "targeted": "6 passed, 52 deselected in 0.63s",
+    "full": "58 passed in 448.23s (0:07:28)"
   },
-  "studio_primary_surface": {
+  "visual_evidence": {
+    "type": "structured_ui_snapshot",
+    "screenshot_attempt": "not_retried_after_policy_block",
+    "note": "Structured Runs snapshot recorded because local screenshot capture remained blocked by policy."
+  },
+  "runs_surface": {
     "panel_ids": [
-      "studio-focus-panel",
-      "studio-connectivity-panel",
-      "studio-editor-workbench"
+      "runs-flow-panel",
+      "run-jobs-overview-panel",
+      "execution-summary-panel",
+      "run-job-detail-panel",
+      "run-jobs-status-banner"
     ],
-    "markers": [
-      "Foco do canvas",
-      "Conectividade do grafo",
-      "Seleção atual",
-      "Cenário inteiro"
-    ]
-  },
-  "focus_rule_clarity": {
-    "focus_rules": [
-      "Regra do foco: W não pode receber rotas entrando; use este ponto apenas como origem.",
-      "Regra do foco: S não pode originar rotas; use este ponto apenas como destino final.",
-      "Regra do foco: rotas com dosagem exigem medição direta compatível."
-    ],
-    "local_violation_examples": [
-      "A conexão em foco entra em W; ajuste a direção antes de continuar.",
-      "R002 usa dosagem sem medição direta compatível."
-    ]
-  },
-  "global_readiness_visibility": {
-    "global_marker": "Cenário inteiro",
-    "global_examples": [
-      "Há conexões entrando em W no cenário; isso ainda bloqueia a passagem para Runs.",
-      "Há conexões saindo de S no cenário; isso ainda bloqueia a passagem para Runs.",
-      "Rotas com dosagem ainda sem medição direta: R002."
-    ]
-  },
-  "secondary_surface": {
-    "workbench_id": "studio-editor-workbench",
-    "technical_disclosure_ids": [
-      "node-studio-summary-panel",
-      "edge-studio-summary-panel",
-      "node-studio-summary",
-      "edge-studio-summary"
-    ]
+    "runs_flow_text": "Passagem Studio -> RunsEstado atualAinda há bloqueios estruturais impedindo a passagem segura para Runs.Objetivo desta áreaTransformar readiness do Studio em uma leitura clara de fila, execução e próximo passo.Próxima açãoVolte ao Studio para corrigir conectividade, regras obrigatórias e medição direta antes de abrir uma nova run.Estado do cenárioAinda há bloqueios estruturais impedindo a passagem segura para Runs.Estado das runsSem pendências. 0 run(s) visível(is), 0 em execução e 0 falha(s) recente(s).Próximo passoA passagem para Decisão continua secundária até o Studio liberar o gate principal de readiness.Voltar ao StudioIr para DecisãoReadinessExige atençãoO Studio ainda sinaliza bloqueios ou avisos relevantes para o enfileiramento.Bloqueios2Avisos0Runs locais0Próxima run-",
+    "queue_text": "Resumo da filaNenhuma execução registradaObjetivo desta áreaEntender o que já rodou, o que ainda está na fila e qual run merece sua atenção agora.Ação principalNenhuma run registrada ainda. Enfileire o cenário atual para iniciar a trilha operacional.Runs0Total observavel na fila local.Estado da filaSem pendênciasfila serial localEm execução0Na fila0Concluídas0Falhas0Próxima run-Entrada seguinte da filaFila agoraWorker local: serialHistórico recenteRuns terminais registradas: 0Status por quantidadeNa fila: 0preparing: 0Executando: 0exporting: 0Concluída: 0Falhou: 0Cancelada: 0",
+    "execution_text": "Resumo executivoÚltima execução exige revisãoObjetivo desta áreaMostrar se a última execução já gerou contexto suficiente para entrar em Decisão.Ação principalCorrija o bloqueio operacional antes de confiar em qualquer leitura de ranking ou candidato oficial.Candidatos0Viáveis0Selecionado-Bundle analisado: -Perfil padrão: -Erro operacional: DECISION_PLATFORM_DISABLE_REAL_JULIA_PROBE=1 disabled the real Julia probe. This execution is invalid for the official Julia-only gate; unset the override or rerun with --allow-diagnostic-python-emulation for explicit diagnostic use only.Próxima açãoCorrija o bloqueio operacional antes de confiar em qualquer leitura de ranking ou candidato oficial.Decisão indisponível nesta execução",
+    "detail_text": "Run em focoAguardando contextoAinda não existe uma run em foco para leitura operacional.Próxima açãoSelecione uma run da fila ou enfileire o cenário atual para abrir este espaço com contexto real.",
+    "queue_feedback_text": "Sem alerta operacional no momento.",
+    "decision_gate_when_missing_result": "Resumo executivoAinda sem candidato oficialObjetivo desta áreaMostrar se a última execução já gerou contexto suficiente para entrar em Decisão.Ação principalReexecute o pipeline quando o cenário estiver pronto para gerar uma leitura comparável.Candidatos0Viáveis0Selecionado-balancedBundle analisado: data/decision_platform/maquete_v2Perfil padrão: balancedErro operacional: sem bloqueio críticoPróxima açãoReexecute o pipeline quando o cenário estiver pronto para gerar uma leitura comparável.Decisão indisponível nesta execução",
+    "preparing_detail_text": "Run em focorun-010preparingofficialGate oficialJulia oficial validadoDuração (s)-Modo da rodada-Leitura operacionalBundle de origem: -Engine utilizado: -Execução pedida: officialPróxima açãoA run já saiu da fila e está preparando artefatos. Aguarde essa etapa antes de avaliar resultado.",
+    "exporting_detail_text": "Run em focorun-011exportingofficialGate oficialJulia oficial validadoDuração (s)-Modo da rodada-Leitura operacionalBundle de origem: -Engine utilizado: -Execução pedida: officialPróxima açãoA run já concluiu o cálculo principal e está finalizando artefatos. Aguarde a consolidação antes de abrir Decisão."
   }
 }
