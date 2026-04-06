@@ -94,3 +94,16 @@ wave_journal:
       ui_snapshot: docs/2026-04-05_phase_ux_refinement_wave2_ui_snapshot.json
       validation_command: "$env:PYTHONPATH='src;.'; .\\.venv\\Scripts\\python.exe -m pytest tests/decision_platform/test_ui_smoke.py -q -p no:cacheprovider --basetemp tests/_tmp/pytest-basetemp-ux-wave2-full2"
       validation_result: "47 passed in 481.22s (0:08:01)"
+  - wave: 3
+    phase_id: ux_phase_1
+    status: completed
+    summary:
+      - shell now exposes a persistent active-space banner shared by Studio, Runs, Decision and Audit
+      - each main product space now explains what it resolves and what should happen before the operator leaves that area
+      - the active-space framing stays synchronized with tab changes and cross-surface CTAs
+      - structured visual evidence closes ux_phase_1 even though screenshot capture was blocked by the local execution policy
+    evidence:
+      handoff: docs/2026-04-05_phase_ux_refinement_wave3_handoff.md
+      ui_snapshot: docs/2026-04-05_phase_ux_refinement_wave3_ui_snapshot.json
+      validation_command: "$env:PYTHONPATH='src;.'; .\\.venv\\Scripts\\python.exe -m pytest tests/decision_platform/test_ui_smoke.py -q -p no:cacheprovider --basetemp tests/_tmp/pytest-basetemp-ux-wave3-full"
+      validation_result: "50 passed in 487.68s (0:08:07)"

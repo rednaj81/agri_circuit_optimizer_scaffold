@@ -167,6 +167,60 @@ def _guidance_card(label: str, text: str) -> Any:
     )
 
 
+def _product_space_content(space: str | None) -> dict[str, str]:
+    normalized = str(space or "studio").strip().lower()
+    if normalized == "runs":
+        return {
+            "label": "Runs",
+            "headline": "Fila local e execução em foco",
+            "description": "Aqui a jornada sai do preparo do cenário e vira leitura operacional da fila, da run em foco e do último resultado.",
+            "objective": "Decidir se ainda falta corrigir o cenário, executar a próxima rodada ou já abrir a decisão assistida.",
+            "next_action": "Revise a fila e a execução em foco antes de avançar para Decisão.",
+        }
+    if normalized == "decision":
+        return {
+            "label": "Decisão",
+            "headline": "Winner, runner-up e contraste com contexto",
+            "description": "Aqui a jornada deixa de ser operacional e passa a ser comparativa, mantendo candidato oficial, runner-up e sinais de risco na mesma leitura.",
+            "objective": "Confirmar se já existe escolha oficial legível ou se ainda falta contraste para a decisão humana assistida.",
+            "next_action": "Valide winner, runner-up e sinais de risco antes de exportar ou abrir Auditoria.",
+        }
+    if normalized == "audit":
+        return {
+            "label": "Auditoria",
+            "headline": "Trilha canônica e evidência técnica",
+            "description": "Aqui ficam bundle, YAMLs e tabelas completas para reconciliação e explicabilidade, fora do caminho primário de produto.",
+            "objective": "Aprofundar persistência, contrato e evidência técnica sem recolocar isso na primeira dobra das outras áreas.",
+            "next_action": "Use esta área apenas quando a leitura principal não for suficiente para reconciliar o cenário ou a decisão.",
+        }
+    return {
+        "label": "Studio",
+        "headline": "Grafo de negócio e readiness do cenário",
+        "description": "Aqui a jornada começa no canvas principal, com foco em montar o cenário, revisar readiness e manter a leitura na camada de negócio.",
+        "objective": "Deixar o cenário claro o suficiente para seguir para Runs sem depender da trilha técnica como superfície principal.",
+        "next_action": "Resolva readiness, projeção e foco do canvas antes de abrir a fila.",
+    }
+
+
+def render_product_space_banner(space: str | None) -> Any:
+    content = _product_space_content(space)
+    return html.Div(
+        children=[
+            html.Div("Espaço ativo", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#47665d"}),
+            html.H2(content["label"], style={"margin": "8px 0 6px"}),
+            html.Div(content["headline"], style={"fontWeight": 700, "lineHeight": "1.5"}),
+            html.P(content["description"], style={"margin": "10px 0 0", "lineHeight": "1.6"}),
+            html.Div(
+                style={**UI_TWO_COLUMN_STYLE, "marginTop": "14px"},
+                children=[
+                    _guidance_card("O que resolver aqui", content["objective"]),
+                    _guidance_card("Antes de sair desta área", content["next_action"]),
+                ],
+            ),
+        ]
+    )
+
+
 def _section_intro(title: str, description: str, *, state_hint: str | None = None, action_hint: str | None = None) -> Any:
     hint_children = []
     for label, text in [("Estado atual", state_hint), ("Próxima ação", action_hint)]:
@@ -840,6 +894,43 @@ def render_studio_projection_panel(summary: dict[str, Any]) -> Any:
     )
 
 
+def render_studio_canvas_guidance_panel(
+    summary: dict[str, Any],
+    node_summary: dict[str, Any],
+    edge_summary: dict[str, Any],
+) -> Any:
+    selected_node_id = str(node_summary.get("selected_node_id") or "").strip()
+    selected_edge_id = str(edge_summary.get("selected_link_id") or "").strip()
+    selected_node_label = str(node_summary.get("business_label") or selected_node_id or "").strip()
+    selected_edge_label = str(edge_summary.get("business_label") or selected_edge_id or "").strip()
+    if selected_edge_id and selected_edge_label:
+        current_focus = f"Conexão em foco: {selected_edge_label}."
+        canvas_action = "Revise a conexão selecionada no canvas e abra a bancada completa só se precisar ajustar famílias, comprimento ou estrutura."
+    elif selected_node_id and selected_node_label:
+        current_focus = f"Entidade em foco: {selected_node_label}."
+        canvas_action = "Use a entidade selecionada para reposicionar, revisar conectividade e validar o papel dela antes de abrir Runs."
+    else:
+        current_focus = "Nenhum foco ativo no canvas."
+        canvas_action = "Clique em uma entidade ou conexão do grafo para abrir o contexto principal desta revisão."
+    return html.Div(
+        style={**UI_MUTED_CARD_STYLE, "padding": "14px", "marginBottom": "14px"},
+        children=[
+            html.Div("Comece pelo canvas", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+            html.Div(current_focus, style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"}),
+            html.Div(
+                style={**UI_TWO_COLUMN_STYLE, "marginTop": "12px"},
+                children=[
+                    _guidance_card("Ação principal agora", canvas_action),
+                    _guidance_card(
+                        "Gate para Runs",
+                        str(summary.get("readiness_headline") or "Revise o readiness do cenário antes de abrir a fila."),
+                    ),
+                ],
+            ),
+        ],
+    )
+
+
 def render_studio_connectivity_panel(
     summary: dict[str, Any],
     node_summary: dict[str, Any],
@@ -862,6 +953,8 @@ def render_studio_connectivity_panel(
     local_violations: list[str] = []
     global_highlights: list[str] = []
     selected_edge = edge_summary.get("selected_edge") or {}
+    selected_node_present = bool(str(node_summary.get("selected_node_id") or "").strip())
+    selected_edge_present = bool(selected_edge)
     if "W" in focus_node_ids:
         local_rules.append("W só pode iniciar fluxo; nenhuma conexão ou rota deve terminar neste ponto.")
     if "S" in focus_node_ids:
@@ -918,10 +1011,30 @@ def render_studio_connectivity_panel(
             qualifiers.append("medição direta")
         qualifier_text = f" ({', '.join(qualifiers)})" if qualifiers else ""
         route_lines.append(f"{route_id}: {source} -> {sink}{qualifier_text}")
+    if local_violations:
+        primary_connectivity_action = local_violations[0]
+    elif prioritized_routes and focused_dosing_routes:
+        primary_connectivity_action = "Há rotas com dosagem neste foco. Confirme medição direta antes de seguir para Runs."
+    elif prioritized_routes:
+        primary_connectivity_action = "A seleção atual já mostra o trecho crítico do cenário. Revise conectividade e rotas obrigatórias neste foco."
+    else:
+        primary_connectivity_action = "Selecione um nó ou uma conexão no canvas para destravar a leitura local de conectividade."
+    runs_gate_action = (
+        "Não siga para Runs enquanto houver bloqueios estruturais ou rotas com dosagem sem medição direta."
+        if int(summary.get("blocker_count", 0) or 0) > 0
+        else str((summary.get("next_steps") or ["Com o cenário consistente, siga para Runs para enfileirar a próxima rodada."])[0])
+    )
     return html.Div(
         id="studio-connectivity-panel",
         children=[
             html.H3("Conectividade do grafo", style={"marginTop": 0}),
+            html.Div(
+                style={**UI_TWO_COLUMN_STYLE, "marginBottom": "12px"},
+                children=[
+                    _guidance_card("O que destrava o cenário", primary_connectivity_action),
+                    _guidance_card("Antes de abrir Runs", runs_gate_action),
+                ],
+            ),
             html.Div(
                 style=UI_THREE_COLUMN_STYLE,
                 children=[
@@ -932,13 +1045,17 @@ def render_studio_connectivity_panel(
                 ],
             ),
             html.Div(
-                "Prioridade da seleção atual" if prioritized_routes else "Prioridade geral do cenário",
+                "Prioridade da seleção atual"
+                if prioritized_routes
+                else ("Seleção atual ainda não abriu um trecho crítico" if selected_node_present or selected_edge_present else "Prioridade geral do cenário"),
                 style={"marginTop": "10px", "fontWeight": 700, "lineHeight": "1.5"},
             ),
             html.H4("Seleção atual", style={"marginBottom": "6px"}),
             _bullet_list(
                 list(dict.fromkeys(local_violations + local_rules))[:4],
-                "Nenhuma regra crítica acionada para a seleção atual.",
+                "Selecione um nó ou uma conexão no canvas para abrir regras locais e bloqueios diretamente neste painel."
+                if not prioritized_routes and not selected_node_present and not selected_edge_present
+                else "Nenhuma regra crítica acionada para a seleção atual.",
             ),
             html.H4("Cenário inteiro", style={"marginBottom": "6px", "marginTop": "14px"}),
             _bullet_list(
@@ -962,21 +1079,32 @@ def render_studio_focus_panel(
     selected_node_id = str(node_summary.get("selected_node_id") or "-")
     selected_edge = edge_summary.get("selected_edge") or {}
     selected_edge_id = str(edge_summary.get("selected_link_id") or "-")
+    focus_node_ids = {
+        selected_node_id if selected_node_id not in {"", "-"} else "",
+        str(selected_edge.get("from_node") or "").strip(),
+        str(selected_edge.get("to_node") or "").strip(),
+    }
+    focus_node_ids = {node_id for node_id in focus_node_ids if node_id}
     relevant_routes = [
         route
         for route in route_rows
-        if selected_node_id not in {"", "-"}
-        and selected_node_id in {str(route.get("source") or "").strip(), str(route.get("sink") or "").strip()}
+        if focus_node_ids
+        and ({str(route.get("source") or "").strip(), str(route.get("sink") or "").strip()} & focus_node_ids)
     ]
     focus_rules: list[str] = []
     selected_node_present = selected_node_id not in {"", "-"}
     selected_edge_present = bool(selected_edge)
+    mandatory_route_count = sum(1 for route in relevant_routes if _coerce_truthy(route.get("mandatory")))
+    dosing_route_count = sum(1 for route in relevant_routes if float(route.get("dose_min_l") or 0.0) > 0)
+    measurement_route_count = sum(1 for route in relevant_routes if _coerce_truthy(route.get("measurement_required")))
     if selected_node_id == "W" or str(selected_edge.get("to_node") or "").strip() == "W":
         focus_rules.append("Regra do foco: W não pode receber rotas entrando; use este ponto apenas como origem.")
     if selected_node_id == "S" or str(selected_edge.get("from_node") or "").strip() == "S":
         focus_rules.append("Regra do foco: S não pode originar rotas; use este ponto apenas como destino final.")
     if any(float(route.get("dose_min_l") or 0.0) > 0 for route in relevant_routes):
         focus_rules.append("Regra do foco: rotas com dosagem exigem medição direta compatível.")
+    if mandatory_route_count:
+        focus_rules.append(f"Regra do foco: {mandatory_route_count} rota(s) obrigatória(s) passam por esta leitura e precisam permanecer legíveis no canvas.")
     edge_breaks_direction_rule = str(selected_edge.get("to_node") or "").strip() == "W" or str(selected_edge.get("from_node") or "").strip() == "S"
     dosing_without_measurement = any(
         float(route.get("dose_min_l") or 0.0) > 0 and not _coerce_truthy(route.get("measurement_required"))
@@ -997,6 +1125,13 @@ def render_studio_focus_panel(
             id="studio-focus-recommended-open-workbench-button",
             style=UI_BUTTON_STYLE,
         )
+    elif selected_edge_present:
+        recommended_action_text = "A conexão em foco já concentra a leitura deste trecho. Revise o fluxo no canvas e abra a bancada completa apenas se precisar ajustar comprimento, famílias ou direção."
+        recommended_action_button = html.Button(
+            "Abrir bancada completa",
+            id="studio-focus-recommended-open-workbench-button",
+            style=UI_BUTTON_STYLE,
+        )
     elif selected_node_present:
         recommended_action_text = "O foco atual permite ajuste rápido de posição no canvas. Reposicione o nó sem sair da primeira dobra e abra a bancada completa só se precisar aprofundar."
         recommended_action_button = html.Button(
@@ -1012,6 +1147,11 @@ def render_studio_focus_panel(
             id="studio-focus-recommended-open-workbench-button",
             style=UI_BUTTON_STYLE,
         )
+    focus_objective = (
+        "Usar a seleção atual para validar conectividade, regras obrigatórias e readiness sem sair do canvas."
+        if selected_node_present or selected_edge_present
+        else "Começar pela seleção no canvas para abrir o contexto principal do cenário."
+    )
     node_next_action = (
         f"Revise as rotas ligadas a {selected_node_id} antes de ajustar posição ou nome."
         if relevant_routes
@@ -1027,6 +1167,13 @@ def render_studio_focus_panel(
         children=[
             html.H3("Foco do canvas", style={"marginTop": 0}),
             html.Div(
+                style={**UI_TWO_COLUMN_STYLE, "marginBottom": "12px"},
+                children=[
+                    _guidance_card("Objetivo desta leitura", focus_objective),
+                    _guidance_card("Próxima ação no canvas", recommended_action_text),
+                ],
+            ),
+            html.Div(
                 style=UI_THREE_COLUMN_STYLE,
                 children=[
                     _metric_card("Nó em foco", node_summary.get("business_label") or "-"),
@@ -1041,6 +1188,9 @@ def render_studio_focus_panel(
                     f"Conexão em foco: {edge_summary.get('from_label') or '-'} -> {edge_summary.get('to_label') or '-'}."
                     if selected_edge
                     else "Selecione uma conexão no canvas para ver o fluxo principal em detalhe.",
+                    f"Rotas deste foco: {mandatory_route_count} obrigatória(s), {dosing_route_count} com dosagem, {measurement_route_count} com medição direta."
+                    if relevant_routes
+                    else "Sem rota ligada a este foco neste momento.",
                 ],
                 "Sem foco atual registrado.",
             ),
@@ -1785,6 +1935,11 @@ def build_app(
                             ),
                         ],
                     ),
+                    html.Div(
+                        id="product-space-banner",
+                        children=render_product_space_banner("studio"),
+                        style={**UI_CARD_STYLE, "marginBottom": "18px"},
+                    ),
                     dcc.Tabs(
                         id="primary-navigation-tabs",
                         value="studio",
@@ -1817,6 +1972,14 @@ def build_app(
                                             html.P(
                                                 "A superfície principal mostra apenas entidades e conexões operacionais. Hubs internos e nós derivados permanecem fora do canvas principal.",
                                                 style={"marginTop": 0, "lineHeight": "1.6"},
+                                            ),
+                                            html.Div(
+                                                id="studio-canvas-guidance-panel",
+                                                children=render_studio_canvas_guidance_panel(
+                                                    initial_studio_readiness,
+                                                    _safe_json_loads(initial_node_studio_summary),
+                                                    _safe_json_loads(initial_edge_studio_summary),
+                                                ),
                                             ),
                                             cyto.Cytoscape(
                                                 id="node-studio-cytoscape",
@@ -3448,6 +3611,7 @@ def build_app(
         )
 
     @app.callback(
+        Output("studio-canvas-guidance-panel", "children"),
         Output("studio-readiness-panel", "children"),
         Output("studio-projection-coverage-panel", "children"),
         Output("runs-flow-panel", "children"),
@@ -3472,11 +3636,12 @@ def build_app(
         node_summary_text: str | None,
         edge_summary_text: str | None,
         studio_status_text: str | None,
-    ) -> tuple[Any, Any, Any, Any, Any, Any, Any, Any]:
+    ) -> tuple[Any, Any, Any, Any, Any, Any, Any, Any, Any]:
         studio_readiness = build_studio_readiness_summary(nodes_rows or [], candidate_links_rows or [], route_rows or [])
         node_summary = _safe_json_loads(node_summary_text)
         edge_summary = _safe_json_loads(edge_summary_text)
         return (
+            render_studio_canvas_guidance_panel(studio_readiness, node_summary, edge_summary),
             render_studio_readiness_panel(studio_readiness),
             render_studio_projection_panel(
                 build_studio_projection_summary(nodes_rows or [], candidate_links_rows or [], route_rows or [])
@@ -3512,7 +3677,7 @@ def build_app(
         Input("decision-open-audit-button", "n_clicks_timestamp"),
         State("primary-navigation-tabs", "value"),
     )
-    def _open_audit_from_studio(
+    def _resolve_primary_navigation(
         search: str | None,
         open_audit_ts: Any,
         open_runs_ts: Any,
@@ -3540,6 +3705,13 @@ def build_app(
         if search:
             return _primary_tab_from_search(search, default=str(current_tab or "studio"))
         return str(current_tab or "studio")
+
+    @app.callback(
+        Output("product-space-banner", "children"),
+        Input("primary-navigation-tabs", "value"),
+    )
+    def _refresh_product_space_banner(current_tab: str | None) -> Any:
+        return render_product_space_banner(current_tab)
 
     @app.callback(
         Output("run-jobs-overview-panel", "children"),

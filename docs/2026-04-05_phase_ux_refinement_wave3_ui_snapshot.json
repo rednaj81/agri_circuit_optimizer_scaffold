@@ -1,37 +1,49 @@
 {
   "wave": "ux_phase_1_wave_3",
   "validation": {
-    "targeted": "2 passed, 36 deselected in 0.57s",
-    "full": "38 passed in 420.80s"
+    "targeted": "3 passed, 47 deselected in 1.14s",
+    "full": "50 passed in 487.68s (0:08:07)"
   },
-  "decision_surface": {
-    "primary_panel_ids": [
+  "visual_evidence": {
+    "type": "structured_ui_snapshot",
+    "screenshot_attempt": "blocked_by_environment_policy",
+    "note": "Chrome headless capture was attempted during the wave but rejected by the execution policy, so this wave records a structured shell snapshot instead."
+  },
+  "visible_tab_labels": [
+    "Studio",
+    "Runs",
+    "Decisão",
+    "Auditoria"
+  ],
+  "product_space_banner": {
+    "component_id": "product-space-banner",
+    "studio": "Espaço ativoStudioGrafo de negócio e readiness do cenárioAqui a jornada começa no canvas principal, com foco em montar o cenário, revisar readiness e manter a leitura na camada de negócio.O que resolver aquiDeixar o cenário claro o suficiente para seguir para Runs sem depender da trilha técnica como superfície principal.Antes de sair desta áreaResolva readiness, projeção e foco do canvas antes de abrir a fila.",
+    "runs": "Espaço ativoRunsFila local e execução em focoAqui a jornada sai do preparo do cenário e vira leitura operacional da fila, da run em foco e do último resultado.O que resolver aquiDecidir se ainda falta corrigir o cenário, executar a próxima rodada ou já abrir a decisão assistida.Antes de sair desta áreaRevise a fila e a execução em foco antes de avançar para Decisão.",
+    "decision": "Espaço ativoDecisãoWinner, runner-up e contraste com contextoAqui a jornada deixa de ser operacional e passa a ser comparativa, mantendo candidato oficial, runner-up e sinais de risco na mesma leitura.O que resolver aquiConfirmar se já existe escolha oficial legível ou se ainda falta contraste para a decisão humana assistida.Antes de sair desta áreaValide winner, runner-up e sinais de risco antes de exportar ou abrir Auditoria.",
+    "audit": "Espaço ativoAuditoriaTrilha canônica e evidência técnicaAqui ficam bundle, YAMLs e tabelas completas para reconciliação e explicabilidade, fora do caminho primário de produto.O que resolver aquiAprofundar persistência, contrato e evidência técnica sem recolocar isso na primeira dobra das outras áreas.Antes de sair desta áreaUse esta área apenas quando a leitura principal não for suficiente para reconciliar o cenário ou a decisão."
+  },
+  "surface_presence": {
+    "studio": [
+      "studio-readiness-panel",
+      "studio-projection-coverage-panel",
+      "studio-focus-panel",
+      "studio-connectivity-panel"
+    ],
+    "runs": [
+      "run-jobs-overview-panel",
+      "runs-flow-panel",
+      "execution-summary-panel",
+      "run-job-detail-panel"
+    ],
+    "decision": [
       "decision-summary-panel",
       "decision-contrast-panel",
       "decision-signal-panel",
-      "catalog-state-summary-panel",
-      "candidate-breakdown-panel"
+      "decision-flow-panel",
+      "catalog-state-summary-panel"
     ],
-    "markers": [
-      "Escolha oficial",
-      "Runner-up e contraste",
-      "Sinais para decisão humana",
-      "Comparação aprofundada"
+    "audit": [
+      "bundle-io-summary-panel"
     ]
-  },
-  "primary_decision_signals": {
-    "winner_marker": "Technical tie / Winner claro",
-    "runner_up_marker": "Alternativa próxima / Empate técnico",
-    "human_signal_metrics": [
-      "Rotas críticas",
-      "Penalidades",
-      "Fallbacks"
-    ]
-  },
-  "technical_disclosure_preserved": [
-    "selected-candidate-summary",
-    "official-candidate-summary",
-    "candidate-breakdown",
-    "catalog-state-summary"
-  ]
+  }
 }

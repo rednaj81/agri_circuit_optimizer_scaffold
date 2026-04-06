@@ -33,9 +33,11 @@ from decision_platform.ui_dash.app import (
     render_decision_signal_panel,
     render_decision_summary_panel,
     render_execution_summary_panel,
+    render_product_space_banner,
     render_run_job_detail_panel,
     render_run_jobs_overview_panel,
     render_runs_flow_panel,
+    render_studio_canvas_guidance_panel,
     render_studio_connectivity_panel,
     render_studio_focus_panel,
     render_studio_projection_panel,
@@ -181,10 +183,45 @@ def test_dash_app_surfaces_only_four_primary_product_spaces() -> None:
         app = build_app("data/decision_platform/maquete_v2")
 
     assert _visible_tab_labels(app.layout) == ["Studio", "Runs", "Decisão", "Auditoria"]
+    assert _find_component_by_id(app.layout, "product-space-banner") is not None
     assert _find_component_by_id(app.layout, "hero-open-studio-link") is not None
     assert _find_component_by_id(app.layout, "hero-open-runs-link") is not None
     assert _find_component_by_id(app.layout, "hero-open-decision-link") is not None
     assert _find_component_by_id(app.layout, "hero-open-audit-link") is not None
+
+
+def test_product_space_banner_uses_consistent_product_language_for_each_space() -> None:
+    studio_banner = _collect_text_content(render_product_space_banner("studio"))
+    runs_banner = _collect_text_content(render_product_space_banner("runs"))
+    decision_banner = _collect_text_content(render_product_space_banner("decision"))
+    audit_banner = _collect_text_content(render_product_space_banner("audit"))
+
+    assert "Espaço ativo" in studio_banner
+    assert "Studio" in studio_banner
+    assert "O que resolver aqui" in studio_banner
+    assert "Antes de sair desta área" in studio_banner
+    assert "Runs" in runs_banner
+    assert "Fila local e execução em foco" in runs_banner
+    assert "Decisão" in decision_banner
+    assert "Winner, runner-up e contraste com contexto" in decision_banner
+    assert "Auditoria" in audit_banner
+    assert "Trilha canônica e evidência técnica" in audit_banner
+
+
+def test_product_space_banner_callback_tracks_active_primary_tab() -> None:
+    with diagnostic_runtime_test_mode():
+        app = build_app("data/decision_platform/maquete_v2")
+
+    callback = _get_callback(app, output_prefix="product-space-banner.children")
+    studio_text = _collect_text_content(callback("studio"))
+    runs_text = _collect_text_content(callback("runs"))
+    decision_text = _collect_text_content(callback("decision"))
+    audit_text = _collect_text_content(callback("audit"))
+
+    assert "Studio" in studio_text
+    assert "Runs" in runs_text
+    assert "Decisão" in decision_text
+    assert "Auditoria" in audit_text
 
 
 def test_studio_tab_surfaces_readiness_and_selection_context() -> None:
@@ -193,6 +230,7 @@ def test_studio_tab_surfaces_readiness_and_selection_context() -> None:
 
     studio_tab = _find_tab_by_label(app.layout, "Studio")
     assert studio_tab is not None
+    assert _find_component_by_id(studio_tab, "studio-canvas-guidance-panel") is not None
     assert _find_component_by_id(studio_tab, "studio-readiness-panel") is not None
     assert _find_component_by_id(studio_tab, "studio-status-banner") is not None
     assert _find_component_by_id(studio_tab, "studio-projection-coverage-panel") is not None
@@ -207,11 +245,49 @@ def test_studio_tab_surfaces_readiness_and_selection_context() -> None:
     assert _find_component_by_id(studio_tab, "studio-open-technical-guide-button") is not None
     assert _find_component_by_id(studio_tab, "studio-open-audit-button") is not None
     assert _find_component_by_id(studio_tab, "studio-open-runs-button") is not None
-    assert _find_component_by_id(studio_tab, "studio-focus-recommended-move-right-button") is not None
+    recommended_focus_actions = [
+        _find_component_by_id(studio_tab, "studio-focus-recommended-move-right-button"),
+        _find_component_by_id(studio_tab, "studio-focus-recommended-open-workbench-button"),
+        _find_component_by_id(studio_tab, "studio-focus-recommended-delete-edge-button"),
+    ]
+    assert any(action is not None for action in recommended_focus_actions)
     assert _find_component_by_id(studio_tab, "studio-focus-move-left-button") is not None
     assert _find_component_by_id(studio_tab, "studio-focus-duplicate-node-button") is not None
     assert _find_component_by_id(studio_tab, "studio-focus-delete-edge-button") is not None
     assert _find_component_by_id(studio_tab, "studio-focus-open-workbench-button") is not None
+
+
+def test_studio_canvas_guidance_panel_keeps_canvas_as_primary_entry() -> None:
+    panel_without_focus = render_studio_canvas_guidance_panel(
+        {
+            "readiness_headline": "Ainda há bloqueios estruturais impedindo a passagem segura para Runs.",
+        },
+        {},
+        {},
+    )
+    panel_with_edge_focus = render_studio_canvas_guidance_panel(
+        {
+            "readiness_headline": "Cenário pronto para seguir para Runs.",
+        },
+        {
+            "selected_node_id": "P1",
+            "business_label": "Bomba principal",
+        },
+        {
+            "selected_link_id": "L001",
+            "business_label": "Bomba -> Misturador",
+        },
+    )
+    without_focus_text = _collect_text_content(panel_without_focus)
+    with_edge_focus_text = _collect_text_content(panel_with_edge_focus)
+
+    assert "Comece pelo canvas" in without_focus_text
+    assert "Nenhum foco ativo no canvas." in without_focus_text
+    assert "Clique em uma entidade ou conexão do grafo" in without_focus_text
+    assert "Gate para Runs" in without_focus_text
+    assert "Conexão em foco: Bomba -> Misturador." in with_edge_focus_text
+    assert "abra a bancada completa só se precisar ajustar famílias" in with_edge_focus_text.lower()
+    assert "Cenário pronto para seguir para Runs." in with_edge_focus_text
 
 
 def test_studio_primary_canvas_hides_internal_and_hub_nodes() -> None:
@@ -383,6 +459,8 @@ def test_studio_connectivity_panel_surfaces_routes_and_measurement_near_canvas()
     panel_text = _collect_text_content(panel)
 
     assert "Conectividade do grafo" in panel_text
+    assert "O que destrava o cenário" in panel_text
+    assert "Antes de abrir Runs" in panel_text
     assert "R001: W -> M (obrigatória)" in panel_text
     assert "Prioridade da seleção atual" in panel_text
     assert "Seleção atual" in panel_text
@@ -418,13 +496,17 @@ def test_studio_focus_panel_uses_canvas_selection_as_primary_context() -> None:
     assert "Tanque de água" in panel_text
     assert "Água para misturador" in panel_text
     assert "Rotas ligadas ao nó" in panel_text
+    assert "Objetivo desta leitura" in panel_text
+    assert "Próxima ação no canvas" in panel_text
     assert "Regras deste foco" in panel_text
     assert "Ações rápidas deste foco" in panel_text
     assert "Ação sugerida agora" in panel_text
     assert "W não pode receber rotas entrando" in panel_text
     assert "rotas com dosagem exigem medição direta compatível" in panel_text
+    assert "2 rota(s) obrigatória(s)" in panel_text
+    assert "Rotas deste foco: 2 obrigatória(s), 1 com dosagem, 1 com medição direta." in panel_text
     assert "Revise as rotas ligadas a W" in panel_text
-    assert _find_component_by_id(panel, "studio-focus-recommended-move-right-button") is not None
+    assert _find_component_by_id(panel, "studio-focus-recommended-open-workbench-button") is not None
     assert _find_component_by_id(panel, "studio-focus-move-left-button") is not None
     assert _find_component_by_id(panel, "studio-focus-move-up-button") is not None
     assert _find_component_by_id(panel, "studio-focus-move-down-button") is not None
