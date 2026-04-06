@@ -84,12 +84,13 @@ wave_journal:
     phase_id: ux_phase_1
     status: completed
     summary:
-      - empty and no-selection states across Studio, Runs, Decision and Audit now explain missing context and next action in product language
-      - filtered decision states now clarify when no candidate is visible because the current profile or filters removed all comparable options
-      - audit bundle panel now reinforces its boundary as canonical evidence space instead of reading like a raw persistence dump
-      - technical payloads remain behind disclosure while the first fold stays focused on purpose, current state and next step
+      - studio readiness now exposes purpose, primary action and stage-oriented guidance before the operator opens runs
+      - studio projection now makes the business-layer boundary explicit before the operator escalates to audit
+      - raw readiness issues and queue/run statuses are translated into product language on the first fold
+      - runs, execution and decision panels now explain what each space resolves and the recommended next move
+      - filtered decision and no-result states keep technical evidence behind disclosure while clarifying why the primary surface is empty
     evidence:
       handoff: docs/2026-04-05_phase_ux_refinement_wave2_handoff.md
       ui_snapshot: docs/2026-04-05_phase_ux_refinement_wave2_ui_snapshot.json
-      validation_command: "$env:PYTHONPATH='src;.'; .\\.venv\\Scripts\\python.exe -m pytest tests/decision_platform/test_ui_smoke.py -q -p no:cacheprovider --basetemp tests/_tmp/pytest-basetemp-ux-wave2-current"
-      validation_result: "45 passed in 460.22s (0:07:40)"
+      validation_command: "$env:PYTHONPATH='src;.'; .\\.venv\\Scripts\\python.exe -m pytest tests/decision_platform/test_ui_smoke.py -q -p no:cacheprovider --basetemp tests/_tmp/pytest-basetemp-ux-wave2-full2"
+      validation_result: "47 passed in 481.22s (0:08:01)"

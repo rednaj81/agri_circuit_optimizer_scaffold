@@ -804,10 +804,17 @@ def render_studio_projection_panel(summary: dict[str, Any]) -> Any:
                 ],
             ),
             html.Div(
+                style={**UI_TWO_COLUMN_STYLE, "marginBottom": "12px"},
+                children=[
+                    _guidance_card("Objetivo desta área", "Mostrar somente a camada de negócio que sustenta a leitura principal do Studio."),
+                    _guidance_card("Quando abrir Auditoria", "Aprofunde a trilha técnica apenas se a projeção principal não explicar uma lacuna estrutural."),
+                ],
+            ),
+            html.Div(
                 style=UI_THREE_COLUMN_STYLE,
                 children=[
                     _metric_card("Rotas projetadas", summary.get("projected_route_count", 0)),
-                    _metric_card("Metadados de rota", summary.get("route_metadata_count", 0)),
+                    _metric_card("Rotas declaradas", summary.get("route_metadata_count", 0)),
                     _metric_card("Entidades cobertas", f"{summary.get('covered_node_count', 0)}/{summary.get('business_node_count', 0)}"),
                 ],
             ),
@@ -1285,19 +1292,26 @@ def render_execution_summary_panel(summary: dict[str, Any]) -> Any:
         children=[
             html.H3("Resumo executivo", style={"marginTop": 0}),
             html.Div(headline, style={"fontWeight": 700, "lineHeight": "1.5", "marginBottom": "10px"}),
+            html.Div(
+                style={**UI_TWO_COLUMN_STYLE, "marginBottom": "12px"},
+                children=[
+                    _guidance_card("Objetivo desta área", "Mostrar se a última execução já gerou contexto suficiente para entrar em Decisão."),
+                    _guidance_card("Ação principal", next_action),
+                ],
+            ),
             html.Div(style=UI_THREE_COLUMN_STYLE, children=[_metric_card("Candidatos", summary.get("candidate_count", 0)), _metric_card("Viáveis", summary.get("feasible_count", 0)), _metric_card("Selecionado", summary.get("selected_candidate_id") or "-", str(summary.get("default_profile_id") or ""))]),
             _label_value_list(
                 [
                     ("Bundle analisado", summary.get("scenario_bundle_root")),
                     ("Perfil padrão", summary.get("default_profile_id")),
-                    ("Erro operacional", error or "nenhum"),
+                    ("Erro operacional", error or "sem bloqueio crítico"),
                 ]
             ),
             html.H4("Próxima ação", style={"marginBottom": "6px", "marginTop": "14px"}),
             html.Div(next_action, style={"lineHeight": "1.6", "fontWeight": 700}),
             html.Div(
                 style=UI_ACTION_ROW_STYLE,
-                children=[html.Button("Ir para Decisão", id="execution-open-decision-button", style=UI_BUTTON_STYLE)],
+                children=[html.Button("Abrir Decisão", id="execution-open-decision-button", style=UI_BUTTON_STYLE)],
             ),
         ]
     )
@@ -1314,6 +1328,13 @@ def render_bundle_io_panel(summary: dict[str, Any]) -> Any:
             html.Div(style={"display": "flex", "gap": "8px", "flexWrap": "wrap", "marginBottom": "8px"}, children=[html.Span(str(summary.get("status") or "idle"), style=UI_PILL_STYLE), html.Span(str(summary.get("bundle_version") or "-"), style=UI_PILL_STYLE)]),
             html.Div("Estado atual", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
             html.Div("Bundle canônico pronto para auditoria e persistência." if status != "error" else "A trilha canônica precisa de correção antes de seguir.", style={"lineHeight": "1.6", "fontWeight": 700, "margin": "6px 0 8px"}),
+            html.Div(
+                style={**UI_TWO_COLUMN_STYLE, "marginBottom": "12px"},
+                children=[
+                    _guidance_card("Objetivo desta área", "Guardar a trilha canônica e a persistência do cenário sem recolocar isso na superfície principal."),
+                    _guidance_card("Ação principal", next_action),
+                ],
+            ),
             html.Div(f"Raiz canonica: {summary.get('canonical_scenario_root') or '-'}", style={"lineHeight": "1.6"}),
             html.Div(f"Manifesto: {summary.get('bundle_manifest') or '-'}", style={"lineHeight": "1.6"}),
             html.H4("Próxima ação", style={"marginBottom": "6px", "marginTop": "14px"}),
@@ -1444,6 +1465,13 @@ def render_decision_summary_panel(summary: dict[str, Any]) -> Any:
     return html.Div(
         children=[
             html.H3("Escolha oficial", style={"marginTop": 0}),
+            html.Div(
+                style={**UI_TWO_COLUMN_STYLE, "marginBottom": "12px"},
+                children=[
+                    _guidance_card("Objetivo desta área", "Explicar por que o candidato oficial ocupa a liderança na leitura principal."),
+                    _guidance_card("Ação principal", "Valide runner-up e sinais de risco antes de oficializar a exportação." if summary.get("runner_up_candidate_id") else "Confirme se já existe contraste suficiente para seguir com a decisão."),
+                ],
+            ),
             html.Div(
                 style={"display": "flex", "alignItems": "center", "gap": "10px", "flexWrap": "wrap"},
                 children=[

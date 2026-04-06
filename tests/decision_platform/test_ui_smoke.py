@@ -38,6 +38,7 @@ from decision_platform.ui_dash.app import (
     render_runs_flow_panel,
     render_studio_connectivity_panel,
     render_studio_focus_panel,
+    render_studio_projection_panel,
     render_studio_readiness_panel,
     render_studio_selection_panel,
     move_node_studio_selection,
@@ -513,9 +514,11 @@ def test_primary_runs_panels_hide_raw_backend_keys_in_main_surface() -> None:
     assert "Concluída" in detail_text
     assert "Modo da rodada" in detail_text
     assert "Erro operacional:" in execution_text
+    assert "Objetivo desta área" in execution_text
+    assert "Ação principal" in execution_text
     assert "Próxima ação" in detail_text
     assert "Próxima ação" in execution_text
-    assert "Ir para Decisão" in execution_text
+    assert "Abrir Decisão" in execution_text
 
 
 def test_primary_surfaces_explain_empty_states_without_debug_language() -> None:
@@ -651,6 +654,8 @@ def test_primary_decision_panels_hide_raw_metric_keys_in_main_surface() -> None:
     breakdown_text = _collect_text_content(breakdown_panel)
 
     assert "Empate técnico" in decision_text
+    assert "Objetivo desta área" in decision_text
+    assert "Ação principal" in decision_text
     assert "Runner-up e contraste" in contrast_text
     assert "cand-02" in contrast_text
     assert "Empate técnico" in contrast_text
@@ -680,7 +685,32 @@ def test_audit_bundle_panel_preserves_technical_space_but_explains_next_step() -
     panel_text = _collect_text_content(panel)
 
     assert "Bundle canônico pronto para auditoria e persistência." in panel_text
+    assert "Objetivo desta área" in panel_text
+    assert "Ação principal" in panel_text
     assert "Use este espaço quando precisar salvar, reabrir ou reconciliar o bundle canônico" in panel_text
+
+
+def test_studio_projection_panel_explains_business_layer_boundary() -> None:
+    panel = render_studio_projection_panel(
+        {
+            "status": "partial",
+            "headline": "Projeção de negócio parcial",
+            "projected_route_count": 2,
+            "route_metadata_count": 3,
+            "covered_node_count": 2,
+            "business_node_count": 4,
+            "guidance": ["A visualização principal cobre parte do cenário e esconde a malha interna por design."],
+            "uncovered_nodes": ["Misturador"],
+            "invalid_routes": [],
+            "technical_trail_message": "Campos avançados do Studio e Auditoria guardam a estrutura técnica completa sem recolocar nós internos na superfície principal.",
+        }
+    )
+    panel_text = _collect_text_content(panel)
+
+    assert "Objetivo desta área" in panel_text
+    assert "Quando abrir Auditoria" in panel_text
+    assert "Rotas declaradas" in panel_text
+    assert "Entidades sem rota projetada: Misturador" in panel_text
 
 
 def test_audit_tab_holds_bundle_editors_and_technical_surfaces() -> None:
