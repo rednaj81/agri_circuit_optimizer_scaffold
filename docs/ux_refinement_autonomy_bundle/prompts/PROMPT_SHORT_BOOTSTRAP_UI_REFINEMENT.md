@@ -17,6 +17,8 @@ Non-negotiable UX direction:
 - the Studio must show only the business graph editable by the user
 - internal technical hubs/intermediate nodes must stay out of the primary Studio surface
 - direct manipulation on the canvas is preferred over raw forms
+- routine Studio work should move toward local canvas actions instead of advanced workbench dependency
+- the first fold must make "who supplies whom" explicit in business language
 - raw JSON, `html.Pre` and logs are not acceptable as the main UI
 - the product must feel closer to market software than to an engineering console
 

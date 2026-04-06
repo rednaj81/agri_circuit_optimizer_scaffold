@@ -19,3 +19,10 @@ A wave is low-value if:
 - it regresses clarity or consistency
 - it leaves the product feeling like an engineering console
 - it continues exposing technical internal graph entities to end users
+- it keeps the Studio interaction model basically unchanged while only polishing framing
+- it does not improve the primary reading of who supplies whom in the business graph
+
+You should strongly prefer redirection or stop when:
+- common Studio actions still require the advanced workbench for routine edits
+- the canvas still does not feel like the primary editor
+- orphan business nodes remain visible without intention or explanation

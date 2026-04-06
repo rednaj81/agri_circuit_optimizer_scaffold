@@ -13,6 +13,8 @@
 10. A UI principal não depende de JSON cru ou `html.Pre` como mecanismo central de leitura
 11. A visualização principal do circuito não mostra nós órfãos ou estruturas técnicas sem valor para o usuário
 12. O studio oferece interação direta suficiente para parecer editor visual, não formulário técnico fragmentado
+13. A primeira leitura do Studio deixa claro quem supre e quem é suprido no cenário e no foco atual
+14. O workbench avançado não é mais o caminho padrão para tarefas comuns de edição
 
 ## Saída do ciclo autônomo
 Encerrar quando ocorrer um destes casos:

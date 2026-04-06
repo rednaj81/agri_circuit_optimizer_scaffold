@@ -15,6 +15,7 @@ Responsável por:
 - reprovar qualquer proposta que exponha o grafo técnico interno como experiência principal
 - empurrar o Studio para um modelo de negócio visual e direto
 - exigir padrão de software de mercado, não de ferramenta técnica crua
+- priorizar interação direta e leitura explícita de suprimento antes de novas ondas de cosmética
 
 ## Agent 2 — Product Flow Engineer
 Responsável por:
@@ -31,6 +32,8 @@ Responsável por:
 - não usar `html.Pre`/JSON cru como solução primária de interface
 - esconder nós técnicos internos, hubs derivados e ruído de solver da experiência principal
 - melhorar manipulação direta do canvas antes de expandir formulários
+- atacar o workbench avançado como fallback, não como caminho padrão
+- fazer o Studio explicar quem supre e quem é suprido sem exigir leitura técnica
 
 ## Agent 3 — UX Auditor (gate)
 Responsável por:
@@ -48,3 +51,5 @@ Responsável por:
 - UI continua com sensação de console técnico
 - Studio ainda expõe entidades internas
 - a mudança foi cosmética, mas não melhorou a jornada
+- a onda não melhora o modelo de interação do Studio
+- a leitura de suprimento continua implícita ou escondida

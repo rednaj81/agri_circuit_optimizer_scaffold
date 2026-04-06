@@ -184,6 +184,9 @@ $guidance = [ordered]@{
         "Treat Studio, Runs, Decision and Audit as the main product spaces.",
         "Keep the Studio focused on the business graph only; technical internal hubs and derived nodes must stay hidden from the primary surface.",
         "Prefer direct manipulation on the canvas over fragmented raw forms whenever the Studio changes.",
+        "Prioritize the Studio interaction model before more shell polish: local canvas actions, context menu, reposition/edit flows, and visible supply-chain relationships.",
+        "Make who supplies whom explicit on the primary Studio surface; do not force the user to infer business flow from technical metadata.",
+        "Do not accept another UX wave that mainly rearranges cards, headers, or wording while routine Studio editing still depends on advanced workbench paths.",
         "Reduce html.Pre and raw JSON as primary UI surfaces; use progressive disclosure instead.",
         "Do not allow orphan nodes or technical clutter in the main final visualization.",
         "Prioritize user-facing flow clarity over backend-only refinements.",
@@ -201,6 +204,8 @@ $guidance = [ordered]@{
     acceptance_targets = @(
         "navigation clarity",
         "scenario readiness feedback",
+        "business supply-flow readability",
+        "direct canvas editing for common tasks",
         "queue/runs readability",
         "winner vs runner-up visibility",
         "technical tie explicitness",

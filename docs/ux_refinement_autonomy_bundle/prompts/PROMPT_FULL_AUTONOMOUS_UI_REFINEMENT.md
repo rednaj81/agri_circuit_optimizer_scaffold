@@ -28,6 +28,9 @@ Critical product direction:
 - internal technical hubs, derived hydraulic nodes and solver-oriented intermediates must stay hidden from the primary Studio experience
 - if the solver needs extra internal graph structure, it must be derived behind the scenes
 - direct manipulation on the canvas is a first-class requirement
+- the next waves must prioritize the Studio interaction model over more shell polish
+- the first-fold Studio reading must make who supplies whom explicit in business language
+- advanced workbench paths should become fallback paths for uncommon edits, not the normal route for common actions
 - raw JSON, `html.Pre`, and logs must move behind progressive disclosure and audit-only areas
 
 Hard constraints:
@@ -86,7 +89,9 @@ Start by:
 1. auditing the current UX against the target flows
 2. explicitly identifying which current surfaces still feel like technical tooling instead of product
 3. identifying which visible nodes/entities must disappear from the Studio and final view because they are technical internals
-4. defining wave 1 with the highest-value UX improvements
-5. implementing wave 1
-6. committing
-7. summarizing progress and remaining friction
+4. identifying which routine Studio tasks still depend too much on the advanced workbench instead of direct canvas interaction
+5. identifying where the supply chain of the business graph is still implicit instead of explicit
+6. defining the next wave with the highest-value UX improvements in that direction
+7. implementing that wave
+8. committing
+9. summarizing progress and remaining friction
