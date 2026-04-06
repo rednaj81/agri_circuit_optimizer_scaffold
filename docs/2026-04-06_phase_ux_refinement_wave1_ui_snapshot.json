@@ -1,13 +1,12 @@
 {
   "wave": "ux_phase_1_wave_1",
   "validation": {
-    "targeted": "9 passed, 69 deselected in 1.41s",
-    "full": "78 passed in 428.22s (0:07:08)"
+    "full": "86 passed in 600.45s (0:10:00)"
   },
   "visual_evidence": {
     "type": "structured_ui_snapshot",
     "screenshot_attempt": "not_attempted_in_this_wave_run",
-    "note": "Structured snapshot generated from the Dash layout and first-fold workspace render paths for the current wave 1 worktree state."
+    "note": "Structured snapshot generated from the Dash layout, Studio focus panel and direct-edit callbacks for the current worktree state."
   },
   "shell": {
     "visible_primary_spaces": [
@@ -17,47 +16,55 @@
       "Auditoria"
     ],
     "layout_presence": {
-      "product-journey-panel": true,
-      "product-space-banner": true,
       "studio-workspace-panel": true,
       "studio-context-detailed-panels": true,
+      "studio-focus-node-label": true,
+      "studio-focus-node-apply-button": true,
+      "studio-focus-edge-length-m": true,
+      "studio-focus-edge-family-hint": true,
+      "studio-focus-edge-apply-button": true,
+      "studio-focus-edge-reverse-button": true,
       "runs-workspace-panel": true,
-      "runs-context-detailed-panels": true,
       "decision-workspace-panel": true,
-      "decision-context-detailed-panels": true,
-      "audit-workspace-panel": true,
-      "audit-context-detailed-panels": true
+      "audit-workspace-panel": true
     }
   },
-  "progressive_disclosure": {
-    "studio": [
-      "studio-context-detailed-panels"
+  "studio_first_fold": {
+    "quick_edit_controls": [
+      "studio-focus-node-label",
+      "studio-focus-node-apply-button",
+      "studio-focus-edge-length-m",
+      "studio-focus-edge-family-hint",
+      "studio-focus-edge-apply-button",
+      "studio-focus-edge-reverse-button"
     ],
-    "runs": [
-      "runs-context-detailed-panels",
-      "runs-operations-details",
-      "runs-technical-audit-details"
-    ],
-    "decision": [
-      "decision-context-detailed-panels",
-      "decision-ranking-details",
-      "decision-comparison-details"
-    ],
-    "audit": [
-      "audit-context-detailed-panels",
-      "audit-bundle-tables-details",
-      "audit-json-details"
+    "panel_copy_markers": [
+      "Edição direta deste foco",
+      "Atualize o rótulo visível desta entidade sem sair da primeira dobra.",
+      "Ajuste comprimento, famílias sugeridas ou direção sem abrir a bancada completa."
     ]
   },
-  "first_fold_previews": {
-    "studio": "Leitura do cenárioExige atençãoAinda há bloqueios estruturais impedindo a passagem segura para Runs.Foco atualTap P1Passagem para RunsAinda bloqueadaPróxima açãoCorrigir regras estruturais e rotas inválidas antes de enfileirar uma nova run.O que precisa de atenção agoraA conexão L011 sai de S, mas S deve aparecer apenas como destino final.Conexão em foco: Produto 1 -> Junção 1.Confira comprimento, direção e famílias ",
-    "runs": "Leitura operacional de RunsAguardando readiness do StudioAinda há bloqueios estruturais impedindo a passagem segura para Runs.Gate do cenárioAinda há bloqueios estruturais impedindo a passagem segura para Runs.Fila agoraNenhuma run registrada ainda.Próxima açãoVolte ao Studio para corrigir conectividade, regras obrigatórias e medição direta antes de abrir uma nova run.O que move a jornada agoraA passagem para Decisão",
-    "decision": "Leitura principal da decisãoSem decisão utilizávelAinda falta uma run utilizável para abrir winner, runner-up e contraste com segurança.Winner atualAinda sem winner oficial legívelRunner-upAinda sem runner-up comparávelPróxima açãoVolte para Runs, confirme uma execução concluída e retorne quando existir resultado comparável.O que esta decisão pede agoraAinda não existe winner legível; a prioridade continua sendo recu",
-    "audit": "Trilha avançadaProntoAuditoria permanece disponível como trilha avançada, sem competir com Studio, Runs ou Decisão.Quando entrar aquiQuando bundle canônico, YAMLs, persistência ou tabelas completas forem necessários para reconciliar a trilha técnica.Quando não entrar aquiQuando a próxima ação ainda for preparar o cenário, revisar a fila ou comparar winner e runner-up.Próxima açãoEntre aqui apenas quando a leitura pri"
+  "callback_outcomes": {
+    "node_quick_edit": {
+      "selected_id": "P1",
+      "updated_label": "Bomba principal refinada",
+      "status": "Rótulo da entidade atualizado direto no foco do canvas."
+    },
+    "edge_quick_edit": {
+      "selected_id": "L013",
+      "updated_length_m": 0.91,
+      "updated_family_hint": "loop,hybrid",
+      "status": "Conexão ajustada direto no foco do canvas."
+    },
+    "edge_reverse": {
+      "selected_id": "L013",
+      "from_node": "J2",
+      "to_node": "J1",
+      "status": "Direção da conexão invertida direto no foco do canvas."
+    }
   },
-  "workspace_render_examples": {
-    "runs_ready_state": "Leitura operacional de RunsDecisão disponívelA última execução já gerou contexto suficiente para entrar em Decisão.Gate do cenárioCenário pronto para seguir para Runs.Fila agoraPróxima run pronta: run-003.Próxima açãoAbra a Decisão para confirmar winner, runner-up e sinais de risco antes de oficializar.O que move a jornada agoraJá existe um resultado utilizável; a passagem para Decisão está liberada.Próxima run pront",
-    "decision_technical_tie_state": "Leitura principal da decisãoEmpate técnicoWinner e runner-up seguem próximos o suficiente para exigir decisão humana assistida.Winner atualcand-01Runner-upcand-02Próxima açãoMantenha a comparação aberta, valide os sinais de risco e aprofunde a Auditoria apenas se precisar reconciliar a trilha técnica.O que esta decisão pede agoraTechnical tie explícito: mantenha winner e runner-up visíveis antes de qualquer oficializ",
-    "audit_advanced_path_state": "Trilha avançadaProntoAuditoria permanece disponível como trilha avançada, sem competir com Studio, Runs ou Decisão.Quando entrar aquiQuando bundle canônico, YAMLs, persistência ou tabelas completas forem necessários para reconciliar a trilha técnica.Quando não entrar aquiQuando a próxima ação ainda for preparar o cenário, revisar a fila ou comparar winner e runner-up.Próxima açãoEntre aqui apenas quando a leitura pri"
-  }
+  "residual_risks": [
+    "visual screenshot evidence is still unavailable because this wave used structured UI evidence only",
+    "the repository worktree still contains unrelated agent and supervisor overlay changes outside this implementation commit"
+  ]
 }

@@ -1,41 +1,40 @@
-# Phase UX Refinement Wave 1 - Navigation and Information Architecture Cleanup
+# Phase UX Refinement Wave 1 - Studio First-Fold Direct Editing
 
 ## Objective
 
-Execute `ux_phase_1` without reopening architecture: keep `decision_platform` framed as one product journey, make Studio, Runs, Decisão and Auditoria read as the four primary spaces, and push technical context out of the first fold.
+Execute the approved UX refinement wave without reopening architecture: preserve the four-space product shell, keep the business graph as the primary Studio surface, and reduce dependence on the advanced workbench for routine first-fold adjustments.
 
 ## Delivered
 
-- Preserved the four-space product shell in `src/decision_platform/ui_dash/app.py` and kept the main navigation constrained to Studio, Runs, Decisão and Auditoria.
-- Consolidated the first fold of Studio, Runs, Decisão and Auditoria into dedicated workspace panels so each space now opens with objective, current state and next action before deeper technical detail.
-- Kept queue operations, decision comparison, bundle editors, tables and raw technical JSON available, but moved them behind progressive disclosure (`html.Details`) instead of leaving them as the primary reading surface.
-- Added primary workspace transitions across the journey, including the Runs workspace CTA into Decisão and the explicit return paths from Decisão and Auditoria.
-- Updated `tests/decision_platform/test_ui_smoke.py` and `tests/decision_platform/test_studio_structure.py` so the UI contract now locks the new workspace hierarchy, disclosure boundaries and CTA wiring.
-- Refreshed the structured evidence artifact in `docs/2026-04-06_phase_ux_refinement_wave1_ui_snapshot.json` to match the current worktree state.
+- Kept the current `decision_platform` shell centered on Studio, Runs, Decisão and Auditoria while preserving the existing workspace hierarchy already present in `src/decision_platform/ui_dash/app.py`.
+- Expanded the Studio focus panel with direct first-fold editing for the selected business entity: the operator can now update the visible node label from the main canvas context through `studio-focus-node-label` and `studio-focus-node-apply-button`.
+- Added direct edge adjustments in the same focus area through `studio-focus-edge-length-m`, `studio-focus-edge-family-hint`, `studio-focus-edge-apply-button` and `studio-focus-edge-reverse-button`, keeping common business-flow corrections local to the canvas.
+- Wired new Dash callbacks so quick edits update node and edge state in place, return honest status messages, and preserve fail-closed validation through the existing node and edge edit helpers.
+- Added `reverse_edge_studio_selection` as an explicit reusable helper so business flow direction can be flipped without opening the full workbench path.
+- Updated `tests/decision_platform/test_studio_structure.py` and `tests/decision_platform/test_ui_smoke.py` to lock the presence of the new first-fold controls and validate the direct-edit callback behavior for label updates, edge adjustments and edge reversal.
+- Refreshed the structured evidence artifact in `docs/2026-04-06_phase_ux_refinement_wave1_ui_snapshot.json` to capture the new first-fold Studio affordances and validation results.
 
 ## Validation
 
 ```powershell
-$env:PYTHONPATH='src;.'; .\.venv\Scripts\python.exe -m pytest tests/decision_platform/test_ui_smoke.py tests/decision_platform/test_studio_structure.py -q -p no:cacheprovider --basetemp tests\_tmp\pytest-basetemp-ux-wave1-targeted -k "runs_workspace_panel_prioritizes_queue_focus_and_primary_transition or decision_workspace_panel_makes_winner_runner_up_and_tie_legible or audit_workspace_panel_relegates_auditoria_to_advanced_path or decision_tab_contains_advanced_sections_without_extra_primary_tabs or runs_tab_combines_queue_and_execution_summary or audit_tab_holds_bundle_editors_and_technical_surfaces or dash_app_exposes_structural_studio_controls or product_space_banner_stays_aligned_with_navigation_resolution or studio_discovery_callbacks_open_guide_and_audit_tab"
-$env:PYTHONPATH='src;.'; .\.venv\Scripts\python.exe -m pytest tests/decision_platform/test_ui_smoke.py tests/decision_platform/test_studio_structure.py -q -p no:cacheprovider --basetemp tests\_tmp\pytest-basetemp-ux-wave1-current
+$env:PYTHONPATH='src;.'; .\.venv\Scripts\python.exe -m pytest tests/decision_platform/test_studio_structure.py tests/decision_platform/test_ui_smoke.py -q -p no:cacheprovider --basetemp tests/_tmp/pytest-basetemp-dev-wave1
 ```
 
 Result:
 
-- `9 passed, 69 deselected in 1.41s`
-- `78 passed in 428.22s (0:07:08)`
+- `86 passed in 600.45s (0:10:00)`
 
 ## Evidence
 
-- Structured shell and first-fold snapshot: `docs/2026-04-06_phase_ux_refinement_wave1_ui_snapshot.json`
+- Structured Studio quick-edit snapshot: `docs/2026-04-06_phase_ux_refinement_wave1_ui_snapshot.json`
 
 ## Scope Guardrails
 
 - No architecture reopening.
-- No replacement of Dash or Cytoscape.
-- No change to Julia-only official execution, fail-closed behavior, queue semantics or backend decision logic.
-- No reintroduction of `html.Pre`, raw JSON or raw logs as the primary reading surface of the touched spaces.
+- No change to Dash/Cytoscape stack or to the Julia-only official execution path.
+- No backend solver, queue semantics, ranking logic or hydraulic-model changes.
+- No promotion of raw JSON, debug payloads or technical internals back to the primary Studio surface.
 
 ## Honest Handoff
 
-The local worktree already contained the main UX wave delta in `app.py` when this session started. I treated that state as the source of truth, reconciled the remaining smoke expectation to the renamed Runs detailed panel, reran the relevant UI suites, and refreshed the handoff plus structured evidence so they now describe the real first-fold behavior across Studio, Runs, Decisão and Auditoria. The wave closes with meaningful IA progress, but evidence remains a structured snapshot rather than a rendered screenshot.
+The main code delta for this wave was already present in the local worktree when the session started. I treated that worktree state as authoritative, validated that the new Studio first-fold editing path behaves correctly, updated the affected UI suites, and refreshed the handoff plus structured evidence so they now describe the real state of the product surface. The wave meaningfully reduces routine workbench dependence for common label and connection edits, but it does not attempt broader shell or navigation changes beyond preserving the existing four-space product framing.

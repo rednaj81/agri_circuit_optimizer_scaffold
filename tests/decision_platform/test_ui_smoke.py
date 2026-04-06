@@ -394,6 +394,12 @@ def test_studio_tab_surfaces_readiness_and_selection_context() -> None:
     assert _find_component_by_id(studio_tab, "studio-focus-move-left-button") is not None
     assert _find_component_by_id(studio_tab, "studio-focus-duplicate-node-button") is not None
     assert _find_component_by_id(studio_tab, "studio-focus-delete-edge-button") is not None
+    assert _find_component_by_id(studio_tab, "studio-focus-node-label") is not None
+    assert _find_component_by_id(studio_tab, "studio-focus-node-apply-button") is not None
+    assert _find_component_by_id(studio_tab, "studio-focus-edge-length-m") is not None
+    assert _find_component_by_id(studio_tab, "studio-focus-edge-family-hint") is not None
+    assert _find_component_by_id(studio_tab, "studio-focus-edge-apply-button") is not None
+    assert _find_component_by_id(studio_tab, "studio-focus-edge-reverse-button") is not None
     assert _find_component_by_id(studio_tab, "studio-focus-open-workbench-button") is not None
 
 
@@ -779,6 +785,9 @@ def test_studio_focus_panel_uses_canvas_selection_as_primary_context() -> None:
     assert "Tanque de água e Misturador supre Bomba principal." not in panel_text
     assert "Tanque de água supre Misturador (rota obrigatória, rotas R001)." in panel_text
     assert "Tanque de água supre Bomba principal." in panel_text
+    assert "Edição direta deste foco" in panel_text
+    assert "Atualize o rótulo visível desta entidade sem sair da primeira dobra." in panel_text
+    assert "Ajuste comprimento, famílias sugeridas ou direção sem abrir a bancada completa." in panel_text
     assert "Por que este foco importa" in panel_text
     assert "Exige atenção" in panel_text
     assert "Ações rápidas deste foco" in panel_text
@@ -791,6 +800,12 @@ def test_studio_focus_panel_uses_canvas_selection_as_primary_context() -> None:
     assert _find_component_by_id(panel, "studio-focus-move-left-button") is not None
     assert _find_component_by_id(panel, "studio-focus-move-up-button") is not None
     assert _find_component_by_id(panel, "studio-focus-move-down-button") is not None
+    assert _find_component_by_id(panel, "studio-focus-node-label") is not None
+    assert _find_component_by_id(panel, "studio-focus-node-apply-button") is not None
+    assert _find_component_by_id(panel, "studio-focus-edge-length-m") is not None
+    assert _find_component_by_id(panel, "studio-focus-edge-family-hint") is not None
+    assert _find_component_by_id(panel, "studio-focus-edge-apply-button") is not None
+    assert _find_component_by_id(panel, "studio-focus-edge-reverse-button") is not None
     assert _find_component_by_id(panel, "studio-focus-duplicate-node-button") is not None
     assert _find_component_by_id(panel, "studio-focus-delete-edge-button") is not None
     assert _find_component_by_id(panel, "studio-focus-open-workbench-button") is not None
@@ -1101,6 +1116,72 @@ def test_canvas_context_button_opens_studio_workbench() -> None:
 
     callback = _get_callback(app, output_prefix="studio-editor-workbench.open")
     assert callback(1, None, None, None, None) is True
+
+
+def test_focus_node_quick_edit_callback_updates_label_without_workbench() -> None:
+    bundle = load_scenario_bundle("data/decision_platform/maquete_v2")
+    with diagnostic_runtime_test_mode():
+        app = build_app("data/decision_platform/maquete_v2")
+
+    callback = _get_callback(app, input_id="studio-focus-node-apply-button")
+    updated_nodes, next_selected_id, status = callback(
+        1,
+        bundle.nodes.to_dict("records"),
+        "P1",
+        "Bomba principal refinada",
+        bundle.candidate_links.to_dict("records"),
+        bundle.route_requirements.to_dict("records"),
+    )
+
+    updated_row = next(row for row in updated_nodes if str(row["node_id"]) == "P1")
+    assert next_selected_id == "P1"
+    assert updated_row["label"] == "Bomba principal refinada"
+    assert status == "Rótulo da entidade atualizado direto no foco do canvas."
+
+
+def test_focus_edge_quick_edit_callback_updates_length_and_family_without_workbench() -> None:
+    bundle = load_scenario_bundle("data/decision_platform/maquete_v2")
+    with diagnostic_runtime_test_mode():
+        app = build_app("data/decision_platform/maquete_v2")
+
+    callback = _get_callback(app, input_id="studio-focus-edge-apply-button")
+    updated_links, next_selected_link_id, status = callback(
+        1,
+        bundle.candidate_links.to_dict("records"),
+        "L013",
+        0.91,
+        "loop,hybrid",
+        bundle.nodes.to_dict("records"),
+        bundle.edge_component_rules.to_dict("records"),
+    )
+
+    updated_row = next(row for row in updated_links if str(row["link_id"]) == "L013")
+    assert next_selected_link_id == "L013"
+    assert updated_row["length_m"] == pytest.approx(0.91)
+    assert updated_row["family_hint"] == "loop,hybrid"
+    assert status == "Conexão ajustada direto no foco do canvas."
+
+
+def test_focus_edge_reverse_callback_swaps_flow_without_workbench() -> None:
+    bundle = load_scenario_bundle("data/decision_platform/maquete_v2")
+    original_row = next(row for row in bundle.candidate_links.to_dict("records") if str(row["link_id"]) == "L013")
+    with diagnostic_runtime_test_mode():
+        app = build_app("data/decision_platform/maquete_v2")
+
+    callback = _get_callback(app, input_id="studio-focus-edge-reverse-button")
+    updated_links, next_selected_link_id, status = callback(
+        1,
+        bundle.candidate_links.to_dict("records"),
+        "L013",
+        bundle.nodes.to_dict("records"),
+        bundle.edge_component_rules.to_dict("records"),
+    )
+
+    updated_row = next(row for row in updated_links if str(row["link_id"]) == "L013")
+    assert next_selected_link_id == "L013"
+    assert updated_row["from_node"] == original_row["to_node"]
+    assert updated_row["to_node"] == original_row["from_node"]
+    assert status == "Direção da conexão invertida direto no foco do canvas."
 
 
 def test_decision_flow_panel_makes_transition_and_next_action_explicit() -> None:

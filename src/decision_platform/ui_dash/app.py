@@ -2316,6 +2316,103 @@ def render_studio_focus_panel(
         else ("Este foco ainda pede revisão antes de seguir para Runs." if warning_count > 0 else "Nada neste foco impede a passagem para Runs.")
     )
     readiness_background, readiness_color = _status_tone(readiness_summary.get("status") or "needs_attention")
+    selected_node = node_summary.get("selected_node") or {}
+    selected_edge_row = edge_summary.get("selected_edge") or {}
+    quick_edit_cards = [
+        html.Div(
+            style={**UI_MUTED_CARD_STYLE, "padding": "14px"},
+            children=[
+                html.Div("Entidade em foco", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+                html.Div(
+                    "Atualize o rótulo visível desta entidade sem sair da primeira dobra."
+                    if selected_node_present
+                    else "Selecione um nó no canvas para liberar a edição direta do rótulo principal.",
+                    style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"},
+                ),
+                _field_block(
+                    "Rótulo visível",
+                    dcc.Input(
+                        id="studio-focus-node-label",
+                        type="text",
+                        value=str(selected_node.get("label") or node_summary.get("business_label") or ""),
+                        disabled=not selected_node_present,
+                        persistence=True,
+                        persistence_type="session",
+                        style={"width": "100%"},
+                    ),
+                ),
+                html.Div(
+                    style=UI_ACTION_ROW_STYLE,
+                    children=[
+                        html.Button(
+                            "Aplicar rótulo direto no canvas",
+                            id="studio-focus-node-apply-button",
+                            style=UI_BUTTON_STYLE,
+                            disabled=not selected_node_present,
+                        ),
+                    ],
+                ),
+            ],
+        ),
+        html.Div(
+            style={**UI_MUTED_CARD_STYLE, "padding": "14px"},
+            children=[
+                html.Div("Conexão em foco", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+                html.Div(
+                    "Ajuste comprimento, famílias sugeridas ou direção sem abrir a bancada completa."
+                    if selected_edge_present
+                    else "Selecione uma conexão no canvas para liberar os ajustes rápidos deste trecho.",
+                    style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"},
+                ),
+                html.Div(
+                    style=UI_TWO_COLUMN_STYLE,
+                    children=[
+                        _field_block(
+                            "Comprimento (m)",
+                            dcc.Input(
+                                id="studio-focus-edge-length-m",
+                                type="number",
+                                value=selected_edge_row.get("length_m"),
+                                disabled=not selected_edge_present,
+                                persistence=True,
+                                persistence_type="session",
+                                style={"width": "100%"},
+                            ),
+                        ),
+                        _field_block(
+                            "Famílias sugeridas",
+                            dcc.Input(
+                                id="studio-focus-edge-family-hint",
+                                type="text",
+                                value=str(selected_edge_row.get("family_hint") or ""),
+                                disabled=not selected_edge_present,
+                                persistence=True,
+                                persistence_type="session",
+                                style={"width": "100%"},
+                            ),
+                        ),
+                    ],
+                ),
+                html.Div(
+                    style=UI_ACTION_ROW_STYLE,
+                    children=[
+                        html.Button(
+                            "Aplicar conexão",
+                            id="studio-focus-edge-apply-button",
+                            style=UI_BUTTON_STYLE,
+                            disabled=not selected_edge_present,
+                        ),
+                        html.Button(
+                            "Inverter direção",
+                            id="studio-focus-edge-reverse-button",
+                            style=UI_BUTTON_STYLE,
+                            disabled=not selected_edge_present,
+                        ),
+                    ],
+                ),
+            ],
+        ),
+    ]
     return html.Div(
         id="studio-focus-panel",
         children=[
@@ -2372,6 +2469,8 @@ def render_studio_focus_panel(
                     ),
                 ],
             ),
+            html.H4("Edição direta deste foco", style={"marginBottom": "6px", "marginTop": "14px"}),
+            html.Div(style={**UI_TWO_COLUMN_STYLE, "marginTop": "8px"}, children=quick_edit_cards),
             html.H4("Por que este foco importa", style={"marginBottom": "6px", "marginTop": "14px"}),
             _bullet_list(support_items + context_highlights[1:], "Sem foco atual registrado."),
             html.H4("Ações rápidas deste foco", style={"marginBottom": "6px", "marginTop": "14px"}),
@@ -4437,6 +4536,53 @@ def build_app(
         Output("nodes-grid", "rowData", allow_duplicate=True),
         Output("node-studio-selected-id", "data", allow_duplicate=True),
         Output("studio-status-message", "data", allow_duplicate=True),
+        Input("studio-focus-node-apply-button", "n_clicks"),
+        State("nodes-grid", "rowData"),
+        State("node-studio-selected-id", "data"),
+        State("studio-focus-node-label", "value"),
+        State("candidate-links-grid", "rowData"),
+        State("routes-grid", "rowData"),
+        prevent_initial_call=True,
+    )
+    def _apply_focus_node_quick_edit(
+        n_clicks: Any,
+        nodes_rows: list[dict[str, Any]] | None,
+        selected_node_id: str | None,
+        label: str | None,
+        candidate_links_rows: list[dict[str, Any]] | None,
+        route_rows: list[dict[str, Any]] | None,
+    ) -> tuple[list[dict[str, Any]], str | None, str]:
+        if not n_clicks:
+            return nodes_rows or [], selected_node_id, ""
+        selected_id = _default_node_studio_selection(nodes_rows or [], preferred_node_id=selected_node_id)
+        selected_row = next(
+            (dict(row) for row in (nodes_rows or []) if str(row.get("node_id", "")).strip() == selected_id),
+            None,
+        )
+        if selected_row is None:
+            return nodes_rows or [], selected_node_id, "Selecione um nó antes de aplicar edição direta no foco."
+        try:
+            updated_rows, next_selected_id = apply_node_studio_edit(
+                nodes_rows or [],
+                selected_node_id=selected_id,
+                node_id=str(selected_row.get("node_id") or selected_id),
+                label=label,
+                node_type=str(selected_row.get("node_type") or ""),
+                x_m=selected_row.get("x_m"),
+                y_m=selected_row.get("y_m"),
+                allow_inbound=bool(selected_row.get("allow_inbound")),
+                allow_outbound=bool(selected_row.get("allow_outbound")),
+                candidate_links_rows=candidate_links_rows or [],
+                route_rows=route_rows or [],
+            )
+        except ValueError as exc:
+            return nodes_rows or [], selected_node_id, str(exc)
+        return updated_rows, next_selected_id, "Rótulo da entidade atualizado direto no foco do canvas."
+
+    @app.callback(
+        Output("nodes-grid", "rowData", allow_duplicate=True),
+        Output("node-studio-selected-id", "data", allow_duplicate=True),
+        Output("studio-status-message", "data", allow_duplicate=True),
         Input("node-studio-move-button", "n_clicks"),
         Input("studio-focus-recommended-move-right-button", "n_clicks_timestamp"),
         Input("studio-focus-move-left-button", "n_clicks_timestamp"),
@@ -4719,6 +4865,87 @@ def build_app(
         except ValueError as exc:
             return candidate_links_rows or [], selected_link_id, str(exc)
         return updated_rows, next_selected_link_id, ""
+
+    @app.callback(
+        Output("candidate-links-grid", "rowData", allow_duplicate=True),
+        Output("edge-studio-selected-id", "data", allow_duplicate=True),
+        Output("studio-status-message", "data", allow_duplicate=True),
+        Input("studio-focus-edge-apply-button", "n_clicks"),
+        State("candidate-links-grid", "rowData"),
+        State("edge-studio-selected-id", "data"),
+        State("studio-focus-edge-length-m", "value"),
+        State("studio-focus-edge-family-hint", "value"),
+        State("nodes-grid", "rowData"),
+        State("edge-component-rules-grid", "rowData"),
+        prevent_initial_call=True,
+    )
+    def _apply_focus_edge_quick_edit(
+        n_clicks: Any,
+        candidate_links_rows: list[dict[str, Any]] | None,
+        selected_link_id: str | None,
+        length_m: Any,
+        family_hint: str | None,
+        nodes_rows: list[dict[str, Any]] | None,
+        edge_component_rules_rows: list[dict[str, Any]] | None,
+    ) -> tuple[list[dict[str, Any]], str | None, str]:
+        if not n_clicks:
+            return candidate_links_rows or [], selected_link_id, ""
+        selected_id = _default_edge_studio_selection(candidate_links_rows or [], preferred_link_id=selected_link_id)
+        selected_row = next(
+            (dict(row) for row in (candidate_links_rows or []) if str(row.get("link_id", "")).strip() == selected_id),
+            None,
+        )
+        if selected_row is None:
+            return candidate_links_rows or [], selected_link_id, "Selecione uma conexão antes de aplicar edição direta no foco."
+        try:
+            updated_rows, next_selected_link_id = apply_edge_studio_edit(
+                candidate_links_rows or [],
+                selected_link_id=selected_id,
+                link_id=str(selected_row.get("link_id") or selected_id),
+                from_node=str(selected_row.get("from_node") or ""),
+                to_node=str(selected_row.get("to_node") or ""),
+                archetype=str(selected_row.get("archetype") or ""),
+                length_m=length_m,
+                bidirectional=bool(selected_row.get("bidirectional")),
+                family_hint=family_hint,
+                nodes_rows=nodes_rows or [],
+                edge_component_rules_rows=edge_component_rules_rows or [],
+            )
+        except ValueError as exc:
+            return candidate_links_rows or [], selected_link_id, str(exc)
+        return updated_rows, next_selected_link_id, "Conexão ajustada direto no foco do canvas."
+
+    @app.callback(
+        Output("candidate-links-grid", "rowData", allow_duplicate=True),
+        Output("edge-studio-selected-id", "data", allow_duplicate=True),
+        Output("studio-status-message", "data", allow_duplicate=True),
+        Input("studio-focus-edge-reverse-button", "n_clicks"),
+        State("candidate-links-grid", "rowData"),
+        State("edge-studio-selected-id", "data"),
+        State("nodes-grid", "rowData"),
+        State("edge-component-rules-grid", "rowData"),
+        prevent_initial_call=True,
+    )
+    def _reverse_focus_edge_direction(
+        n_clicks: Any,
+        candidate_links_rows: list[dict[str, Any]] | None,
+        selected_link_id: str | None,
+        nodes_rows: list[dict[str, Any]] | None,
+        edge_component_rules_rows: list[dict[str, Any]] | None,
+    ) -> tuple[list[dict[str, Any]], str | None, str]:
+        if not n_clicks:
+            return candidate_links_rows or [], selected_link_id, ""
+        selected_id = _default_edge_studio_selection(candidate_links_rows or [], preferred_link_id=selected_link_id)
+        try:
+            updated_rows, next_selected_link_id = reverse_edge_studio_selection(
+                candidate_links_rows or [],
+                selected_link_id=selected_id,
+                nodes_rows=nodes_rows or [],
+                edge_component_rules_rows=edge_component_rules_rows or [],
+            )
+        except ValueError as exc:
+            return candidate_links_rows or [], selected_link_id, str(exc)
+        return updated_rows, next_selected_link_id, "Direção da conexão invertida direto no foco do canvas."
 
     @app.callback(
         Output("candidate-links-grid", "rowData", allow_duplicate=True),
@@ -6704,6 +6931,37 @@ def delete_edge_studio_selection(
     remaining_rows = [dict(row) for row in candidate_links_rows if str(row.get("link_id", "")).strip() != selected_id]
     next_selected_id = _default_edge_studio_selection(remaining_rows)
     return remaining_rows, next_selected_id
+
+
+def reverse_edge_studio_selection(
+    candidate_links_rows: list[dict[str, Any]],
+    *,
+    selected_link_id: str | None,
+    nodes_rows: list[dict[str, Any]] | None = None,
+    edge_component_rules_rows: list[dict[str, Any]] | None = None,
+) -> tuple[list[dict[str, Any]], str | None]:
+    selected_id = _default_edge_studio_selection(candidate_links_rows, preferred_link_id=selected_link_id)
+    if selected_id is None:
+        return candidate_links_rows, None
+    selected_row = next(
+        (dict(row) for row in candidate_links_rows if str(row.get("link_id", "")).strip() == selected_id),
+        None,
+    )
+    if selected_row is None:
+        return candidate_links_rows, None
+    return apply_edge_studio_edit(
+        candidate_links_rows,
+        selected_link_id=selected_id,
+        link_id=str(selected_row.get("link_id") or selected_id),
+        from_node=str(selected_row.get("to_node") or ""),
+        to_node=str(selected_row.get("from_node") or ""),
+        archetype=str(selected_row.get("archetype") or ""),
+        length_m=selected_row.get("length_m"),
+        bidirectional=bool(selected_row.get("bidirectional")),
+        family_hint=str(selected_row.get("family_hint") or ""),
+        nodes_rows=nodes_rows or [],
+        edge_component_rules_rows=edge_component_rules_rows or [],
+    )
 
 
 def build_node_studio_elements(

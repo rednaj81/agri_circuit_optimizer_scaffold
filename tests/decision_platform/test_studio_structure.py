@@ -10,6 +10,7 @@ from decision_platform.data_io.storage import save_authored_scenario_bundle
 from decision_platform.ui_dash.app import (
     STUDIO_CONTEXT_MENU,
     apply_studio_context_menu_action,
+    reverse_edge_studio_selection,
     build_app,
     create_business_node_studio_node,
     create_edge_studio_link,
@@ -51,6 +52,12 @@ def test_dash_app_exposes_structural_studio_controls() -> None:
     assert "studio-quick-link-create-button" in layout_repr
     assert "studio-workspace-panel" in layout_repr
     assert "studio-business-flow-panel" in layout_repr
+    assert "studio-focus-node-label" in layout_repr
+    assert "studio-focus-node-apply-button" in layout_repr
+    assert "studio-focus-edge-length-m" in layout_repr
+    assert "studio-focus-edge-family-hint" in layout_repr
+    assert "studio-focus-edge-apply-button" in layout_repr
+    assert "studio-focus-edge-reverse-button" in layout_repr
     assert "studio-context-detailed-panels" in layout_repr
     assert "runs-workspace-panel" in layout_repr
     assert "runs-context-detailed-panels" in layout_repr
@@ -171,6 +178,26 @@ def test_context_menu_action_creates_and_removes_business_elements() -> None:
     assert removed_link_id != "L013"
     assert status == "Conexão removida pelo menu contextual."
     assert open_workbench is False
+
+
+@pytest.mark.fast
+def test_reverse_edge_studio_selection_swaps_business_flow_direction() -> None:
+    bundle = load_scenario_bundle("data/decision_platform/maquete_v2")
+
+    updated_links, next_selected_link_id = reverse_edge_studio_selection(
+        bundle.candidate_links.to_dict("records"),
+        selected_link_id="L013",
+        nodes_rows=bundle.nodes.to_dict("records"),
+        edge_component_rules_rows=bundle.edge_component_rules.to_dict("records"),
+    )
+
+    reversed_link = next(row for row in updated_links if str(row["link_id"]) == "L013")
+    original_link = next(row for row in bundle.candidate_links.to_dict("records") if str(row["link_id"]) == "L013")
+
+    assert next_selected_link_id == "L013"
+    assert reversed_link["from_node"] == original_link["to_node"]
+    assert reversed_link["to_node"] == original_link["from_node"]
+    assert reversed_link["length_m"] == original_link["length_m"]
 
 
 @pytest.mark.fast
