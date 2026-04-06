@@ -664,6 +664,44 @@ def render_studio_projection_panel(summary: dict[str, Any]) -> Any:
     )
 
 
+def render_studio_connectivity_panel(
+    summary: dict[str, Any],
+    route_rows: list[dict[str, Any]] | None,
+) -> Any:
+    route_rows = route_rows or []
+    route_lines = []
+    for route in route_rows[:4]:
+        route_id = str(route.get("route_id") or "ROTA")
+        source = str(route.get("source") or "-")
+        sink = str(route.get("sink") or "-")
+        qualifiers = []
+        if _coerce_truthy(route.get("mandatory")):
+            qualifiers.append("obrigatória")
+        if _coerce_truthy(route.get("measurement_required")):
+            qualifiers.append("medição direta")
+        qualifier_text = f" ({', '.join(qualifiers)})" if qualifiers else ""
+        route_lines.append(f"{route_id}: {source} -> {sink}{qualifier_text}")
+    return html.Div(
+        id="studio-connectivity-panel",
+        children=[
+            html.H3("Conectividade do grafo", style={"marginTop": 0}),
+            html.Div(
+                style=UI_THREE_COLUMN_STYLE,
+                children=[
+                    _metric_card("Bloqueios", summary.get("blocker_count", 0)),
+                    _metric_card("Avisos", summary.get("warning_count", 0)),
+                    _metric_card("Rotas obrigatórias", summary.get("mandatory_route_count", 0)),
+                    _metric_card("Medição direta", summary.get("measurement_route_count", 0)),
+                ],
+            ),
+            html.H4("Rotas em foco", style={"marginBottom": "6px"}),
+            _bullet_list(route_lines, "Sem rotas registradas para esta leitura."),
+            html.H4("Próxima ação", style={"marginBottom": "6px", "marginTop": "14px"}),
+            _bullet_list(list(summary.get("next_steps", []))[:2], "Sem próximo passo registrado."),
+        ],
+    )
+
+
 def render_studio_selection_panel(summary: dict[str, Any], selection_type: str) -> Any:
     key = "selected_node" if selection_type == "node" else "selected_edge"
     selected = summary.get(key) or {}
@@ -1234,119 +1272,127 @@ def build_app(
                                 style=UI_TWO_COLUMN_STYLE,
                                 children=[
                                     html.Div(
+                                        style=UI_CARD_STYLE,
+                                        children=[
+                                            html.H3("Grafo de negócio", style={"marginTop": 0}),
+                                            html.P(
+                                                "A superfície principal mostra apenas entidades e conexões operacionais. Hubs internos e nós derivados permanecem fora do canvas principal.",
+                                                style={"marginTop": 0, "lineHeight": "1.6"},
+                                            ),
+                                            cyto.Cytoscape(
+                                                id="node-studio-cytoscape",
+                                                elements=initial_node_studio_elements,
+                                                layout={"name": "preset"},
+                                                style={"width": "100%", "height": "560px"},
+                                                stylesheet=_build_node_studio_stylesheet(
+                                                    initial_node_studio_selected_id,
+                                                    initial_edge_studio_selected_id,
+                                                ),
+                                            ),
+                                        ],
+                                    ),
+                                    html.Div(
                                         style={**UI_MUTED_CARD_STYLE, "display": "grid", "gap": "12px"},
                                         children=[
                                             html.Div(id="studio-status-banner", children=render_status_banner("")),
                                             html.Div(id="node-studio-summary-panel", children=render_studio_selection_panel(_safe_json_loads(initial_node_studio_summary), "node")),
                                             html.Div(id="edge-studio-summary-panel", children=render_studio_selection_panel(_safe_json_loads(initial_edge_studio_summary), "edge")),
+                                            render_studio_connectivity_panel(initial_studio_readiness, authoring_payload["route_rows"]),
                                         ],
                                     ),
-                                    html.Details(
-                                        id="studio-technical-guide",
-                                        style=UI_MUTED_CARD_STYLE,
+                                ],
+                            ),
+                            html.Details(
+                                id="studio-editor-workbench",
+                                style=UI_MUTED_CARD_STYLE,
+                                children=[
+                                    html.Summary("Ações de edição do grafo"),
+                                    html.Div(
+                                        style=UI_TWO_COLUMN_STYLE,
                                         children=[
-                                            html.Summary("Onde está a trilha técnica"),
-                                            html.P(
-                                                "A projeção principal mantém apenas entidades e fluxos de negócio. Campos contratuais, IDs e estrutura detalhada continuam disponíveis nos campos avançados do Studio e na aba Auditoria.",
-                                                style={"lineHeight": "1.6"},
-                                            ),
-                                            html.Ul(
-                                                [
-                                                    html.Li("Abra os campos técnicos do nó ou da conexão quando precisar editar o bundle estrutural."),
-                                                    html.Li("Use a aba Auditoria para revisar tabelas canônicas, textos YAML e o bundle salvo."),
-                                                    html.Li("Nós internos e hubs continuam ocultos por design na camada principal."),
+                                            html.Div(
+                                                id="node-studio-business-editor",
+                                                style=UI_CARD_STYLE,
+                                                children=[
+                                                    html.H3("Entidade do cenário", style={"marginTop": 0}),
+                                                    html.P(
+                                                        "Edite o nome exibido e a posição da entidade no grafo principal. IDs, tipo técnico e flags ficam em campos avançados.",
+                                                        style={"marginTop": 0, "lineHeight": "1.6"},
+                                                    ),
+                                                    _field_block("Rótulo visível", dcc.Input(id="node-studio-label", type="text", value=initial_node_studio_form["label"], persistence=True, persistence_type="session", style={"width": "100%"})),
+                                                    html.Div(
+                                                        style=UI_TWO_COLUMN_STYLE,
+                                                        children=[
+                                                            _field_block("Posição X (m)", dcc.Input(id="node-studio-x-m", type="number", value=initial_node_studio_form["x_m"], persistence=True, persistence_type="session", style={"width": "100%"})),
+                                                            _field_block("Posição Y (m)", dcc.Input(id="node-studio-y-m", type="number", value=initial_node_studio_form["y_m"], persistence=True, persistence_type="session", style={"width": "100%"})),
+                                                        ],
+                                                    ),
+                                                    html.Div(style=UI_ACTION_ROW_STYLE, children=[html.Button("Aplicar propriedades do nó", id="node-studio-apply-button", style=UI_BUTTON_STYLE), html.Button("Criar nó", id="node-studio-create-button", style=UI_BUTTON_STYLE), html.Button("Duplicar nó", id="node-studio-duplicate-button", style=UI_BUTTON_STYLE), html.Button("Excluir nó selecionado", id="node-studio-delete-button", style=UI_BUTTON_STYLE)]),
+                                                    html.Div(
+                                                        style=UI_TWO_COLUMN_STYLE,
+                                                        children=[
+                                                            _field_block("Mover", dcc.Dropdown(id="node-studio-move-direction", options=[{"label": "Esquerda", "value": "left"}, {"label": "Direita", "value": "right"}, {"label": "Cima", "value": "up"}, {"label": "Baixo", "value": "down"}], value="right", persistence=True, persistence_type="session")),
+                                                            _field_block("Passo", dcc.Input(id="node-studio-move-step", type="number", value=0.02, persistence=True, persistence_type="session", style={"width": "100%"})),
+                                                        ],
+                                                    ),
+                                                    html.Button("Mover nó", id="node-studio-move-button", style=UI_BUTTON_STYLE),
+                                                    html.Details(
+                                                        style={**UI_MUTED_CARD_STYLE, "marginTop": "12px"},
+                                                        children=[
+                                                            html.Summary("Campos técnicos do nó"),
+                                                            _field_block("Node ID contratual", dcc.Input(id="node-studio-node-id", type="text", value=initial_node_studio_form["node_id"], persistence=True, persistence_type="session", style={"width": "100%"})),
+                                                            _field_block("Tipo técnico", dcc.Input(id="node-studio-node-type", type="text", value=initial_node_studio_form["node_type"], persistence=True, persistence_type="session", style={"width": "100%"})),
+                                                            _field_block("Permitir entrada", dcc.Checklist(id="node-studio-allow-inbound", options=[{"label": "allow_inbound", "value": "allow_inbound"}], value=initial_node_studio_form["allow_inbound"], persistence=True, persistence_type="session")),
+                                                            _field_block("Permitir saída", dcc.Checklist(id="node-studio-allow-outbound", options=[{"label": "allow_outbound", "value": "allow_outbound"}], value=initial_node_studio_form["allow_outbound"], persistence=True, persistence_type="session")),
+                                                        ],
+                                                    ),
                                                 ],
-                                                style={"margin": "8px 0 0 18px", "lineHeight": "1.6"},
+                                            ),
+                                            html.Div(
+                                                id="edge-studio-business-editor",
+                                                style=UI_CARD_STYLE,
+                                                children=[
+                                                    html.H3("Conexão do cenário", style={"marginTop": 0}),
+                                                    html.P(
+                                                        "Mantenha a edição principal focada na leitura do fluxo. Origem, destino e contratos técnicos ficam em campos avançados.",
+                                                        style={"marginTop": 0, "lineHeight": "1.6"},
+                                                    ),
+                                                    _field_block("Comprimento (m)", dcc.Input(id="edge-studio-length-m", type="number", value=initial_edge_studio_form["length_m"], persistence=True, persistence_type="session", style={"width": "100%"})),
+                                                    _field_block("Famílias sugeridas", dcc.Input(id="edge-studio-family-hint", type="text", value=initial_edge_studio_form["family_hint"], persistence=True, persistence_type="session", style={"width": "100%"})),
+                                                    html.Div(style=UI_ACTION_ROW_STYLE, children=[html.Button("Aplicar propriedades da aresta", id="edge-studio-apply-button", style=UI_BUTTON_STYLE), html.Button("Criar aresta", id="edge-studio-create-button", style=UI_BUTTON_STYLE), html.Button("Excluir aresta selecionada", id="edge-studio-delete-button", style=UI_BUTTON_STYLE)]),
+                                                    html.Details(
+                                                        style={**UI_MUTED_CARD_STYLE, "marginTop": "12px"},
+                                                        children=[
+                                                            html.Summary("Campos técnicos da conexão"),
+                                                            _field_block("Link ID contratual", dcc.Input(id="edge-studio-link-id", type="text", value=initial_edge_studio_form["link_id"], persistence=True, persistence_type="session", style={"width": "100%"})),
+                                                            _field_block("Origem técnica", dcc.Input(id="edge-studio-from-node", type="text", value=initial_edge_studio_form["from_node"], persistence=True, persistence_type="session", style={"width": "100%"})),
+                                                            _field_block("Destino técnico", dcc.Input(id="edge-studio-to-node", type="text", value=initial_edge_studio_form["to_node"], persistence=True, persistence_type="session", style={"width": "100%"})),
+                                                            _field_block("Archetype técnico", dcc.Input(id="edge-studio-archetype", type="text", value=initial_edge_studio_form["archetype"], persistence=True, persistence_type="session", style={"width": "100%"})),
+                                                            _field_block("Bidirecional", dcc.Checklist(id="edge-studio-bidirectional", options=[{"label": "bidirectional", "value": "bidirectional"}], value=initial_edge_studio_form["bidirectional"], persistence=True, persistence_type="session")),
+                                                        ],
+                                                    ),
+                                                ],
                                             ),
                                         ],
                                     ),
                                 ],
                             ),
-                            html.Div(
-                                style=UI_CARD_STYLE,
+                            html.Details(
+                                id="studio-technical-guide",
+                                style=UI_MUTED_CARD_STYLE,
                                 children=[
-                                    html.H3("Grafo de negócio", style={"marginTop": 0}),
+                                    html.Summary("Onde está a trilha técnica"),
                                     html.P(
-                                        "A superfície principal mostra apenas entidades e conexões operacionais. Hubs internos e nós derivados permanecem fora do canvas principal.",
-                                        style={"marginTop": 0, "lineHeight": "1.6"},
+                                        "A projeção principal mantém apenas entidades e fluxos de negócio. Campos contratuais, IDs e estrutura detalhada continuam disponíveis nos campos avançados do Studio e na aba Auditoria.",
+                                        style={"lineHeight": "1.6"},
                                     ),
-                                    cyto.Cytoscape(
-                                        id="node-studio-cytoscape",
-                                        elements=initial_node_studio_elements,
-                                        layout={"name": "preset"},
-                                        style={"width": "100%", "height": "560px"},
-                                        stylesheet=_build_node_studio_stylesheet(
-                                            initial_node_studio_selected_id,
-                                            initial_edge_studio_selected_id,
-                                        ),
-                                    ),
-                                ],
-                            ),
-                            html.Div(
-                                style=UI_TWO_COLUMN_STYLE,
-                                children=[
-                                    html.Div(
-                                        id="node-studio-business-editor",
-                                        style=UI_CARD_STYLE,
-                                        children=[
-                                            html.H3("Entidade do cenário", style={"marginTop": 0}),
-                                            html.P(
-                                                "Edite o nome exibido e a posição da entidade no grafo principal. IDs, tipo técnico e flags ficam em campos avançados.",
-                                                style={"marginTop": 0, "lineHeight": "1.6"},
-                                            ),
-                                            _field_block("Rótulo visível", dcc.Input(id="node-studio-label", type="text", value=initial_node_studio_form["label"], persistence=True, persistence_type="session", style={"width": "100%"})),
-                                            html.Div(
-                                                style=UI_TWO_COLUMN_STYLE,
-                                                children=[
-                                                    _field_block("Posição X (m)", dcc.Input(id="node-studio-x-m", type="number", value=initial_node_studio_form["x_m"], persistence=True, persistence_type="session", style={"width": "100%"})),
-                                                    _field_block("Posição Y (m)", dcc.Input(id="node-studio-y-m", type="number", value=initial_node_studio_form["y_m"], persistence=True, persistence_type="session", style={"width": "100%"})),
-                                                ],
-                                            ),
-                                            html.Div(style=UI_ACTION_ROW_STYLE, children=[html.Button("Aplicar propriedades do nó", id="node-studio-apply-button", style=UI_BUTTON_STYLE), html.Button("Criar nó", id="node-studio-create-button", style=UI_BUTTON_STYLE), html.Button("Duplicar nó", id="node-studio-duplicate-button", style=UI_BUTTON_STYLE), html.Button("Excluir nó selecionado", id="node-studio-delete-button", style=UI_BUTTON_STYLE)]),
-                                            html.Div(
-                                                style=UI_TWO_COLUMN_STYLE,
-                                                children=[
-                                                    _field_block("Mover", dcc.Dropdown(id="node-studio-move-direction", options=[{"label": "Esquerda", "value": "left"}, {"label": "Direita", "value": "right"}, {"label": "Cima", "value": "up"}, {"label": "Baixo", "value": "down"}], value="right", persistence=True, persistence_type="session")),
-                                                    _field_block("Passo", dcc.Input(id="node-studio-move-step", type="number", value=0.02, persistence=True, persistence_type="session", style={"width": "100%"})),
-                                                ],
-                                            ),
-                                            html.Button("Mover nó", id="node-studio-move-button", style=UI_BUTTON_STYLE),
-                                            html.Details(
-                                                style={**UI_MUTED_CARD_STYLE, "marginTop": "12px"},
-                                                children=[
-                                                    html.Summary("Campos técnicos do nó"),
-                                                    _field_block("Node ID contratual", dcc.Input(id="node-studio-node-id", type="text", value=initial_node_studio_form["node_id"], persistence=True, persistence_type="session", style={"width": "100%"})),
-                                                    _field_block("Tipo técnico", dcc.Input(id="node-studio-node-type", type="text", value=initial_node_studio_form["node_type"], persistence=True, persistence_type="session", style={"width": "100%"})),
-                                                    _field_block("Permitir entrada", dcc.Checklist(id="node-studio-allow-inbound", options=[{"label": "allow_inbound", "value": "allow_inbound"}], value=initial_node_studio_form["allow_inbound"], persistence=True, persistence_type="session")),
-                                                    _field_block("Permitir saída", dcc.Checklist(id="node-studio-allow-outbound", options=[{"label": "allow_outbound", "value": "allow_outbound"}], value=initial_node_studio_form["allow_outbound"], persistence=True, persistence_type="session")),
-                                                ],
-                                            ),
+                                    html.Ul(
+                                        [
+                                            html.Li("Abra a bancada de edição do grafo quando precisar ajustar nome, posição ou famílias sugeridas."),
+                                            html.Li("Use os campos técnicos do nó ou da conexão apenas quando precisar editar o bundle estrutural."),
+                                            html.Li("Use a aba Auditoria para revisar tabelas canônicas, textos YAML e o bundle salvo."),
                                         ],
-                                    ),
-                                    html.Div(
-                                        id="edge-studio-business-editor",
-                                        style=UI_CARD_STYLE,
-                                        children=[
-                                            html.H3("Conexão do cenário", style={"marginTop": 0}),
-                                            html.P(
-                                                "Mantenha a edição principal focada na leitura do fluxo. Origem, destino e contratos técnicos ficam em campos avançados.",
-                                                style={"marginTop": 0, "lineHeight": "1.6"},
-                                            ),
-                                            _field_block("Comprimento (m)", dcc.Input(id="edge-studio-length-m", type="number", value=initial_edge_studio_form["length_m"], persistence=True, persistence_type="session", style={"width": "100%"})),
-                                            _field_block("Famílias sugeridas", dcc.Input(id="edge-studio-family-hint", type="text", value=initial_edge_studio_form["family_hint"], persistence=True, persistence_type="session", style={"width": "100%"})),
-                                            html.Div(style=UI_ACTION_ROW_STYLE, children=[html.Button("Aplicar propriedades da aresta", id="edge-studio-apply-button", style=UI_BUTTON_STYLE), html.Button("Criar aresta", id="edge-studio-create-button", style=UI_BUTTON_STYLE), html.Button("Excluir aresta selecionada", id="edge-studio-delete-button", style=UI_BUTTON_STYLE)]),
-                                            html.Details(
-                                                style={**UI_MUTED_CARD_STYLE, "marginTop": "12px"},
-                                                children=[
-                                                    html.Summary("Campos técnicos da conexão"),
-                                                    _field_block("Link ID contratual", dcc.Input(id="edge-studio-link-id", type="text", value=initial_edge_studio_form["link_id"], persistence=True, persistence_type="session", style={"width": "100%"})),
-                                                    _field_block("Origem técnica", dcc.Input(id="edge-studio-from-node", type="text", value=initial_edge_studio_form["from_node"], persistence=True, persistence_type="session", style={"width": "100%"})),
-                                                    _field_block("Destino técnico", dcc.Input(id="edge-studio-to-node", type="text", value=initial_edge_studio_form["to_node"], persistence=True, persistence_type="session", style={"width": "100%"})),
-                                                    _field_block("Archetype técnico", dcc.Input(id="edge-studio-archetype", type="text", value=initial_edge_studio_form["archetype"], persistence=True, persistence_type="session", style={"width": "100%"})),
-                                                    _field_block("Bidirecional", dcc.Checklist(id="edge-studio-bidirectional", options=[{"label": "bidirectional", "value": "bidirectional"}], value=initial_edge_studio_form["bidirectional"], persistence=True, persistence_type="session")),
-                                                ],
-                                            ),
-                                        ],
+                                        style={"margin": "8px 0 0 18px", "lineHeight": "1.6"},
                                     ),
                                 ],
                             ),
@@ -2815,6 +2861,7 @@ def build_app(
         Output("studio-readiness-panel", "children"),
         Output("studio-projection-coverage-panel", "children"),
         Output("runs-flow-panel", "children"),
+        Output("studio-connectivity-panel", "children"),
         Output("node-studio-summary-panel", "children"),
         Output("edge-studio-summary-panel", "children"),
         Output("studio-status-banner", "children"),
@@ -2834,7 +2881,7 @@ def build_app(
         node_summary_text: str | None,
         edge_summary_text: str | None,
         studio_status_text: str | None,
-    ) -> tuple[Any, Any, Any, Any, Any, Any]:
+    ) -> tuple[Any, Any, Any, Any, Any, Any, Any]:
         studio_readiness = build_studio_readiness_summary(nodes_rows or [], candidate_links_rows or [], route_rows or [])
         return (
             render_studio_readiness_panel(studio_readiness),
@@ -2842,6 +2889,7 @@ def build_app(
                 build_studio_projection_summary(nodes_rows or [], candidate_links_rows or [], route_rows or [])
             ),
             render_runs_flow_panel(studio_readiness, _safe_json_loads(run_jobs_summary_text)),
+            render_studio_connectivity_panel(studio_readiness, route_rows),
             render_studio_selection_panel(_safe_json_loads(node_summary_text), "node"),
             render_studio_selection_panel(_safe_json_loads(edge_summary_text), "edge"),
             render_status_banner(studio_status_text),

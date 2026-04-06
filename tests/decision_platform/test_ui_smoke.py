@@ -32,6 +32,7 @@ from decision_platform.ui_dash.app import (
     render_execution_summary_panel,
     render_run_job_detail_panel,
     render_runs_flow_panel,
+    render_studio_connectivity_panel,
     render_studio_readiness_panel,
     move_node_studio_selection,
     rerank_catalog,
@@ -184,8 +185,10 @@ def test_studio_tab_surfaces_readiness_and_selection_context() -> None:
     assert _find_component_by_id(studio_tab, "studio-readiness-panel") is not None
     assert _find_component_by_id(studio_tab, "studio-status-banner") is not None
     assert _find_component_by_id(studio_tab, "studio-projection-coverage-panel") is not None
+    assert _find_component_by_id(studio_tab, "studio-connectivity-panel") is not None
     assert _find_component_by_id(studio_tab, "node-studio-summary-panel") is not None
     assert _find_component_by_id(studio_tab, "edge-studio-summary-panel") is not None
+    assert _find_component_by_id(studio_tab, "studio-editor-workbench") is not None
     assert _find_component_by_id(studio_tab, "node-studio-business-editor") is not None
     assert _find_component_by_id(studio_tab, "edge-studio-business-editor") is not None
     assert _find_component_by_id(studio_tab, "studio-technical-guide") is not None
@@ -290,6 +293,31 @@ def test_studio_readiness_panel_surfaces_runs_transition_with_real_readiness() -
     assert "Passagem para Runs" in panel_text
     assert "bloqueios ou avisos" in panel_text.lower()
     assert _find_component_by_id(panel, "studio-open-runs-button") is not None
+
+
+def test_studio_connectivity_panel_surfaces_routes_and_measurement_near_canvas() -> None:
+    panel = render_studio_connectivity_panel(
+        {
+            "blocker_count": 1,
+            "warning_count": 2,
+            "mandatory_route_count": 3,
+            "measurement_route_count": 1,
+            "next_steps": [
+                "Corrigir bloqueios estruturais antes de enfileirar uma nova run.",
+                "Salvar e reabrir o bundle canonico quando a revisao estiver pronta.",
+            ],
+        },
+        [
+            {"route_id": "R001", "source": "W", "sink": "M", "mandatory": True, "measurement_required": False},
+            {"route_id": "R002", "source": "I", "sink": "M", "mandatory": True, "measurement_required": True},
+        ],
+    )
+    panel_text = _collect_text_content(panel)
+
+    assert "Conectividade do grafo" in panel_text
+    assert "R001: W -> M (obrigatória)" in panel_text
+    assert "R002: I -> M (obrigatória, medição direta)" in panel_text
+    assert "Corrigir bloqueios estruturais" in panel_text
 
 
 def test_runs_flow_panel_reflects_studio_gate_and_queue_state() -> None:

@@ -1,0 +1,44 @@
+{
+  "wave": "ux_phase_2_wave_1",
+  "validation": {
+    "targeted": "2 passed, 37 deselected in 0.35s",
+    "full": "39 passed in 404.46s"
+  },
+  "studio_surface": {
+    "primary_panel_ids": [
+      "studio-readiness-panel",
+      "studio-projection-coverage-panel",
+      "studio-connectivity-panel",
+      "node-studio-summary-panel",
+      "edge-studio-summary-panel",
+      "studio-editor-workbench"
+    ],
+    "markers": [
+      "Grafo de negócio",
+      "Conectividade do grafo",
+      "Ações de edição do grafo",
+      "Onde está a trilha técnica"
+    ]
+  },
+  "connectivity_first_signals": {
+    "metrics": [
+      "Bloqueios",
+      "Avisos",
+      "Rotas obrigatórias",
+      "Medição direta"
+    ],
+    "route_examples": [
+      "R001: W -> M (obrigatória)",
+      "R002: I -> M (obrigatória, medição direta)"
+    ]
+  },
+  "secondary_editing_surface": {
+    "workbench_id": "studio-editor-workbench",
+    "technical_disclosure_ids": [
+      "node-studio-node-id",
+      "edge-studio-link-id",
+      "node-studio-summary",
+      "edge-studio-summary"
+    ]
+  }
+}
