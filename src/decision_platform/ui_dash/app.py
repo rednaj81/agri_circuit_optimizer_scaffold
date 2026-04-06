@@ -429,13 +429,27 @@ def _humanize_readiness_status(status: Any) -> str:
 
 def _humanize_run_status(status: Any) -> str:
     lookup = {
-        "idle": "Sem pendências",
+        "idle": "Pronto",
         "queued": "Na fila",
-        "running": "Executando",
+        "running": "Em execução",
         "completed": "Concluída",
         "failed": "Falhou",
         "canceled": "Cancelada",
-        "unknown": "Sem leitura",
+        "unknown": "Sem contexto",
+    }
+    normalized = str(status or "").strip().lower()
+    return lookup.get(normalized, normalized.replace("_", " ") or "-")
+
+
+def _humanize_audit_status(status: Any) -> str:
+    lookup = {
+        "idle": "Pronto",
+        "saved": "Concluído",
+        "persisted": "Concluído",
+        "saving": "Em execução",
+        "error": "Bloqueado",
+        "failed": "Bloqueado",
+        "unknown": "Sem contexto",
     }
     normalized = str(status or "").strip().lower()
     return lookup.get(normalized, normalized.replace("_", " ") or "-")
@@ -863,7 +877,7 @@ def render_studio_readiness_panel(summary: dict[str, Any]) -> Any:
                 style={**UI_THREE_COLUMN_STYLE, "marginBottom": "12px"},
                 children=[
                     _guidance_card("Objetivo desta área", "Confirmar se o cenário já pode sair do Studio sem depender da trilha técnica."),
-                    _guidance_card("Ação principal", str(summary.get("primary_action") or "Revise a camada principal antes de abrir Runs.")),
+                    _guidance_card("Próxima ação", str(summary.get("primary_action") or "Revise a camada principal antes de abrir Runs.")),
                     _guidance_card("Bloqueio principal", primary_blocker),
                 ],
             ),
@@ -1546,7 +1560,7 @@ def render_run_jobs_overview_panel(summary: dict[str, Any]) -> Any:
                 style={**UI_TWO_COLUMN_STYLE, "marginBottom": "12px"},
                 children=[
                     _guidance_card("Objetivo desta área", "Entender o que já rodou, o que ainda está na fila e qual run merece sua atenção agora."),
-                    _guidance_card("Ação principal", queue_guidance),
+                    _guidance_card("Próxima ação", queue_guidance),
                 ],
             ),
             html.Div(
@@ -1729,7 +1743,7 @@ def render_execution_summary_panel(summary: dict[str, Any]) -> Any:
                 style={**UI_TWO_COLUMN_STYLE, "marginBottom": "12px"},
                 children=[
                     _guidance_card("Objetivo desta área", "Mostrar se a última execução já gerou contexto suficiente para entrar em Decisão."),
-                    _guidance_card("Ação principal", next_action),
+                    _guidance_card("Próxima ação", next_action),
                 ],
             ),
             html.Div(style=UI_THREE_COLUMN_STYLE, children=[_metric_card("Candidatos", summary.get("candidate_count", 0)), _metric_card("Viáveis", summary.get("feasible_count", 0)), _metric_card("Selecionado", summary.get("selected_candidate_id") or "-", str(summary.get("default_profile_id") or ""))]),
@@ -1758,14 +1772,14 @@ def render_bundle_io_panel(summary: dict[str, Any]) -> Any:
         next_action = "Use este espaço quando precisar salvar, reabrir ou reconciliar o bundle canônico fora do fluxo principal."
     return html.Div(
         children=[
-            html.Div(style={"display": "flex", "gap": "8px", "flexWrap": "wrap", "marginBottom": "8px"}, children=[html.Span(str(summary.get("status") or "idle"), style=UI_PILL_STYLE), html.Span(str(summary.get("bundle_version") or "-"), style=UI_PILL_STYLE)]),
+            html.Div(style={"display": "flex", "gap": "8px", "flexWrap": "wrap", "marginBottom": "8px"}, children=[html.Span(_humanize_audit_status(status), style=UI_PILL_STYLE), html.Span(str(summary.get("bundle_version") or "-"), style=UI_PILL_STYLE)]),
             html.Div("Estado atual", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
             html.Div("Bundle canônico pronto para auditoria e persistência." if status != "error" else "A trilha canônica precisa de correção antes de seguir.", style={"lineHeight": "1.6", "fontWeight": 700, "margin": "6px 0 8px"}),
             html.Div(
                 style={**UI_TWO_COLUMN_STYLE, "marginBottom": "12px"},
                 children=[
                     _guidance_card("Objetivo desta área", "Guardar a trilha canônica e a persistência do cenário sem recolocar isso na superfície principal."),
-                    _guidance_card("Ação principal", next_action),
+                    _guidance_card("Próxima ação", next_action),
                 ],
             ),
             html.Div(f"Raiz canonica: {summary.get('canonical_scenario_root') or '-'}", style={"lineHeight": "1.6"}),
@@ -1793,7 +1807,7 @@ def render_catalog_state_panel(summary: dict[str, Any]) -> Any:
                 style={**UI_TWO_COLUMN_STYLE, "marginBottom": "12px"},
                 children=[
                     _guidance_card("Objetivo desta área", "Mostrar quantos candidatos seguem visíveis e quem lidera a leitura atual."),
-                    _guidance_card("Ação principal", "Ajuste filtros e pesos só o suficiente para manter um conjunto comparável antes de aprofundar o candidato em foco."),
+                    _guidance_card("Próxima ação", "Ajuste filtros e pesos só o suficiente para manter um conjunto comparável antes de aprofundar o candidato em foco."),
                 ],
             ),
             html.Div(style=UI_THREE_COLUMN_STYLE, children=[_metric_card("Visiveis", visible_candidate_count), _metric_card("Selecionado", summary.get("selected_candidate_id") or "-"), _metric_card("Familia lider", top_family)]),
@@ -1818,20 +1832,20 @@ def render_candidate_summary_panel(summary: dict[str, Any]) -> Any:
     feasibility_label = "Viável" if summary.get("feasible") else "Inviável"
     infeasibility_reason = str(summary.get("infeasibility_reason") or "").strip()
     if infeasibility_reason:
-        primary_blocker = f"Inviavel agora: {_humanize_infeasibility_reason(infeasibility_reason)}."
+        primary_blocker = f"Inviável agora: {_humanize_infeasibility_reason(infeasibility_reason)}."
         next_action = "Use o runner-up e os sinais de risco para decidir se vale revisar o cenário antes de oficializar."
     elif summary.get("critical_routes"):
         top_route = list(summary.get("critical_routes", []))[0]
         route_id = str(top_route.get("route_id") or "-")
         route_reason = _humanize_route_issue(top_route.get("reason"))
-        primary_blocker = f"Rota critica {route_id}: {route_reason}."
-        next_action = "Confirme se a rota critica ainda sustenta a escolha antes de exportar o candidato."
+        primary_blocker = f"Rota crítica {route_id}: {route_reason}."
+        next_action = "Confirme se a rota crítica ainda sustenta a escolha antes de exportar o candidato."
     elif int(summary.get("fallback_component_count") or 0) > 0:
-        primary_blocker = "A alternativa continua viavel, mas depende de fallback para fechar a composicao."
+        primary_blocker = "A alternativa continua viável, mas depende de fallback para fechar a composição."
         next_action = "Compare com o runner-up antes de oficializar uma alternativa dependente de fallback."
     else:
         primary_blocker = "Nenhum bloqueio principal domina a leitura deste candidato."
-        next_action = "Use o circuito primario e o contraste com o runner-up para confirmar a escolha final."
+        next_action = "Use o circuito primário e o contraste com o runner-up para confirmar a escolha final."
     return html.Div(
         children=[
             html.H3("Candidato em foco", style={"marginTop": 0}),
@@ -1841,7 +1855,7 @@ def render_candidate_summary_panel(summary: dict[str, Any]) -> Any:
                 style={**UI_TWO_COLUMN_STYLE, "marginBottom": "12px", "marginTop": "12px"},
                 children=[
                     _guidance_card("Bloqueio principal", primary_blocker),
-                    _guidance_card("Proxima acao", next_action),
+                    _guidance_card("Próxima ação", next_action),
                 ],
             ),
             html.Div(

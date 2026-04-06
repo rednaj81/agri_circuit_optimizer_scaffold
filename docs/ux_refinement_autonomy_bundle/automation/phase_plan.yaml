@@ -174,3 +174,17 @@ wave_journal:
       ui_snapshot: docs/2026-04-06_phase_ux_refinement_wave8_ui_snapshot.json
       validation_command: "$env:PYTHONPATH='src;.'; .\\.venv\\Scripts\\python.exe -m pytest tests/decision_platform/test_ui_smoke.py -q -p no:cacheprovider --basetemp tests/_tmp/pytest-basetemp-ux-wave8-full"
       validation_result: "64 passed in 467.76s (0:07:47)"
+  - wave: 9
+    phase_id: ux_phase_5
+    status: completed
+    summary:
+      - primary summary cards now converge on `Próxima ação` instead of mixing that label with `Ação principal`
+      - runs status vocabulary now aligns with the product-wide readiness language through `Pronto`, `Em execução` and `Sem contexto`
+      - audit status pills no longer expose raw backend values like `idle` as the first user-facing marker
+      - candidate focus in decision now uses the same accented, product-language vocabulary expected elsewhere in the platform
+      - this wave stays semantic and visual only, preserving all stabilized flows while preparing wave 10 for final polish and stabilization
+    evidence:
+      handoff: docs/2026-04-06_phase_ux_refinement_wave9_handoff.md
+      ui_snapshot: docs/2026-04-06_phase_ux_refinement_wave9_ui_snapshot.json
+      validation_command: "$env:PYTHONPATH='src;.'; .\\.venv\\Scripts\\python.exe -m pytest tests/decision_platform/test_ui_smoke.py -q -p no:cacheprovider --basetemp tests/_tmp/pytest-basetemp-ux-wave9-full"
+      validation_result: "66 passed in 462.67s (0:07:42)"

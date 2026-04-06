@@ -400,7 +400,7 @@ def test_studio_readiness_panel_surfaces_runs_transition_with_real_readiness() -
 
     assert "Passagem para Runs" in panel_text
     assert "Objetivo desta área" in panel_text
-    assert "Ação principal" in panel_text
+    assert "Próxima ação" in panel_text
     assert "Fluxo principal" in panel_text
     assert "Agora no Studio" in panel_text
     assert "Destino seguinte" in panel_text
@@ -665,7 +665,7 @@ def test_primary_runs_panels_hide_raw_backend_keys_in_main_surface() -> None:
     assert "Modo da rodada" in detail_text
     assert "Erro operacional:" in execution_text
     assert "Objetivo desta área" in execution_text
-    assert "Ação principal" in execution_text
+    assert "Próxima ação" in execution_text
     assert "Próxima ação" in detail_text
     assert "Próxima ação" in execution_text
     assert "Abrir Decisão desta execução" in execution_text
@@ -1032,9 +1032,9 @@ def test_candidate_summary_panel_surfaces_primary_blocker_and_next_action() -> N
     panel_text = _collect_text_content(panel)
 
     assert "Bloqueio principal" in panel_text
-    assert "Inviavel agora" in panel_text
+    assert "Inviável agora" in panel_text
     assert "rota obrigatória não conseguiu fechar" in panel_text
-    assert "Proxima acao" in panel_text
+    assert "Próxima ação" in panel_text
 
 
 def test_build_render_payload_keeps_only_business_circuit_surface_when_internal_hubs_dominate() -> None:
@@ -1095,8 +1095,9 @@ def test_audit_bundle_panel_preserves_technical_space_but_explains_next_step() -
     panel_text = _collect_text_content(panel)
 
     assert "Bundle canônico pronto para auditoria e persistência." in panel_text
+    assert "Pronto" in panel_text
     assert "Objetivo desta área" in panel_text
-    assert "Ação principal" in panel_text
+    assert "Próxima ação" in panel_text
     assert "Use este espaço quando precisar salvar, reabrir ou reconciliar o bundle canônico" in panel_text
 
 

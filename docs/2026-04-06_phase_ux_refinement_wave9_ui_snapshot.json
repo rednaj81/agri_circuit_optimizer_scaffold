@@ -1,0 +1,38 @@
+{
+  "wave": "ux_phase_5_wave_1",
+  "validation": {
+    "targeted": "4 passed, 62 deselected in 0.66s",
+    "full": "66 passed in 462.67s (0:07:42)"
+  },
+  "language_convergence": {
+    "shared_guidance_label": "Próxima ação",
+    "surfaces": [
+      "Studio",
+      "Runs",
+      "Decisão",
+      "Auditoria"
+    ],
+    "status_vocabulary": {
+      "ready": "Pronto",
+      "needs_attention": "Exige atenção",
+      "blocked": "Bloqueado",
+      "running": "Em execução",
+      "technical_tie": "Empate técnico",
+      "no_result": "Sem decisão utilizável"
+    }
+  },
+  "panels_touched": [
+    "studio-readiness-panel",
+    "run-jobs-overview-panel",
+    "execution-summary-panel",
+    "bundle-io-summary-panel",
+    "catalog-state-summary-panel",
+    "selected-candidate-summary-panel"
+  ],
+  "scope": {
+    "new_flows": false,
+    "new_panels": false,
+    "backend_reopened": false
+  },
+  "visual_evidence_note": "Screenshot capture remains blocked by the local execution policy; this structured snapshot records the converged labels and state vocabulary delivered before the final stabilization wave."
+}
