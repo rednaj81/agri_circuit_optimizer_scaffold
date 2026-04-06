@@ -669,6 +669,7 @@ def _decision_primary_state(summary: dict[str, Any]) -> dict[str, str]:
     runner_up_id = str(summary.get("runner_up_candidate_id") or "").strip()
     decision_status = str(summary.get("decision_status") or ("technical_tie" if summary.get("technical_tie") else "winner_clear"))
     infeasibility_reason = _humanize_infeasibility_reason(summary.get("infeasibility_reason"))
+    feasible_is_false = summary.get("feasible") is False
     if not candidate_id:
         return {
             "state_label": "Sem decisão utilizável",
@@ -678,7 +679,7 @@ def _decision_primary_state(summary: dict[str, Any]) -> dict[str, str]:
             "winner_guidance": "Nenhum candidato oficial apareceu a partir da execução atual.",
             "runner_up_guidance": "Sem runner-up comparável até existir uma run utilizável.",
         }
-    if not summary.get("feasible"):
+    if feasible_is_false:
         return {
             "state_label": "Winner inviável",
             "headline": "Existe um winner visível, mas ele ainda não pode ser oficializado na leitura principal.",
@@ -1056,6 +1057,7 @@ def render_studio_readiness_panel(summary: dict[str, Any]) -> Any:
     status = str(summary.get("status") or "needs_attention")
     background, color = _status_tone(status)
     blocker_count = int(summary.get("blocker_count", 0) or 0)
+    warning_count = int(summary.get("warning_count", 0) or 0)
     next_step = str((summary.get("next_steps") or ["Feche a leitura principal do Studio antes de seguir."])[0])
     if summary.get("blockers"):
         primary_blocker = _humanize_readiness_issue(list(summary.get("blockers", []))[0])
@@ -1063,6 +1065,18 @@ def render_studio_readiness_panel(summary: dict[str, Any]) -> Any:
         primary_blocker = _humanize_readiness_issue(list(summary.get("warnings", []))[0])
     else:
         primary_blocker = "Nenhum bloqueio ou aviso domina a passagem atual para Runs."
+    if status == "ready":
+        readiness_state_label = "Pronto para Runs"
+        dominant_cta = html.Button("Ir para Runs", id="studio-open-runs-button", style=UI_BUTTON_STYLE)
+        secondary_cta = html.Button("Abrir ajustes do Studio", id="studio-readiness-open-workbench-button", style=UI_BUTTON_STYLE)
+    elif blocker_count > 0:
+        readiness_state_label = "Bloqueado no Studio"
+        dominant_cta = html.Button("Corrigir no canvas", id="studio-readiness-open-workbench-button", style=UI_BUTTON_STYLE)
+        secondary_cta = html.Button("Abrir Runs com bloqueios", id="studio-open-runs-button", style=UI_BUTTON_STYLE)
+    else:
+        readiness_state_label = "Exige atenção"
+        dominant_cta = html.Button("Revisar no canvas", id="studio-readiness-open-workbench-button", style=UI_BUTTON_STYLE)
+        secondary_cta = html.Button("Abrir Runs quando o cenário estiver pronto", id="studio-open-runs-button", style=UI_BUTTON_STYLE)
     if blocker_count > 0:
         runs_button_label = "Abrir Runs com bloqueios"
     elif status != "ready":
@@ -1076,9 +1090,18 @@ def render_studio_readiness_panel(summary: dict[str, Any]) -> Any:
             html.Div(
                 style={**UI_THREE_COLUMN_STYLE, "marginBottom": "12px"},
                 children=[
+                    _guidance_card("Estado dominante", readiness_state_label),
                     _guidance_card("Objetivo desta área", "Confirmar se o cenário já pode sair do Studio sem depender da trilha técnica."),
                     _guidance_card("Próxima ação", str(summary.get("primary_action") or "Revise a camada principal antes de abrir Runs.")),
                     _guidance_card("Bloqueio principal", primary_blocker),
+                ],
+            ),
+            html.Div(
+                style={**UI_ACTION_ROW_STYLE, "marginTop": "0", "marginBottom": "12px"},
+                children=[
+                    dominant_cta,
+                    secondary_cta,
+                    _button_link("Abrir Auditoria", "?tab=audit", "studio-readiness-open-audit-link"),
                 ],
             ),
             html.H4("Fluxo principal", style={"marginBottom": "6px"}),
@@ -1091,13 +1114,6 @@ def render_studio_readiness_panel(summary: dict[str, Any]) -> Any:
                 ],
             ),
             html.Div(
-                style={**UI_ACTION_ROW_STYLE, "marginTop": "0", "marginBottom": "12px"},
-                children=[
-                    _button_link("Abrir Runs", "?tab=runs", "studio-readiness-open-runs-link", primary=True),
-                    _button_link("Abrir Auditoria", "?tab=audit", "studio-readiness-open-audit-link"),
-                ],
-            ),
-            html.Div(
                 style=UI_THREE_COLUMN_STYLE,
                 children=[
                     _metric_card("Entidades visíveis", summary.get("business_node_count", 0)),
@@ -1105,7 +1121,7 @@ def render_studio_readiness_panel(summary: dict[str, Any]) -> Any:
                     _metric_card("Internos ocultos", summary.get("hidden_internal_node_count", 0), "Hubs e nós técnicos fora do canvas principal."),
                     _metric_card("Rotas obrigatorias", summary.get("mandatory_route_count", 0)),
                     _metric_card("Bloqueios", summary.get("blocker_count", 0), "Impedem seguir direto para Runs."),
-                    _metric_card("Avisos", summary.get("warning_count", 0), "Podem pedir revisão antes do enfileiramento."),
+                    _metric_card("Avisos", warning_count, "Podem pedir revisão antes do enfileiramento."),
                 ],
             ),
             html.H4("Passagem para Runs", style={"marginBottom": "6px"}),
@@ -1114,12 +1130,7 @@ def render_studio_readiness_panel(summary: dict[str, Any]) -> Any:
                 children=[
                     html.Div(str(summary.get("readiness_stage") or "Preparar a passagem"), style={"fontWeight": 700, "lineHeight": "1.5"}),
                     html.Div("Quando a camada principal estiver clara, siga para Runs para enfileirar ou revisar a fila. Se ainda houver bloqueios, termine a revisão no Studio antes de abrir uma nova rodada.", style={"lineHeight": "1.6", "marginTop": "6px"}),
-                    html.Div(
-                        style=UI_ACTION_ROW_STYLE,
-                        children=[
-                            html.Button(runs_button_label, id="studio-open-runs-button", style=UI_BUTTON_STYLE),
-                        ],
-                    ),
+                    html.Div(runs_button_label, style={"lineHeight": "1.6", "marginTop": "10px", "fontWeight": 700}),
                 ],
             ),
             html.H4("Bloqueios", style={"marginBottom": "6px"}),
@@ -1836,54 +1847,104 @@ def render_run_jobs_overview_panel(summary: dict[str, Any]) -> Any:
     )
 
 
-def render_runs_flow_panel(studio_summary: dict[str, Any], run_summary: dict[str, Any]) -> Any:
+def render_runs_flow_panel(
+    studio_summary: dict[str, Any],
+    run_summary: dict[str, Any],
+    execution_summary: dict[str, Any] | None = None,
+) -> Any:
     studio_status = str(studio_summary.get("status") or "needs_attention")
     run_count = int(run_summary.get("run_count", 0) or 0) if isinstance(run_summary, dict) else 0
     next_queued_run_id = run_summary.get("next_queued_run_id") if isinstance(run_summary, dict) else None
     queue_state = _humanize_run_status((run_summary or {}).get("queue_state", "idle")) if isinstance(run_summary, dict) else "Sem leitura"
     active_run_ids = list((run_summary or {}).get("active_run_ids", [])) if isinstance(run_summary, dict) else []
     failed_count = int((run_summary or {}).get("status_counts", {}).get("failed", 0) or 0) if isinstance(run_summary, dict) else 0
-    if studio_status == "ready":
-        readiness_note = "O cenário já passou pelo gate principal de prontidão do Studio."
-        next_action = (
-            f"Há uma run pronta na fila ({next_queued_run_id}). Revise a run em foco ou execute o próximo job."
-            if next_queued_run_id
-            else ("Acompanhe a run em andamento antes de abrir uma nova rodada." if active_run_ids else "Enfileire o cenário atual ou revise a última execução antes de avançar para Decisão.")
-        )
-        decision_gate = (
-            f"A fila ainda tem uma próxima run explícita ({next_queued_run_id}); confirme se vale executar antes de entrar em Decisão."
-            if next_queued_run_id
-            else ("Uma run ainda está em execução; espere o resultado utilizável antes de seguir para Decisão." if active_run_ids else ("Já existe histórico de runs para leitura; avance para Decisão quando o resumo executivo estiver claro." if run_count else "Ainda não há histórico de run; enfileire o cenário antes de abrir Decisão."))
-        )
-    else:
+    execution_summary = execution_summary or {}
+    execution_error = str(execution_summary.get("error") or "").strip()
+    decision_available = bool(execution_summary.get("selected_candidate_id") and not execution_error)
+    if studio_status != "ready":
         readiness_note = "O Studio ainda sinaliza bloqueios ou avisos relevantes para o enfileiramento."
+        flow_state = "Aguardando readiness do Studio"
+        headline = str(studio_summary.get("readiness_headline") or readiness_note)
         next_action = "Volte ao Studio para corrigir conectividade, regras obrigatórias e medição direta antes de abrir uma nova run."
         decision_gate = "A passagem para Decisão continua secundária até o Studio liberar o gate principal de readiness."
+        decision_button_label = "Decisão ainda secundária"
+        decision_enabled = False
+    elif active_run_ids:
+        readiness_note = "O cenário já passou pelo gate principal de prontidão do Studio."
+        flow_state = "Execução em andamento"
+        headline = f"Há uma run em andamento agora ({active_run_ids[0]})."
+        next_action = "Acompanhe a run em foco antes de abrir uma nova rodada ou esperar uma decisão utilizável."
+        decision_gate = "A execução atual ainda não consolidou um resultado utilizável para a Decisão."
+        decision_button_label = "Aguardar execução atual"
+        decision_enabled = False
+    elif next_queued_run_id and not decision_available:
+        readiness_note = "O cenário já passou pelo gate principal de prontidão do Studio."
+        flow_state = "Fila pronta"
+        headline = f"Há uma run pronta na fila ({next_queued_run_id})."
+        next_action = "Revise a fila e execute apenas a próxima rodada necessária antes de abrir Decisão."
+        decision_gate = "Ainda falta um resultado utilizável; execute ou revise a próxima run antes de avançar."
+        decision_button_label = "Gerar resultado utilizável"
+        decision_enabled = False
+    elif execution_error:
+        readiness_note = "O cenário já passou pelo gate principal de prontidão do Studio."
+        flow_state = "Resultado bloqueado"
+        headline = "A última execução terminou com bloqueio operacional."
+        next_action = "Corrija o bloqueio operacional antes de confiar em qualquer leitura de ranking ou candidato oficial."
+        decision_gate = "A Decisão permanece bloqueada enquanto o resumo executivo carregar erro crítico."
+        decision_button_label = "Decisão bloqueada nesta execução"
+        decision_enabled = False
+    elif decision_available:
+        readiness_note = "O cenário já passou pelo gate principal de prontidão do Studio."
+        flow_state = "Decisão disponível"
+        headline = "A última execução já gerou contexto suficiente para entrar em Decisão."
+        next_action = "Abra a Decisão para confirmar winner, runner-up e sinais de risco antes de oficializar."
+        decision_gate = "Já existe um resultado utilizável; a passagem para Decisão está liberada."
+        decision_button_label = "Ir para Decisão"
+        decision_enabled = True
+    elif run_count:
+        readiness_note = "O cenário já passou pelo gate principal de prontidão do Studio."
+        flow_state = "Sem resultado utilizável"
+        headline = "Há histórico de runs, mas ainda sem resultado utilizável para decisão."
+        next_action = "Revise a última execução ou reexecute o pipeline até obter um candidato oficial comparável."
+        decision_gate = "A Decisão segue secundária até existir winner legível sem bloqueio crítico."
+        decision_button_label = "Gerar resultado utilizável"
+        decision_enabled = False
+    else:
+        readiness_note = "O cenário já passou pelo gate principal de prontidão do Studio."
+        flow_state = "Sem runs"
+        headline = "Ainda não há execução registrada para abrir leitura operacional útil."
+        next_action = "Enfileire o cenário atual antes de esperar fila, execução ativa ou Decisão disponível."
+        decision_gate = "A passagem para Decisão ainda depende da primeira execução utilizável."
+        decision_button_label = "Enfileirar antes da Decisão"
+        decision_enabled = False
     return html.Div(
         children=[
             _screen_opening_panel(
                 "Passagem Studio -> Runs",
-                str(studio_summary.get("readiness_headline") or readiness_note),
+                headline,
                 "Transformar readiness do Studio em uma leitura clara de fila, execução e próximo passo.",
                 next_action,
                 [
+                    ("Estado dominante", flow_state),
                     ("Estado do cenário", str(studio_summary.get("readiness_headline") or readiness_note)),
-                    ("Estado das runs", f"{queue_state}. {run_count} run(s) visível(is), {len(active_run_ids)} em execução e {failed_count} falha(s) recente(s)."),
-                    ("Próximo passo", decision_gate),
+                    ("Entrada da Decisão", decision_gate),
                 ],
                 [
                     _button_link("Voltar ao Studio", "?tab=studio", "runs-flow-open-studio-link"),
-                    _button_link("Ir para Decisão", "?tab=decision", "runs-flow-open-decision-link", primary=True),
+                    html.Button(decision_button_label, id="runs-flow-open-decision-button", style=UI_BUTTON_STYLE, disabled=not decision_enabled),
                 ],
             ),
             html.Div(
                 style={**UI_THREE_COLUMN_STYLE, "marginTop": "14px"},
                 children=[
+                    _metric_card("Estado dominante", flow_state, next_action),
                     _metric_card("Readiness", _humanize_readiness_status(studio_status), readiness_note),
                     _metric_card("Bloqueios", studio_summary.get("blocker_count", 0)),
                     _metric_card("Avisos", studio_summary.get("warning_count", 0)),
                     _metric_card("Runs locais", run_count),
                     _metric_card("Próxima run", next_queued_run_id or "-"),
+                    _metric_card("Estado da fila", queue_state),
+                    _metric_card("Falhas recentes", failed_count),
                 ],
             ),
         ]
@@ -1963,12 +2024,15 @@ def render_execution_summary_panel(summary: dict[str, Any]) -> Any:
     has_selected_candidate = bool(summary.get("selected_candidate_id"))
     can_open_decision = bool(has_selected_candidate and not error)
     if error:
+        state_label = "Resultado bloqueado"
         headline = "Última execução exige revisão"
         next_action = "Corrija o bloqueio operacional antes de confiar em qualquer leitura de ranking ou candidato oficial."
     elif has_selected_candidate:
+        state_label = "Decisão disponível"
         headline = "Última execução disponível para decisão"
         next_action = "Revise o candidato oficial e siga para a comparação lado a lado quando precisar confirmar a escolha."
     else:
+        state_label = "Sem resultado utilizável"
         headline = "Ainda sem candidato oficial"
         next_action = "Reexecute o pipeline quando o cenário estiver pronto para gerar uma leitura comparável."
     decision_button_label = "Abrir Decisão desta execução" if can_open_decision else "Decisão indisponível nesta execução"
@@ -1979,6 +2043,7 @@ def render_execution_summary_panel(summary: dict[str, Any]) -> Any:
             html.Div(
                 style={**UI_TWO_COLUMN_STYLE, "marginBottom": "12px"},
                 children=[
+                    _guidance_card("Estado dominante", state_label),
                     _guidance_card("Objetivo desta área", "Mostrar se a última execução já gerou contexto suficiente para entrar em Decisão."),
                     _guidance_card("Próxima ação", next_action),
                 ],
@@ -2119,6 +2184,7 @@ def render_decision_flow_panel(summary: dict[str, Any]) -> Any:
     candidate_id = str(summary.get("candidate_id") or "").strip()
     runner_up_id = str(summary.get("runner_up_candidate_id") or "").strip()
     decision_status = str(summary.get("decision_status") or ("technical_tie" if summary.get("technical_tie") else "winner_clear"))
+    feasible_is_false = summary.get("feasible") is False
     score_margin_delta = _coerce_float_or_none(summary.get("score_margin_delta"))
     winner_penalties = list(summary.get("winner_penalties", []))
     critical_routes = list(summary.get("critical_routes", []))
@@ -2128,7 +2194,7 @@ def render_decision_flow_panel(summary: dict[str, Any]) -> Any:
     elif decision_status == "technical_tie":
         signal_title = "Empate técnico ativo"
         signal_text = "Winner e runner-up seguem próximos o suficiente para exigir leitura humana assistida antes da oficialização."
-    elif not summary.get("feasible"):
+    elif feasible_is_false:
         signal_title = "Winner ainda bloqueado"
         signal_text = f"A leitura principal ainda carrega inviabilidade: {_humanize_infeasibility_reason(summary.get('infeasibility_reason'))}."
     elif critical_routes:
@@ -2144,6 +2210,13 @@ def render_decision_flow_panel(summary: dict[str, Any]) -> Any:
     else:
         signal_title = "Contraste suficiente"
         signal_text = "Winner e runner-up já aparecem com separação legível para a decisão assistida."
+    runs_cta_label = "Voltar para Runs"
+    runs_primary = False
+    audit_primary = True
+    if not candidate_id or feasible_is_false:
+        runs_cta_label = "Revisar Runs" if candidate_id else "Voltar para Runs"
+        runs_primary = True
+        audit_primary = False
     return html.Div(
         children=[
             _screen_opening_panel(
@@ -2152,13 +2225,13 @@ def render_decision_flow_panel(summary: dict[str, Any]) -> Any:
                 "Explicar se a execução atual já pode ser lida como decisão ou se ainda falta contexto.",
                 decision_state["next_action"],
                 [
+                    ("Estado dominante", decision_state["state_label"]),
                     ("Winner atual", candidate_id or "Ainda sem candidato oficial legível."),
-                    ("Contraste atual", decision_state["contrast_state"]),
                     ("Saída do fluxo", decision_state["next_action"]),
                 ],
                 [
-                    _button_link("Voltar para Runs", "?tab=runs", "decision-flow-open-runs-link"),
-                    _button_link("Abrir Auditoria", "?tab=audit", "decision-flow-open-audit-link", primary=True),
+                    _button_link(runs_cta_label, "?tab=runs", "decision-flow-open-runs-link", primary=runs_primary),
+                    _button_link("Abrir Auditoria", "?tab=audit", "decision-flow-open-audit-link", primary=audit_primary),
                 ],
             ),
             html.Div(
@@ -2206,7 +2279,7 @@ def render_decision_summary_panel(summary: dict[str, Any]) -> Any:
     decision_state = _decision_primary_state(summary)
     decision_status = str(summary.get("decision_status") or ("technical_tie" if summary.get("technical_tie") else "winner_clear"))
     decision_label = decision_state["state_label"]
-    feasibility_label = "Viável" if summary.get("feasible") else "Inviável"
+    feasibility_label = "Inviável" if summary.get("feasible") is False else "Viável"
     score_margin_delta = _coerce_float_or_none(summary.get("score_margin_delta"))
     if decision_status == "technical_tie":
         priority_signal = "Empate técnico ativo; não oficialize sem manter o runner-up visível."
@@ -2222,7 +2295,7 @@ def render_decision_summary_panel(summary: dict[str, Any]) -> Any:
     else:
         priority_signal = "O winner abriu contraste suficiente para orientar a decisão assistida."
     winner_reason = str(summary.get("winner_reason_summary") or "Sem justificativa resumida.")
-    if not summary.get("feasible"):
+    if summary.get("feasible") is False:
         winner_reason = f"{winner_reason} Bloqueio atual: {_humanize_infeasibility_reason(summary.get('infeasibility_reason'))}."
     return html.Div(
         children=[
@@ -2764,7 +2837,15 @@ def build_app(
                                 state_hint="Camada principal: fila local, run em foco e último resumo executivo.",
                                 action_hint="Escolha a próxima run, revise o estado atual e execute apenas o próximo passo necessário.",
                             ),
-                            html.Div(id="runs-flow-panel", children=render_runs_flow_panel(initial_studio_readiness, initial_run_jobs_snapshot["summary"]), style=UI_CARD_STYLE),
+                            html.Div(
+                                id="runs-flow-panel",
+                                children=render_runs_flow_panel(
+                                    initial_studio_readiness,
+                                    initial_run_jobs_snapshot["summary"],
+                                    _safe_json_loads(initial_execution_summary),
+                                ),
+                                style=UI_CARD_STYLE,
+                            ),
                             html.Div(
                                 style=UI_TWO_COLUMN_STYLE,
                                 children=[
@@ -3617,12 +3698,18 @@ def build_app(
     @app.callback(
         Output("studio-editor-workbench", "open"),
         Input("studio-canvas-open-workbench-button", "n_clicks"),
+        Input("studio-readiness-open-workbench-button", "n_clicks"),
         Input("studio-focus-recommended-open-workbench-button", "n_clicks"),
         Input("studio-focus-open-workbench-button", "n_clicks"),
         prevent_initial_call=True,
     )
-    def _open_studio_editor_workbench(canvas_n_clicks: Any, recommended_n_clicks: Any, n_clicks: Any) -> bool:
-        return bool(canvas_n_clicks or recommended_n_clicks or n_clicks)
+    def _open_studio_editor_workbench(
+        canvas_n_clicks: Any,
+        readiness_n_clicks: Any,
+        recommended_n_clicks: Any,
+        n_clicks: Any,
+    ) -> bool:
+        return bool(canvas_n_clicks or readiness_n_clicks or recommended_n_clicks or n_clicks)
 
     @app.callback(
         Output("run-jobs-summary", "children", allow_duplicate=True),
@@ -4251,6 +4338,7 @@ def build_app(
         Input("candidate-links-grid", "rowData"),
         Input("routes-grid", "rowData"),
         Input("run-jobs-summary", "children"),
+        Input("execution-summary", "children"),
         Input("node-studio-summary", "children"),
         Input("edge-studio-summary", "children"),
         Input("studio-status", "children"),
@@ -4260,6 +4348,7 @@ def build_app(
         candidate_links_rows: list[dict[str, Any]] | None,
         route_rows: list[dict[str, Any]] | None,
         run_jobs_summary_text: str | None,
+        execution_summary_text: str | None,
         node_summary_text: str | None,
         edge_summary_text: str | None,
         studio_status_text: str | None,
@@ -4273,7 +4362,11 @@ def build_app(
             render_studio_projection_panel(
                 build_studio_projection_summary(nodes_rows or [], candidate_links_rows or [], route_rows or [])
             ),
-            render_runs_flow_panel(studio_readiness, _safe_json_loads(run_jobs_summary_text)),
+            render_runs_flow_panel(
+                studio_readiness,
+                _safe_json_loads(run_jobs_summary_text),
+                _safe_json_loads(execution_summary_text),
+            ),
             render_studio_focus_panel(node_summary, edge_summary, route_rows, studio_readiness, studio_status_text),
             render_studio_connectivity_panel(studio_readiness, node_summary, edge_summary, route_rows),
             render_studio_selection_panel(node_summary, "node"),
@@ -4297,6 +4390,7 @@ def build_app(
         Input("ui-location", "search"),
         Input("studio-open-audit-button", "n_clicks_timestamp"),
         Input("studio-open-runs-button", "n_clicks_timestamp"),
+        Input("runs-flow-open-decision-button", "n_clicks_timestamp"),
         Input("execution-open-decision-button", "n_clicks_timestamp"),
         State("primary-navigation-tabs", "value"),
     )
@@ -4304,6 +4398,7 @@ def build_app(
         search: str | None,
         open_audit_ts: Any,
         open_runs_ts: Any,
+        runs_flow_open_decision_ts: Any,
         execution_open_decision_ts: Any,
         current_tab: str | None,
     ) -> str:
@@ -4311,6 +4406,7 @@ def build_app(
             [
                 (_timestamp_or_zero(open_audit_ts), "audit"),
                 (_timestamp_or_zero(open_runs_ts), "runs"),
+                (_timestamp_or_zero(runs_flow_open_decision_ts), "decision"),
                 (_timestamp_or_zero(execution_open_decision_ts), "decision"),
             ],
             key=lambda item: item[0],

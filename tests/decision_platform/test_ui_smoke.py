@@ -320,7 +320,7 @@ def test_studio_tab_surfaces_readiness_and_selection_context() -> None:
     assert _find_component_by_id(studio_tab, "studio-open-technical-guide-button") is not None
     assert _find_component_by_id(studio_tab, "studio-open-audit-button") is not None
     assert _find_component_by_id(studio_tab, "studio-open-runs-button") is not None
-    assert _find_component_by_id(studio_tab, "studio-readiness-open-runs-link") is not None
+    assert _find_component_by_id(studio_tab, "studio-readiness-open-workbench-button") is not None
     assert _find_component_by_id(studio_tab, "studio-readiness-open-audit-link") is not None
     recommended_focus_actions = [
         _find_component_by_id(studio_tab, "studio-focus-recommended-move-right-button"),
@@ -438,10 +438,11 @@ def test_studio_discovery_callbacks_open_guide_and_audit_tab() -> None:
     open_navigation_callback = _get_callback(app, input_id="studio-open-audit-button")
 
     assert open_guide_callback(0, 1, False) is True
-    assert open_navigation_callback("?tab=runs", 30, 20, 10, "studio") == "audit"
-    assert open_navigation_callback("?tab=decision", 0, 40, 0, "studio") == "runs"
-    assert open_navigation_callback("?tab=studio", 0, 0, 50, "runs") == "decision"
-    assert open_navigation_callback("?tab=decision", 0, 0, 0, "studio") == "decision"
+    assert open_navigation_callback("?tab=runs", 30, 20, 0, 10, "studio") == "audit"
+    assert open_navigation_callback("?tab=decision", 0, 40, 0, 0, "studio") == "runs"
+    assert open_navigation_callback("?tab=studio", 0, 0, 50, 0, "runs") == "decision"
+    assert open_navigation_callback("?tab=decision", 0, 0, 0, 50, "runs") == "decision"
+    assert open_navigation_callback("?tab=decision", 0, 0, 0, 0, "studio") == "decision"
 
 
 def test_primary_tab_from_search_accepts_known_main_spaces() -> None:
@@ -481,7 +482,7 @@ def test_runs_tab_combines_queue_and_execution_summary() -> None:
     assert _find_component_by_id(runs_tab, "run-jobs-overview-panel") is not None
     assert _find_component_by_id(runs_tab, "runs-flow-panel") is not None
     assert _find_component_by_id(runs_tab, "runs-flow-open-studio-link") is not None
-    assert _find_component_by_id(runs_tab, "runs-flow-open-decision-link") is not None
+    assert _find_component_by_id(runs_tab, "runs-flow-open-decision-button") is not None
     assert _find_component_by_id(runs_tab, "execution-summary-panel") is not None
     assert _find_component_by_id(runs_tab, "run-jobs-status-banner") is not None
     assert _find_component_by_id(runs_tab, "runs-open-studio-button") is None
@@ -507,9 +508,11 @@ def test_studio_readiness_panel_surfaces_runs_transition_with_real_readiness() -
     assert "Destino seguinte" in panel_text
     assert "ainda não tem fluxo suficiente" in panel_text.lower()
     assert "Conectar o grafo principal" in panel_text
+    assert "Exige atenção" in panel_text
+    assert "Revisar no canvas" in panel_text
     assert "Abrir Runs quando o cenário estiver pronto" in panel_text
     assert _find_component_by_id(panel, "studio-open-runs-button") is not None
-    assert getattr(_find_component_by_id(panel, "studio-readiness-open-runs-link"), "href", None) == "?tab=runs"
+    assert _find_component_by_id(panel, "studio-readiness-open-workbench-button") is not None
     assert getattr(_find_component_by_id(panel, "studio-readiness-open-audit-link"), "href", None) == "?tab=audit"
 
 
@@ -536,6 +539,8 @@ def test_studio_readiness_panel_humanizes_primary_blockers_and_warnings() -> Non
     assert "A conexão L900 termina em W" in panel_text
     assert "Há rotas com dosagem sem medição direta compatível: R002." in panel_text
     assert "Ainda existem entidades sem conexão na leitura principal do grafo: P3." in panel_text
+    assert "Bloqueado no Studio" in panel_text
+    assert "Corrigir no canvas" in panel_text
     assert "Abrir Runs com bloqueios" in panel_text
 
 
@@ -722,15 +727,15 @@ def test_runs_flow_panel_reflects_studio_gate_and_queue_state() -> None:
     assert "Objetivo desta área" in panel_text
     assert "Próxima ação" in panel_text
     assert "Estado do cenário" in panel_text
-    assert "Estado das runs" in panel_text
-    assert "Próximo passo" in panel_text
+    assert "Entrada da Decisão" in panel_text
+    assert "Aguardando readiness do Studio" in panel_text
     assert "Exige atenção" in panel_text
     assert "Voltar ao Studio" in panel_text
-    assert "Ir para Decisão" in panel_text
+    assert "Decisão ainda secundária" in panel_text
     assert "run-003" in panel_text
     assert "conectividade" in panel_text.lower()
     assert getattr(_find_component_by_id(panel, "runs-flow-open-studio-link"), "href", None) == "?tab=studio"
-    assert getattr(_find_component_by_id(panel, "runs-flow-open-decision-link"), "href", None) == "?tab=decision"
+    assert getattr(_find_component_by_id(panel, "runs-flow-open-decision-button"), "disabled", None) is True
 
 
 def test_primary_runs_panels_hide_raw_backend_keys_in_main_surface() -> None:
@@ -909,7 +914,7 @@ def test_canvas_context_button_opens_studio_workbench() -> None:
         app = build_app("data/decision_platform/maquete_v2")
 
     callback = _get_callback(app, output_prefix="studio-editor-workbench.open")
-    assert callback(1, None, None) is True
+    assert callback(1, None, None, None) is True
 
 
 def test_decision_flow_panel_makes_transition_and_next_action_explicit() -> None:
@@ -943,6 +948,33 @@ def test_decision_flow_panel_makes_transition_and_next_action_explicit() -> None
     assert "leitura humana assistida" in panel_text.lower()
     assert getattr(_find_component_by_id(panel, "decision-flow-open-runs-link"), "href", None) == "?tab=runs"
     assert getattr(_find_component_by_id(panel, "decision-flow-open-audit-link"), "href", None) == "?tab=audit"
+
+
+def test_runs_flow_panel_enables_decision_only_with_usable_execution_result() -> None:
+    panel = render_runs_flow_panel(
+        {
+            "status": "ready",
+            "blocker_count": 0,
+            "warning_count": 0,
+            "readiness_headline": "O cenário já passou pelo gate principal de prontidão do Studio.",
+        },
+        {
+            "run_count": 2,
+            "next_queued_run_id": None,
+            "active_run_ids": [],
+            "status_counts": {"completed": 2, "failed": 0},
+        },
+        {
+            "selected_candidate_id": "cand-01",
+            "error": None,
+        },
+    )
+    panel_text = _collect_text_content(panel)
+    decision_button = _find_component_by_id(panel, "runs-flow-open-decision-button")
+
+    assert "Decisão disponível" in panel_text
+    assert "Ir para Decisão" in panel_text
+    assert getattr(decision_button, "disabled", None) is False
 
 
 def test_decision_flow_panel_surfaces_contrast_risk_before_secondary_comparison() -> None:
@@ -1720,7 +1752,7 @@ def test_studio_callbacks_round_trip_structural_edits_through_ui_flow() -> None:
         assert node_summary["selected_node_id"] != created_node_id
         assert edge_summary["selected_link_id"] == created_link_id
         assert any(str(element["data"].get("id", "")).startswith("route:") for element in elements if "source" in element["data"])
-        assert open_workbench_callback(0, 0, 1) is True
+        assert open_workbench_callback(0, 0, 0, 1) is True
 
         created_callback_result = save_callback(
             1,

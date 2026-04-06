@@ -1,71 +1,67 @@
 {
   "wave": "ux_phase_1_wave_2",
-  "captured_at": "2026-04-06",
-  "scenario_dir": "data/decision_platform/maquete_v2",
   "validation": {
-    "targeted_command": "$env:PYTHONPATH='src;.'; .\\.venv\\Scripts\\python.exe -m pytest tests/decision_platform/test_ui_smoke.py -q -p no:cacheprovider -k \"studio_tab_surfaces_readiness_and_selection_context or studio_readiness_panel_surfaces_runs_transition_with_real_readiness or runs_tab_combines_queue_and_execution_summary or runs_flow_panel_reflects_studio_gate_and_queue_state or decision_tab_contains_advanced_sections_without_extra_primary_tabs or decision_flow_panel_makes_transition_and_next_action_explicit\" --basetemp tests/_tmp/pytest-basetemp-ux-wave2-targeted",
-    "targeted_result": "6 passed, 45 deselected in 1.34s",
-    "full_command": "$env:PYTHONPATH='src;.'; .\\.venv\\Scripts\\python.exe -m pytest tests/decision_platform/test_ui_smoke.py -q -p no:cacheprovider --basetemp tests/_tmp/pytest-basetemp-ux-wave2-full-current",
-    "full_result": "51 passed in 475.86s (0:07:55)"
+    "targeted": "10 passed, 57 deselected in 1.40s",
+    "full": "72 passed in 504.20s (0:08:24)"
   },
-  "primary_flow_links": {
-    "studio": {
-      "runs": "?tab=runs",
-      "audit": "?tab=audit"
-    },
-    "runs": {
-      "studio": "?tab=studio",
-      "decision": "?tab=decision"
-    },
-    "decision": {
-      "runs": "?tab=runs",
-      "audit": "?tab=audit"
-    }
+  "first_fold_ids": {
+    "studio": [
+      "studio-readiness-panel",
+      "studio-open-runs-button",
+      "studio-readiness-open-workbench-button"
+    ],
+    "runs": [
+      "runs-flow-panel",
+      "runs-flow-open-decision-button",
+      "execution-summary-panel"
+    ],
+    "decision": [
+      "decision-flow-panel",
+      "decision-summary-panel",
+      "decision-flow-open-runs-link",
+      "decision-flow-open-audit-link"
+    ]
   },
-  "visible_tabs": [
-    {
-      "label": "Studio",
-      "contains": {
-        "studio_readiness_open_runs_link": true,
-        "studio_readiness_open_audit_link": true,
-        "runs_flow_open_studio_link": false,
-        "runs_flow_open_decision_link": false,
-        "decision_flow_open_runs_link": false,
-        "decision_flow_open_audit_link": false
-      }
-    },
-    {
-      "label": "Runs",
-      "contains": {
-        "studio_readiness_open_runs_link": false,
-        "studio_readiness_open_audit_link": false,
-        "runs_flow_open_studio_link": true,
-        "runs_flow_open_decision_link": true,
-        "decision_flow_open_runs_link": false,
-        "decision_flow_open_audit_link": false
-      }
-    },
-    {
-      "label": "Decisão",
-      "contains": {
-        "studio_readiness_open_runs_link": false,
-        "studio_readiness_open_audit_link": false,
-        "runs_flow_open_studio_link": false,
-        "runs_flow_open_decision_link": false,
-        "decision_flow_open_runs_link": true,
-        "decision_flow_open_audit_link": true
-      }
-    },
-    {
-      "label": "Auditoria",
-      "contains": {
-        "studio_readiness_open_runs_link": false,
-        "studio_readiness_open_audit_link": false,
-        "runs_flow_open_studio_link": false,
-        "runs_flow_open_decision_link": false,
-        "decision_flow_open_runs_link": false,
-        "decision_flow_open_audit_link": false
-      }
-    }
-  ]
+  "state_markers": {
+    "studio": [
+      "Estado dominante",
+      "Bloqueado no Studio",
+      "Corrigir no canvas"
+    ],
+    "runs_blocked": [
+      "Aguardando readiness do Studio",
+      "Decisão ainda secundária"
+    ],
+    "runs_ready": [
+      "Decisão disponível",
+      "Ir para Decisão"
+    ],
+    "decision": [
+      "Estado dominante",
+      "Empate técnico",
+      "Abrir Auditoria"
+    ],
+    "execution": [
+      "Estado dominante",
+      "Decisão disponível",
+      "Abrir Decisão desta execução"
+    ]
+  },
+  "button_states": {
+    "runs_when_blocked_disabled": true,
+    "runs_when_decision_ready_disabled": false
+  },
+  "text_preview": {
+    "studio": "Readiness do cenárioExige atençãoAinda há bloqueios estruturais impedindo a passagem segura para Runs.Estado dominanteBloqueado no StudioObjetivo desta áreaConfirmar se o cenário já pode sair do Studio sem depender da trilha técnica.Próxima açãoCorrigir regras estruturais e rotas inválidas antes de enfileirar uma nova run.Bloqueio principalA conexão L900 ter",
+    "runs_blocked": "Passagem Studio -> RunsEstado atualAinda há bloqueios ou avisos a revisar antes de enfileirar.Objetivo desta áreaTransformar readiness do Studio em uma leitura clara de fila, execução e próximo passo.Próxima açãoVolte ao Studio para corrigir conectividade, regras obrigatórias e medição direta antes de abrir uma nova run.Estado dominanteAguardando readiness d",
+    "runs_ready": "Passagem Studio -> RunsEstado atualA última execução já gerou contexto suficiente para entrar em Decisão.Objetivo desta áreaTransformar readiness do Studio em uma leitura clara de fila, execução e próximo passo.Próxima açãoAbra a Decisão para confirmar winner, runner-up e sinais de risco antes de oficializar.Estado dominanteDecisão disponívelEstado do cenári",
+    "decision": "Passagem Runs -> DecisãoEstado atualWinner e runner-up seguem próximos o suficiente para exigir decisão humana assistida.Objetivo desta áreaExplicar se a execução atual já pode ser lida como decisão ou se ainda falta contexto.Próxima açãoMantenha a comparação aberta, valide os sinais de risco e aprofunde a Auditoria apenas se precisar reconciliar a trilha té",
+    "execution": "Resumo executivoÚltima execução disponível para decisãoEstado dominanteDecisão disponívelObjetivo desta áreaMostrar se a última execução já gerou contexto suficiente para entrar em Decisão.Próxima açãoRevise o candidato oficial e siga para a comparação lado a lado quando precisar"
+  },
+  "layout_presence": {
+    "studio_readiness_open_workbench_button": true,
+    "runs_flow_open_decision_button": true,
+    "execution_open_decision_button": true
+  },
+  "visual_evidence_note": "Structured snapshot generated from the Dash layout and first-fold render functions for wave 2."
 }
