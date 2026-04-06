@@ -31,22 +31,22 @@ from decision_platform.ui_dash._compat import DASH_AVAILABLE, Dash, Input, Outpu
 UI_FONT_STACK = '"IBM Plex Sans", "Segoe UI", sans-serif'
 UI_PAGE_STYLE = {
     "minHeight": "100vh",
-    "padding": "24px",
+    "padding": "18px",
     "background": "linear-gradient(180deg, #f4efe6 0%, #eef4f1 48%, #f8fafb 100%)",
     "color": "#18322c",
     "fontFamily": UI_FONT_STACK,
 }
 UI_SHELL_STYLE = {
-    "maxWidth": "1500px",
+    "maxWidth": "1720px",
     "margin": "0 auto",
 }
 UI_HERO_STYLE = {
-    "padding": "28px",
-    "borderRadius": "28px",
+    "padding": "20px",
+    "borderRadius": "24px",
     "background": "linear-gradient(135deg, #103b35 0%, #1f5c51 58%, #d7e5c1 100%)",
     "color": "#f5f3ee",
-    "boxShadow": "0 22px 56px rgba(16, 59, 53, 0.18)",
-    "marginBottom": "20px",
+    "boxShadow": "0 18px 40px rgba(16, 59, 53, 0.16)",
+    "marginBottom": "14px",
 }
 UI_CARD_STYLE = {
     "background": "rgba(255, 255, 255, 0.92)",
@@ -121,13 +121,13 @@ UI_NAV_LINK_STYLE = {
 }
 UI_JOURNEY_PANEL_STYLE = {
     **UI_CARD_STYLE,
-    "marginBottom": "18px",
+    "marginBottom": "12px",
 }
 UI_JOURNEY_CARD_STYLE = {
     **UI_MUTED_CARD_STYLE,
-    "padding": "16px",
+    "padding": "14px",
     "display": "grid",
-    "gap": "10px",
+    "gap": "8px",
     "height": "100%",
 }
 UI_JOURNEY_CARD_ACTIVE_STYLE = {
@@ -139,11 +139,30 @@ UI_JOURNEY_CARD_ACTIVE_STYLE = {
 }
 UI_PERSISTENT_BANNER_STYLE = {
     **UI_CARD_STYLE,
-    "marginBottom": "18px",
+    "marginBottom": "12px",
     "position": "sticky",
-    "top": "16px",
+    "top": "10px",
     "zIndex": 10,
     "backdropFilter": "blur(18px)",
+}
+UI_STUDIO_MAIN_GRID_STYLE = {
+    "display": "grid",
+    "gridTemplateColumns": "minmax(0, 1.75fr) minmax(360px, 430px)",
+    "gap": "18px",
+    "alignItems": "start",
+}
+UI_STUDIO_SIDEBAR_STYLE = {
+    "display": "grid",
+    "gap": "14px",
+    "alignContent": "start",
+}
+UI_STUDIO_CANVAS_CARD_STYLE = {
+    **UI_CARD_STYLE,
+    "padding": "16px",
+}
+UI_COMPACT_BANNER_CARD_STYLE = {
+    **UI_MUTED_CARD_STYLE,
+    "padding": "12px 14px",
 }
 UI_PILL_STYLE = {
     "display": "inline-flex",
@@ -181,15 +200,15 @@ def _safe_json_loads(text: Any) -> dict[str, Any]:
 def _journey_step_card(step: str, title: str, description: str) -> Any:
     return html.Div(
         style={
-            "padding": "14px 16px",
-            "borderRadius": "18px",
+            "padding": "12px 14px",
+            "borderRadius": "16px",
             "background": "rgba(255, 255, 255, 0.15)",
             "border": "1px solid rgba(255, 255, 255, 0.18)",
         },
         children=[
-            html.Div(step, style={"fontSize": "12px", "fontWeight": 700, "letterSpacing": "0.12em", "opacity": 0.8}),
-            html.Div(title, style={"fontSize": "20px", "fontWeight": 700, "marginTop": "6px"}),
-            html.Div(description, style={"fontSize": "14px", "lineHeight": "1.5", "marginTop": "6px"}),
+            html.Div(step, style={"fontSize": "11px", "fontWeight": 700, "letterSpacing": "0.12em", "opacity": 0.8}),
+            html.Div(title, style={"fontSize": "18px", "fontWeight": 700, "marginTop": "4px"}),
+            html.Div(description, style={"fontSize": "13px", "lineHeight": "1.45", "marginTop": "4px"}),
         ],
     )
 
@@ -565,18 +584,19 @@ def _journey_space_card(
             html.Div(
                 style={"display": "flex", "justifyContent": "space-between", "gap": "10px", "alignItems": "center", "flexWrap": "wrap"},
                 children=[
-                    html.Div(title, style={"fontSize": "20px", "fontWeight": 700}),
+                    html.Div(title, style={"fontSize": "18px", "fontWeight": 700}),
                     _journey_card_status_pill("Espaço ativo" if is_active else "Espaço principal", active=is_active),
                 ],
             ),
-            html.Div(state["purpose"], style={"lineHeight": "1.6", "color": muted_color if is_active else "#496158"}),
-            html.Div("Estado atual", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": muted_color}),
-            html.Div(state["state_label"], style={"fontWeight": 700, "fontSize": "18px", "lineHeight": "1.4"}),
-            html.Div(state["state_text"], style={"lineHeight": "1.6"}),
-            html.Div("Próxima ação", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": muted_color}),
-            html.Div(state["next_action"], style={"lineHeight": "1.6", "fontWeight": 700}),
-            html.Div("Transição sugerida", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": muted_color}),
-            html.Div(guidance["target_reason"], style={"lineHeight": "1.6"}),
+            html.Div(state["purpose"], style={"lineHeight": "1.5", "color": muted_color if is_active else "#496158"}),
+            html.Div(
+                style={**UI_TWO_COLUMN_STYLE, "gridTemplateColumns": "1fr", "gap": "8px"},
+                children=[
+                    _guidance_card("Estado atual", state["state_label"]),
+                    _guidance_card("Próxima ação", state["next_action"]),
+                    _guidance_card("Transição sugerida", guidance["target_reason"]),
+                ],
+            ),
             _button_link(
                 guidance["target_label"],
                 f"?tab={guidance['target_space']}",
@@ -593,16 +613,16 @@ def render_product_journey_panel(
     run_summary: dict[str, Any],
     decision_summary: dict[str, Any],
 ) -> Any:
-    return html.Div(
+    return html.Details(
+        open=False,
         children=[
-            html.Div("Jornada principal", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#47665d"}),
-            html.H2("Escolha a próxima área pelo estado do produto", style={"margin": "8px 0 6px"}),
-            html.P(
-                "A navegação principal agora mostra Studio, Runs, Decisão e Auditoria como uma jornada única. Cada área resume objetivo, estado atual e próxima ação antes dos detalhes técnicos.",
-                style={"margin": "0 0 14px", "lineHeight": "1.6"},
+            html.Summary("Jornada principal completa"),
+            html.Div(
+                "Escolha a próxima área pelo estado do produto",
+                style={"fontSize": "13px", "fontWeight": 700, "marginTop": "10px", "color": "#35524a"},
             ),
             html.Div(
-                style=UI_TWO_COLUMN_STYLE,
+                style={"display": "grid", "gridTemplateColumns": "repeat(auto-fit, minmax(220px, 1fr))", "gap": "12px", "marginTop": "12px"},
                 children=[
                     _journey_space_card(
                         space="studio",
@@ -654,13 +674,13 @@ def render_product_space_banner(
     return html.Div(
         children=[
             html.Div(
-                style={"display": "flex", "justifyContent": "space-between", "gap": "12px", "alignItems": "flex-start", "flexWrap": "wrap"},
+                style={"display": "flex", "justifyContent": "space-between", "gap": "12px", "alignItems": "center", "flexWrap": "wrap"},
                 children=[
                     html.Div(
                         children=[
                             html.Div("Espaço ativo", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#47665d"}),
-                            html.H2(content["label"], style={"margin": "8px 0 6px"}),
-                            html.Div(content["headline"], style={"fontWeight": 700, "lineHeight": "1.5"}),
+                            html.H2(content["label"], style={"margin": "6px 0 4px"}),
+                            html.Div(content["headline"], style={"fontWeight": 700, "lineHeight": "1.4"}),
                         ]
                     ),
                     html.Div(
@@ -679,13 +699,15 @@ def render_product_space_banner(
                     ),
                 ],
             ),
-            html.P(content["description"], style={"margin": "10px 0 0", "lineHeight": "1.6"}),
             html.Div(
-                style={**UI_THREE_COLUMN_STYLE, "marginTop": "14px"},
+                style={**UI_COMPACT_BANNER_CARD_STYLE, "marginTop": "10px"},
                 children=[
-                    _guidance_card("O que esta área resolve", content["objective"]),
-                    _guidance_card("Estado do fluxo agora", f"{guidance['flow_label']}: {guidance['flow_text']}"),
-                    _guidance_card("Próximo destino sugerido", f"{guidance['target_label']}: {guidance['target_reason']}"),
+                    html.Div("O que esta área resolve", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+                    html.Div(content["objective"], style={"fontWeight": 700, "lineHeight": "1.45", "marginTop": "6px"}),
+                    html.Div("Estado do fluxo agora", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+                    html.Div(f"{guidance['flow_label']}: {guidance['flow_text']}", style={"fontWeight": 700, "lineHeight": "1.45", "marginTop": "6px"}),
+                    html.Div("Próximo destino sugerido", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d", "marginTop": "8px"}),
+                    html.Div(f"{guidance['target_label']}: {guidance['target_reason']}", style={"lineHeight": "1.45", "marginTop": "6px", "color": "#496158"}),
                 ],
             ),
         ]
@@ -2067,7 +2089,7 @@ def render_studio_workspace_panel(
                 ],
             ),
             html.Div(
-                style={**UI_THREE_COLUMN_STYLE, "marginBottom": "12px"},
+                style={**UI_TWO_COLUMN_STYLE, "gridTemplateColumns": "repeat(2, minmax(0, 1fr))", "marginBottom": "12px"},
                 children=[
                     _guidance_card("Seleção atual", focus_summary["headline"]),
                     _guidance_card("Conectividade em foco", connection_preview),
@@ -2076,12 +2098,11 @@ def render_studio_workspace_panel(
                 ],
             ),
             html.Div(
-                style={**UI_MUTED_CARD_STYLE, "padding": "12px", "marginBottom": "12px"},
+                style={**UI_COMPACT_BANNER_CARD_STYLE, "marginBottom": "12px"},
                 children=[
                     html.Div("O que precisa de atenção agora", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
                     html.Div(top_issue, style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"}),
-                    html.Div(focus_summary["headline"], style={"lineHeight": "1.6", "marginTop": "10px"}),
-                    html.Div(focus_summary["recommended_action"], style={"lineHeight": "1.6", "marginTop": "10px", "fontWeight": 700}),
+                    html.Div(focus_summary["recommended_action"], style={"lineHeight": "1.45", "marginTop": "8px"}),
                 ],
             ),
             html.Div(
@@ -2117,17 +2138,21 @@ def render_studio_workspace_panel(
                     html.Div("Quem supre quem na camada principal", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
                     html.Div(str(business_flow.get("headline") or "Sem cadeia principal visível."), style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"}),
                     html.Div(
-                        style={**UI_THREE_COLUMN_STYLE, "marginTop": "12px"},
+                        style={**UI_TWO_COLUMN_STYLE, "gridTemplateColumns": "repeat(2, minmax(0, 1fr))", "marginTop": "10px"},
                         children=[
-                            _guidance_card("Escopo desta leitura", str(business_flow.get("scope_label") or "Cenário inteiro")),
                             _guidance_card("É suprido por", str(business_flow.get("supplied_by_label") or "Ainda não recebe suprimento visível.")),
                             _guidance_card("Supre", str(business_flow.get("supplies_label") or "Ainda não abastece outra entidade visível.")),
                         ],
                     ),
-                    html.Div("Trechos de negócio já legíveis", style={"fontWeight": 700, "marginTop": "12px", "marginBottom": "6px"}),
-                    _bullet_list(
-                        list(business_flow.get("connection_lines") or [])[:4],
-                        "Ainda não há trecho de suprimento legível na camada principal.",
+                    html.Details(
+                        style={**UI_MUTED_CARD_STYLE, "padding": "10px", "marginTop": "10px"},
+                        children=[
+                            html.Summary("Ver trechos legíveis do fluxo"),
+                            _bullet_list(
+                                list(business_flow.get("connection_lines") or [])[:4],
+                                "Ainda não há trecho de suprimento legível na camada principal.",
+                            ),
+                        ],
                     ),
                 ],
             ),
@@ -2141,7 +2166,7 @@ def render_studio_workspace_panel(
             ),
             html.Div(style={**UI_ACTION_ROW_STYLE, "marginTop": "12px"}, children=[*primary_actions, _button_link("Abrir Auditoria", "?tab=audit", "studio-workspace-open-audit-link")]),
             html.Div(
-                style={**UI_MUTED_CARD_STYLE, "padding": "12px", "marginTop": "12px"},
+                style={**UI_COMPACT_BANNER_CARD_STYLE, "marginTop": "12px"},
                 children=[
                     html.Div("Sinal de saída desta área", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
                     html.Div(str((studio_summary.get("next_steps") or ["Feche a leitura principal do Studio antes de sair."])[0]), style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"}),
@@ -2188,38 +2213,27 @@ def render_studio_command_center_panel(
         id="studio-command-center-panel",
         children=[
             html.Div("Command center do Studio", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
-            html.Div("Monte o grafo de negócio sem abrir a trilha técnica", style={"fontWeight": 700, "fontSize": "22px", "lineHeight": "1.3", "marginTop": "8px"}),
-            html.P(
-                "A primeira dobra do Studio agora concentra criação de entidades, ligação entre pontos do negócio e leitura do foco atual. O workbench técnico continua disponível, mas saiu do papel de superfície principal.",
-                style={"lineHeight": "1.6", "marginTop": "10px"},
-            ),
+            html.Div("Monte o grafo de negócio sem sair da superfície principal", style={"fontWeight": 700, "fontSize": "20px", "lineHeight": "1.25", "marginTop": "6px"}),
             html.Div(
-                style={**UI_THREE_COLUMN_STYLE, "marginBottom": "12px"},
+                style={**UI_TWO_COLUMN_STYLE, "gridTemplateColumns": "repeat(2, minmax(0, 1fr))", "marginTop": "12px", "marginBottom": "12px"},
                 children=[
                     _guidance_card("Foco atual", selected_focus),
-                    _guidance_card("Como agir agora", focus_hint),
                     _guidance_card("Passagem para Runs", "Liberada" if runs_ready else "Continue no Studio até fechar readiness e conectividade."),
                 ],
             ),
             html.Div(
                 style={**UI_MUTED_CARD_STYLE, "padding": "14px", "marginBottom": "12px"},
                 children=[
-                    html.Div("1. Adicionar entidades de negócio", style={"fontWeight": 700, "marginBottom": "8px"}),
-                    html.Div(
-                        "Crie fontes, produtos, mistura, serviço e saída diretamente daqui. Hubs internos continuam derivados e fora do canvas principal.",
-                        style={"lineHeight": "1.6", "marginBottom": "12px"},
-                    ),
+                    html.Div("Adicionar entidades visíveis", style={"fontWeight": 700, "marginBottom": "8px"}),
+                    html.Div("Crie só fontes, produtos, mistura, serviço e saída. Hubs internos continuam fora do canvas.", style={"lineHeight": "1.45", "marginBottom": "10px"}),
                     html.Div(style=UI_ACTION_ROW_STYLE, children=palette_buttons),
                 ],
             ),
             html.Div(
                 style={**UI_MUTED_CARD_STYLE, "padding": "14px", "marginBottom": "12px"},
                 children=[
-                    html.Div("2. Ligar entidades visíveis", style={"fontWeight": 700, "marginBottom": "8px"}),
-                    html.Div(
-                        "Use a ligação rápida para fechar o fluxo do cenário sem cair no editor completo de arestas.",
-                        style={"lineHeight": "1.6", "marginBottom": "12px"},
-                    ),
+                    html.Div("Ligação rápida", style={"fontWeight": 700, "marginBottom": "8px"}),
+                    html.Div(focus_hint, style={"lineHeight": "1.45", "marginBottom": "10px"}),
                     html.Div(
                         style=UI_THREE_COLUMN_STYLE,
                         children=[
@@ -2270,20 +2284,6 @@ def render_studio_command_center_panel(
                     _metric_card("Entidades de negócio", studio_summary.get("business_node_count", 0), "Só o que o usuário precisa editar."),
                     _metric_card("Conexões visíveis", studio_summary.get("business_edge_count", 0), "Fluxo principal sem malha interna."),
                     _metric_card("Internos ocultos", studio_summary.get("hidden_internal_node_count", 0), "Nós derivados e hubs fora da superfície principal."),
-                ],
-            ),
-            html.Div(
-                style={**UI_MUTED_CARD_STYLE, "padding": "14px", "marginTop": "12px"},
-                children=[
-                    html.Div("3. Guardrails do Studio", style={"fontWeight": 700, "marginBottom": "8px"}),
-                    _bullet_list(
-                        [
-                            "O Studio principal continua mostrando apenas entidades e conexões de negócio.",
-                            "Nós internos, hubs técnicos e JSON cru permanecem fora da primeira dobra.",
-                            "Se a conexão rápida não bastar, use o workbench avançado sem recolocar a trilha técnica na UI principal.",
-                        ],
-                        "Sem guardrail registrado.",
-                    ),
                 ],
             ),
         ],
@@ -2366,7 +2366,6 @@ def render_studio_projection_panel(summary: dict[str, Any]) -> Any:
         "ready" if status == "complete" else ("needs_attention" if status == "partial" else "blocked")
     )
     return html.Div(
-        id="studio-projection-coverage-panel",
         children=[
             html.Div("Cobertura da projeção", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
             html.Div(
@@ -2623,7 +2622,6 @@ def render_studio_connectivity_panel(
             ],
         )
     return html.Div(
-        id="studio-connectivity-panel",
         children=[
             html.H3("Conectividade do grafo", style={"marginTop": 0}),
             html.Div(
@@ -2840,7 +2838,6 @@ def render_studio_focus_panel(
     selected_node = node_summary.get("selected_node") or {}
     selected_edge_row = edge_summary.get("selected_edge") or {}
     return html.Div(
-        id="studio-focus-panel",
         children=[
             html.H3("Foco do canvas", style={"marginTop": 0}),
             html.Div(id="studio-status-banner", children=render_status_banner(status_text or "")),
@@ -4085,13 +4082,13 @@ def build_app(
                         style=UI_HERO_STYLE,
                         children=[
                             html.Div("Decision Platform", style={"fontSize": "13px", "letterSpacing": "0.14em", "textTransform": "uppercase", "opacity": 0.78}),
-                            html.H1("Studio, runs e decisão numa jornada única", style={"margin": "8px 0 10px", "fontSize": "40px", "lineHeight": "1.05"}),
+                            html.H1("Studio, runs e decisão numa jornada única", style={"margin": "6px 0 8px", "fontSize": "30px", "lineHeight": "1.05"}),
                             html.P(
                                 "A interface principal foi reorganizada para deixar explícito quando editar o cenário, quando acompanhar a fila, quando decidir entre alternativas e quando abrir a trilha técnica.",
-                                style={"maxWidth": "760px", "fontSize": "16px", "lineHeight": "1.6", "margin": "0 0 18px"},
+                                style={"maxWidth": "860px", "fontSize": "14px", "lineHeight": "1.45", "margin": "0 0 12px"},
                             ),
                             html.Div(
-                                style=UI_TWO_COLUMN_STYLE,
+                                style={"display": "grid", "gridTemplateColumns": "repeat(auto-fit, minmax(180px, 1fr))", "gap": "10px"},
                                 children=[
                                     _journey_step_card("1", "Studio", "Preparar o cenário com readiness e menos ruído."),
                                     _journey_step_card("2", "Runs", "Ler fila e status sem depender de logs."),
@@ -4100,7 +4097,7 @@ def build_app(
                                 ],
                             ),
                             html.Div(
-                                style={**UI_ACTION_ROW_STYLE, "marginTop": "18px"},
+                                style={**UI_ACTION_ROW_STYLE, "marginTop": "12px"},
                                 children=[
                                     _hero_navigation_link("Abrir Studio", "?tab=studio", "hero-open-studio-link"),
                                     _hero_navigation_link("Abrir Runs", "?tab=runs", "hero-open-runs-link"),
@@ -4139,22 +4136,49 @@ def build_app(
                         label="Studio",
                         value="studio",
                         children=[
-                            _section_intro(
-                                "Studio",
-                                "O Studio principal agora mostra apenas o grafo de negócio editável. Hubs internos e contratos crus continuam preservados, mas saem da superfície principal e aparecem apenas em campos avançados ou na Auditoria.",
-                                state_hint="Camada principal: projeção de negócio e readiness do cenário.",
-                                action_hint="Priorize cobertura da projeção, depois ajuste o cenário e só então aprofunde a trilha técnica.",
+                            html.Div(
+                                style={**UI_COMPACT_BANNER_CARD_STYLE, "marginBottom": "14px"},
+                                children=[
+                                    html.Div("Studio", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#47665d"}),
+                                    html.Div("Edite o grafo de negócio com prioridade para o canvas.", style={"fontWeight": 700, "fontSize": "22px", "lineHeight": "1.25", "marginTop": "6px"}),
+                                    html.Div(
+                                        style={**UI_TWO_COLUMN_STYLE, "gridTemplateColumns": "minmax(0, 1fr) minmax(280px, 360px)", "marginTop": "10px"},
+                                        children=[
+                                            html.Div("A superfície principal mantém só entidades e conexões de negócio. Hubs internos, contratos crus e JSON ficam fora da primeira dobra.", style={"lineHeight": "1.45"}),
+                                            html.Div(
+                                                style={**UI_MUTED_CARD_STYLE, "padding": "10px"},
+                                                children=[
+                                                    html.Div("Prioridade agora", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+                                                    html.Div("Revise o fluxo no canvas, corrija readiness e use a bancada avançada só quando a ação direta não bastar.", style={"fontWeight": 700, "lineHeight": "1.45", "marginTop": "6px"}),
+                                                ],
+                                            ),
+                                        ],
+                                    ),
+                                ],
                             ),
                             html.Div(
-                                style=UI_TWO_COLUMN_STYLE,
+                                style=UI_STUDIO_MAIN_GRID_STYLE,
                                 children=[
                                     html.Div(
-                                        style=UI_CARD_STYLE,
+                                        style=UI_STUDIO_CANVAS_CARD_STYLE,
                                         children=[
-                                            html.H3("Grafo de negócio", style={"marginTop": 0}),
-                                            html.P(
-                                                "A superfície principal mostra apenas entidades e conexões operacionais. Hubs internos e nós derivados permanecem fora do canvas principal.",
-                                                style={"marginTop": 0, "lineHeight": "1.6"},
+                                            html.Div(
+                                                style={"display": "flex", "justifyContent": "space-between", "gap": "12px", "alignItems": "flex-start", "flexWrap": "wrap"},
+                                                children=[
+                                                    html.Div(
+                                                        children=[
+                                                            html.H3("Grafo de negócio", style={"margin": "0 0 4px"}),
+                                                            html.Div("Use esta área para enxergar e corrigir o fluxo principal do cenário.", style={"lineHeight": "1.45", "color": "#496158"}),
+                                                        ]
+                                                    ),
+                                                    html.Div(
+                                                        style={**UI_MUTED_CARD_STYLE, "padding": "10px", "minWidth": "240px"},
+                                                        children=[
+                                                            html.Div("Visibilidade principal", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+                                                            html.Div("Somente entidades e conexões de negócio aparecem aqui.", style={"fontWeight": 700, "lineHeight": "1.45", "marginTop": "6px"}),
+                                                        ],
+                                                    ),
+                                                ],
                                             ),
                                             html.Div(
                                                 id="studio-canvas-guidance-panel",
@@ -4168,7 +4192,7 @@ def build_app(
                                                 id="node-studio-cytoscape",
                                                 elements=initial_node_studio_elements,
                                                 layout={"name": "preset"},
-                                                style={"width": "100%", "height": "560px"},
+                                                style={"width": "100%", "height": "720px"},
                                                 contextMenu=STUDIO_CONTEXT_MENU,
                                                 stylesheet=_build_node_studio_stylesheet(
                                                     initial_node_studio_selected_id,
@@ -4178,7 +4202,7 @@ def build_app(
                                         ],
                                     ),
                                     html.Div(
-                                        style=UI_SECTION_STYLE,
+                                        style=UI_STUDIO_SIDEBAR_STYLE,
                                         children=[
                                             html.Div(
                                                 id="studio-command-center-shell",
