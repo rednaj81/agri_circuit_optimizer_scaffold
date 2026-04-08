@@ -1,0 +1,16 @@
+Wave 8 capture validation
+
+- powershell -ExecutionPolicy Bypass -File scripts/Capture-UxRefinementStudio.ps1 -Port 8060 -OutputPath output/playwright/studio-fullhd-wave8.png
+
+Result:
+
+- output/playwright/studio-fullhd-wave8.png was produced in 1920x1080
+- the capture flow rejected the bitmap because visual sanity checks failed
+- output/playwright/studio-fullhd-wave8-assessment.json recorded:
+  - image_grab => `OSError: screen grab failed`
+  - print_window => single-color frame, `visually_useful = false`
+
+Evidence:
+
+- output\playwright\studio-fullhd-wave8.png
+- output\playwright\studio-fullhd-wave8-assessment.json

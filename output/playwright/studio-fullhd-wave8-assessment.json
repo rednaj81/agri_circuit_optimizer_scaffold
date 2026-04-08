@@ -1,0 +1,51 @@
+{
+  "url": "http://127.0.0.1:8060/?tab=studio",
+  "output": "C:\\d\\dev\\agri_circuit_optimizer_scaffold\\output\\playwright\\studio-fullhd-wave8.png",
+  "attempts": [
+    {
+      "method": "image_grab",
+      "error": "OSError: screen grab failed"
+    },
+    {
+      "method": "print_window",
+      "size": [
+        1920,
+        1080
+      ],
+      "unique_colors": 1,
+      "extrema": [
+        [
+          243,
+          243
+        ],
+        [
+          243,
+          243
+        ],
+        [
+          243,
+          243
+        ],
+        [
+          255,
+          255
+        ]
+      ],
+      "mean": [
+        243.0,
+        243.0,
+        243.0,
+        255.0
+      ],
+      "stddev": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "max_channel_spread": 0,
+      "visually_useful": false
+    }
+  ],
+  "accepted": null
+}

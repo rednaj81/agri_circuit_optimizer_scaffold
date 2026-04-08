@@ -1,6 +1,6 @@
 param(
     [int]$Port = 8060,
-    [string]$OutputPath = "output/playwright/studio-fullhd-wave7.png"
+    [string]$OutputPath = "output/playwright/studio-fullhd-wave8.png"
 )
 
 $ErrorActionPreference = "Stop"
@@ -11,10 +11,11 @@ if (-not (Test-Path $pythonExe)) {
 }
 $serverScript = Join-Path $repoRoot "output\run_wave5_dash.py"
 $captureScript = Join-Path $repoRoot "scripts\capture_edge_window.py"
-$profileDir = Join-Path $repoRoot "output\edge-wave7-profile"
+$profileDir = Join-Path $repoRoot "output\edge-wave8-profile"
 $resolvedOutput = Join-Path $repoRoot $OutputPath
-$serverLog = Join-Path $repoRoot "output\playwright\wave7-server.log"
-$serverJobLog = Join-Path $repoRoot "output\playwright\wave7-server-job.log"
+$assessmentOutput = Join-Path $repoRoot "output\playwright\studio-fullhd-wave8-assessment.json"
+$serverLog = Join-Path $repoRoot "output\playwright\wave8-server.log"
+$serverJobLog = Join-Path $repoRoot "output\playwright\wave8-server-job.log"
 
 New-Item -ItemType Directory -Force -Path (Split-Path -Parent $resolvedOutput) | Out-Null
 New-Item -ItemType Directory -Force -Path $profileDir | Out-Null
@@ -44,12 +45,13 @@ try {
     & $pythonExe $captureScript `
         --url "http://127.0.0.1:$Port/?tab=studio" `
         --output $resolvedOutput `
+        --assessment-output $assessmentOutput `
         --profile-dir $profileDir `
         --width 1920 `
         --height 1080 `
         --wait-seconds 12
 
-    Get-Item $resolvedOutput | Select-Object FullName, Length, LastWriteTime
+    Get-Item $resolvedOutput, $assessmentOutput | Select-Object FullName, Length, LastWriteTime
 } finally {
     Receive-Job $serverJob -Keep | Out-String | Set-Content $serverJobLog
     Stop-Job $serverJob -ErrorAction SilentlyContinue
