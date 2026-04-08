@@ -1,0 +1,14 @@
+Wave 6 capture validation
+
+- .\.venv\Scripts\python.exe output\wave5_browser_capture.py
+- python inline launcher for direct Chrome headless with `--remote-debugging-port=9222`
+
+Result:
+
+- `output/playwright/studio-fullhd-wave6.png` was not produced
+- existing CDP capture path failed with `RuntimeError: Chrome CDP did not become ready`
+- direct Chrome startup failed with `CreateFile: Acesso negado. (0x5)` and `platform_channel.cc:108`
+
+Evidence:
+
+- output\playwright\wave6_capture_blocker.txt

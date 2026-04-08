@@ -1,0 +1,28 @@
+Wave 6 capture blocker reproduction
+
+1) Existing CDP capture script
+command: ['C:\\d\\dev\\agri_circuit_optimizer_scaffold\\.venv\\Scripts\\python.exe', 'C:\\d\\dev\\agri_circuit_optimizer_scaffold\\output\\wave5_browser_capture.py']
+returncode: 1
+stdout:
+Dash is running on http://127.0.0.1:8060/
+
+ * Serving Flask app 'decision_platform.ui_dash.app'
+ * Debug mode: off
+stderr:
+WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+ * Running on http://127.0.0.1:8060
+Press CTRL+C to quit
+127.0.0.1 - - [08/Apr/2026 16:26:09] "GET / HTTP/1.1" 200 -
+Traceback (most recent call last):
+  File "C:\d\dev\agri_circuit_optimizer_scaffold\output\wave5_browser_capture.py", line 46, in <module>
+    raise RuntimeError('Chrome CDP did not become ready')
+RuntimeError: Chrome CDP did not become ready
+
+2) Direct Chrome startup with remote debugging
+chrome_returncode: 4294930433
+chrome_stdout:
+
+chrome_stderr:
+[0408/162709.804:ERROR:third_party\crashpad\crashpad\util\win\registration_protocol_win.cc:108] CreateFile: Acesso negado. (0x5)
+[51672:70876:0408/162710.047:FATAL:mojo\public\cpp\platform\platform_channel.cc:108] Check failed: . : Acesso negado. (0x5)
+[0408/162710.047:ERROR:third_party\crashpad\crashpad\client\crashpad_client_win.cc:142] crash server failed to launch, self-terminating
