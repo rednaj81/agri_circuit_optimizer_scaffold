@@ -235,6 +235,12 @@ def test_studio_primary_surface_exposes_business_command_center() -> None:
     assert _find_component_by_id(app.layout, "studio-route-complete-to-node-button") is not None
     assert _find_component_by_id(app.layout, "studio-route-cancel-draft-button") is not None
     assert _find_component_by_id(app.layout, "studio-route-create-from-edge-button") is not None
+    assert _find_component_by_id(app.layout, "studio-route-compose-intent") is not None
+    assert _find_component_by_id(app.layout, "studio-route-compose-q-min-lpm") is not None
+    assert _find_component_by_id(app.layout, "studio-route-compose-dose-min-l") is not None
+    assert _find_component_by_id(app.layout, "studio-route-compose-measurement-required") is not None
+    assert _find_component_by_id(app.layout, "studio-route-compose-confirm-button") is not None
+    assert _find_component_by_id(app.layout, "studio-route-composer-preview-panel") is not None
     assert _find_component_by_id(app.layout, "studio-route-intent-mandatory-button") is not None
     assert _find_component_by_id(app.layout, "studio-route-intent-desirable-button") is not None
     assert _find_component_by_id(app.layout, "studio-route-intent-optional-button") is not None
@@ -255,11 +261,12 @@ def test_studio_primary_surface_exposes_business_command_center() -> None:
     assert "Tap" not in studio_text
     assert "Junção" not in studio_text
     route_text = _collect_text_content(_find_component_by_id(app.layout, "studio-route-editor-panel"))
-    assert "Criar rota deste trecho" in route_text
-    assert "Iniciar rota desta entidade" in route_text
+    assert "Trazer este trecho para o composer" in route_text
+    assert "Usar esta entidade como origem" in route_text
     assert "Usar esta entidade como destino" in route_text
     assert "Quem supre quem agora" in route_text
-    assert "Trecho em foco" in route_text
+    assert "Composer local da rota" in route_text
+    assert "Confirmar rota no canvas" in route_text
     assert "W ->" not in route_text
     assert "Tap" not in route_text
     assert "Junção" not in route_text
@@ -1351,7 +1358,7 @@ def test_focus_node_quick_edit_callback_updates_label_without_workbench() -> Non
     assert status == "Rótulo da entidade atualizado direto no foco do canvas."
 
 
-def test_route_panel_callbacks_manage_draft_and_complete_route_without_workbench() -> None:
+def test_route_panel_callbacks_manage_composer_and_confirm_route_without_workbench() -> None:
     bundle = load_scenario_bundle("data/decision_platform/maquete_v2")
     route_rows = [
         row
@@ -1361,23 +1368,43 @@ def test_route_panel_callbacks_manage_draft_and_complete_route_without_workbench
     with diagnostic_runtime_test_mode():
         app = build_app("data/decision_platform/maquete_v2")
 
-    callback = _get_callback(app, input_id="studio-route-start-from-node-button")
-    unchanged_rows, draft_source_id, status = callback(1, 0, 0, "I", "", route_rows)
-    assert unchanged_rows == route_rows
-    assert draft_source_id == "I"
-    assert status == "Origem da rota armada em I. Selecione o destino no canvas."
+    set_source_callback = _get_callback(app, input_id="studio-route-start-from-node-button")
+    set_target_callback = _get_callback(app, input_id="studio-route-complete-to-node-button")
+    sync_fields_callback = _get_callback(app, input_id="studio-route-compose-intent")
+    confirm_callback = _get_callback(app, input_id="studio-route-compose-confirm-button")
+    cancel_callback = _get_callback(app, input_id="studio-route-cancel-draft-button")
 
-    completed_rows, next_draft_source_id, status = callback(1, 2, 0, "IR", draft_source_id, route_rows)
+    composer_state, status = set_source_callback(1, "I", {})
+    assert composer_state["source_node_id"] == "I"
+    assert status == "Origem da rota armada em I. Agora defina o destino explicitamente no composer."
+
+    composer_state, status = set_target_callback(1, "IR", composer_state)
+    assert composer_state["sink_node_id"] == "IR"
+    assert status == "Destino da rota ajustado para IR. Revise o preview e confirme no canvas."
+
+    composer_state = sync_fields_callback("mandatory", 18, 2.5, "Fluxo local validado", ["measurement_required"], composer_state)
+    assert composer_state["intent"] == "mandatory"
+    assert composer_state["measurement_required"] is True
+    assert composer_state["q_min_delivered_lpm"] == pytest.approx(18.0)
+    assert composer_state["dose_min_l"] == pytest.approx(2.5)
+    assert composer_state["notes"] == "Fluxo local validado"
+
+    completed_rows, cleared_state, status = confirm_callback(1, composer_state, route_rows)
     created_route = next(row for row in completed_rows if str(row["route_id"]) == "R018")
-    assert next_draft_source_id == ""
     assert created_route["source"] == "I"
     assert created_route["sink"] == "IR"
-    assert status == "Rota R018 criada direto no canvas entre I e IR."
+    assert bool(created_route["mandatory"]) is True
+    assert bool(created_route["measurement_required"]) is True
+    assert created_route["q_min_delivered_lpm"] == pytest.approx(18.0)
+    assert created_route["dose_min_l"] == pytest.approx(2.5)
+    assert created_route["notes"] == "Fluxo local validado"
+    assert cleared_state["source_node_id"] == ""
+    assert status == "Rota R018 confirmada no canvas com preview revisado."
 
-    canceled_rows, canceled_draft_source_id, cancel_status = callback(1, 0, 2, "IR", draft_source_id, route_rows)
-    assert canceled_rows == route_rows
-    assert canceled_draft_source_id == ""
-    assert cancel_status == "Criação direta da rota cancelada no canvas."
+    canceled_state, cancel_status = cancel_callback(1)
+    assert canceled_state["source_node_id"] == ""
+    assert canceled_state["sink_node_id"] == ""
+    assert cancel_status == "Composer local da rota limpo no canvas."
 
 
 def test_focus_edge_quick_edit_callback_updates_length_and_family_without_workbench() -> None:
@@ -2308,6 +2335,7 @@ def test_studio_callbacks_round_trip_structural_edits_through_ui_flow() -> None:
             route_rows,
             created_node_id,
             created_link_id,
+            {"source_node_id": created_node_id, "sink_node_id": duplicated_node_id, "intent": "mandatory"},
             status,
         )
         node_summary = json.loads(node_summary_text)

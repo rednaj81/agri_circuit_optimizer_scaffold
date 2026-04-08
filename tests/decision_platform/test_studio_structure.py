@@ -68,6 +68,12 @@ def test_dash_app_exposes_structural_studio_controls() -> None:
     assert "studio-route-complete-to-node-button" in layout_repr
     assert "studio-route-cancel-draft-button" in layout_repr
     assert "studio-route-create-from-edge-button" in layout_repr
+    assert "studio-route-compose-intent" in layout_repr
+    assert "studio-route-compose-q-min-lpm" in layout_repr
+    assert "studio-route-compose-dose-min-l" in layout_repr
+    assert "studio-route-compose-measurement-required" in layout_repr
+    assert "studio-route-compose-confirm-button" in layout_repr
+    assert "studio-route-composer-preview-panel" in layout_repr
     assert "studio-route-intent-mandatory-button" in layout_repr
     assert "studio-route-intent-desirable-button" in layout_repr
     assert "studio-route-intent-optional-button" in layout_repr
@@ -310,6 +316,28 @@ def test_primary_studio_projection_marks_desirable_routes_in_canvas_classes() ->
     route_element = next(element for element in elements if element.get("data", {}).get("route_id") == "R010")
     assert "desirable" in str(route_element.get("classes") or "")
     assert route_element["data"]["intent"] == "desirable"
+
+
+@pytest.mark.fast
+def test_primary_studio_projection_includes_route_composer_preview_edge() -> None:
+    bundle = load_scenario_bundle("data/decision_platform/maquete_v2")
+
+    elements = build_primary_node_studio_elements(
+        bundle.nodes.to_dict("records"),
+        bundle.candidate_links.to_dict("records"),
+        bundle.route_requirements.to_dict("records"),
+        route_composer_state={
+            "source_node_id": "W",
+            "sink_node_id": "M",
+            "intent": "mandatory",
+        },
+    )
+
+    preview_edge = next(element for element in elements if element.get("data", {}).get("preview") is True)
+    assert preview_edge["data"]["source"] == "W"
+    assert preview_edge["data"]["target"] == "M"
+    assert "route-composer-preview" in str(preview_edge.get("classes") or "")
+    assert "mandatory" in str(preview_edge.get("classes") or "")
 
 
 @pytest.mark.fast

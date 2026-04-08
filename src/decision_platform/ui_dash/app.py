@@ -1673,6 +1673,98 @@ def _normalize_callback_map_for_testing(app: Any) -> None:
     app.callback_map = normalized
 
 
+def _empty_route_composer_state() -> dict[str, Any]:
+    return {
+        "source_node_id": "",
+        "sink_node_id": "",
+        "intent": "optional",
+        "measurement_required": False,
+        "q_min_delivered_lpm": 10.0,
+        "dose_min_l": 0.0,
+        "notes": "",
+    }
+
+
+def _normalize_route_composer_state(state: dict[str, Any] | None) -> dict[str, Any]:
+    payload = dict(_empty_route_composer_state())
+    if isinstance(state, dict):
+        payload.update(state)
+    payload["source_node_id"] = str(payload.get("source_node_id") or "").strip()
+    payload["sink_node_id"] = str(payload.get("sink_node_id") or "").strip()
+    intent = str(payload.get("intent") or "optional").strip().lower()
+    payload["intent"] = intent if intent in {"mandatory", "desirable", "optional"} else "optional"
+    payload["measurement_required"] = _coerce_truthy(payload.get("measurement_required"))
+    try:
+        payload["q_min_delivered_lpm"] = float(payload.get("q_min_delivered_lpm") or 0.0)
+    except (TypeError, ValueError):
+        payload["q_min_delivered_lpm"] = 0.0
+    try:
+        payload["dose_min_l"] = float(payload.get("dose_min_l") or 0.0)
+    except (TypeError, ValueError):
+        payload["dose_min_l"] = 0.0
+    payload["notes"] = str(payload.get("notes") or "").strip()
+    return payload
+
+
+def _build_route_composer_preview(
+    composer_state: dict[str, Any] | None,
+    *,
+    nodes_rows: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    state = _normalize_route_composer_state(composer_state)
+    node_lookup = {
+        str(row.get("node_id", "")).strip(): dict(row)
+        for row in _visible_studio_nodes(nodes_rows or [])
+        if str(row.get("node_id", "")).strip()
+    }
+    source_id = str(state.get("source_node_id") or "").strip()
+    sink_id = str(state.get("sink_node_id") or "").strip()
+    source_label = _studio_node_business_label_from_lookup(source_id, node_lookup) if source_id else "Origem ainda não definida"
+    sink_label = _studio_node_business_label_from_lookup(sink_id, node_lookup) if sink_id else "Destino ainda não definido"
+    intent = str(state.get("intent") or "optional")
+    intent_label = _route_intent_label(intent)
+    measurement_required = bool(state.get("measurement_required"))
+    q_min_delivered_lpm = float(state.get("q_min_delivered_lpm") or 0.0)
+    dose_min_l = float(state.get("dose_min_l") or 0.0)
+    if source_id and sink_id and source_id != sink_id:
+        headline = f"{source_label} supre {sink_label}."
+        status_label = "Preview pronto"
+        next_action = "Confirme a rota no canvas quando origem, destino e intenção estiverem corretos."
+    elif source_id and not sink_id:
+        headline = f"{source_label} já está armado como origem; falta escolher o destino."
+        status_label = "Origem definida"
+        next_action = "Selecione a entidade de destino e use o composer para completar a rota."
+    elif source_id and sink_id and source_id == sink_id:
+        headline = f"{source_label} ainda não pode suprir a si mesmo."
+        status_label = "Composer inválido"
+        next_action = "Escolha uma entidade de destino diferente da origem antes de confirmar."
+    else:
+        headline = "O composer local ainda não recebeu origem nem destino."
+        status_label = "Composer vazio"
+        next_action = "Escolha a origem e o destino diretamente a partir do canvas."
+    if dose_min_l > 0 and not measurement_required:
+        readiness_signal = "Bloqueio preventivo: dosagem sem medição direta ainda impediria uma passagem segura para Runs."
+    elif intent == "mandatory":
+        readiness_signal = "A rota em preparo entrará como obrigatória e passará a sustentar a readiness principal."
+    elif intent == "desirable":
+        readiness_signal = "A rota em preparo ficará desejável: orienta o ranking sem virar hard constraint."
+    else:
+        readiness_signal = "A rota em preparo ficará opcional: continua legível no Studio sem travar a saída para Runs."
+    return {
+        "headline": headline,
+        "status_label": status_label,
+        "source_label": source_label,
+        "sink_label": sink_label,
+        "intent_label": intent_label,
+        "measurement_label": "Medição direta exigida" if measurement_required else "Medição direta não exigida",
+        "readiness_signal": readiness_signal,
+        "next_action": next_action,
+        "confirm_enabled": bool(source_id and sink_id and source_id != sink_id),
+        "state": state,
+        "notes": str(state.get("notes") or "").strip() or "Sem observação visível no preview.",
+    }
+
+
 def _next_route_identifier(route_rows: list[dict[str, Any]]) -> str:
     numeric_suffixes: list[int] = []
     existing_ids = {
@@ -2594,7 +2686,7 @@ def render_studio_route_editor_panel(
     node_summary: dict[str, Any],
     edge_summary: dict[str, Any],
     studio_summary: dict[str, Any],
-    route_draft_source_id: str | None = None,
+    composer_state: dict[str, Any] | None = None,
     nodes_rows: list[dict[str, Any]] | None = None,
 ) -> Any:
     focus_node_ids = {
@@ -2616,8 +2708,9 @@ def render_studio_route_editor_panel(
     selected_edge_present = bool(selected_edge)
     selected_node_id = str(node_summary.get("selected_node_id") or "").strip()
     selected_node_label = str(node_summary.get("business_label") or selected_node_id or "").strip() or "Entidade em foco"
-    route_draft_source = str(route_draft_source_id or "").strip()
-    route_draft_source_label = _studio_node_business_label_from_lookup(route_draft_source, node_lookup) if route_draft_source else "Nenhuma origem armada"
+    composer_preview = _build_route_composer_preview(composer_state, nodes_rows=nodes_rows)
+    composer_data = composer_preview["state"]
+    route_draft_source = str(composer_data.get("source_node_id") or "").strip()
     can_start_route_from_node = bool(selected_node_id)
     can_complete_route_to_node = bool(route_draft_source and selected_node_id and selected_node_id != route_draft_source)
     selected_edge_flow = (
@@ -2665,31 +2758,95 @@ def render_studio_route_editor_panel(
                 children=[
                     _guidance_card("Quem supre quem agora", selected_edge_flow),
                     _guidance_card("Próximo gesto", route_next_action),
-                    _guidance_card("Origem em preparo", route_draft_source_label),
+                    _guidance_card("Composer local", str(composer_preview.get("status_label") or "Composer vazio")),
                 ],
             ),
             html.Div(
                 style={**UI_MUTED_CARD_STYLE, "padding": "10px", "marginTop": "10px"},
                 children=[
-                    html.Div("Trecho em foco", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
-                    html.Div(selected_edge_flow, style={"fontWeight": 700, "lineHeight": "1.45", "marginTop": "6px"}),
+                    html.Div("Composer local da rota", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+                    html.Div(str(composer_preview.get("headline") or "Sem preview local de rota."), style={"fontWeight": 700, "lineHeight": "1.45", "marginTop": "6px"}),
+                    html.Div(str(composer_preview.get("readiness_signal") or "Sem impacto preventivo calculado."), style={"lineHeight": "1.45", "marginTop": "6px"}),
+                    html.Div(str(composer_preview.get("next_action") or "Selecione origem e destino para continuar."), style={"lineHeight": "1.45", "marginTop": "6px"}),
                     html.Div(
-                        f"Origem de rota em preparo: {route_draft_source}. Selecione o destino no canvas para concluir."
-                        if route_draft_source
-                        else "Ainda não há uma origem de rota em preparo no canvas.",
-                        style={"lineHeight": "1.45", "marginTop": "6px"},
+                        id="studio-route-composer-preview-panel",
+                        style={**UI_TWO_COLUMN_STYLE, "marginTop": "10px"},
+                        children=[
+                            _guidance_card("Origem", str(composer_preview.get("source_label") or "Origem ainda não definida")),
+                            _guidance_card("Destino", str(composer_preview.get("sink_label") or "Destino ainda não definido")),
+                            _guidance_card("Intenção", str(composer_preview.get("intent_label") or "Opcional")),
+                            _guidance_card("Readiness", str(composer_preview.get("measurement_label") or "Sem requisito adicional")),
+                            _guidance_card("Vazão mínima", f"{float(composer_data.get('q_min_delivered_lpm') or 0.0):.1f} L/min"),
+                            _guidance_card("Dosagem mínima", f"{float(composer_data.get('dose_min_l') or 0.0):.1f} L"),
+                        ],
+                    ),
+                    _field_block(
+                        "Intenção em preparo",
+                        dcc.Dropdown(
+                            id="studio-route-compose-intent",
+                            options=[
+                                {"label": "Obrigatória", "value": "mandatory"},
+                                {"label": "Desejável", "value": "desirable"},
+                                {"label": "Opcional", "value": "optional"},
+                            ],
+                            value=composer_data.get("intent"),
+                            persistence=True,
+                            persistence_type="session",
+                        ),
                     ),
                     html.Div(
-                        "Use a conexão selecionada para criar a rota deste trecho sem passar pelo workbench."
-                        if selected_edge_present
-                        else "A criação direta de rota fica disponível assim que uma conexão visível for selecionada.",
-                        style={"lineHeight": "1.45", "marginTop": "6px"},
+                        style={**UI_THREE_COLUMN_STYLE, "marginTop": "8px"},
+                        children=[
+                            _field_block(
+                                "Vazão mínima do preview (L/min)",
+                                dcc.Input(
+                                    id="studio-route-compose-q-min-lpm",
+                                    type="number",
+                                    value=composer_data.get("q_min_delivered_lpm"),
+                                    persistence=True,
+                                    persistence_type="session",
+                                    style={"width": "100%"},
+                                ),
+                            ),
+                            _field_block(
+                                "Dosagem mínima do preview (L)",
+                                dcc.Input(
+                                    id="studio-route-compose-dose-min-l",
+                                    type="number",
+                                    value=composer_data.get("dose_min_l"),
+                                    persistence=True,
+                                    persistence_type="session",
+                                    style={"width": "100%"},
+                                ),
+                            ),
+                            _field_block(
+                                "Observação do preview",
+                                dcc.Input(
+                                    id="studio-route-compose-notes",
+                                    type="text",
+                                    value=composer_data.get("notes"),
+                                    persistence=True,
+                                    persistence_type="session",
+                                    style={"width": "100%"},
+                                ),
+                            ),
+                        ],
+                    ),
+                    _field_block(
+                        "Medição direta do preview",
+                        dcc.Checklist(
+                            id="studio-route-compose-measurement-required",
+                            options=[{"label": "Exigir medição direta nesta rota em preparo", "value": "measurement_required"}],
+                            value=["measurement_required"] if bool(composer_data.get("measurement_required")) else [],
+                            persistence=True,
+                            persistence_type="session",
+                        ),
                     ),
                     html.Div(
                         style=UI_ACTION_ROW_STYLE,
                         children=[
                             html.Button(
-                                "Iniciar rota desta entidade",
+                                "Usar esta entidade como origem",
                                 id="studio-route-start-from-node-button",
                                 style=UI_BUTTON_STYLE,
                                 disabled=not can_start_route_from_node,
@@ -2701,16 +2858,22 @@ def render_studio_route_editor_panel(
                                 disabled=not can_complete_route_to_node,
                             ),
                             html.Button(
-                                "Cancelar rota em preparo",
-                                id="studio-route-cancel-draft-button",
-                                style=UI_BUTTON_STYLE,
-                                disabled=not bool(route_draft_source),
-                            ),
-                            html.Button(
-                                "Criar rota deste trecho",
+                                "Trazer este trecho para o composer",
                                 id="studio-route-create-from-edge-button",
                                 style=UI_BUTTON_STYLE,
                                 disabled=not selected_edge_present,
+                            ),
+                            html.Button(
+                                "Confirmar rota no canvas",
+                                id="studio-route-compose-confirm-button",
+                                style=UI_BUTTON_STYLE,
+                                disabled=not bool(composer_preview.get("confirm_enabled")),
+                            ),
+                            html.Button(
+                                "Limpar composer",
+                                id="studio-route-cancel-draft-button",
+                                style=UI_BUTTON_STYLE,
+                                disabled=not bool(route_draft_source),
                             ),
                             html.Button(
                                 "Obrigatória",
@@ -2860,7 +3023,7 @@ def render_studio_workspace_panel(
     candidate_links_rows: list[dict[str, Any]],
     route_rows: list[dict[str, Any]] | None,
     studio_status_text: str | None,
-    route_draft_source_id: str | None = None,
+    composer_state: dict[str, Any] | None = None,
 ) -> Any:
     status = str(studio_summary.get("status") or "needs_attention")
     background, color = _status_tone(status)
@@ -2899,7 +3062,7 @@ def render_studio_workspace_panel(
         node_summary,
         edge_summary,
         studio_summary,
-        route_draft_source_id=route_draft_source_id,
+        composer_state=composer_state,
         nodes_rows=nodes_rows,
     )
     runs_enabled = status == "ready"
@@ -4905,10 +5068,12 @@ def build_app(
         authoring_payload["nodes_rows"],
         authoring_payload["candidate_links_rows"],
     )
+    initial_route_composer_state = _empty_route_composer_state()
     initial_node_studio_elements = build_primary_node_studio_elements(
         authoring_payload["nodes_rows"],
         authoring_payload["candidate_links_rows"],
         authoring_payload["route_rows"],
+        route_composer_state=initial_route_composer_state,
     )
     initial_edge_studio_selected_id = _default_primary_edge_studio_selection(
         authoring_payload["nodes_rows"],
@@ -4978,6 +5143,7 @@ def build_app(
             dcc.Store(id="node-studio-selected-id", data=initial_node_studio_selected_id),
             dcc.Store(id="edge-studio-selected-id", data=initial_edge_studio_selected_id),
             dcc.Store(id="studio-route-draft-source-id", data=""),
+            dcc.Store(id="studio-route-composer-state", data=initial_route_composer_state),
             dcc.Store(id="studio-status-message", data=""),
             html.Div(
                 style=UI_SHELL_STYLE,
@@ -5130,7 +5296,7 @@ def build_app(
                                                     authoring_payload["candidate_links_rows"],
                                                     authoring_payload["route_rows"],
                                                     "",
-                                                    "",
+                                                    initial_route_composer_state,
                                                 ),
                                                 style=UI_CARD_STYLE,
                                             ),
@@ -5820,6 +5986,7 @@ def build_app(
         Input("routes-grid", "rowData"),
         Input("node-studio-selected-id", "data"),
         Input("edge-studio-selected-id", "data"),
+        Input("studio-route-composer-state", "data"),
         Input("studio-status-message", "data"),
     )
     def _refresh_node_studio(
@@ -5828,6 +5995,7 @@ def build_app(
         route_rows: list[dict[str, Any]] | None,
         selected_node_id: str | None,
         selected_edge_id: str | None,
+        route_composer_state: dict[str, Any] | None,
         studio_status_message: str | None,
     ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], str, str, str]:
         normalized_nodes = nodes_rows or []
@@ -5848,7 +6016,12 @@ def build_app(
             preferred_link_id=focused_link_id,
         )
         return (
-            build_primary_node_studio_elements(normalized_nodes, normalized_links, normalized_routes),
+            build_primary_node_studio_elements(
+                normalized_nodes,
+                normalized_links,
+                normalized_routes,
+                route_composer_state=route_composer_state,
+            ),
             _build_node_studio_stylesheet(selected_id, selected_link_id),
             json.dumps(_build_node_studio_summary(normalized_nodes, selected_id), indent=2, ensure_ascii=False),
             json.dumps(
@@ -6280,54 +6453,160 @@ def build_app(
         )
 
     @app.callback(
-        Output("routes-grid", "rowData", allow_duplicate=True),
-        Output("studio-route-draft-source-id", "data", allow_duplicate=True),
+        Output("studio-route-composer-state", "data", allow_duplicate=True),
         Output("studio-status-message", "data", allow_duplicate=True),
         Input("studio-route-start-from-node-button", "n_clicks"),
-        Input("studio-route-complete-to-node-button", "n_clicks"),
-        Input("studio-route-cancel-draft-button", "n_clicks"),
         State("node-studio-selected-id", "data"),
-        State("studio-route-draft-source-id", "data"),
+        State("studio-route-composer-state", "data"),
+        prevent_initial_call=True,
+    )
+    def _set_route_composer_source(
+        n_clicks: Any,
+        selected_node_id: str | None,
+        composer_state: dict[str, Any] | None,
+    ) -> tuple[dict[str, Any], str]:
+        state = _normalize_route_composer_state(composer_state)
+        if not n_clicks:
+            return state, ""
+        selected_id = str(selected_node_id or "").strip()
+        if not selected_id:
+            return state, "Selecione uma entidade antes de definir a origem da rota."
+        state["source_node_id"] = selected_id
+        if state.get("sink_node_id") == selected_id:
+            state["sink_node_id"] = ""
+        return state, f"Origem da rota armada em {selected_id}. Agora defina o destino explicitamente no composer."
+
+    @app.callback(
+        Output("studio-route-composer-state", "data", allow_duplicate=True),
+        Output("studio-status-message", "data", allow_duplicate=True),
+        Input("studio-route-complete-to-node-button", "n_clicks"),
+        State("node-studio-selected-id", "data"),
+        State("studio-route-composer-state", "data"),
+        prevent_initial_call=True,
+    )
+    def _set_route_composer_target(
+        n_clicks: Any,
+        selected_node_id: str | None,
+        composer_state: dict[str, Any] | None,
+    ) -> tuple[dict[str, Any], str]:
+        state = _normalize_route_composer_state(composer_state)
+        if not n_clicks:
+            return state, ""
+        selected_id = str(selected_node_id or "").strip()
+        if not selected_id:
+            return state, "Selecione uma entidade antes de definir o destino da rota."
+        state["sink_node_id"] = selected_id
+        return state, f"Destino da rota ajustado para {selected_id}. Revise o preview e confirme no canvas."
+
+    @app.callback(
+        Output("studio-route-composer-state", "data", allow_duplicate=True),
+        Output("studio-status-message", "data", allow_duplicate=True),
+        Input("studio-route-create-from-edge-button", "n_clicks"),
+        State("edge-studio-selected-id", "data"),
+        State("candidate-links-grid", "rowData"),
+        State("studio-route-composer-state", "data"),
+        prevent_initial_call=True,
+    )
+    def _load_selected_edge_into_route_composer(
+        n_clicks: Any,
+        selected_link_id: str | None,
+        candidate_links_rows: list[dict[str, Any]] | None,
+        composer_state: dict[str, Any] | None,
+    ) -> tuple[dict[str, Any], str]:
+        state = _normalize_route_composer_state(composer_state)
+        if not n_clicks:
+            return state, ""
+        selected_id = _default_edge_studio_selection(candidate_links_rows or [], preferred_link_id=selected_link_id)
+        edge_row = next(
+            (
+                dict(row)
+                for row in (candidate_links_rows or [])
+                if str(row.get("link_id") or "").strip() == selected_id
+            ),
+            None,
+        )
+        if edge_row is None:
+            return state, "Selecione uma conexão visível antes de carregar o trecho no composer."
+        state["source_node_id"] = str(edge_row.get("from_node") or "").strip()
+        state["sink_node_id"] = str(edge_row.get("to_node") or "").strip()
+        return state, f"Trecho {selected_id} carregado no composer. Revise intenção e readiness antes de confirmar."
+
+    @app.callback(
+        Output("studio-route-composer-state", "data", allow_duplicate=True),
+        Output("studio-status-message", "data", allow_duplicate=True),
+        Input("studio-route-cancel-draft-button", "n_clicks"),
+        prevent_initial_call=True,
+    )
+    def _clear_route_composer(n_clicks: Any) -> tuple[dict[str, Any], str]:
+        if not n_clicks:
+            return _empty_route_composer_state(), ""
+        return _empty_route_composer_state(), "Composer local da rota limpo no canvas."
+
+    @app.callback(
+        Output("studio-route-composer-state", "data", allow_duplicate=True),
+        Input("studio-route-compose-intent", "value"),
+        Input("studio-route-compose-q-min-lpm", "value"),
+        Input("studio-route-compose-dose-min-l", "value"),
+        Input("studio-route-compose-notes", "value"),
+        Input("studio-route-compose-measurement-required", "value"),
+        State("studio-route-composer-state", "data"),
+        prevent_initial_call=True,
+    )
+    def _sync_route_composer_fields(
+        intent: str | None,
+        q_min_delivered_lpm: Any,
+        dose_min_l: Any,
+        notes: str | None,
+        measurement_required: list[str] | None,
+        composer_state: dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        state = _normalize_route_composer_state(composer_state)
+        state["intent"] = str(intent or state.get("intent") or "optional").strip().lower()
+        state["q_min_delivered_lpm"] = q_min_delivered_lpm
+        state["dose_min_l"] = dose_min_l
+        state["notes"] = str(notes or "").strip()
+        state["measurement_required"] = "measurement_required" in (measurement_required or [])
+        return _normalize_route_composer_state(state)
+
+    @app.callback(
+        Output("routes-grid", "rowData", allow_duplicate=True),
+        Output("studio-route-composer-state", "data", allow_duplicate=True),
+        Output("studio-status-message", "data", allow_duplicate=True),
+        Input("studio-route-compose-confirm-button", "n_clicks"),
+        State("studio-route-composer-state", "data"),
         State("routes-grid", "rowData"),
         prevent_initial_call=True,
     )
-    def _manage_route_draft_from_route_panel(
-        start_n_clicks: Any,
-        complete_n_clicks: Any,
-        cancel_n_clicks: Any,
-        selected_node_id: str | None,
-        route_draft_source_id: str | None,
+    def _confirm_route_composer(
+        n_clicks: Any,
+        composer_state: dict[str, Any] | None,
         route_rows: list[dict[str, Any]] | None,
-    ) -> tuple[list[dict[str, Any]], str, str]:
-        click_map = {
-            "start": int(start_n_clicks or 0),
-            "complete": int(complete_n_clicks or 0),
-            "cancel": int(cancel_n_clicks or 0),
-        }
-        action = max(click_map, key=click_map.get)
-        if click_map[action] <= 0:
-            return route_rows or [], str(route_draft_source_id or "").strip(), ""
-        selected_id = str(selected_node_id or "").strip()
-        draft_source = str(route_draft_source_id or "").strip()
-        if action == "start":
-            if not selected_id:
-                return route_rows or [], draft_source, "Selecione uma entidade antes de iniciar a criação da rota."
-            return route_rows or [], selected_id, f"Origem da rota armada em {selected_id}. Selecione o destino no canvas."
-        if action == "cancel":
-            if not draft_source:
-                return route_rows or [], "", ""
-            return route_rows or [], "", "Criação direta da rota cancelada no canvas."
-        if not draft_source or not selected_id or selected_id == draft_source:
-            return route_rows or [], draft_source, ""
+    ) -> tuple[list[dict[str, Any]], dict[str, Any], str]:
+        state = _normalize_route_composer_state(composer_state)
+        if not n_clicks:
+            return route_rows or [], state, ""
+        source_node_id = str(state.get("source_node_id") or "").strip()
+        sink_node_id = str(state.get("sink_node_id") or "").strip()
+        if not source_node_id or not sink_node_id or source_node_id == sink_node_id:
+            return route_rows or [], state, "Defina origem e destino diferentes antes de confirmar a rota no canvas."
         try:
             updated_rows, created_route_id = create_route_between_business_nodes(
                 route_rows or [],
-                source_node_id=draft_source,
-                sink_node_id=selected_id,
+                source_node_id=source_node_id,
+                sink_node_id=sink_node_id,
+            )
+            updated_rows, created_route_id = apply_route_studio_edit(
+                updated_rows,
+                selected_route_id=created_route_id,
+                intent=str(state.get("intent") or "optional"),
+                measurement_required=bool(state.get("measurement_required")),
+                dose_min_l=state.get("dose_min_l"),
+                q_min_delivered_lpm=state.get("q_min_delivered_lpm"),
+                notes=state.get("notes"),
             )
         except ValueError as exc:
-            return route_rows or [], "", str(exc)
-        return updated_rows, "", f"Rota {created_route_id} criada direto no canvas entre {draft_source} e {selected_id}."
+            return route_rows or [], state, str(exc)
+        return updated_rows, _empty_route_composer_state(), f"Rota {created_route_id} confirmada no canvas com preview revisado."
 
     @app.callback(
         Output("routes-grid", "rowData", allow_duplicate=True),
@@ -6371,7 +6650,6 @@ def build_app(
     @app.callback(
         Output("routes-grid", "rowData", allow_duplicate=True),
         Output("studio-status-message", "data", allow_duplicate=True),
-        Input("studio-route-create-from-edge-button", "n_clicks"),
         Input("studio-route-intent-mandatory-button", "n_clicks"),
         Input("studio-route-intent-desirable-button", "n_clicks"),
         Input("studio-route-intent-optional-button", "n_clicks"),
@@ -6382,7 +6660,6 @@ def build_app(
         prevent_initial_call=True,
     )
     def _apply_route_canvas_quick_actions(
-        create_route_n_clicks: Any,
         mandatory_n_clicks: Any,
         desirable_n_clicks: Any,
         optional_n_clicks: Any,
@@ -6392,7 +6669,6 @@ def build_app(
         selected_route_id: str | None,
     ) -> tuple[list[dict[str, Any]], str]:
         click_map = {
-            "create": int(create_route_n_clicks or 0),
             "mandatory": int(mandatory_n_clicks or 0),
             "desirable": int(desirable_n_clicks or 0),
             "optional": int(optional_n_clicks or 0),
@@ -6401,13 +6677,6 @@ def build_app(
         if click_map[action] <= 0:
             return route_rows or [], ""
         try:
-            if action == "create":
-                updated_rows, created_route_id = create_route_from_edge_studio_selection(
-                    route_rows or [],
-                    selected_link_id=selected_link_id,
-                    candidate_links_rows=candidate_links_rows or [],
-                )
-                return updated_rows, f"Rota {created_route_id} criada direto do trecho selecionado."
             if selected_route_id:
                 updated_rows, route_id = apply_route_studio_edit(
                     route_rows or [],
@@ -6674,22 +6943,29 @@ def build_app(
 
     @app.callback(
         Output("studio-route-draft-source-id", "data"),
+        Output("studio-route-composer-state", "data", allow_duplicate=True),
         Output("studio-status-message", "data", allow_duplicate=True),
         Input("node-studio-cytoscape", "contextMenuData"),
         State("node-studio-selected-id", "data"),
+        State("studio-route-composer-state", "data"),
         prevent_initial_call=True,
     )
     def _start_route_draft_from_context_menu(
         context_menu_data: dict[str, Any] | None,
         selected_node_id: str | None,
-    ) -> tuple[str, str]:
+        composer_state: dict[str, Any] | None,
+    ) -> tuple[str, dict[str, Any], str]:
         payload = context_menu_data or {}
         if str(payload.get("menuItemId") or "").strip() != "start-route-from-node":
-            return "", ""
+            return "", _normalize_route_composer_state(composer_state), ""
         source_node_id = str(payload.get("elementId") or selected_node_id or "").strip()
         if not source_node_id:
-            return "", "Selecione uma entidade antes de iniciar a criação da rota."
-        return source_node_id, f"Origem da rota armada em {source_node_id}. Selecione o destino no canvas."
+            return "", _normalize_route_composer_state(composer_state), "Selecione uma entidade antes de iniciar a criação da rota."
+        next_state = _normalize_route_composer_state(composer_state)
+        next_state["source_node_id"] = source_node_id
+        if next_state.get("sink_node_id") == source_node_id:
+            next_state["sink_node_id"] = ""
+        return "", next_state, f"Origem da rota armada em {source_node_id}. Agora defina o destino explicitamente no composer."
 
     @app.callback(
         Output("routes-grid", "rowData", allow_duplicate=True),
@@ -7460,7 +7736,7 @@ def build_app(
         Input("node-studio-summary", "children"),
         Input("edge-studio-summary", "children"),
         Input("studio-status", "children"),
-        Input("studio-route-draft-source-id", "data"),
+        Input("studio-route-composer-state", "data"),
     )
     def _refresh_studio_panels(
         nodes_rows: list[dict[str, Any]] | None,
@@ -7471,7 +7747,7 @@ def build_app(
         node_summary_text: str | None,
         edge_summary_text: str | None,
         studio_status_text: str | None,
-        route_draft_source_id: str | None,
+        route_composer_state: dict[str, Any] | None,
     ) -> tuple[Any, Any, Any, Any, Any, Any, Any, Any, Any, Any, Any]:
         studio_readiness = build_studio_readiness_summary(nodes_rows or [], candidate_links_rows or [], route_rows or [])
         node_summary = _safe_json_loads(node_summary_text)
@@ -7496,7 +7772,7 @@ def build_app(
                 candidate_links_rows or [],
                 route_rows,
                 studio_status_text,
-                route_draft_source_id,
+                route_composer_state,
             ),
             render_studio_readiness_panel(studio_readiness, route_rows or [], nodes_rows or []),
             render_studio_projection_panel(
@@ -8827,6 +9103,7 @@ def build_primary_node_studio_elements(
     nodes_rows: list[dict[str, Any]],
     candidate_links_rows: list[dict[str, Any]],
     route_rows: list[dict[str, Any]] | None = None,
+    route_composer_state: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     visible_nodes = _visible_studio_nodes(nodes_rows)
     node_lookup = {
@@ -8881,6 +9158,25 @@ def build_primary_node_studio_elements(
                     ),
                 }
             )
+        composer_state = _normalize_route_composer_state(route_composer_state)
+        composer_source = str(composer_state.get("source_node_id") or "").strip()
+        composer_sink = str(composer_state.get("sink_node_id") or "").strip()
+        if composer_source in node_lookup and composer_sink in node_lookup and composer_source != composer_sink:
+            composer_intent = str(composer_state.get("intent") or "optional")
+            elements.append(
+                {
+                    "data": {
+                        "id": f"route-preview:{composer_source}:{composer_sink}",
+                        "source": composer_source,
+                        "target": composer_sink,
+                        "label": f"Rota em preparo · {_route_intent_label(composer_intent)}",
+                        "route_group": composer_intent,
+                        "intent": composer_intent,
+                        "preview": True,
+                    },
+                    "classes": f"route-projection route-composer-preview {composer_intent}",
+                }
+            )
         return elements
     visible_edges = _visible_studio_edges(nodes_rows, candidate_links_rows)
     for row in visible_edges:
@@ -8904,6 +9200,25 @@ def build_primary_node_studio_elements(
                     "family_hint": str(row.get("family_hint", "")).strip(),
                     "notes": str(row.get("notes", "")).strip(),
                 }
+            }
+        )
+    composer_state = _normalize_route_composer_state(route_composer_state)
+    composer_source = str(composer_state.get("source_node_id") or "").strip()
+    composer_sink = str(composer_state.get("sink_node_id") or "").strip()
+    if composer_source in node_lookup and composer_sink in node_lookup and composer_source != composer_sink:
+        composer_intent = str(composer_state.get("intent") or "optional")
+        elements.append(
+            {
+                "data": {
+                    "id": f"route-preview:{composer_source}:{composer_sink}",
+                    "source": composer_source,
+                    "target": composer_sink,
+                    "label": f"Rota em preparo · {_route_intent_label(composer_intent)}",
+                    "route_group": composer_intent,
+                    "intent": composer_intent,
+                    "preview": True,
+                },
+                "classes": f"route-composer-preview {composer_intent}",
             }
         )
     return elements
@@ -9195,6 +9510,7 @@ def _build_node_studio_stylesheet(
             },
         },
         {"selector": ".route-projection", "style": {"width": 4, "line-color": "#0f766e", "target-arrow-color": "#0f766e"}},
+        {"selector": ".route-composer-preview", "style": {"line-style": "dashed", "width": 6, "line-color": "#1d4ed8", "target-arrow-color": "#1d4ed8", "opacity": 0.92}},
         {"selector": ".mandatory", "style": {"width": 5, "line-color": "#0f766e", "target-arrow-color": "#0f766e"}},
         {"selector": ".desirable", "style": {"line-style": "dashed", "line-color": "#d97706", "target-arrow-color": "#d97706", "opacity": 0.92}},
         {"selector": ".optional", "style": {"line-style": "dotted", "line-color": "#64748b", "target-arrow-color": "#64748b", "opacity": 0.82}},
