@@ -1,0 +1,15 @@
+Wave 7 capture validation
+
+- powershell -ExecutionPolicy Bypass -File scripts/Capture-UxRefinementStudio.ps1 -Port 8060 -OutputPath output/playwright/studio-fullhd-wave7.png
+- python inline image assessment for output/playwright/studio-fullhd-wave7.png
+
+Result:
+
+- alternative capture flow is now scripted in the repository
+- output/playwright/studio-fullhd-wave7.png was produced at 1920x1080
+- the produced bitmap is invalid as Studio evidence because it is a single-color white frame
+
+Evidence:
+
+- output\playwright\studio-fullhd-wave7.png
+- output\playwright\wave7_capture_assessment.txt

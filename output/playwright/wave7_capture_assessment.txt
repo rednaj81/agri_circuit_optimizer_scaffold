@@ -1,0 +1,7 @@
+Wave 7 capture assessment
+
+path: C:\d\dev\agri_circuit_optimizer_scaffold\output\playwright\studio-fullhd-wave7.png
+size: 1920x1080
+unique_colors: 1
+top_colors:
+- (243, 243, 243, 255): 2073600
