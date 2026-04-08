@@ -10,8 +10,10 @@ from decision_platform.data_io.storage import save_authored_scenario_bundle
 from decision_platform.ui_dash.app import (
     STUDIO_CONTEXT_MENU,
     apply_studio_context_menu_action,
+    apply_route_studio_edit,
     reverse_edge_studio_selection,
     build_app,
+    build_primary_node_studio_elements,
     create_business_node_studio_node,
     create_edge_studio_link,
     create_node_studio_node,
@@ -54,6 +56,10 @@ def test_dash_app_exposes_structural_studio_controls() -> None:
     assert "studio-workspace-quick-edit-panel" in layout_repr
     assert "studio-workspace-local-actions-panel" in layout_repr
     assert "studio-business-flow-panel" in layout_repr
+    assert "studio-route-editor-panel" in layout_repr
+    assert "studio-route-focus-dropdown" in layout_repr
+    assert "studio-route-intent" in layout_repr
+    assert "studio-route-apply-button" in layout_repr
     assert "studio-focus-node-label" in layout_repr
     assert "studio-focus-node-apply-button" in layout_repr
     assert "studio-focus-edge-length-m" in layout_repr
@@ -201,6 +207,50 @@ def test_reverse_edge_studio_selection_swaps_business_flow_direction() -> None:
     assert reversed_link["from_node"] == original_link["to_node"]
     assert reversed_link["to_node"] == original_link["from_node"]
     assert reversed_link["length_m"] == original_link["length_m"]
+
+
+@pytest.mark.fast
+def test_route_focus_edit_updates_intent_and_measurement_flags() -> None:
+    bundle = load_scenario_bundle("data/decision_platform/maquete_v2")
+
+    updated_routes, selected_route_id = apply_route_studio_edit(
+        bundle.route_requirements.to_dict("records"),
+        selected_route_id="R010",
+        intent="desirable",
+        measurement_required=True,
+        dose_min_l=3.5,
+        q_min_delivered_lpm=12,
+        notes="Premix desejável perto do canvas",
+    )
+
+    updated_route = next(row for row in updated_routes if str(row["route_id"]) == "R010")
+    assert selected_route_id == "R010"
+    assert bool(updated_route["mandatory"]) is False
+    assert updated_route["route_group"] == "desirable"
+    assert bool(updated_route["measurement_required"]) is True
+    assert updated_route["dose_min_l"] == pytest.approx(3.5)
+    assert updated_route["q_min_delivered_lpm"] == pytest.approx(12.0)
+    assert updated_route["notes"] == "Premix desejável perto do canvas"
+
+
+@pytest.mark.fast
+def test_primary_studio_projection_marks_desirable_routes_in_canvas_classes() -> None:
+    bundle = load_scenario_bundle("data/decision_platform/maquete_v2")
+    route_rows = bundle.route_requirements.to_dict("records")
+    for route in route_rows:
+        if str(route["route_id"]) == "R010":
+            route["mandatory"] = 0
+            route["route_group"] = "desirable"
+
+    elements = build_primary_node_studio_elements(
+        bundle.nodes.to_dict("records"),
+        bundle.candidate_links.to_dict("records"),
+        route_rows,
+    )
+
+    route_element = next(element for element in elements if element.get("data", {}).get("route_id") == "R010")
+    assert "desirable" in str(route_element.get("classes") or "")
+    assert route_element["data"]["intent"] == "desirable"
 
 
 @pytest.mark.fast

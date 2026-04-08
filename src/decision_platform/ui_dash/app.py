@@ -1304,6 +1304,182 @@ def _humanize_label_list(items: list[str]) -> str:
     return f"{unique_items[0]}, {unique_items[1]}, {unique_items[2]} e mais {len(unique_items) - 3}"
 
 
+def _route_intent_value(route: dict[str, Any] | None) -> str:
+    if _coerce_truthy((route or {}).get("mandatory")):
+        return "mandatory"
+    route_group = str((route or {}).get("route_group", "")).strip().lower()
+    if route_group == "desirable":
+        return "desirable"
+    return "optional"
+
+
+def _route_intent_label(intent: Any) -> str:
+    normalized = str(intent or "optional").strip().lower()
+    lookup = {
+        "mandatory": "Obrigatória",
+        "optional": "Opcional",
+        "desirable": "Desejável",
+    }
+    return lookup.get(normalized, "Opcional")
+
+
+def _route_intent_badge_style(intent: Any) -> dict[str, Any]:
+    normalized = str(intent or "optional").strip().lower()
+    background = "#e2e8f0"
+    color = "#334155"
+    if normalized == "mandatory":
+        background = "#d1fae5"
+        color = "#065f46"
+    elif normalized == "desirable":
+        background = "#fef3c7"
+        color = "#92400e"
+    return {
+        "display": "inline-flex",
+        "alignItems": "center",
+        "padding": "6px 10px",
+        "borderRadius": "999px",
+        "fontSize": "12px",
+        "fontWeight": 700,
+        "background": background,
+        "color": color,
+    }
+
+
+def _route_focus_rows(
+    route_rows: list[dict[str, Any]] | None,
+    *,
+    focus_node_ids: set[str] | None = None,
+) -> list[dict[str, Any]]:
+    normalized_routes = [dict(route) for route in (route_rows or [])]
+    normalized_focus = {
+        str(node_id).strip()
+        for node_id in (focus_node_ids or set())
+        if str(node_id).strip()
+    }
+    if normalized_focus:
+        filtered_routes = [
+            route
+            for route in normalized_routes
+            if str(route.get("source") or "").strip() in normalized_focus
+            or str(route.get("sink") or "").strip() in normalized_focus
+        ]
+        if filtered_routes:
+            normalized_routes = filtered_routes
+    return sorted(
+        normalized_routes,
+        key=lambda route: (
+            0 if _route_intent_value(route) == "mandatory" else (1 if _route_intent_value(route) == "desirable" else 2),
+            -float(route.get("weight") or 0.0),
+            str(route.get("route_id") or ""),
+        ),
+    )
+
+
+def _route_choice_options(
+    route_rows: list[dict[str, Any]] | None,
+    *,
+    focus_node_ids: set[str] | None = None,
+) -> list[dict[str, str]]:
+    options: list[dict[str, str]] = []
+    for route in _route_focus_rows(route_rows, focus_node_ids=focus_node_ids):
+        route_id = str(route.get("route_id") or "").strip()
+        if not route_id:
+            continue
+        source = str(route.get("source") or "-").strip() or "-"
+        sink = str(route.get("sink") or "-").strip() or "-"
+        label = f"{route_id} · {source} -> {sink} · {_route_intent_label(_route_intent_value(route))}"
+        options.append({"label": label, "value": route_id})
+    return options
+
+
+def _default_route_focus_selection(
+    route_rows: list[dict[str, Any]] | None,
+    *,
+    focus_node_ids: set[str] | None = None,
+    preferred_route_id: str | None = None,
+) -> str | None:
+    preferred = str(preferred_route_id or "").strip()
+    options = _route_choice_options(route_rows, focus_node_ids=focus_node_ids)
+    option_values = [str(option["value"]) for option in options]
+    if preferred and preferred in option_values:
+        return preferred
+    return option_values[0] if option_values else None
+
+
+def _route_studio_form_values(
+    route_rows: list[dict[str, Any]] | None,
+    *,
+    focus_node_ids: set[str] | None = None,
+    selected_route_id: str | None = None,
+) -> dict[str, Any]:
+    selected_id = _default_route_focus_selection(
+        route_rows,
+        focus_node_ids=focus_node_ids,
+        preferred_route_id=selected_route_id,
+    )
+    selected_row = next(
+        (
+            dict(route)
+            for route in (route_rows or [])
+            if str(route.get("route_id") or "").strip() == selected_id
+        ),
+        None,
+    )
+    if selected_row is None:
+        return {
+            "route_id": None,
+            "intent": "optional",
+            "measurement_required": [],
+            "dose_min_l": None,
+            "q_min_delivered_lpm": None,
+            "notes": "",
+            "source": "",
+            "sink": "",
+        }
+    return {
+        "route_id": selected_id,
+        "intent": _route_intent_value(selected_row),
+        "measurement_required": ["measurement_required"] if _coerce_truthy(selected_row.get("measurement_required")) else [],
+        "dose_min_l": float(selected_row.get("dose_min_l") or 0.0),
+        "q_min_delivered_lpm": float(selected_row.get("q_min_delivered_lpm") or 0.0),
+        "notes": str(selected_row.get("notes") or "").strip(),
+        "source": str(selected_row.get("source") or "").strip(),
+        "sink": str(selected_row.get("sink") or "").strip(),
+    }
+
+
+def apply_route_studio_edit(
+    route_rows: list[dict[str, Any]],
+    *,
+    selected_route_id: str | None,
+    intent: str | None,
+    measurement_required: bool,
+    dose_min_l: Any,
+    q_min_delivered_lpm: Any,
+    notes: str | None,
+) -> tuple[list[dict[str, Any]], str | None]:
+    selected_id = _default_route_focus_selection(route_rows, preferred_route_id=selected_route_id)
+    if not selected_id:
+        raise ValueError("Selecione uma rota antes de aplicar a edição local.")
+    normalized_intent = str(intent or "optional").strip().lower()
+    if normalized_intent not in {"mandatory", "optional", "desirable"}:
+        raise ValueError(f"Intento de rota desconhecido: {intent}")
+    updated_rows: list[dict[str, Any]] = []
+    for row in route_rows:
+        current = dict(row)
+        if str(current.get("route_id") or "").strip() != selected_id:
+            updated_rows.append(current)
+            continue
+        current["mandatory"] = 1 if normalized_intent == "mandatory" else 0
+        current["route_group"] = "desirable" if normalized_intent == "desirable" else ("core" if normalized_intent == "mandatory" else "optional")
+        current["measurement_required"] = 1 if measurement_required else 0
+        current["dose_min_l"] = float(dose_min_l or 0.0)
+        current["q_min_delivered_lpm"] = float(q_min_delivered_lpm or 0.0)
+        current["notes"] = str(notes or "").strip()
+        updated_rows.append(current)
+    return updated_rows, selected_id
+
+
 def _primary_route_projection_rows(
     nodes_rows: list[dict[str, Any]],
     route_rows: list[dict[str, Any]] | None,
@@ -1328,6 +1504,7 @@ def _primary_route_projection_rows(
                 "target": sink,
                 "label": str(route.get("notes", "")).strip() or f"{_studio_node_business_label(node_lookup[source])} -> {_studio_node_business_label(node_lookup[sink])}",
                 "route_group": str(route.get("route_group", "")).strip() or "core",
+                "intent": _route_intent_value(route),
                 "mandatory": bool(route.get("mandatory")),
                 "measurement_required": _coerce_truthy(route.get("measurement_required")),
                 "q_min_delivered_lpm": float(route.get("q_min_delivered_lpm") or 0.0),
@@ -1521,6 +1698,8 @@ def build_studio_readiness_summary(
         if source == "S":
             blockers.append(f"{row.get('link_id')} sai de S")
     mandatory_routes = [row for row in route_rows if _coerce_truthy(row.get("mandatory"))]
+    desirable_routes = [row for row in route_rows if _route_intent_value(row) == "desirable"]
+    optional_routes = [row for row in route_rows if _route_intent_value(row) == "optional"]
     for route in route_rows:
         route_id = str(route.get("route_id", "")).strip() or "ROUTE"
         source = str(route.get("source", "")).strip()
@@ -1604,6 +1783,8 @@ def build_studio_readiness_summary(
         "business_edge_count": len(projected_business_routes) or len(_visible_studio_edges(nodes_rows, candidate_links_rows)),
         "hidden_internal_node_count": max(len(nodes_rows) - len(visible_business_nodes), 0),
         "mandatory_route_count": len(mandatory_routes),
+        "desirable_route_count": len(desirable_routes),
+        "optional_route_count": len(optional_routes),
         "measurement_route_count": sum(1 for row in route_rows if _coerce_truthy(row.get("measurement_required"))),
         "blocker_count": len(list(dict.fromkeys(blockers))),
         "warning_count": len(list(dict.fromkeys(warnings))),
@@ -2024,6 +2205,166 @@ def _studio_workspace_quick_edit_cards(
     ]
 
 
+def render_studio_route_editor_panel(
+    route_rows: list[dict[str, Any]] | None,
+    node_summary: dict[str, Any],
+    edge_summary: dict[str, Any],
+    studio_summary: dict[str, Any],
+) -> Any:
+    focus_node_ids = {
+        str(node_summary.get("selected_node_id") or "").strip(),
+        str((edge_summary.get("selected_edge") or {}).get("from_node") or "").strip(),
+        str((edge_summary.get("selected_edge") or {}).get("to_node") or "").strip(),
+    }
+    focus_node_ids = {node_id for node_id in focus_node_ids if node_id}
+    route_options = _route_choice_options(route_rows, focus_node_ids=focus_node_ids)
+    form_values = _route_studio_form_values(route_rows, focus_node_ids=focus_node_ids)
+    focused_routes = _route_focus_rows(route_rows, focus_node_ids=focus_node_ids)
+    selected_route_present = bool(form_values.get("route_id"))
+    top_route = focused_routes[0] if focused_routes else None
+    if top_route is not None:
+        route_scope_text = (
+            f"O foco atual toca {len(focused_routes)} rota(s). Comece por {top_route.get('route_id')} e ajuste a intenção perto do canvas."
+            if focus_node_ids
+            else f"O cenário já tem {len(focused_routes)} rota(s). Ajuste a intenção das mais relevantes sem sair do primeiro fold."
+        )
+    else:
+        route_scope_text = "Selecione um trecho do canvas para abrir as rotas ligadas a ele."
+    highlighted_route_lines = []
+    for route in focused_routes[:4]:
+        route_id = str(route.get("route_id") or "ROTA")
+        source = str(route.get("source") or "-").strip() or "-"
+        sink = str(route.get("sink") or "-").strip() or "-"
+        intent = _route_intent_label(_route_intent_value(route))
+        notes = str(route.get("notes") or "").strip()
+        highlight = f"{route_id}: {source} -> {sink} · {intent}"
+        if notes:
+            highlight += f" · {notes}"
+        highlighted_route_lines.append(highlight)
+    return html.Div(
+        id="studio-route-editor-panel",
+        style={**UI_MUTED_CARD_STYLE, "padding": "12px", "marginBottom": "12px"},
+        children=[
+            html.Div("Rotas que precisam de serviço", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+            html.Div(route_scope_text, style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"}),
+            html.Div(
+                style={"display": "flex", "gap": "8px", "flexWrap": "wrap", "marginTop": "10px"},
+                children=[
+                    html.Span("Obrigatória", style=_route_intent_badge_style("mandatory")),
+                    html.Span("Desejável", style=_route_intent_badge_style("desirable")),
+                    html.Span("Opcional", style=_route_intent_badge_style("optional")),
+                ],
+            ),
+            html.Div(
+                style={**UI_TWO_COLUMN_STYLE, "marginTop": "12px"},
+                children=[
+                    _guidance_card("Readiness desta camada", str(studio_summary.get("readiness_stage") or "Revisar rotas")),
+                    _guidance_card("Gate para Runs", "Feche primeiro as rotas obrigatórias e confirme medição direta quando houver dosagem."),
+                ],
+            ),
+            _field_block(
+                "Rota em foco",
+                dcc.Dropdown(
+                    id="studio-route-focus-dropdown",
+                    options=route_options,
+                    value=form_values.get("route_id"),
+                    persistence=True,
+                    persistence_type="session",
+                    placeholder="Selecione uma rota ligada ao foco atual",
+                ),
+            ),
+            html.Div(
+                style={**UI_THREE_COLUMN_STYLE, "marginTop": "8px"},
+                children=[
+                    _field_block(
+                        "Intenção",
+                        dcc.Dropdown(
+                            id="studio-route-intent",
+                            options=[
+                                {"label": "Obrigatória", "value": "mandatory"},
+                                {"label": "Desejável", "value": "desirable"},
+                                {"label": "Opcional", "value": "optional"},
+                            ],
+                            value=form_values.get("intent"),
+                            disabled=not selected_route_present,
+                            persistence=True,
+                            persistence_type="session",
+                        ),
+                    ),
+                    _field_block(
+                        "Vazão mínima (L/min)",
+                        dcc.Input(
+                            id="studio-route-q-min-lpm",
+                            type="number",
+                            value=form_values.get("q_min_delivered_lpm"),
+                            disabled=not selected_route_present,
+                            persistence=True,
+                            persistence_type="session",
+                            style={"width": "100%"},
+                        ),
+                    ),
+                    _field_block(
+                        "Dosagem mínima (L)",
+                        dcc.Input(
+                            id="studio-route-dose-min-l",
+                            type="number",
+                            value=form_values.get("dose_min_l"),
+                            disabled=not selected_route_present,
+                            persistence=True,
+                            persistence_type="session",
+                            style={"width": "100%"},
+                        ),
+                    ),
+                ],
+            ),
+            _field_block(
+                "Observação visível da rota",
+                dcc.Input(
+                    id="studio-route-notes",
+                    type="text",
+                    value=form_values.get("notes"),
+                    disabled=not selected_route_present,
+                    persistence=True,
+                    persistence_type="session",
+                    style={"width": "100%"},
+                ),
+            ),
+            _field_block(
+                "Medição direta",
+                dcc.Checklist(
+                    id="studio-route-measurement-required",
+                    options=[{"label": "Exigir medição direta nesta rota", "value": "measurement_required"}],
+                    value=form_values.get("measurement_required"),
+                    persistence=True,
+                    persistence_type="session",
+                ),
+            ),
+            html.Div(
+                style=UI_ACTION_ROW_STYLE,
+                children=[
+                    html.Button(
+                        "Aplicar rota no foco",
+                        id="studio-route-apply-button",
+                        style=UI_BUTTON_STYLE,
+                        disabled=not selected_route_present,
+                    ),
+                ],
+            ),
+            html.Details(
+                id="studio-route-editor-details",
+                style={**UI_MUTED_CARD_STYLE, "padding": "10px", "marginTop": "10px"},
+                children=[
+                    html.Summary("Ver rotas ligadas a este foco"),
+                    _bullet_list(
+                        highlighted_route_lines,
+                        "Ainda não há rota ligada ao foco atual.",
+                    ),
+                ],
+            ),
+        ],
+    )
+
+
 def render_studio_workspace_panel(
     studio_summary: dict[str, Any],
     node_summary: dict[str, Any],
@@ -2065,6 +2406,7 @@ def render_studio_workspace_panel(
         nodes_rows=nodes_rows,
         candidate_links_rows=candidate_links_rows,
     )
+    route_editor_panel = render_studio_route_editor_panel(route_rows, node_summary, edge_summary, studio_summary)
     runs_enabled = status == "ready"
     runs_button_label = "Ir para Runs" if runs_enabled else "Runs bloqueado neste estado"
     primary_actions: list[Any]
@@ -2131,6 +2473,7 @@ def render_studio_workspace_panel(
                     ),
                 ],
             ),
+            route_editor_panel,
             html.Div(
                 id="studio-business-flow-panel",
                 style={**UI_MUTED_CARD_STYLE, "padding": "12px", "marginBottom": "12px"},
@@ -2162,6 +2505,8 @@ def render_studio_workspace_panel(
                     _metric_card("Bloqueios", blocker_count, "Impedem liberar a passagem para Runs."),
                     _metric_card("Avisos", warning_count, "Pedem revisão antes de enfileirar."),
                     _metric_card("Rotas obrigatórias", studio_summary.get("mandatory_route_count", 0), "Base mínima da conectividade principal."),
+                    _metric_card("Rotas desejáveis", studio_summary.get("desirable_route_count", 0), "Desejos explícitos sem virar hard constraint."),
+                    _metric_card("Rotas opcionais", studio_summary.get("optional_route_count", 0), "Alternativas que não travam a saída para Runs."),
                 ],
             ),
             html.Div(style={**UI_ACTION_ROW_STYLE, "marginTop": "12px"}, children=[*primary_actions, _button_link("Abrir Auditoria", "?tab=audit", "studio-workspace-open-audit-link")]),
@@ -2183,6 +2528,7 @@ def render_studio_command_center_panel(
     edge_summary: dict[str, Any],
     nodes_rows: list[dict[str, Any]],
     candidate_links_rows: list[dict[str, Any]],
+    route_rows: list[dict[str, Any]] | None = None,
 ) -> Any:
     options = _business_node_choice_options(nodes_rows)
     quick_source, quick_target = _studio_quick_link_defaults(nodes_rows, node_summary, edge_summary)
@@ -2209,16 +2555,36 @@ def render_studio_command_center_panel(
         )
         for preset_key, preset in BUSINESS_NODE_PRESETS.items()
     ]
+    route_rows = route_rows or []
     return html.Div(
         id="studio-command-center-panel",
         children=[
             html.Div("Command center do Studio", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
-            html.Div("Monte o grafo de negócio sem sair da superfície principal", style={"fontWeight": 700, "fontSize": "20px", "lineHeight": "1.25", "marginTop": "6px"}),
+            html.Div("Desenhe primeiro as rotas que precisam de serviço", style={"fontWeight": 700, "fontSize": "20px", "lineHeight": "1.25", "marginTop": "6px"}),
             html.Div(
                 style={**UI_TWO_COLUMN_STYLE, "gridTemplateColumns": "repeat(2, minmax(0, 1fr))", "marginTop": "12px", "marginBottom": "12px"},
                 children=[
                     _guidance_card("Foco atual", selected_focus),
                     _guidance_card("Passagem para Runs", "Liberada" if runs_ready else "Continue no Studio até fechar readiness e conectividade."),
+                ],
+            ),
+            html.Div(
+                style={**UI_MUTED_CARD_STYLE, "padding": "14px", "marginBottom": "12px"},
+                children=[
+                    html.Div("Intenção das rotas", style={"fontWeight": 700, "marginBottom": "8px"}),
+                    html.Div("Obrigatória, desejável e opcional ficam na mesma superfície para evitar desvio prematuro ao workbench.", style={"lineHeight": "1.45", "marginBottom": "10px"}),
+                    html.Div(
+                        style={"display": "flex", "gap": "8px", "flexWrap": "wrap"},
+                        children=[
+                            html.Span(f"{studio_summary.get('mandatory_route_count', 0)} obrigatórias", style=_route_intent_badge_style("mandatory")),
+                            html.Span(f"{studio_summary.get('desirable_route_count', 0)} desejáveis", style=_route_intent_badge_style("desirable")),
+                            html.Span(f"{studio_summary.get('optional_route_count', 0)} opcionais", style=_route_intent_badge_style("optional")),
+                        ],
+                    ),
+                    html.Div(
+                        _route_choice_options(route_rows)[0]["label"] if _route_choice_options(route_rows) else "Ainda não há rota registrada para esta leitura.",
+                        style={"marginTop": "10px", "lineHeight": "1.45"},
+                    ),
                 ],
             ),
             html.Div(
@@ -2284,6 +2650,7 @@ def render_studio_command_center_panel(
                     _metric_card("Entidades de negócio", studio_summary.get("business_node_count", 0), "Só o que o usuário precisa editar."),
                     _metric_card("Conexões visíveis", studio_summary.get("business_edge_count", 0), "Fluxo principal sem malha interna."),
                     _metric_card("Internos ocultos", studio_summary.get("hidden_internal_node_count", 0), "Nós derivados e hubs fora da superfície principal."),
+                    _metric_card("Rotas declaradas", len(route_rows), "Trabalho principal desta etapa do Studio."),
                 ],
             ),
         ],
@@ -4140,16 +4507,16 @@ def build_app(
                                 style={**UI_COMPACT_BANNER_CARD_STYLE, "marginBottom": "14px"},
                                 children=[
                                     html.Div("Studio", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#47665d"}),
-                                    html.Div("Edite o grafo de negócio com prioridade para o canvas.", style={"fontWeight": 700, "fontSize": "22px", "lineHeight": "1.25", "marginTop": "6px"}),
+                                    html.Div("Desenhe primeiro as rotas de negócio e ajuste a intenção perto do canvas.", style={"fontWeight": 700, "fontSize": "22px", "lineHeight": "1.25", "marginTop": "6px"}),
                                     html.Div(
                                         style={**UI_TWO_COLUMN_STYLE, "gridTemplateColumns": "minmax(0, 1fr) minmax(280px, 360px)", "marginTop": "10px"},
                                         children=[
-                                            html.Div("A superfície principal mantém só entidades e conexões de negócio. Hubs internos, contratos crus e JSON ficam fora da primeira dobra.", style={"lineHeight": "1.45"}),
+                                            html.Div("A superfície principal mantém rotas, entidades e conexões de negócio. Hubs internos, contratos crus e JSON ficam fora da primeira dobra.", style={"lineHeight": "1.45"}),
                                             html.Div(
                                                 style={**UI_MUTED_CARD_STYLE, "padding": "10px"},
                                                 children=[
                                                     html.Div("Prioridade agora", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
-                                                    html.Div("Revise o fluxo no canvas, corrija readiness e use a bancada avançada só quando a ação direta não bastar.", style={"fontWeight": 700, "lineHeight": "1.45", "marginTop": "6px"}),
+                                                    html.Div("Defina as rotas a servir, ajuste intenção e conectividade no canvas e use a bancada avançada só quando a ação direta não bastar.", style={"fontWeight": 700, "lineHeight": "1.45", "marginTop": "6px"}),
                                                 ],
                                             ),
                                         ],
@@ -4167,15 +4534,15 @@ def build_app(
                                                 children=[
                                                     html.Div(
                                                         children=[
-                                                            html.H3("Grafo de negócio", style={"margin": "0 0 4px"}),
-                                                            html.Div("Use esta área para enxergar e corrigir o fluxo principal do cenário.", style={"lineHeight": "1.45", "color": "#496158"}),
+                                                            html.H3("Rotas de negócio no canvas", style={"margin": "0 0 4px"}),
+                                                            html.Div("Use esta área para enxergar quem supre quem, desenhar os trechos principais e revisar a intenção das rotas.", style={"lineHeight": "1.45", "color": "#496158"}),
                                                         ]
                                                     ),
                                                     html.Div(
                                                         style={**UI_MUTED_CARD_STYLE, "padding": "10px", "minWidth": "240px"},
                                                         children=[
                                                             html.Div("Visibilidade principal", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
-                                                            html.Div("Somente entidades e conexões de negócio aparecem aqui.", style={"fontWeight": 700, "lineHeight": "1.45", "marginTop": "6px"}),
+                                                            html.Div("Somente entidades, conexões e projeções de rota de negócio aparecem aqui.", style={"fontWeight": 700, "lineHeight": "1.45", "marginTop": "6px"}),
                                                         ],
                                                     ),
                                                 ],
@@ -4213,6 +4580,7 @@ def build_app(
                                                     _safe_json_loads(initial_edge_studio_summary),
                                                     authoring_payload["nodes_rows"],
                                                     authoring_payload["candidate_links_rows"],
+                                                    authoring_payload["route_rows"],
                                                 ),
                                             ),
                                             html.Div(
@@ -5310,6 +5678,93 @@ def build_app(
         return business_options, source_value, target_candidates, target_value
 
     @app.callback(
+        Output("studio-route-focus-dropdown", "options"),
+        Output("studio-route-focus-dropdown", "value"),
+        Output("studio-route-intent", "value"),
+        Output("studio-route-q-min-lpm", "value"),
+        Output("studio-route-dose-min-l", "value"),
+        Output("studio-route-notes", "value"),
+        Output("studio-route-measurement-required", "value"),
+        Input("routes-grid", "rowData"),
+        Input("node-studio-summary", "children"),
+        Input("edge-studio-summary", "children"),
+        State("studio-route-focus-dropdown", "value"),
+    )
+    def _sync_route_focus_controls(
+        route_rows: list[dict[str, Any]] | None,
+        node_summary_text: str | None,
+        edge_summary_text: str | None,
+        current_route_id: str | None,
+    ) -> tuple[list[dict[str, str]], str | None, str | None, float | None, float | None, str, list[str]]:
+        node_summary = _safe_json_loads(node_summary_text)
+        edge_summary = _safe_json_loads(edge_summary_text)
+        focus_node_ids = {
+            str(node_summary.get("selected_node_id") or "").strip(),
+            str((edge_summary.get("selected_edge") or {}).get("from_node") or "").strip(),
+            str((edge_summary.get("selected_edge") or {}).get("to_node") or "").strip(),
+        }
+        focus_node_ids = {node_id for node_id in focus_node_ids if node_id}
+        options = _route_choice_options(route_rows, focus_node_ids=focus_node_ids)
+        selected_route_id = _default_route_focus_selection(
+            route_rows,
+            focus_node_ids=focus_node_ids,
+            preferred_route_id=current_route_id,
+        )
+        form_values = _route_studio_form_values(
+            route_rows,
+            focus_node_ids=focus_node_ids,
+            selected_route_id=selected_route_id,
+        )
+        return (
+            options,
+            selected_route_id,
+            form_values.get("intent"),
+            form_values.get("q_min_delivered_lpm"),
+            form_values.get("dose_min_l"),
+            str(form_values.get("notes") or ""),
+            list(form_values.get("measurement_required") or []),
+        )
+
+    @app.callback(
+        Output("routes-grid", "rowData", allow_duplicate=True),
+        Output("studio-status-message", "data", allow_duplicate=True),
+        Input("studio-route-apply-button", "n_clicks"),
+        State("routes-grid", "rowData"),
+        State("studio-route-focus-dropdown", "value"),
+        State("studio-route-intent", "value"),
+        State("studio-route-measurement-required", "value"),
+        State("studio-route-dose-min-l", "value"),
+        State("studio-route-q-min-lpm", "value"),
+        State("studio-route-notes", "value"),
+        prevent_initial_call=True,
+    )
+    def _apply_route_focus_edit(
+        n_clicks: Any,
+        route_rows: list[dict[str, Any]] | None,
+        selected_route_id: str | None,
+        intent: str | None,
+        measurement_required: list[str] | None,
+        dose_min_l: Any,
+        q_min_delivered_lpm: Any,
+        notes: str | None,
+    ) -> tuple[list[dict[str, Any]], str]:
+        if not n_clicks:
+            return route_rows or [], ""
+        try:
+            updated_rows, route_id = apply_route_studio_edit(
+                route_rows or [],
+                selected_route_id=selected_route_id,
+                intent=intent,
+                measurement_required="measurement_required" in (measurement_required or []),
+                dose_min_l=dose_min_l,
+                q_min_delivered_lpm=q_min_delivered_lpm,
+                notes=notes,
+            )
+        except ValueError as exc:
+            return route_rows or [], str(exc)
+        return updated_rows, f"Rota {route_id} atualizada direto no foco do canvas."
+
+    @app.callback(
         Output("candidate-links-grid", "rowData", allow_duplicate=True),
         Output("edge-studio-selected-id", "data", allow_duplicate=True),
         Output("studio-status-message", "data", allow_duplicate=True),
@@ -6286,6 +6741,7 @@ def build_app(
                 edge_summary,
                 nodes_rows or [],
                 candidate_links_rows or [],
+                route_rows,
             ),
             render_studio_workspace_panel(
                 studio_readiness,
@@ -7613,6 +8069,7 @@ def build_primary_node_studio_elements(
                         "target": str(route["target"]),
                         "label": str(route["label"]),
                         "route_group": str(route["route_group"]),
+                        "intent": str(route["intent"]),
                         "mandatory": bool(route["mandatory"]),
                         "measurement_required": bool(route["measurement_required"]),
                         "q_min_delivered_lpm": float(route["q_min_delivered_lpm"]),
@@ -7623,7 +8080,7 @@ def build_primary_node_studio_elements(
                         for item in [
                             "route-projection",
                             str(route["route_group"]),
-                            "mandatory" if bool(route["mandatory"]) else "optional",
+                            str(route["intent"]),
                             "measurement-required" if bool(route["measurement_required"]) else "",
                         ]
                         if item
@@ -7939,7 +8396,9 @@ def _build_node_studio_stylesheet(
             },
         },
         {"selector": ".route-projection", "style": {"width": 4, "line-color": "#0f766e", "target-arrow-color": "#0f766e"}},
-        {"selector": ".optional", "style": {"line-style": "dashed", "opacity": 0.82}},
+        {"selector": ".mandatory", "style": {"width": 5, "line-color": "#0f766e", "target-arrow-color": "#0f766e"}},
+        {"selector": ".desirable", "style": {"line-style": "dashed", "line-color": "#d97706", "target-arrow-color": "#d97706", "opacity": 0.92}},
+        {"selector": ".optional", "style": {"line-style": "dotted", "line-color": "#64748b", "target-arrow-color": "#64748b", "opacity": 0.82}},
         {"selector": ".service", "style": {"line-style": "dotted", "line-color": "#475569", "target-arrow-color": "#475569"}},
         {"selector": ".candidate-hub", "style": {"background-color": "#f59e0b", "shape": "diamond"}},
         {"selector": ".block-inbound", "style": {"border-color": "#dc2626"}},
