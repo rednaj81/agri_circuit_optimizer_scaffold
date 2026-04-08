@@ -64,6 +64,9 @@ def test_dash_app_exposes_structural_studio_controls() -> None:
     assert "studio-route-focus-dropdown" in layout_repr
     assert "studio-route-intent" in layout_repr
     assert "studio-route-apply-button" in layout_repr
+    assert "studio-route-start-from-node-button" in layout_repr
+    assert "studio-route-complete-to-node-button" in layout_repr
+    assert "studio-route-cancel-draft-button" in layout_repr
     assert "studio-route-create-from-edge-button" in layout_repr
     assert "studio-route-intent-mandatory-button" in layout_repr
     assert "studio-route-intent-desirable-button" in layout_repr

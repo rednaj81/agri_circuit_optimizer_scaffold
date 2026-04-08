@@ -2614,11 +2614,25 @@ def render_studio_route_editor_panel(
     selected_route_present = bool(form_values.get("route_id"))
     selected_edge = edge_summary.get("selected_edge") or {}
     selected_edge_present = bool(selected_edge)
+    selected_node_id = str(node_summary.get("selected_node_id") or "").strip()
+    selected_node_label = str(node_summary.get("business_label") or selected_node_id or "").strip() or "Entidade em foco"
     route_draft_source = str(route_draft_source_id or "").strip()
+    route_draft_source_label = _studio_node_business_label_from_lookup(route_draft_source, node_lookup) if route_draft_source else "Nenhuma origem armada"
+    can_start_route_from_node = bool(selected_node_id)
+    can_complete_route_to_node = bool(route_draft_source and selected_node_id and selected_node_id != route_draft_source)
     selected_edge_flow = (
         f"{str(edge_summary.get('from_label') or '-')} supre {str(edge_summary.get('to_label') or '-')}"
         if selected_edge_present
         else "Selecione uma conexão no canvas para criar ou revisar a rota deste trecho."
+    )
+    route_next_action = (
+        f"Use {selected_node_label} como destino para concluir a rota já armada."
+        if can_complete_route_to_node
+        else (
+            f"Inicie a rota a partir de {selected_node_label} para continuar definindo o atendimento direto no canvas."
+            if can_start_route_from_node
+            else "Selecione uma entidade ou conexão na camada principal para iniciar a definição da rota."
+        )
     )
     top_route = focused_routes[0] if focused_routes else None
     if top_route is not None:
@@ -2647,6 +2661,14 @@ def render_studio_route_editor_panel(
             html.Div("Rotas que precisam de serviço", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
             html.Div(route_scope_text, style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"}),
             html.Div(
+                style={**UI_THREE_COLUMN_STYLE, "marginTop": "10px"},
+                children=[
+                    _guidance_card("Quem supre quem agora", selected_edge_flow),
+                    _guidance_card("Próximo gesto", route_next_action),
+                    _guidance_card("Origem em preparo", route_draft_source_label),
+                ],
+            ),
+            html.Div(
                 style={**UI_MUTED_CARD_STYLE, "padding": "10px", "marginTop": "10px"},
                 children=[
                     html.Div("Trecho em foco", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
@@ -2666,6 +2688,24 @@ def render_studio_route_editor_panel(
                     html.Div(
                         style=UI_ACTION_ROW_STYLE,
                         children=[
+                            html.Button(
+                                "Iniciar rota desta entidade",
+                                id="studio-route-start-from-node-button",
+                                style=UI_BUTTON_STYLE,
+                                disabled=not can_start_route_from_node,
+                            ),
+                            html.Button(
+                                "Usar esta entidade como destino",
+                                id="studio-route-complete-to-node-button",
+                                style=UI_BUTTON_STYLE,
+                                disabled=not can_complete_route_to_node,
+                            ),
+                            html.Button(
+                                "Cancelar rota em preparo",
+                                id="studio-route-cancel-draft-button",
+                                style=UI_BUTTON_STYLE,
+                                disabled=not bool(route_draft_source),
+                            ),
                             html.Button(
                                 "Criar rota deste trecho",
                                 id="studio-route-create-from-edge-button",
@@ -6238,6 +6278,56 @@ def build_app(
             str(form_values.get("notes") or ""),
             list(form_values.get("measurement_required") or []),
         )
+
+    @app.callback(
+        Output("routes-grid", "rowData", allow_duplicate=True),
+        Output("studio-route-draft-source-id", "data", allow_duplicate=True),
+        Output("studio-status-message", "data", allow_duplicate=True),
+        Input("studio-route-start-from-node-button", "n_clicks"),
+        Input("studio-route-complete-to-node-button", "n_clicks"),
+        Input("studio-route-cancel-draft-button", "n_clicks"),
+        State("node-studio-selected-id", "data"),
+        State("studio-route-draft-source-id", "data"),
+        State("routes-grid", "rowData"),
+        prevent_initial_call=True,
+    )
+    def _manage_route_draft_from_route_panel(
+        start_n_clicks: Any,
+        complete_n_clicks: Any,
+        cancel_n_clicks: Any,
+        selected_node_id: str | None,
+        route_draft_source_id: str | None,
+        route_rows: list[dict[str, Any]] | None,
+    ) -> tuple[list[dict[str, Any]], str, str]:
+        click_map = {
+            "start": int(start_n_clicks or 0),
+            "complete": int(complete_n_clicks or 0),
+            "cancel": int(cancel_n_clicks or 0),
+        }
+        action = max(click_map, key=click_map.get)
+        if click_map[action] <= 0:
+            return route_rows or [], str(route_draft_source_id or "").strip(), ""
+        selected_id = str(selected_node_id or "").strip()
+        draft_source = str(route_draft_source_id or "").strip()
+        if action == "start":
+            if not selected_id:
+                return route_rows or [], draft_source, "Selecione uma entidade antes de iniciar a criação da rota."
+            return route_rows or [], selected_id, f"Origem da rota armada em {selected_id}. Selecione o destino no canvas."
+        if action == "cancel":
+            if not draft_source:
+                return route_rows or [], "", ""
+            return route_rows or [], "", "Criação direta da rota cancelada no canvas."
+        if not draft_source or not selected_id or selected_id == draft_source:
+            return route_rows or [], draft_source, ""
+        try:
+            updated_rows, created_route_id = create_route_between_business_nodes(
+                route_rows or [],
+                source_node_id=draft_source,
+                sink_node_id=selected_id,
+            )
+        except ValueError as exc:
+            return route_rows or [], "", str(exc)
+        return updated_rows, "", f"Rota {created_route_id} criada direto no canvas entre {draft_source} e {selected_id}."
 
     @app.callback(
         Output("routes-grid", "rowData", allow_duplicate=True),

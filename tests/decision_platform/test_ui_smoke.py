@@ -231,6 +231,9 @@ def test_studio_primary_surface_exposes_business_command_center() -> None:
     assert _find_component_by_id(app.layout, "studio-route-focus-dropdown") is not None
     assert _find_component_by_id(app.layout, "studio-route-intent") is not None
     assert _find_component_by_id(app.layout, "studio-route-apply-button") is not None
+    assert _find_component_by_id(app.layout, "studio-route-start-from-node-button") is not None
+    assert _find_component_by_id(app.layout, "studio-route-complete-to-node-button") is not None
+    assert _find_component_by_id(app.layout, "studio-route-cancel-draft-button") is not None
     assert _find_component_by_id(app.layout, "studio-route-create-from-edge-button") is not None
     assert _find_component_by_id(app.layout, "studio-route-intent-mandatory-button") is not None
     assert _find_component_by_id(app.layout, "studio-route-intent-desirable-button") is not None
@@ -253,6 +256,9 @@ def test_studio_primary_surface_exposes_business_command_center() -> None:
     assert "Junção" not in studio_text
     route_text = _collect_text_content(_find_component_by_id(app.layout, "studio-route-editor-panel"))
     assert "Criar rota deste trecho" in route_text
+    assert "Iniciar rota desta entidade" in route_text
+    assert "Usar esta entidade como destino" in route_text
+    assert "Quem supre quem agora" in route_text
     assert "Trecho em foco" in route_text
     assert "W ->" not in route_text
     assert "Tap" not in route_text
@@ -1343,6 +1349,35 @@ def test_focus_node_quick_edit_callback_updates_label_without_workbench() -> Non
     assert next_selected_id == "P1"
     assert updated_row["label"] == "Bomba principal refinada"
     assert status == "Rótulo da entidade atualizado direto no foco do canvas."
+
+
+def test_route_panel_callbacks_manage_draft_and_complete_route_without_workbench() -> None:
+    bundle = load_scenario_bundle("data/decision_platform/maquete_v2")
+    route_rows = [
+        row
+        for row in bundle.route_requirements.to_dict("records")
+        if str(row["route_id"]) != "R018"
+    ]
+    with diagnostic_runtime_test_mode():
+        app = build_app("data/decision_platform/maquete_v2")
+
+    callback = _get_callback(app, input_id="studio-route-start-from-node-button")
+    unchanged_rows, draft_source_id, status = callback(1, 0, 0, "I", "", route_rows)
+    assert unchanged_rows == route_rows
+    assert draft_source_id == "I"
+    assert status == "Origem da rota armada em I. Selecione o destino no canvas."
+
+    completed_rows, next_draft_source_id, status = callback(1, 2, 0, "IR", draft_source_id, route_rows)
+    created_route = next(row for row in completed_rows if str(row["route_id"]) == "R018")
+    assert next_draft_source_id == ""
+    assert created_route["source"] == "I"
+    assert created_route["sink"] == "IR"
+    assert status == "Rota R018 criada direto no canvas entre I e IR."
+
+    canceled_rows, canceled_draft_source_id, cancel_status = callback(1, 0, 2, "IR", draft_source_id, route_rows)
+    assert canceled_rows == route_rows
+    assert canceled_draft_source_id == ""
+    assert cancel_status == "Criação direta da rota cancelada no canvas."
 
 
 def test_focus_edge_quick_edit_callback_updates_length_and_family_without_workbench() -> None:

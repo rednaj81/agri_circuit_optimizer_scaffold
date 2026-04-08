@@ -2,47 +2,37 @@
 
 ## Escopo executado
 
-- Desloquei a criação de rota para um gesto direto no canvas: o operador pode iniciar a rota em uma entidade visível pelo menu contextual e concluir a criação ao selecionar a entidade de destino no grafo.
-- Mantive a edição de intenção e particularidades de rota perto do canvas, com ações rápidas para `obrigatória`, `desejável` e `opcional`.
-- Reforcei o menu contextual do Studio para incluir ações explícitas de rota no próprio grafo, sem recolocar o workbench técnico como caminho principal.
-- Mantive o Studio na camada de negócio e preservei internals fora da superfície primária.
+- Levei o fluxo comum de rota para a primeira dobra do Studio com ações diretas visíveis no próprio painel local: iniciar rota a partir da entidade em foco, concluir na entidade selecionada e cancelar o draft sem cair no workbench avançado.
+- Reforcei a leitura de cadeia de suprimento no bloco local de rotas com cards explícitos para `quem supre quem agora`, `próximo gesto` e `origem em preparo`.
+- Mantive o caminho já existente de criação por conexão, mas agora o operador também consegue fechar o fluxo `origem -> destino` diretamente a partir da seleção do canvas.
+- Contive a onda ao Studio e aos testes de smoke/estrutura; não abri frente nova em Runs, Decision ou captura visual.
 
 ## Mudanças principais
 
 - `src/decision_platform/ui_dash/app.py`
-  - adiciona `start-route-from-node` ao menu contextual do canvas
-  - adiciona `studio-route-draft-source-id` e o fluxo `origem -> clique no destino` para criar rotas direto no canvas
-  - adiciona ações rápidas locais para marcar intenção de rota sem depender do dropdown como caminho normal
-  - amplia o menu contextual de aresta com ações de intenção de rota
-  - endurece a superfície primária para esconder `junction` como foco técnico inicial do Studio
-- `tests/decision_platform/test_studio_structure.py`
-  - cobre criação de rota entre entidades de negócio
-  - cobre início de draft de rota via menu contextual do canvas
-  - cobre intenção de rota aplicada a partir de contexto local
+  - amplia `render_studio_route_editor_panel` com orientação local de suprimento e próximos gestos de rota;
+  - adiciona os controles `studio-route-start-from-node-button`, `studio-route-complete-to-node-button` e `studio-route-cancel-draft-button`;
+  - adiciona callback dedicado para gerenciar draft de rota pelo painel local e concluir criação de rota sem workbench.
 - `tests/decision_platform/test_ui_smoke.py`
-  - valida os novos controles locais de rota e as ações contextuais no Studio
+  - valida a presença dos novos controles route-first na primeira dobra do Studio;
+  - cobre o callback que arma, conclui e cancela a criação de rota direto no canvas.
+- `tests/decision_platform/test_studio_structure.py`
+  - valida a presença estrutural dos novos controles do fluxo route-first no layout do Studio.
 
 ## Validação executada
 
-- `python -m py_compile src\decision_platform\ui_dash\app.py`
-- `$env:PYTHONPATH='C:\d\dev\agri_circuit_optimizer_scaffold'; python -m pytest -q tests/decision_platform/test_studio_structure.py::test_dash_app_exposes_structural_studio_controls tests/decision_platform/test_studio_structure.py::test_create_route_between_business_nodes_adds_visible_route tests/decision_platform/test_studio_structure.py::test_apply_route_intent_from_edge_context_updates_matching_route tests/decision_platform/test_studio_structure.py::test_context_menu_action_starts_route_draft_from_selected_node tests/decision_platform/test_ui_smoke.py::test_studio_primary_surface_exposes_business_command_center`
+- `PYTHONPATH=. pytest tests/decision_platform/test_ui_smoke.py tests/decision_platform/test_studio_structure.py -q`
 
 Resultado:
 
-- `5 passed in 0.64s`
-
-## Evidência gerada
-
-- `output/ux_refinement_wave2_studio_snapshot.json`
-  - snapshot estrutural do Studio já montado pelo Dash
-  - registra textos da primeira dobra, ações locais de rota, IDs do menu contextual e presença do store de draft de rota
+- `97 passed, 1 skipped in 442.90s`
 
 ## Limites honestos
 
-- Não consegui produzir screenshot real em navegador nesta onda: o runtime local de Playwright/Chromium falhou com `spawn EPERM` e as ferramentas MCP de browser retornaram cancelamento no ambiente atual.
-- A evidência visual desta onda ficou, portanto, em snapshot estruturado do layout Dash, não em captura bitmap Full HD.
-- A ação contextual `create-route-from-edge` permanece útil apenas quando o trecho selecionado ainda não possui rota registrada; o caminho principal recomendado para criação agora é `iniciar rota daqui` no nó de origem e concluir no nó de destino.
+- Esta onda melhora o fluxo comum de rota na primeira dobra, mas ainda depende da seleção atual do canvas; não implementei um composer visual mais rico com múltiplas etapas ou previews gráficos dedicados.
+- O callback do painel local usa contagem de cliques para resolver a ação mais recente, suficiente para a suíte atual e para o fluxo esperado, mas ainda não foi endurecido com timestamps explícitos.
+- Não gerei evidência Playwright/screenshot nesta onda; a evidência principal continua sendo a suíte alvo verde e este handoff.
 
 ## Próximo passo sugerido
 
-- Fechar a próxima iteração do Studio na leitura imediata da rota em foco e na coerência entre projeção de rota e contexto local, antes de avançar para a fase de Runs.
+- A próxima onda do Studio pode concentrar-se em tornar ainda mais legíveis as particularidades da rota em foco e a passagem para readiness, antes de mover a frente principal para Runs.
