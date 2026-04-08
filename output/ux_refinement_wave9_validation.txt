@@ -1,0 +1,23 @@
+Wave 9 validation
+Date: 2026-04-08
+
+Command executed:
+powershell -ExecutionPolicy Bypass -File scripts\Capture-UxRefinementStudio.ps1 -Port 8060 -OutputPath output\playwright\studio-fullhd-wave9.png
+
+Observed result:
+- Dash Studio became ready on http://127.0.0.1:8060/?tab=studio
+- Browser-native Edge headless screenshot path executed
+- No PNG was generated at output/playwright/studio-fullhd-wave9.png
+- Assessment file was generated at output/playwright/studio-fullhd-wave9-assessment.json
+
+Assessment summary:
+- edge_exit_code: -2147483645
+- output_exists: false
+- visually_useful: false
+
+Primary blocker evidence:
+- output/playwright/wave9-edge-native.stderr.log
+- output/playwright/studio-fullhd-wave9-assessment.json
+
+Conclusion:
+The browser-native capture path is now the single reproduced blocker for ux_phase_2 visual evidence in this runtime.

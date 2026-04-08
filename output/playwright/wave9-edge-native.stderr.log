@@ -1,0 +1,7 @@
+[0408/164941.711:ERROR:third_party\crashpad\crashpad\util\win\registration_protocol_win.cc:108] CreateFile: Acesso negado. (0x5)
+[0408/164941.870:ERROR:third_party\crashpad\crashpad\util\file\filesystem_win.cc:128] GetFileAttributes C:\d\dev\agri_circuit_optimizer_scaffold\output\edge-wave9-headless-profile\Crashpad\attachments\61b59768-5155-4f36-bf75-f87974a3efac: O sistema não pode encontrar o arquivo especificado. (0x2)
+[0408/164941.870:ERROR:third_party\crashpad\crashpad\util\file\filesystem_win.cc:128] GetFileAttributes C:\d\dev\agri_circuit_optimizer_scaffold\output\edge-wave9-headless-profile\Crashpad\attachments\8314bd44-1a7f-46be-bca9-8f59aaea140a: O sistema não pode encontrar o arquivo especificado. (0x2)
+[0408/164941.870:ERROR:third_party\crashpad\crashpad\util\file\filesystem_win.cc:128] GetFileAttributes C:\d\dev\agri_circuit_optimizer_scaffold\output\edge-wave9-headless-profile\Crashpad\attachments\0135499d-6c7c-4d91-bba6-4f090a97acca: O sistema não pode encontrar o arquivo especificado. (0x2)
+[43344:25612:0408/164941.991:FATAL:mojo\public\cpp\platform\platform_channel.cc:170] Check failed: . : Acesso negado. (0x5)
+[0408/164941.992:ERROR:third_party\crashpad\crashpad\client\crashpad_client_win.cc:154] crash server failed to launch
+[43344:60788:0408/164941.992:ERROR:chrome\installer\util\google_update_settings.cc:508] Failed opening key Software\Microsoft\EdgeUpdate\ClientStateMedium\{56EB18F8-B008-4CBD-B6D2-8C97FE7E9062} to set usagestats; result: 5
