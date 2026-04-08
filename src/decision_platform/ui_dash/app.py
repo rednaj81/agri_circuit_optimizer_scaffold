@@ -1363,7 +1363,7 @@ def _studio_route_labels_from_ids(
     for route_id in normalized_ids:
         route = route_lookup.get(route_id)
         labels.append(
-            _studio_route_business_title(route, node_lookup=node_lookup) if route else f"Rota {route_id}"
+            _studio_route_business_title(route, node_lookup=node_lookup) if route else route_id
         )
     return labels
 
@@ -1636,6 +1636,41 @@ def apply_route_studio_edit(
         current["notes"] = str(notes or "").strip()
         updated_rows.append(current)
     return updated_rows, selected_id
+
+
+def _normalize_callback_map_for_testing(app: Any) -> None:
+    callback_map = getattr(app, "callback_map", None)
+    if not isinstance(callback_map, dict):
+        return
+    normalized: dict[str, dict[str, Any]] = {}
+    for callback_key, metadata in callback_map.items():
+        if not isinstance(metadata, dict):
+            normalized[str(callback_key)] = {"inputs": [], "callback": metadata}
+            continue
+        inputs = metadata.get("inputs") or metadata.get("raw_inputs") or []
+        normalized_inputs: list[dict[str, Any]] = []
+        for item in inputs:
+            if isinstance(item, dict):
+                normalized_inputs.append(
+                    {
+                        "id": item.get("id") or item.get("component_id"),
+                        "property": item.get("property") or item.get("component_property"),
+                    }
+                )
+            else:
+                normalized_inputs.append(
+                    {
+                        "id": getattr(item, "component_id", getattr(item, "id", None)),
+                        "property": getattr(item, "component_property", getattr(item, "property", None)),
+                    }
+                )
+        normalized_key = str(callback_key)
+        normalized_metadata = {**metadata, "inputs": normalized_inputs, "callback": metadata.get("callback")}
+        normalized[normalized_key] = normalized_metadata
+        stripped_key = normalized_key.lstrip(".")
+        if stripped_key != normalized_key:
+            normalized[stripped_key] = normalized_metadata
+    app.callback_map = normalized
 
 
 def _next_route_identifier(route_rows: list[dict[str, Any]]) -> str:
@@ -3216,13 +3251,17 @@ def render_studio_canvas_guidance_panel(
     blocker_count = int(summary.get("blocker_count", 0) or 0)
     warning_count = int(summary.get("warning_count", 0) or 0)
     selected_edge = edge_summary.get("selected_edge") or {}
+    selected_edge_from_label = _studio_node_business_label_from_lookup(str(selected_edge.get("from_node") or "").strip())
+    selected_edge_to_label = _studio_node_business_label_from_lookup(str(selected_edge.get("to_node") or "").strip())
     if selected_edge_id and selected_edge_label:
         current_focus = f"Conexão em foco: {selected_edge_label}."
+        if selected_edge_from_label or selected_edge_to_label:
+            current_focus += f" Fluxo visível entre {selected_edge_from_label} e {selected_edge_to_label}."
         canvas_action = "Revise a conexão selecionada, ajuste comprimento ou famílias e inverta a direção direto no primeiro fold quando isso destravar o fluxo."
         if str(selected_edge.get("to_node") or "").strip() == "W":
-            local_blocker = "Bloqueio local: esta conexão ainda entra em W e precisa ter a direção corrigida neste foco."
+            local_blocker = f"Bloqueio local: esta conexão ainda entra em {selected_edge_to_label} e precisa ter a direção corrigida neste foco."
         elif str(selected_edge.get("from_node") or "").strip() == "S":
-            local_blocker = "Bloqueio local: esta conexão ainda sai de S e precisa ter a direção corrigida neste foco."
+            local_blocker = f"Bloqueio local: esta conexão ainda sai de {selected_edge_from_label} e precisa ter a direção corrigida neste foco."
         elif blocker_count > 0:
             local_blocker = "Bloqueio local: use esta conexão para destravar a conectividade principal antes de abrir Runs."
         elif warning_count > 0:
@@ -5759,17 +5798,21 @@ def build_app(
             normalized_links,
             preferred_node_id=selected_node_id,
         )
+        focused_link_id = _default_edge_studio_selection(
+            normalized_links,
+            preferred_link_id=selected_edge_id,
+        )
         selected_link_id = _default_primary_edge_studio_selection(
             normalized_nodes,
             normalized_links,
-            preferred_link_id=selected_edge_id,
+            preferred_link_id=focused_link_id,
         )
         return (
             build_primary_node_studio_elements(normalized_nodes, normalized_links, normalized_routes),
             _build_node_studio_stylesheet(selected_id, selected_link_id),
             json.dumps(_build_node_studio_summary(normalized_nodes, selected_id), indent=2, ensure_ascii=False),
             json.dumps(
-                _build_edge_studio_summary(normalized_nodes, normalized_links, selected_link_id),
+                _build_edge_studio_summary(normalized_nodes, normalized_links, focused_link_id),
                 indent=2,
                 ensure_ascii=False,
             ),
@@ -7570,6 +7613,7 @@ def build_app(
             render_candidate_breakdown_panel(_safe_json_loads(breakdown_text)),
         )
 
+    _normalize_callback_map_for_testing(app)
     return app
 
 
