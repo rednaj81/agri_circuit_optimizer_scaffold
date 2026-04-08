@@ -5142,7 +5142,6 @@ def build_app(
             dcc.Store(id="run-queue-root", data=str(run_queue_root)),
             dcc.Store(id="node-studio-selected-id", data=initial_node_studio_selected_id),
             dcc.Store(id="edge-studio-selected-id", data=initial_edge_studio_selected_id),
-            dcc.Store(id="studio-route-draft-source-id", data=""),
             dcc.Store(id="studio-route-composer-state", data=initial_route_composer_state),
             dcc.Store(id="studio-status-message", data=""),
             html.Div(
@@ -6942,7 +6941,6 @@ def build_app(
         )
 
     @app.callback(
-        Output("studio-route-draft-source-id", "data"),
         Output("studio-route-composer-state", "data", allow_duplicate=True),
         Output("studio-status-message", "data", allow_duplicate=True),
         Input("node-studio-cytoscape", "contextMenuData"),
@@ -6954,46 +6952,18 @@ def build_app(
         context_menu_data: dict[str, Any] | None,
         selected_node_id: str | None,
         composer_state: dict[str, Any] | None,
-    ) -> tuple[str, dict[str, Any], str]:
+    ) -> tuple[dict[str, Any], str]:
         payload = context_menu_data or {}
         if str(payload.get("menuItemId") or "").strip() != "start-route-from-node":
-            return "", _normalize_route_composer_state(composer_state), ""
+            return _normalize_route_composer_state(composer_state), ""
         source_node_id = str(payload.get("elementId") or selected_node_id or "").strip()
         if not source_node_id:
-            return "", _normalize_route_composer_state(composer_state), "Selecione uma entidade antes de iniciar a criação da rota."
+            return _normalize_route_composer_state(composer_state), "Selecione uma entidade antes de iniciar a criação da rota."
         next_state = _normalize_route_composer_state(composer_state)
         next_state["source_node_id"] = source_node_id
         if next_state.get("sink_node_id") == source_node_id:
             next_state["sink_node_id"] = ""
-        return "", next_state, f"Origem da rota armada em {source_node_id}. Agora defina o destino explicitamente no composer."
-
-    @app.callback(
-        Output("routes-grid", "rowData", allow_duplicate=True),
-        Output("studio-route-draft-source-id", "data", allow_duplicate=True),
-        Output("studio-status-message", "data", allow_duplicate=True),
-        Input("node-studio-cytoscape", "tapNodeData"),
-        State("studio-route-draft-source-id", "data"),
-        State("routes-grid", "rowData"),
-        prevent_initial_call=True,
-    )
-    def _complete_route_draft_on_canvas(
-        tap_node_data: dict[str, Any] | None,
-        route_draft_source_id: str | None,
-        route_rows: list[dict[str, Any]] | None,
-    ) -> tuple[list[dict[str, Any]], str, str]:
-        draft_source = str(route_draft_source_id or "").strip()
-        target_node_id = str((tap_node_data or {}).get("id") or (tap_node_data or {}).get("node_id") or "").strip()
-        if not draft_source or not target_node_id or target_node_id == draft_source:
-            return route_rows or [], draft_source, ""
-        try:
-            updated_rows, created_route_id = create_route_between_business_nodes(
-                route_rows or [],
-                source_node_id=draft_source,
-                sink_node_id=target_node_id,
-            )
-        except ValueError as exc:
-            return route_rows or [], "", str(exc)
-        return updated_rows, "", f"Rota {created_route_id} criada direto no canvas entre {draft_source} e {target_node_id}."
+        return next_state, f"Origem da rota armada em {source_node_id}. Agora defina o destino explicitamente no composer."
 
     @app.callback(
         Output("candidate-links-grid", "rowData", allow_duplicate=True),

@@ -74,6 +74,7 @@ def test_dash_app_exposes_structural_studio_controls() -> None:
     assert "studio-route-compose-measurement-required" in layout_repr
     assert "studio-route-compose-confirm-button" in layout_repr
     assert "studio-route-composer-preview-panel" in layout_repr
+    assert "studio-route-draft-source-id" not in layout_repr
     assert "studio-route-intent-mandatory-button" in layout_repr
     assert "studio-route-intent-desirable-button" in layout_repr
     assert "studio-route-intent-optional-button" in layout_repr

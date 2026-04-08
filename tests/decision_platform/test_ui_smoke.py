@@ -241,6 +241,7 @@ def test_studio_primary_surface_exposes_business_command_center() -> None:
     assert _find_component_by_id(app.layout, "studio-route-compose-measurement-required") is not None
     assert _find_component_by_id(app.layout, "studio-route-compose-confirm-button") is not None
     assert _find_component_by_id(app.layout, "studio-route-composer-preview-panel") is not None
+    assert _find_component_by_id(app.layout, "studio-route-draft-source-id") is None
     assert _find_component_by_id(app.layout, "studio-route-intent-mandatory-button") is not None
     assert _find_component_by_id(app.layout, "studio-route-intent-desirable-button") is not None
     assert _find_component_by_id(app.layout, "studio-route-intent-optional-button") is not None

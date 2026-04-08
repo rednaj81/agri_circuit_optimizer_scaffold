@@ -1,0 +1,209 @@
+{
+  "phase_id": "phase_ux_refinement",
+  "wave_index": 4,
+  "captured_at": "2026-04-08",
+  "capture_method": {
+    "type": "structured_dash_layout_snapshot",
+    "source": "build_app().server.test_client().get('/_dash-layout')",
+    "why": "The environment blocked honest browser bitmap capture, so the UI evidence was extracted from the actual Dash layout served by the app."
+  },
+  "viewport_assessment": {
+    "target": "Full HD first fold",
+    "studio_main_grid_style": {
+      "display": "grid",
+      "gridTemplateColumns": "minmax(0, 1.75fr) minmax(360px, 430px)",
+      "gap": "18px",
+      "alignItems": "start"
+    },
+    "assessment": "The main Studio grid keeps the canvas as the dominant column and confines local editing to a narrower sidebar, which matches the route-first Full HD objective for this wave."
+  },
+  "primary_surface_snapshot": {
+    "studio-command-center-panel": {
+      "found": true,
+      "text": [
+        "Command center do Studio",
+        "Desenhe primeiro as rotas que precisam de serviço",
+        "Foco atual",
+        "Tanque de água",
+        "Passagem para Runs",
+        "Continue no Studio até fechar readiness e conectividade.",
+        "Intenção das rotas",
+        "Obrigatória, desejável e opcional ficam na mesma superfície para evitar desvio prematuro ao workbench.",
+        "9 obrigatórias",
+        "0 desejáveis",
+        "9 opcionais",
+        "Tanque de água para Misturador · Obrigatória · Água para misturador",
+        "Adicionar entidades visíveis",
+        "Crie só fontes, produtos, mistura, serviço e saída. Hubs internos continuam fora do canvas.",
+        "Nova fonte",
+        "Novo produto",
+        "Novo misturador",
+        "Novo serviço",
+        "Nova saída",
+        "Ligação rápida",
+        "A entidade em foco é Tanque de água. Use a paleta para completar o fluxo a partir deste ponto.",
+        "De",
+        "Para",
+        "Tipo de conexão",
+        "Criar conexão no canvas",
+        "Abrir workbench avançado",
+        "Entidades de negócio",
+        "9",
+        "Só o que o usuário precisa editar.",
+        "Conexões visíveis",
+        "18",
+        "Fluxo principal sem malha interna.",
+        "Internos ocultos",
+        "9",
+        "Nós derivados e hubs fora da superfície principal.",
+        "Rotas declaradas",
+        "18",
+        "Trabalho principal desta etapa do Studio."
+      ]
+    },
+    "studio-route-editor-panel": {
+      "found": true,
+      "text": [
+        "Rotas que precisam de serviço",
+        "O foco atual toca 3 rota(s). Comece por Tanque de água para Misturador · Obrigatória e ajuste a intenção perto do canvas.",
+        "Quem supre quem agora",
+        "Selecione uma conexão no canvas para criar ou revisar a rota deste trecho.",
+        "Próximo gesto",
+        "Inicie a rota a partir de Tanque de água para continuar definindo o atendimento direto no canvas.",
+        "Composer local",
+        "Composer vazio",
+        "Composer local da rota",
+        "O composer local ainda não recebeu origem nem destino.",
+        "A rota em preparo ficará opcional: continua legível no Studio sem travar a saída para Runs.",
+        "Escolha a origem e o destino diretamente a partir do canvas.",
+        "Origem",
+        "Origem ainda não definida",
+        "Destino",
+        "Destino ainda não definido",
+        "Intenção",
+        "Opcional",
+        "Readiness",
+        "Medição direta não exigida",
+        "Vazão mínima",
+        "10.0 L/min",
+        "Dosagem mínima",
+        "0.0 L",
+        "Intenção em preparo",
+        "Vazão mínima do preview (L/min)",
+        "Dosagem mínima do preview (L)",
+        "Observação do preview",
+        "Medição direta do preview",
+        "Usar esta entidade como origem",
+        "Usar esta entidade como destino",
+        "Trazer este trecho para o composer",
+        "Confirmar rota no canvas",
+        "Limpar composer",
+        "Obrigatória",
+        "Desejável",
+        "Opcional"
+      ]
+    },
+    "studio-route-composer-preview-panel": {
+      "found": true,
+      "text": [
+        "Origem",
+        "Origem ainda não definida",
+        "Destino",
+        "Destino ainda não definido",
+        "Intenção",
+        "Opcional",
+        "Readiness",
+        "Medição direta não exigida",
+        "Vazão mínima",
+        "10.0 L/min",
+        "Dosagem mínima",
+        "0.0 L"
+      ]
+    },
+    "studio-business-flow-panel": {
+      "found": true,
+      "text": [
+        "Quem supre quem na camada principal",
+        "Tanque de água supre Incorporador, Misturador e Saída externa.",
+        "É suprido por",
+        "Ainda não recebe suprimento visível.",
+        "Supre",
+        "Incorporador, Misturador e Saída externa",
+        "Ver trechos legíveis do fluxo",
+        "Tanque de água supre Misturador (rota obrigatória).",
+        "Tanque de água supre Incorporador (rota obrigatória).",
+        "Tanque de água supre Saída externa (rota obrigatória)."
+      ]
+    },
+    "studio-readiness-panel": {
+      "found": true,
+      "text": [
+        "Readiness do cenário",
+        "Exige atenção",
+        "Ainda há bloqueios estruturais impedindo a passagem segura para Runs.",
+        "Estado dominante",
+        "Bloqueado no Studio",
+        "Objetivo desta área",
+        "Confirmar se o cenário já pode sair do Studio sem depender da trilha técnica.",
+        "Próxima ação",
+        "Corrigir regras estruturais e rotas inválidas antes de enfileirar uma nova run.",
+        "Bloqueio principal",
+        "A conexão L011 sai de Saída externa, mas Saída externa deve aparecer apenas como destino final.",
+        "Corrigir no canvas",
+        "Abrir Runs com bloqueios",
+        "Abrir Auditoria",
+        "Fluxo principal",
+        "Agora no Studio",
+        "Remover bloqueios",
+        "Sinal de passagem",
+        "Ainda há bloqueios estruturais impedindo a passagem segura para Runs.",
+        "Destino seguinte",
+        "Feche os bloqueios estruturais antes de enfileirar uma nova run."
+      ]
+    },
+    "studio-focus-panel": {
+      "found": true,
+      "text": [
+        "Foco do canvas",
+        "Sem alerta operacional no momento.",
+        "Nó em foco",
+        "Tanque de água já orienta a próxima revisão no canvas.",
+        "Exige atenção",
+        "Este foco ainda convive com bloqueios antes de Runs.",
+        "Problema ou oportunidade",
+        "Usar a seleção atual para validar conectividade, regras obrigatórias e readiness sem sair do canvas.",
+        "Próxima ação",
+        "O foco atual permite ajuste rápido de posição no canvas. Reposicione o nó sem sair da primeira dobra e abra a bancada completa só se precisar aprofundar."
+      ]
+    },
+    "studio-canvas-guidance-panel": {
+      "found": true,
+      "text": [
+        "Comece pelo canvas",
+        "Entidade em foco: Tanque de água.",
+        "Ação principal agora",
+        "Use a entidade selecionada para reposicionar, revisar conectividade e validar o papel dela antes de abrir Runs.",
+        "Bloqueio ou liberação local",
+        "Bloqueio local: este nó ajuda a localizar a próxima correção estrutural no grafo principal.",
+        "Gate para Runs",
+        "Ainda há bloqueios estruturais impedindo a passagem segura para Runs."
+      ]
+    }
+  },
+  "capture_attempts": [
+    {
+      "type": "mcp_playwright_browser",
+      "result": "blocked",
+      "detail": "The environment returned 'user cancelled MCP tool call' when trying to navigate to the local Studio app."
+    },
+    {
+      "type": "local_headless_browser",
+      "result": "blocked",
+      "detail": "Local Playwright and Edge screenshot attempts failed under execution restrictions, so no honest bitmap was produced in this wave."
+    }
+  ],
+  "supporting_logs": [
+    "output/playwright/wave4-studio-server.log",
+    "output/playwright/wave4-studio-server.err.log"
+  ]
+}
