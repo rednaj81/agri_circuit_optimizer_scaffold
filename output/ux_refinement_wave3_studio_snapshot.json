@@ -1,0 +1,38 @@
+{
+  "phase": "phase_ux_refinement",
+  "wave": 3,
+  "studio_header": "Command center do StudioDesenhe primeiro as rotas que precisam de serviçoFoco atualTanque de águaPassagem para RunsContinue no Studio até fechar readiness e conectividade.Intenção das rotasObrigatória, desejável e opcional ficam na mesma superfície para evitar desvio prematuro ao workbench.9 obrigatórias0 desejáveis9 opcionaisR001 · W -> M · ObrigatóriaAdicionar entidades visíveisCrie só fontes, produtos, mistura, serviço e saída. Hubs internos continuam fora do canvas.Nova fonteNovo produtoNovo misturadorNovo serviçoNova saídaLigação rápidaA entidade em foco é Tanque de água. Use a paleta para completar o fluxo a partir deste ponto.DeParaTipo de conexãoCriar conexão no canvasAbrir workbench avançadoEntidades de negócio9Só o que o usuário precisa editar.Conexões visíveis18Fluxo principal sem malha interna.Internos ocultos9Nós derivados e hubs fora da superfície principal.Rotas declaradas18Trabalho principal desta etapa do Studio.",
+  "route_panel_text": "Rotas que precisam de serviçoO foco atual toca 3 rota(s). Comece por R001 e ajuste a intenção perto do canvas.Trecho em focoSelecione uma conexão no canvas para criar ou revisar a rota deste trecho.Ainda não há uma origem de rota em preparo no canvas.A criação direta de rota fica disponível assim que uma conexão visível for selecionada.Criar rota deste trechoObrigatóriaDesejávelOpcionalObrigatóriaDesejávelOpcionalReadiness desta camadaRemover bloqueiosGate para RunsFeche primeiro as rotas obrigatórias e confirme medição direta quando houver dosagem.Rota em focoIntençãoVazão mínima (L/min)Dosagem mínima (L)Observação visível da rotaMedição diretaAplicar rota no focoVer rotas ligadas a este focoR001: W -> M · Obrigatória · Água para misturadorR002: W -> I · Obrigatória · Água para incorporadorR003: W -> S · Obrigatória · Água para saída",
+  "workspace_text": "Leitura do cenárioExige atençãoAinda há bloqueios estruturais impedindo a passagem segura para Runs.Seleção atualEntidade em foco: Tanque de água.Conectividade em focoTanque de água supre Misturador (rota obrigatória, rotas R001).Readiness localA conexão L011 sai de S, mas S deve aparecer apenas como destino final.Próxima açãoCorrigir regras estruturais e rotas inválidas antes de enfileirar uma nova run.O que precisa de atenção agoraA conexão L011 sai de S, mas S deve aparecer apenas como destino final.Use este foco para fechar o principal bloqueio estrutural antes de liberar a passagem para Runs.Ajustes locais do canvasUse estes controles rápidos para ajustes rotineiros sem abrir a bancada avançada.Entidade em focoAtualize o rótulo visível desta entidade sem sair da leitura principal do Studio.Rótulo visívelAplicar rótulo direto no canvasConexão em focoSelecione uma conexão no canvas para liberar os ajustes rápidos deste trecho.Comprimento (m)Famílias sugeridasAplicar conexãoInverter direçãoFluxo atualSelecione uma conexão no canvas para abrir o trecho de suprimento desta edição.Se inverter agoraSem conexão em foco para inverter agora.Impacto previstoO impacto da inversão aparece aqui assim que uma conexão visível for selecionada.Rotas tocadasNenhuma rota em foco neste momento.Sem conexão em foco: primeiro selecione um trecho do grafo principal.Mover à esquerdaMover acimaMover abaixoDuplicar nó em focoExcluir conexão em focoAbrir bancada completaRotas que precisam de serviçoO foco atual toca 3 rota(s). Comece por R001 e ajuste a intenção perto do canvas.Trecho em focoSelecione uma conexão no canvas para criar ou revisar a rota deste trecho.Ainda não há uma origem de rota em preparo no canvas.A criação direta de rota fica disponível assim que uma conexão visível for selecionada.Criar rota deste trechoObrigatóriaDesejávelOpcionalObrigatóriaDesejávelOpcionalReadiness desta camadaRemover bloqueiosGate para RunsFeche primeiro as rotas obrigatórias e confirme medição dir",
+  "canvas_guidance_text": "Comece pelo canvasEntidade em foco: Tanque de água.Ação principal agoraUse a entidade selecionada para reposicionar, revisar conectividade e validar o papel dela antes de abrir Runs.Bloqueio ou liberação localBloqueio local: este nó ajuda a localizar a próxima correção estrutural no grafo principal.Gate para RunsAinda há bloqueios estruturais impedindo a passagem segura para Runs.Abrir bancada desta entidadeAbrir orientação deste focoIr para Runs quando o cenário estiver pronto",
+  "context_menu_ids": [
+    "add-source-node",
+    "add-product-node",
+    "add-mixer-node",
+    "add-service-node",
+    "add-outlet-node",
+    "duplicate-node",
+    "start-route-from-node",
+    "remove-node",
+    "create-route-from-edge",
+    "mark-route-mandatory",
+    "mark-route-desirable",
+    "mark-route-optional",
+    "reverse-edge",
+    "remove-edge",
+    "open-workbench"
+  ],
+  "route_local_actions": [
+    "studio-route-create-from-edge-button",
+    "studio-route-intent-mandatory-button",
+    "studio-route-intent-desirable-button",
+    "studio-route-intent-optional-button",
+    "studio-route-apply-button",
+    "start-route-from-node"
+  ],
+  "canvas_style": {
+    "width": "100%",
+    "height": "720px"
+  },
+  "route_draft_store_present": true
+}

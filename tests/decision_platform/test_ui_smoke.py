@@ -247,9 +247,27 @@ def test_studio_primary_surface_exposes_business_command_center() -> None:
     studio_text = _collect_text_content(_find_component_by_id(app.layout, "studio-command-center-panel"))
     assert "Desenhe primeiro as rotas que precisam de serviço" in studio_text
     assert "Intenção das rotas" in studio_text
+    assert "Tap" not in studio_text
+    assert "Junção" not in studio_text
     route_text = _collect_text_content(_find_component_by_id(app.layout, "studio-route-editor-panel"))
     assert "Criar rota deste trecho" in route_text
     assert "Trecho em foco" in route_text
+    assert "Tap" not in route_text
+    assert "Junção" not in route_text
+
+
+def test_studio_primary_workspace_avoids_technical_internal_terms() -> None:
+    with diagnostic_runtime_test_mode():
+        app = build_app("data/decision_platform/maquete_v2")
+
+    workspace_text = _collect_text_content(_find_component_by_id(app.layout, "studio-workspace-panel"))
+    canvas_text = _collect_text_content(_find_component_by_id(app.layout, "studio-canvas-guidance-panel"))
+
+    assert "Junção" not in workspace_text
+    assert "Hub estrela" not in workspace_text
+    assert "Tap" not in workspace_text
+    assert "Junção" not in canvas_text
+    assert "Tap" not in canvas_text
 
 
 def test_product_space_banner_uses_consistent_product_language_for_each_space() -> None:

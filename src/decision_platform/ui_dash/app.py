@@ -1263,8 +1263,9 @@ def _studio_quick_link_defaults(
     options = [option["value"] for option in _business_node_choice_options(nodes_rows)]
     if len(options) < 2:
         return None, None
-    preferred_source = str(node_summary.get("selected_node_id") or edge_summary.get("selected_edge", {}).get("from_node") or "").strip()
-    preferred_target = str(edge_summary.get("selected_edge", {}).get("to_node") or "").strip()
+    selected_edge = edge_summary.get("selected_edge") or {}
+    preferred_source = str(node_summary.get("selected_node_id") or selected_edge.get("from_node") or "").strip()
+    preferred_target = str(selected_edge.get("to_node") or "").strip()
     source = preferred_source if preferred_source in options else options[0]
     target_candidates = [candidate for candidate in options if candidate != source]
     if preferred_target in target_candidates:
@@ -2814,7 +2815,11 @@ def render_studio_command_center_panel(
     quick_source, quick_target = _studio_quick_link_defaults(nodes_rows, node_summary, edge_summary)
     selected_node_label = str(node_summary.get("business_label") or "").strip()
     selected_edge_label = str(edge_summary.get("business_label") or "").strip()
-    selected_focus = selected_edge_label or selected_node_label or "Nenhuma entidade selecionada"
+    if selected_node_label == "-":
+        selected_node_label = ""
+    if selected_edge_label == "-":
+        selected_edge_label = ""
+    selected_focus = selected_edge_label or selected_node_label or "Nenhum trecho selecionado"
     status = str(studio_summary.get("status") or "needs_attention")
     runs_ready = status == "ready"
     focus_hint = (
@@ -2823,7 +2828,7 @@ def render_studio_command_center_panel(
         else (
             f"A entidade em foco é {selected_node_label}. Use a paleta para completar o fluxo a partir deste ponto."
             if selected_node_label
-            else "Selecione uma entidade no canvas para que a criação e a conexão rápidas usem esse contexto."
+            else "Selecione uma entidade ou rota no canvas para que a criação e a conexão rápidas usem esse contexto."
         )
     )
     palette_buttons = [
@@ -8767,7 +8772,12 @@ def _build_edge_studio_summary(
     candidate_links_rows: list[dict[str, Any]],
     selected_link_id: str | None,
 ) -> dict[str, Any]:
-    selected_id = _default_edge_studio_selection(candidate_links_rows, preferred_link_id=selected_link_id)
+    preferred_selected_id = str(selected_link_id or "").strip()
+    selected_id = (
+        _default_edge_studio_selection(candidate_links_rows, preferred_link_id=preferred_selected_id)
+        if preferred_selected_id
+        else None
+    )
     selected_row = next(
         (dict(item) for item in candidate_links_rows if str(item.get("link_id", "")).strip() == selected_id),
         None,
