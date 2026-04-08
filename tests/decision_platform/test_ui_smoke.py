@@ -247,11 +247,14 @@ def test_studio_primary_surface_exposes_business_command_center() -> None:
     studio_text = _collect_text_content(_find_component_by_id(app.layout, "studio-command-center-panel"))
     assert "Desenhe primeiro as rotas que precisam de serviço" in studio_text
     assert "Intenção das rotas" in studio_text
+    assert "R001 ·" not in studio_text
+    assert "W ->" not in studio_text
     assert "Tap" not in studio_text
     assert "Junção" not in studio_text
     route_text = _collect_text_content(_find_component_by_id(app.layout, "studio-route-editor-panel"))
     assert "Criar rota deste trecho" in route_text
     assert "Trecho em foco" in route_text
+    assert "W ->" not in route_text
     assert "Tap" not in route_text
     assert "Junção" not in route_text
 
@@ -549,7 +552,7 @@ def test_studio_canvas_guidance_panel_surfaces_contextual_blocker_and_runs_gate(
     panel_text = _collect_text_content(panel)
 
     assert "Bloqueio local" in panel_text
-    assert "entra em W" in panel_text
+    assert "Tanque de água" in panel_text
     assert "Ir para Runs quando o cenário estiver pronto" in panel_text
 
 
@@ -591,7 +594,7 @@ def test_studio_workspace_panel_unifies_focus_connectivity_and_runs_gate() -> No
     assert "Seleção atual" in panel_text
     assert "Conectividade em foco" in panel_text
     assert "Readiness local" in panel_text
-    assert "A conexão L900 termina em W" in panel_text
+    assert "A conexão L900 termina em Tanque de água" in panel_text
     assert "Quem supre quem na camada principal" in panel_text
     assert "Bomba principal é suprido por Tanque de água e supre Misturador." in panel_text
     assert "Tanque de água supre Bomba principal." in panel_text
@@ -765,13 +768,19 @@ def test_studio_readiness_panel_humanizes_primary_blockers_and_warnings() -> Non
             "blockers": ["L900 entra em W", "Rotas com dosagem sem medicao direta: R002"],
             "warnings": ["Nos sem conexao no grafo visivel: P3"],
             "next_steps": ["Feche os bloqueios estruturais antes de enfileirar uma nova run."],
-        }
+        },
+        [{"route_id": "R002", "source": "W", "sink": "M", "mandatory": True, "dose_min_l": 2.0}],
+        [
+            {"node_id": "W", "label": "Tanque de água", "node_type": "water_tank", "zone": "supply"},
+            {"node_id": "M", "label": "Misturador", "node_type": "mixer", "zone": "process"},
+            {"node_id": "P3", "label": "Produto 3", "node_type": "product_tank", "zone": "process"},
+        ],
     )
     panel_text = _collect_text_content(panel)
 
-    assert "A conexão L900 termina em W" in panel_text
-    assert "Há rotas com dosagem sem medição direta compatível: R002." in panel_text
-    assert "Ainda existem entidades sem conexão na leitura principal do grafo: P3." in panel_text
+    assert "A conexão L900 termina em Tanque de água" in panel_text
+    assert "Há rotas com dosagem sem medição direta compatível: Tanque de água para Misturador." in panel_text
+    assert "Ainda existem entidades sem conexão na leitura principal do grafo: Produto 3." in panel_text
     assert "Bloqueado no Studio" in panel_text
     assert "Corrigir no canvas" in panel_text
     assert "Abrir Runs com bloqueios" in panel_text
@@ -803,6 +812,10 @@ def test_studio_readiness_panel_surfaces_primary_blocker_before_detailed_lists()
 
 
 def test_studio_connectivity_panel_surfaces_routes_and_measurement_near_canvas() -> None:
+    nodes_rows = [
+        {"node_id": "W", "label": "Tanque de água", "node_type": "water_tank", "zone": "supply"},
+        {"node_id": "M", "label": "Misturador", "node_type": "mixer", "zone": "process"},
+    ]
     panel = render_studio_connectivity_panel(
         {
             "blocker_count": 1,
@@ -831,6 +844,8 @@ def test_studio_connectivity_panel_surfaces_routes_and_measurement_near_canvas()
             {"route_id": "R001", "source": "W", "sink": "M", "mandatory": True, "measurement_required": False},
             {"route_id": "R002", "source": "W", "sink": "M", "mandatory": True, "measurement_required": False, "dose_min_l": 2.0},
         ],
+        nodes_rows,
+        [],
     )
     panel_text = _collect_text_content(panel)
 
@@ -842,12 +857,13 @@ def test_studio_connectivity_panel_surfaces_routes_and_measurement_near_canvas()
     assert "Destino do trecho" in panel_text
     assert "Se inverter no canvas" in panel_text
     assert "Rotas tocadas" in panel_text
-    assert "R001: W -> M (obrigatória)" in panel_text
+    assert "Tanque de água para Misturador · Obrigatória" in panel_text
+    assert "R001: W -> M" not in panel_text
     assert "Prioridade da seleção atual" in panel_text
     assert "Seleção atual" in panel_text
     assert "Cenário inteiro" in panel_text
-    assert "W só pode iniciar fluxo" in panel_text
-    assert "R002 usa dosagem sem medição direta compatível" in panel_text
+    assert "Tanque de água só pode iniciar fluxo" in panel_text
+    assert "Tanque de água para Misturador · Obrigatória usa dosagem sem medição direta compatível" in panel_text
     assert "Há conexões entrando em W no cenário" in panel_text
     assert "Corrigir bloqueios estruturais" in panel_text
 
@@ -890,7 +906,7 @@ def test_studio_connectivity_panel_previews_reverse_action_in_business_language(
     assert "Trecho acionável no canvas" in panel_text
     assert "Bomba principal supre Tanque de água." in panel_text
     assert "Impacto agora" in panel_text
-    assert "A conexão em foco entra em W; ajuste a direção antes de continuar." in panel_text
+    assert "A conexão em foco termina em Tanque de água; ajuste a direção antes de continuar." in panel_text
     assert "Se inverter agora, Tanque de água passa a suprir Bomba principal." in panel_text
     assert "A inversão reduz os bloqueios de readiness do cenário." in panel_text
     assert "Rotas tocadas" in panel_text
@@ -936,7 +952,7 @@ def test_studio_focus_panel_uses_canvas_selection_as_primary_context() -> None:
     assert "Problema ou oportunidade" in panel_text
     assert "Relações de negócio deste foco" in panel_text
     assert "Tanque de água e Misturador supre Bomba principal." not in panel_text
-    assert "Tanque de água supre Misturador (rota obrigatória, rotas R001)." in panel_text
+    assert "Tanque de água supre Misturador (rota obrigatória)." in panel_text
     assert "Tanque de água supre Bomba principal." in panel_text
     assert "Edição direta deste foco" in panel_text
     assert "Controles rápidos já estão no primeiro fold do Studio." in panel_text
@@ -945,7 +961,7 @@ def test_studio_focus_panel_uses_canvas_selection_as_primary_context() -> None:
     assert "Exige atenção" in panel_text
     assert "Ações rápidas deste foco" in panel_text
     assert "Ação sugerida agora" in panel_text
-    assert "W não pode receber rotas entrando" in panel_text
+    assert "Tanque de água não pode receber rotas entrando" in panel_text
     assert "rotas com dosagem exigem medição direta compatível" in panel_text
     assert "Rotas deste foco: 2 obrigatória(s), 1 com dosagem, 1 com medição direta." in panel_text
     assert "Confira comprimento e famílias sugeridas para a conexão L001." in panel_text

@@ -968,34 +968,69 @@ def _coerce_float_or_none(value: Any) -> float | None:
         return None
 
 
-def _humanize_readiness_issue(issue: Any) -> str:
+def _humanize_readiness_issue(
+    issue: Any,
+    *,
+    route_rows: list[dict[str, Any]] | None = None,
+    nodes_rows: list[dict[str, Any]] | None = None,
+) -> str:
     text = str(issue or "").strip()
     if not text:
         return "Sem detalhe registrado."
+    node_lookup = {
+        str(row.get("node_id", "")).strip(): dict(row)
+        for row in _visible_studio_nodes(nodes_rows or [])
+        if str(row.get("node_id", "")).strip()
+    }
     if " entra em W" in text:
         link_id = text.split(" entra em W", 1)[0]
-        return f"A conexão {link_id} termina em W, mas W deve apenas iniciar fluxo."
+        water_label = _studio_node_business_label_from_lookup("W", node_lookup)
+        return f"A conexão {link_id} termina em {water_label}, mas {water_label} deve apenas iniciar fluxo."
     if " sai de S" in text:
         link_id = text.split(" sai de S", 1)[0]
-        return f"A conexão {link_id} sai de S, mas S deve aparecer apenas como destino final."
+        outlet_label = _studio_node_business_label_from_lookup("S", node_lookup)
+        return f"A conexão {link_id} sai de {outlet_label}, mas {outlet_label} deve aparecer apenas como destino final."
     if text.startswith("Rotas com dosagem sem medicao direta:"):
         route_ids = text.split(":", 1)[1].strip()
-        return f"Há rotas com dosagem sem medição direta compatível: {route_ids}."
+        route_labels = _studio_route_labels_from_ids(
+            [item.strip() for item in route_ids.split(",") if item.strip()],
+            route_rows=route_rows,
+            node_lookup=node_lookup,
+        )
+        detail = ", ".join(route_labels) if route_labels else route_ids
+        return f"Há rotas com dosagem sem medição direta compatível: {detail}."
     if " referencia source inexistente:" in text:
         route_id, source = text.split(" referencia source inexistente:", 1)
-        return f"A rota {route_id} aponta para uma origem que não está disponível no cenário: {source.strip()}."
+        route_labels = _studio_route_labels_from_ids([route_id.strip()], route_rows=route_rows, node_lookup=node_lookup)
+        source_label = _studio_node_business_label_from_lookup(source.strip(), node_lookup)
+        route_label = route_labels[0] if route_labels else f"Rota {route_id.strip()}"
+        return f"A rota {route_label} aponta para uma origem que não está disponível no cenário: {source_label}."
     if " referencia sink inexistente:" in text:
         route_id, sink = text.split(" referencia sink inexistente:", 1)
-        return f"A rota {route_id} aponta para um destino que não está disponível no cenário: {sink.strip()}."
+        route_labels = _studio_route_labels_from_ids([route_id.strip()], route_rows=route_rows, node_lookup=node_lookup)
+        sink_label = _studio_node_business_label_from_lookup(sink.strip(), node_lookup)
+        route_label = route_labels[0] if route_labels else f"Rota {route_id.strip()}"
+        return f"A rota {route_label} aponta para um destino que não está disponível no cenário: {sink_label}."
     if " ainda nao tem saida conectada a partir de " in text:
         route_id, source = text.split(" ainda nao tem saida conectada a partir de ", 1)
-        return f"A rota {route_id} ainda não encontrou uma saída conectada a partir de {source.strip()}."
+        route_labels = _studio_route_labels_from_ids([route_id.strip()], route_rows=route_rows, node_lookup=node_lookup)
+        source_label = _studio_node_business_label_from_lookup(source.strip(), node_lookup)
+        route_label = route_labels[0] if route_labels else f"Rota {route_id.strip()}"
+        return f"A rota {route_label} ainda não encontrou uma saída conectada a partir de {source_label}."
     if " ainda nao tem entrada conectada em " in text:
         route_id, sink = text.split(" ainda nao tem entrada conectada em ", 1)
-        return f"A rota {route_id} ainda não encontrou uma entrada conectada em {sink.strip()}."
+        route_labels = _studio_route_labels_from_ids([route_id.strip()], route_rows=route_rows, node_lookup=node_lookup)
+        sink_label = _studio_node_business_label_from_lookup(sink.strip(), node_lookup)
+        route_label = route_labels[0] if route_labels else f"Rota {route_id.strip()}"
+        return f"A rota {route_label} ainda não encontrou uma entrada conectada em {sink_label}."
     if text.startswith("Nos sem conexao no grafo visivel:"):
         node_ids = text.split(":", 1)[1].strip()
-        return f"Ainda existem entidades sem conexão na leitura principal do grafo: {node_ids}."
+        node_labels = ", ".join(
+            _studio_node_business_label_from_lookup(node_id.strip(), node_lookup)
+            for node_id in node_ids.split(",")
+            if node_id.strip()
+        )
+        return f"Ainda existem entidades sem conexão na leitura principal do grafo: {node_labels or node_ids}."
     return text
 
 
@@ -1228,6 +1263,23 @@ def _studio_node_business_label(row: dict[str, Any] | None) -> str:
     return label or node_id or "Entidade sem rótulo"
 
 
+def _studio_node_business_label_from_lookup(
+    node_id: str | None,
+    node_lookup: dict[str, dict[str, Any]] | None = None,
+) -> str:
+    normalized_id = str(node_id or "").strip()
+    if not normalized_id:
+        return "Entidade sem rótulo"
+    if node_lookup and normalized_id in node_lookup:
+        return _studio_node_business_label(node_lookup[normalized_id])
+    fallback_labels = {
+        "W": "Tanque de água",
+        "M": "Misturador",
+        "S": "Saída principal",
+    }
+    return fallback_labels.get(normalized_id, normalized_id)
+
+
 def _studio_node_role_label(row: dict[str, Any] | None) -> str:
     if not row:
         return "Entidade"
@@ -1253,6 +1305,67 @@ def _business_node_choice_options(nodes_rows: list[dict[str, Any]]) -> list[dict
             }
         )
     return options
+
+
+def _studio_route_business_title(
+    route: dict[str, Any] | None,
+    *,
+    node_lookup: dict[str, dict[str, Any]] | None = None,
+) -> str:
+    if not route:
+        return "Rota sem origem e destino definidos"
+    source_label = _studio_node_business_label_from_lookup(str(route.get("source") or route.get("from_node") or "").strip(), node_lookup)
+    sink_label = _studio_node_business_label_from_lookup(str(route.get("sink") or route.get("target") or "").strip(), node_lookup)
+    return f"{source_label} para {sink_label}"
+
+
+def _studio_route_primary_label(
+    route: dict[str, Any] | None,
+    *,
+    node_lookup: dict[str, dict[str, Any]] | None = None,
+    include_intent: bool = False,
+    include_notes: bool = False,
+    include_measurement: bool = False,
+) -> str:
+    if not route:
+        return "Rota sem leitura principal disponível"
+    parts = [_studio_route_business_title(route, node_lookup=node_lookup)]
+    if include_intent:
+        parts.append(_route_intent_label(_route_intent_value(route)))
+    if include_measurement and _coerce_truthy(route.get("measurement_required")):
+        parts.append("medição direta")
+    notes = str(route.get("notes") or "").strip()
+    if include_notes and notes:
+        parts.append(notes)
+    return " · ".join(part for part in parts if part)
+
+
+def _studio_route_secondary_label(route: dict[str, Any] | None) -> str:
+    route_id = str((route or {}).get("route_id") or "").strip()
+    return f"Código {route_id}" if route_id else "Sem código técnico disponível"
+
+
+def _studio_route_labels_from_ids(
+    route_ids: list[str],
+    *,
+    route_rows: list[dict[str, Any]] | None = None,
+    node_lookup: dict[str, dict[str, Any]] | None = None,
+) -> list[str]:
+    normalized_ids = [str(route_id).strip() for route_id in route_ids if str(route_id).strip()]
+    if not normalized_ids:
+        return []
+    route_lookup = {
+        str(route.get("route_id") or "").strip(): dict(route)
+        for route in (route_rows or [])
+        if str(route.get("route_id") or "").strip()
+    }
+    labels: list[str] = []
+    for route_id in normalized_ids:
+        route = route_lookup.get(route_id)
+        labels.append(
+            _studio_route_business_title(route, node_lookup=node_lookup) if route else f"Rota {route_id}"
+        )
+    return labels
 
 
 def _studio_quick_link_defaults(
@@ -1412,15 +1525,24 @@ def _route_choice_options(
     route_rows: list[dict[str, Any]] | None,
     *,
     focus_node_ids: set[str] | None = None,
+    nodes_rows: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, str]]:
+    node_lookup = {
+        str(row.get("node_id", "")).strip(): dict(row)
+        for row in _visible_studio_nodes(nodes_rows or [])
+        if str(row.get("node_id", "")).strip()
+    }
     options: list[dict[str, str]] = []
     for route in _route_focus_rows(route_rows, focus_node_ids=focus_node_ids):
         route_id = str(route.get("route_id") or "").strip()
         if not route_id:
             continue
-        source = str(route.get("source") or "-").strip() or "-"
-        sink = str(route.get("sink") or "-").strip() or "-"
-        label = f"{route_id} · {source} -> {sink} · {_route_intent_label(_route_intent_value(route))}"
+        label = _studio_route_primary_label(
+            route,
+            node_lookup=node_lookup,
+            include_intent=True,
+            include_notes=True,
+        )
         options.append({"label": label, "value": route_id})
     return options
 
@@ -1430,9 +1552,10 @@ def _default_route_focus_selection(
     *,
     focus_node_ids: set[str] | None = None,
     preferred_route_id: str | None = None,
+    nodes_rows: list[dict[str, Any]] | None = None,
 ) -> str | None:
     preferred = str(preferred_route_id or "").strip()
-    options = _route_choice_options(route_rows, focus_node_ids=focus_node_ids)
+    options = _route_choice_options(route_rows, focus_node_ids=focus_node_ids, nodes_rows=nodes_rows)
     option_values = [str(option["value"]) for option in options]
     if preferred and preferred in option_values:
         return preferred
@@ -1444,11 +1567,13 @@ def _route_studio_form_values(
     *,
     focus_node_ids: set[str] | None = None,
     selected_route_id: str | None = None,
+    nodes_rows: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     selected_id = _default_route_focus_selection(
         route_rows,
         focus_node_ids=focus_node_ids,
         preferred_route_id=selected_route_id,
+        nodes_rows=nodes_rows,
     )
     selected_row = next(
         (
@@ -1814,8 +1939,11 @@ def build_studio_business_flow_summary(
         qualifiers: list[str] = []
         if relation["mandatory"]:
             qualifiers.append("rota obrigatória")
-        if relation["route_ids"]:
-            qualifiers.append("rotas " + ", ".join(relation["route_ids"][:2]))
+        route_count = len(relation["route_ids"])
+        if route_count > 1:
+            qualifiers.append(f"{route_count} rotas de atendimento")
+        elif route_count == 1 and not relation["mandatory"]:
+            qualifiers.append("rota de atendimento")
         qualifier_text = f" ({', '.join(qualifiers)})" if qualifiers else ""
         connection_lines.append(f"{source_label} supre {target_label}{qualifier_text}.")
 
@@ -2014,16 +2142,20 @@ def build_studio_readiness_summary(
     }
 
 
-def render_studio_readiness_panel(summary: dict[str, Any]) -> Any:
+def render_studio_readiness_panel(
+    summary: dict[str, Any],
+    route_rows: list[dict[str, Any]] | None = None,
+    nodes_rows: list[dict[str, Any]] | None = None,
+) -> Any:
     status = str(summary.get("status") or "needs_attention")
     background, color = _status_tone(status)
     blocker_count = int(summary.get("blocker_count", 0) or 0)
     warning_count = int(summary.get("warning_count", 0) or 0)
     next_step = str((summary.get("next_steps") or ["Feche a leitura principal do Studio antes de seguir."])[0])
     if summary.get("blockers"):
-        primary_blocker = _humanize_readiness_issue(list(summary.get("blockers", []))[0])
+        primary_blocker = _humanize_readiness_issue(list(summary.get("blockers", []))[0], route_rows=route_rows, nodes_rows=nodes_rows)
     elif summary.get("warnings"):
-        primary_blocker = _humanize_readiness_issue(list(summary.get("warnings", []))[0])
+        primary_blocker = _humanize_readiness_issue(list(summary.get("warnings", []))[0], route_rows=route_rows, nodes_rows=nodes_rows)
     else:
         primary_blocker = "Nenhum bloqueio ou aviso domina a passagem atual para Runs."
     if status == "ready":
@@ -2095,9 +2227,9 @@ def render_studio_readiness_panel(summary: dict[str, Any]) -> Any:
                 ],
             ),
             html.H4("Bloqueios", style={"marginBottom": "6px"}),
-            _bullet_list([_humanize_readiness_issue(item) for item in list(summary.get("blockers", []))], "Nenhum bloqueio estrutural detectado."),
+            _bullet_list([_humanize_readiness_issue(item, route_rows=route_rows, nodes_rows=nodes_rows) for item in list(summary.get("blockers", []))], "Nenhum bloqueio estrutural detectado."),
             html.H4("Avisos", style={"marginBottom": "6px", "marginTop": "14px"}),
-            _bullet_list([_humanize_readiness_issue(item) for item in list(summary.get("warnings", []))], "Sem aviso relevante neste momento."),
+            _bullet_list([_humanize_readiness_issue(item, route_rows=route_rows, nodes_rows=nodes_rows) for item in list(summary.get("warnings", []))], "Sem aviso relevante neste momento."),
             html.H4("Proximos passos", style={"marginBottom": "6px", "marginTop": "14px"}),
             _bullet_list(list(summary.get("next_steps", [])), "Sem proximo passo registrado."),
         ],
@@ -2428,6 +2560,7 @@ def render_studio_route_editor_panel(
     edge_summary: dict[str, Any],
     studio_summary: dict[str, Any],
     route_draft_source_id: str | None = None,
+    nodes_rows: list[dict[str, Any]] | None = None,
 ) -> Any:
     focus_node_ids = {
         str(node_summary.get("selected_node_id") or "").strip(),
@@ -2435,8 +2568,13 @@ def render_studio_route_editor_panel(
         str((edge_summary.get("selected_edge") or {}).get("to_node") or "").strip(),
     }
     focus_node_ids = {node_id for node_id in focus_node_ids if node_id}
-    route_options = _route_choice_options(route_rows, focus_node_ids=focus_node_ids)
-    form_values = _route_studio_form_values(route_rows, focus_node_ids=focus_node_ids)
+    node_lookup = {
+        str(row.get("node_id", "")).strip(): dict(row)
+        for row in _visible_studio_nodes(nodes_rows or [])
+        if str(row.get("node_id", "")).strip()
+    }
+    route_options = _route_choice_options(route_rows, focus_node_ids=focus_node_ids, nodes_rows=nodes_rows)
+    form_values = _route_studio_form_values(route_rows, focus_node_ids=focus_node_ids, nodes_rows=nodes_rows)
     focused_routes = _route_focus_rows(route_rows, focus_node_ids=focus_node_ids)
     selected_route_present = bool(form_values.get("route_id"))
     selected_edge = edge_summary.get("selected_edge") or {}
@@ -2449,8 +2587,9 @@ def render_studio_route_editor_panel(
     )
     top_route = focused_routes[0] if focused_routes else None
     if top_route is not None:
+        top_route_label = _studio_route_primary_label(top_route, node_lookup=node_lookup, include_intent=True)
         route_scope_text = (
-            f"O foco atual toca {len(focused_routes)} rota(s). Comece por {top_route.get('route_id')} e ajuste a intenção perto do canvas."
+            f"O foco atual toca {len(focused_routes)} rota(s). Comece por {top_route_label} e ajuste a intenção perto do canvas."
             if focus_node_ids
             else f"O cenário já tem {len(focused_routes)} rota(s). Ajuste a intenção das mais relevantes sem sair do primeiro fold."
         )
@@ -2458,15 +2597,14 @@ def render_studio_route_editor_panel(
         route_scope_text = "Selecione um trecho do canvas para abrir as rotas ligadas a ele."
     highlighted_route_lines = []
     for route in focused_routes[:4]:
-        route_id = str(route.get("route_id") or "ROTA")
-        source = str(route.get("source") or "-").strip() or "-"
-        sink = str(route.get("sink") or "-").strip() or "-"
-        intent = _route_intent_label(_route_intent_value(route))
-        notes = str(route.get("notes") or "").strip()
-        highlight = f"{route_id}: {source} -> {sink} · {intent}"
-        if notes:
-            highlight += f" · {notes}"
-        highlighted_route_lines.append(highlight)
+        highlight = _studio_route_primary_label(
+            route,
+            node_lookup=node_lookup,
+            include_intent=True,
+            include_notes=True,
+            include_measurement=True,
+        )
+        highlighted_route_lines.append(f"{highlight} ({_studio_route_secondary_label(route).lower()})")
     return html.Div(
         id="studio-route-editor-panel",
         style={**UI_MUTED_CARD_STYLE, "padding": "12px", "marginBottom": "12px"},
@@ -2655,7 +2793,7 @@ def render_studio_workspace_panel(
     warning_count = int(studio_summary.get("warning_count", 0) or 0)
     focus_summary = _studio_workspace_focus_summary(node_summary, edge_summary, route_rows, studio_summary)
     issues = [
-        _humanize_readiness_issue(item)
+        _humanize_readiness_issue(item, route_rows=route_rows, nodes_rows=nodes_rows)
         for item in [*(studio_summary.get("blockers") or []), *(studio_summary.get("warnings") or [])]
     ]
     business_flow = build_studio_business_flow_summary(
@@ -2687,6 +2825,7 @@ def render_studio_workspace_panel(
         edge_summary,
         studio_summary,
         route_draft_source_id=route_draft_source_id,
+        nodes_rows=nodes_rows,
     )
     runs_enabled = status == "ready"
     runs_button_label = "Ir para Runs" if runs_enabled else "Runs bloqueado neste estado"
@@ -2841,6 +2980,7 @@ def render_studio_command_center_panel(
         for preset_key, preset in BUSINESS_NODE_PRESETS.items()
     ]
     route_rows = route_rows or []
+    route_options = _route_choice_options(route_rows, nodes_rows=nodes_rows)
     return html.Div(
         id="studio-command-center-panel",
         children=[
@@ -2867,7 +3007,7 @@ def render_studio_command_center_panel(
                         ],
                     ),
                     html.Div(
-                        _route_choice_options(route_rows)[0]["label"] if _route_choice_options(route_rows) else "Ainda não há rota registrada para esta leitura.",
+                        route_options[0]["label"] if route_options else "Ainda não há rota registrada para esta leitura.",
                         style={"marginTop": "10px", "lineHeight": "1.45"},
                     ),
                 ],
@@ -3149,6 +3289,11 @@ def render_studio_connectivity_panel(
     nodes_rows = nodes_rows or []
     candidate_links_rows = candidate_links_rows or []
     route_rows = route_rows or []
+    node_lookup = {
+        str(row.get("node_id", "")).strip(): dict(row)
+        for row in _visible_studio_nodes(nodes_rows)
+        if str(row.get("node_id", "")).strip()
+    }
     focus_node_ids = {
         str(node_summary.get("selected_node_id") or "").strip(),
         str((edge_summary.get("selected_edge") or {}).get("from_node") or "").strip(),
@@ -3168,9 +3313,13 @@ def render_studio_connectivity_panel(
     selected_edge_present = bool(selected_edge)
     edge_action_panel: Any = None
     if "W" in focus_node_ids:
-        local_rules.append("W só pode iniciar fluxo; nenhuma conexão ou rota deve terminar neste ponto.")
+        local_rules.append(
+            f"{_studio_node_business_label_from_lookup('W', node_lookup)} só pode iniciar fluxo; nenhuma conexão ou rota deve terminar neste ponto."
+        )
     if "S" in focus_node_ids:
-        local_rules.append("S é ponto terminal; nenhuma conexão ou rota deve sair deste ponto.")
+        local_rules.append(
+            f"{_studio_node_business_label_from_lookup('S', node_lookup)} é ponto terminal; nenhuma conexão ou rota deve sair deste ponto."
+        )
     focused_dosing_routes = [
         route
         for route in prioritized_routes
@@ -3179,17 +3328,25 @@ def render_studio_connectivity_panel(
     if focused_dosing_routes:
         local_rules.append("Rotas com dosagem exigem medição direta antes de seguir para Runs.")
     if str(selected_edge.get("to_node") or "").strip() == "W":
-        local_violations.append("A conexão em foco entra em W; ajuste a direção antes de continuar.")
+        local_violations.append(
+            f"A conexão em foco termina em {_studio_node_business_label_from_lookup('W', node_lookup)}; ajuste a direção antes de continuar."
+        )
     if str(selected_edge.get("from_node") or "").strip() == "S":
-        local_violations.append("A conexão em foco sai de S; corrija a direção para manter a regra estrutural.")
+        local_violations.append(
+            f"A conexão em foco sai de {_studio_node_business_label_from_lookup('S', node_lookup)}; corrija a direção para manter a regra estrutural."
+        )
     for route in prioritized_routes:
-        route_id = str(route.get("route_id") or "ROTA")
+        route_label = _studio_route_primary_label(route, node_lookup=node_lookup, include_intent=True)
         if str(route.get("sink") or "").strip() == "W":
-            local_violations.append(f"{route_id} tenta terminar em W; essa rota precisa ser redirecionada.")
+            local_violations.append(
+                f"{route_label} tenta terminar em {_studio_node_business_label_from_lookup('W', node_lookup)}; essa rota precisa ser redirecionada."
+            )
         if str(route.get("source") or "").strip() == "S":
-            local_violations.append(f"{route_id} tenta sair de S; essa rota precisa ser revista.")
+            local_violations.append(
+                f"{route_label} tenta sair de {_studio_node_business_label_from_lookup('S', node_lookup)}; essa rota precisa ser revista."
+            )
         if float(route.get("dose_min_l") or 0.0) > 0 and not _coerce_truthy(route.get("measurement_required")):
-            local_violations.append(f"{route_id} usa dosagem sem medição direta compatível.")
+            local_violations.append(f"{route_label} usa dosagem sem medição direta compatível.")
     for blocker in list(summary.get("blockers", []))[:4]:
         blocker_text = str(blocker)
         if "entra em W" in blocker_text:
@@ -3198,7 +3355,16 @@ def render_studio_connectivity_panel(
             global_highlights.append("Há conexões saindo de S no cenário; isso ainda bloqueia a passagem para Runs.")
         elif blocker_text.startswith("Rotas com dosagem sem medicao direta:"):
             route_ids = blocker_text.split(":", 1)[1].strip()
-            global_highlights.append(f"Rotas com dosagem ainda sem medição direta: {route_ids}.")
+            route_labels = _studio_route_labels_from_ids(
+                [item.strip() for item in route_ids.split(",") if item.strip()],
+                route_rows=route_rows,
+                node_lookup=node_lookup,
+            )
+            global_highlights.append(
+                "Rotas com dosagem ainda sem medição direta: "
+                + (", ".join(route_labels) if route_labels else route_ids)
+                + "."
+            )
         elif "referencia source inexistente" in blocker_text:
             global_highlights.append("Há rota apontando para uma origem que não está disponível no grafo principal.")
         elif "referencia sink inexistente" in blocker_text:
@@ -3213,16 +3379,15 @@ def render_studio_connectivity_panel(
             global_highlights.append(warning_text)
     route_lines = []
     for route in (prioritized_routes or route_rows)[:4]:
-        route_id = str(route.get("route_id") or "ROTA")
-        source = str(route.get("source") or "-")
-        sink = str(route.get("sink") or "-")
-        qualifiers = []
-        if _coerce_truthy(route.get("mandatory")):
-            qualifiers.append("obrigatória")
-        if _coerce_truthy(route.get("measurement_required")):
-            qualifiers.append("medição direta")
-        qualifier_text = f" ({', '.join(qualifiers)})" if qualifiers else ""
-        route_lines.append(f"{route_id}: {source} -> {sink}{qualifier_text}")
+        route_lines.append(
+            _studio_route_primary_label(
+                route,
+                node_lookup=node_lookup,
+                include_intent=True,
+                include_measurement=True,
+                include_notes=True,
+            )
+        )
     if local_violations:
         primary_connectivity_action = local_violations[0]
     elif prioritized_routes and focused_dosing_routes:
@@ -3330,6 +3495,11 @@ def render_studio_focus_panel(
 ) -> Any:
     route_rows = route_rows or []
     readiness_summary = readiness_summary or {}
+    node_lookup = {
+        str(row.get("node_id", "")).strip(): dict(row)
+        for row in _visible_studio_nodes(nodes_rows)
+        if str(row.get("node_id", "")).strip()
+    }
     selected_node_id = str(node_summary.get("selected_node_id") or "-")
     selected_edge = edge_summary.get("selected_edge") or {}
     selected_edge_id = str(edge_summary.get("selected_link_id") or "-")
@@ -3360,9 +3530,11 @@ def render_studio_focus_panel(
     blocker_count = int(readiness_summary.get("blocker_count", 0) or 0)
     warning_count = int(readiness_summary.get("warning_count", 0) or 0)
     if selected_node_id == "W" or str(selected_edge.get("to_node") or "").strip() == "W":
-        focus_rules.append("Regra do foco: W não pode receber rotas entrando; use este ponto apenas como origem.")
+        water_label = _studio_node_business_label_from_lookup("W", node_lookup)
+        focus_rules.append(f"Regra do foco: {water_label} não pode receber rotas entrando; use este ponto apenas como origem.")
     if selected_node_id == "S" or str(selected_edge.get("from_node") or "").strip() == "S":
-        focus_rules.append("Regra do foco: S não pode originar rotas; use este ponto apenas como destino final.")
+        outlet_label = _studio_node_business_label_from_lookup("S", node_lookup)
+        focus_rules.append(f"Regra do foco: {outlet_label} não pode originar rotas; use este ponto apenas como destino final.")
     if any(float(route.get("dose_min_l") or 0.0) > 0 for route in relevant_routes):
         focus_rules.append("Regra do foco: rotas com dosagem exigem medição direta compatível.")
     if mandatory_route_count:
@@ -3435,7 +3607,7 @@ def render_studio_focus_panel(
     if not readiness_context:
         readiness_context.append("Nada neste foco impede a passagem para Runs neste momento.")
     node_next_action = (
-        f"Revise as rotas ligadas a {selected_node_id} antes de ajustar posição ou nome."
+        f"Revise as rotas ligadas a {_studio_node_business_label_from_lookup(selected_node_id, node_lookup)} antes de ajustar posição ou nome."
         if relevant_routes
         else "Use a bancada de edição apenas depois de confirmar se este nó precisa participar de uma rota obrigatória."
     )
@@ -3460,7 +3632,7 @@ def render_studio_focus_panel(
         f"Nó em foco: {node_summary.get('role_label') or '-'} na superfície principal."
         if selected_node_present
         else "Nenhum nó em foco no momento.",
-        f"Conexão em foco: {edge_summary.get('from_label') or '-'} -> {edge_summary.get('to_label') or '-'}."
+        f"Conexão em foco: {edge_summary.get('from_label') or '-'} supre {edge_summary.get('to_label') or '-'}."
         if selected_edge
         else "Nenhuma conexão em foco no momento.",
         f"Rotas deste foco: {mandatory_route_count} obrigatória(s), {dosing_route_count} com dosagem, {measurement_route_count} com medição direta."
@@ -4895,7 +5067,15 @@ def build_app(
                                     html.Div(
                                         style={**UI_TWO_COLUMN_STYLE, "marginTop": "12px"},
                                         children=[
-                                            html.Div(id="studio-readiness-panel", children=render_studio_readiness_panel(initial_studio_readiness), style=UI_CARD_STYLE),
+                                            html.Div(
+                                                id="studio-readiness-panel",
+                                                children=render_studio_readiness_panel(
+                                                    initial_studio_readiness,
+                                                    authoring_payload["route_rows"],
+                                                    authoring_payload["nodes_rows"],
+                                                ),
+                                                style=UI_CARD_STYLE,
+                                            ),
                                             html.Div(id="studio-projection-coverage-panel", children=render_studio_projection_panel(initial_studio_projection), style=UI_CARD_STYLE),
                                         ],
                                     ),
@@ -5972,12 +6152,14 @@ def build_app(
         Output("studio-route-dose-min-l", "value"),
         Output("studio-route-notes", "value"),
         Output("studio-route-measurement-required", "value"),
+        Input("nodes-grid", "rowData"),
         Input("routes-grid", "rowData"),
         Input("node-studio-summary", "children"),
         Input("edge-studio-summary", "children"),
         State("studio-route-focus-dropdown", "value"),
     )
     def _sync_route_focus_controls(
+        nodes_rows: list[dict[str, Any]] | None,
         route_rows: list[dict[str, Any]] | None,
         node_summary_text: str | None,
         edge_summary_text: str | None,
@@ -5991,16 +6173,18 @@ def build_app(
             str((edge_summary.get("selected_edge") or {}).get("to_node") or "").strip(),
         }
         focus_node_ids = {node_id for node_id in focus_node_ids if node_id}
-        options = _route_choice_options(route_rows, focus_node_ids=focus_node_ids)
+        options = _route_choice_options(route_rows, focus_node_ids=focus_node_ids, nodes_rows=nodes_rows)
         selected_route_id = _default_route_focus_selection(
             route_rows,
             focus_node_ids=focus_node_ids,
             preferred_route_id=current_route_id,
+            nodes_rows=nodes_rows,
         )
         form_values = _route_studio_form_values(
             route_rows,
             focus_node_ids=focus_node_ids,
             selected_route_id=selected_route_id,
+            nodes_rows=nodes_rows,
         )
         return (
             options,
@@ -7181,7 +7365,7 @@ def build_app(
                 studio_status_text,
                 route_draft_source_id,
             ),
-            render_studio_readiness_panel(studio_readiness),
+            render_studio_readiness_panel(studio_readiness, route_rows or [], nodes_rows or []),
             render_studio_projection_panel(
                 build_studio_projection_summary(nodes_rows or [], candidate_links_rows or [], route_rows or [])
             ),
