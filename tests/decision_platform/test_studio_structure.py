@@ -9,6 +9,7 @@ from decision_platform.data_io.loader import load_scenario_bundle
 from decision_platform.data_io.storage import save_authored_scenario_bundle
 from decision_platform.ui_dash.app import (
     STUDIO_CONTEXT_MENU,
+    _route_choice_options,
     apply_studio_context_menu_action,
     apply_route_intent_from_edge_context,
     apply_route_studio_edit,
@@ -378,6 +379,24 @@ def test_context_menu_action_starts_route_draft_from_selected_node() -> None:
     assert next_link_id == "L013"
     assert status == ""
     assert open_workbench is False
+
+
+@pytest.mark.fast
+def test_route_choice_options_use_business_labels_before_technical_ids() -> None:
+    bundle = load_scenario_bundle("data/decision_platform/maquete_v2")
+
+    labels = [
+        str(option["label"])
+        for option in _route_choice_options(
+            bundle.route_requirements.to_dict("records"),
+            nodes_rows=bundle.nodes.to_dict("records"),
+        )[:3]
+    ]
+
+    assert labels
+    assert labels[0].startswith("Tanque de água para Misturador")
+    assert all("R00" not in label for label in labels)
+    assert all("->" not in label for label in labels)
 
 
 @pytest.mark.fast

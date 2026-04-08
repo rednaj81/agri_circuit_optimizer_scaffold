@@ -273,6 +273,22 @@ def test_studio_primary_workspace_avoids_technical_internal_terms() -> None:
     assert "Tap" not in canvas_text
 
 
+def test_studio_route_focus_dropdown_keeps_business_language_in_primary_surface() -> None:
+    with diagnostic_runtime_test_mode():
+        app = build_app("data/decision_platform/maquete_v2")
+
+    dropdown = _find_component_by_id(app.layout, "studio-route-focus-dropdown")
+    option_labels = [str(option.get("label")) for option in getattr(dropdown, "options", [])[:3]]
+    readiness_text = _collect_text_content(_find_component_by_id(app.layout, "studio-readiness-panel"))
+
+    assert option_labels
+    assert option_labels[0].startswith("Tanque de água para Misturador")
+    assert all("R00" not in label for label in option_labels)
+    assert all("->" not in label for label in option_labels)
+    assert "R001" not in readiness_text
+    assert "W ->" not in readiness_text
+
+
 def test_product_space_banner_uses_consistent_product_language_for_each_space() -> None:
     studio_banner = _collect_text_content(render_product_space_banner("studio"))
     runs_banner = _collect_text_content(render_product_space_banner("runs"))

@@ -1,0 +1,39 @@
+{
+  "phase": "phase_ux_refinement",
+  "wave": 5,
+  "phase_exit_ready": true,
+  "route_first_baseline": {
+    "context_menu_ids": [
+      "add-source-node",
+      "add-product-node",
+      "add-mixer-node",
+      "add-service-node",
+      "add-outlet-node",
+      "duplicate-node",
+      "start-route-from-node",
+      "remove-node",
+      "create-route-from-edge",
+      "mark-route-mandatory",
+      "mark-route-desirable",
+      "mark-route-optional",
+      "reverse-edge",
+      "remove-edge",
+      "open-workbench"
+    ],
+    "route_dropdown_labels": [
+      "Tanque de água para Misturador · Obrigatória · Água para misturador",
+      "Tanque de água para Incorporador · Obrigatória · Água para incorporador",
+      "Tanque de água para Saída externa · Obrigatória · Água para saída"
+    ],
+    "studio_header": "Command center do StudioDesenhe primeiro as rotas que precisam de serviçoFoco atualTanque de águaPassagem para RunsContinue no Studio até fechar readiness e conectividade.Intenção das rotasObrigatória, desejável e opcional ficam na mesma superfície para evitar desvio prematuro ao workbench.9 obrigatórias0 desejáveis9 opcionaisTanque de água para Misturador · Obrigatória · Água para misturadorAdicionar entidades visíveisCrie só fontes, produtos, mistura, serviço e saída. Hubs internos continuam fora do canvas.Nova fonteNovo produtoNovo misturadorNovo serviçoNova saídaLigação rápidaA entidade em foco é Tanque de água. Use a paleta para completar o fluxo a partir deste ponto.DeParaTipo de conexãoCriar conexão no canvasAbrir workbench avançadoEntidades de negócio9Só o que o usuário precisa editar.Conexões visíveis18Fluxo principal sem malha interna.Internos ocultos9Nós derivados e hubs fora da superfície principal.Rotas declaradas18Trabalho principal desta etapa do Studio.",
+    "workspace_text": "Leitura do cenárioExige atençãoAinda há bloqueios estruturais impedindo a passagem segura para Runs.Seleção atualEntidade em foco: Tanque de água.Conectividade em focoTanque de água supre Misturador (rota obrigatória).Readiness localA conexão L011 sai de Saída externa, mas Saída externa deve aparecer apenas como destino final.Próxima açãoCorrigir regras estruturais e rotas inválidas antes de enfileirar uma nova run.O que precisa de atenção agoraA conexão L011 sai de Saída externa, mas Saída externa deve aparecer apenas como destino final.Use este foco para fechar o principal bloqueio estrutural antes de liberar a passagem para Runs.Ajustes locais do canvasUse estes controles rápidos para ajustes rotineiros sem abrir a bancada avançada.Entidade em focoAtualize o rótulo visível desta entidade sem sair da leitura principal do Studio.Rótulo visívelAplicar rótulo direto no canvasConexão em focoSelecione uma conexão no canvas para liberar os ajustes rápidos deste trecho.Comprimento (m)Famílias sugeridasAplicar conexãoInverter direçãoFluxo atualSelecione uma conexão no canvas para abrir o trecho de suprimento desta edição.Se inverter agoraSem conexão em foco para inverter agora.Impacto previstoO impacto da inversão aparece aqui assim que uma conexão visível for selecionada.Rotas tocadasNenhuma rota em foco neste momento.Sem conexão em foco: primeiro selecione um trecho do grafo principal.Mover à esquerdaMover acimaMover abaixoDuplicar nó em focoExcluir conexão em focoAbrir bancada completaRotas que precisam de serviçoO foco atual toca 3 rota(s). Comece por Tanque de água para Misturador · Obrigatória e ajuste a intenção perto do canvas.Trecho em focoSelecione uma conexão no canvas para criar ou revisar a rota deste trecho.Ainda não há uma origem de rota em preparo no canvas.A criação direta de rota fica disponível assim que uma conexão visível for selecionada.Criar rota deste trechoObrigatóriaDesejávelOpcionalObrigatóriaDesejávelOpcionalReadiness desta camadaRemover bloqueiosGate para RunsFeche primeiro as rotas obrigatórias e confirme medição direta quando houver dosagem.Rota em focoIntençãoVazão mínima (L/min)Dosagem mínima (L)Observação visível da rotaMedição diretaAplicar rota no focoVer rotas ligadas a este focoTanque de água para Misturador · Obrigatória · medição direta · Água para misturador (código r001)Tanque de água para Incorporador · Obrigatória · medição direta · Água para incorporador (código r002)Tanque de água para Saída externa · Obrigatória · medição direta · Água para saída (código r003)Quem supre quem na camada principalTanque de água supre Incorporador, Misturador e Saída externa.É suprido porAinda não recebe suprimento visível.SupreIncorporador, Misturador e Saída externaVer trechos legíveis do fluxoTanque de água supre Misturador (rota obrigatória).Tanque de água supre Incorporador (rota obrigatória).Tanque de água supre Saída externa (rota obrigatória).Bloqueios2Impedem liberar a passagem para Runs.Avisos0Pedem revisão antes de enfileirar.Rotas obrigatórias9Base mínima da conectividade principal.Rotas desejáveis0Desejos explícitos sem virar hard constraint.Rotas opcionais9Alternativas que não travam a saída para Runs.Corrigir no canvasRuns bloqueado neste estadoAbrir AuditoriaSinal de saída desta áreaFeche os bloqueios estruturais antes de enfileirar uma nova run.Sem alerta operacional no momento.",
+    "readiness_text": "Readiness do cenárioExige atençãoAinda há bloqueios estruturais impedindo a passagem segura para Runs.Estado dominanteBloqueado no StudioObjetivo desta áreaConfirmar se o cenário já pode sair do Studio sem depender da trilha técnica.Próxima açãoCorrigir regras estruturais e rotas inválidas antes de enfileirar uma nova run.Bloqueio principalA conexão L011 sai de Saída externa, mas Saída externa deve aparecer apenas como destino final.Corrigir no canvasAbrir Runs com bloqueiosAbrir AuditoriaFluxo principalAgora no StudioRemover bloqueiosSinal de passagemAinda há bloqueios estruturais impedindo a passagem segura para Runs.Destino seguinteFeche os bloqueios estruturais antes de enfileirar uma nova run.Entidades visíveis9Fluxos projetados18Leitura primária do circuito de negócio.Internos ocultos9Hubs e nós técnicos fora do canvas principal.Rotas obrigatorias9Bloqueios2Impedem seguir direto para Runs.Avisos0Podem pedir revisão antes do enfileiramento.Passagem para RunsRemover bloqueiosQuando a camada principal estiver clara, siga para Runs para enfileirar ou revisar a fila. Se ainda houver bloqueios, termine a revisão no Studio antes de abrir uma nova rodada.Abrir Runs com bloqueiosBloqueiosA conexão L011 sai de Saída externa, mas Saída externa deve aparecer apenas como destino final.A conexão L012 sai de Saída externa, mas Saída externa deve aparecer apenas como destino final.AvisosSem aviso relevante neste momento.Proximos passosFeche os bloqueios estruturais antes de enfileirar uma nova run.Salve e reabra o bundle canônico quando a revisão estiver pronta."
+  },
+  "transition_checklist": [
+    "Canvas principal permanece business graph only",
+    "Criacao e edicao contextual de rotas seguem no primeiro fold",
+    "Readiness preventivo continua visivel antes de Runs",
+    "Quem supre quem segue legivel na superficie primaria",
+    "Runs pode assumir esta baseline sem reabrir o Studio"
+  ]
+}
