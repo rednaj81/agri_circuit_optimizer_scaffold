@@ -10,7 +10,10 @@ from decision_platform.data_io.storage import save_authored_scenario_bundle
 from decision_platform.ui_dash.app import (
     STUDIO_CONTEXT_MENU,
     apply_studio_context_menu_action,
+    apply_route_intent_from_edge_context,
     apply_route_studio_edit,
+    create_route_between_business_nodes,
+    create_route_from_edge_studio_selection,
     reverse_edge_studio_selection,
     build_app,
     build_primary_node_studio_elements,
@@ -60,6 +63,10 @@ def test_dash_app_exposes_structural_studio_controls() -> None:
     assert "studio-route-focus-dropdown" in layout_repr
     assert "studio-route-intent" in layout_repr
     assert "studio-route-apply-button" in layout_repr
+    assert "studio-route-create-from-edge-button" in layout_repr
+    assert "studio-route-intent-mandatory-button" in layout_repr
+    assert "studio-route-intent-desirable-button" in layout_repr
+    assert "studio-route-intent-optional-button" in layout_repr
     assert "studio-focus-node-label" in layout_repr
     assert "studio-focus-node-apply-button" in layout_repr
     assert "studio-focus-edge-length-m" in layout_repr
@@ -157,7 +164,7 @@ def test_context_menu_action_creates_and_removes_business_elements() -> None:
     candidate_links_rows = bundle.candidate_links.to_dict("records")
     route_rows = bundle.route_requirements.to_dict("records")
 
-    updated_nodes, updated_links, next_node_id, next_link_id, status, open_workbench = apply_studio_context_menu_action(
+    updated_nodes, updated_links, updated_routes, next_node_id, next_link_id, status, open_workbench = apply_studio_context_menu_action(
         context_menu_data={"menuItemId": "add-product-node", "x": 420, "y": 180},
         nodes_rows=nodes_rows,
         candidate_links_rows=candidate_links_rows,
@@ -168,13 +175,14 @@ def test_context_menu_action_creates_and_removes_business_elements() -> None:
 
     created_node = next(row for row in updated_nodes if str(row["node_id"]) == next_node_id)
     assert updated_links == candidate_links_rows
+    assert updated_routes == route_rows
     assert status == "Entidade de negócio adicionada pelo menu contextual."
     assert open_workbench is False
     assert created_node["node_type"] == "product_tank"
     assert created_node["x_m"] == pytest.approx(0.42)
     assert created_node["y_m"] == pytest.approx(0.3)
 
-    updated_nodes, updated_links, _, removed_link_id, status, open_workbench = apply_studio_context_menu_action(
+    updated_nodes, updated_links, updated_routes, _, removed_link_id, status, open_workbench = apply_studio_context_menu_action(
         context_menu_data={"menuItemId": "remove-edge", "elementId": "L013"},
         nodes_rows=updated_nodes,
         candidate_links_rows=updated_links,
@@ -184,6 +192,7 @@ def test_context_menu_action_creates_and_removes_business_elements() -> None:
     )
 
     assert all(str(row["link_id"]) != "L013" for row in updated_links)
+    assert updated_routes == route_rows
     assert removed_link_id != "L013"
     assert status == "Conexão removida pelo menu contextual."
     assert open_workbench is False
@@ -234,6 +243,52 @@ def test_route_focus_edit_updates_intent_and_measurement_flags() -> None:
 
 
 @pytest.mark.fast
+def test_create_route_between_business_nodes_adds_visible_route() -> None:
+    bundle = load_scenario_bundle("data/decision_platform/maquete_v2")
+    route_rows = [
+        row
+        for row in bundle.route_requirements.to_dict("records")
+        if str(row["route_id"]) != "R018"
+    ]
+
+    updated_routes, created_route_id = create_route_between_business_nodes(
+        route_rows,
+        source_node_id="I",
+        sink_node_id="IR",
+    )
+
+    created_route = next(row for row in updated_routes if str(row["route_id"]) == created_route_id)
+    assert created_route["source"] == "I"
+    assert created_route["sink"] == "IR"
+    assert created_route["route_group"] == "optional"
+    assert bool(created_route["mandatory"]) is False
+    assert "Rota criada no canvas" in str(created_route["notes"])
+
+
+@pytest.mark.fast
+def test_apply_route_intent_from_edge_context_updates_matching_route() -> None:
+    bundle = load_scenario_bundle("data/decision_platform/maquete_v2")
+    route_rows = bundle.route_requirements.to_dict("records")
+    route_rows, created_route_id = create_route_from_edge_studio_selection(
+        route_rows,
+        selected_link_id="L018",
+        candidate_links_rows=bundle.candidate_links.to_dict("records"),
+    )
+
+    updated_routes, selected_route_id = apply_route_intent_from_edge_context(
+        route_rows,
+        selected_link_id="L018",
+        candidate_links_rows=bundle.candidate_links.to_dict("records"),
+        intent="desirable",
+    )
+
+    updated_route = next(row for row in updated_routes if str(row["route_id"]) == created_route_id)
+    assert selected_route_id == created_route_id
+    assert updated_route["route_group"] == "desirable"
+    assert bool(updated_route["mandatory"]) is False
+
+
+@pytest.mark.fast
 def test_primary_studio_projection_marks_desirable_routes_in_canvas_classes() -> None:
     bundle = load_scenario_bundle("data/decision_platform/maquete_v2")
     route_rows = bundle.route_requirements.to_dict("records")
@@ -259,6 +314,11 @@ def test_studio_context_menu_declares_business_first_actions() -> None:
     assert "add-product-node" in menu_ids
     assert "add-mixer-node" in menu_ids
     assert "add-outlet-node" in menu_ids
+    assert "start-route-from-node" in menu_ids
+    assert "create-route-from-edge" in menu_ids
+    assert "mark-route-mandatory" in menu_ids
+    assert "mark-route-desirable" in menu_ids
+    assert "mark-route-optional" in menu_ids
     assert "duplicate-node" in menu_ids
     assert "reverse-edge" in menu_ids
     assert "remove-edge" in menu_ids
@@ -271,7 +331,7 @@ def test_context_menu_action_reverses_edge_and_reports_readiness_change() -> Non
     candidate_links_rows = bundle.candidate_links.to_dict("records")
     original_link = next(row for row in candidate_links_rows if str(row["link_id"]) == "L013")
 
-    updated_nodes, updated_links, next_node_id, next_link_id, status, open_workbench = apply_studio_context_menu_action(
+    updated_nodes, updated_links, updated_routes, next_node_id, next_link_id, status, open_workbench = apply_studio_context_menu_action(
         context_menu_data={"menuItemId": "reverse-edge", "elementId": "L013"},
         nodes_rows=bundle.nodes.to_dict("records"),
         candidate_links_rows=candidate_links_rows,
@@ -282,6 +342,7 @@ def test_context_menu_action_reverses_edge_and_reports_readiness_change() -> Non
 
     reversed_link = next(row for row in updated_links if str(row["link_id"]) == "L013")
     assert updated_nodes == bundle.nodes.to_dict("records")
+    assert updated_routes == bundle.route_requirements.to_dict("records")
     assert next_node_id == "P1"
     assert next_link_id == "L013"
     assert reversed_link["from_node"] == original_link["to_node"]
@@ -289,6 +350,33 @@ def test_context_menu_action_reverses_edge_and_reports_readiness_change() -> Non
     assert "Conexão invertida pelo menu contextual." in status
     assert "Agora" in status
     assert "Runs" in status
+    assert open_workbench is False
+
+
+@pytest.mark.fast
+def test_context_menu_action_starts_route_draft_from_selected_node() -> None:
+    bundle = load_scenario_bundle("data/decision_platform/maquete_v2")
+    route_rows = [
+        row
+        for row in bundle.route_requirements.to_dict("records")
+        if str(row["route_id"]) != "R018"
+    ]
+
+    updated_nodes, updated_links, updated_routes, next_node_id, next_link_id, status, open_workbench = apply_studio_context_menu_action(
+        context_menu_data={"menuItemId": "start-route-from-node", "elementId": "I"},
+        nodes_rows=bundle.nodes.to_dict("records"),
+        candidate_links_rows=bundle.candidate_links.to_dict("records"),
+        selected_node_id="I",
+        selected_link_id="L013",
+        route_rows=route_rows,
+    )
+
+    assert updated_nodes == bundle.nodes.to_dict("records")
+    assert updated_links == bundle.candidate_links.to_dict("records")
+    assert updated_routes == route_rows
+    assert next_node_id == "I"
+    assert next_link_id == "L013"
+    assert status == ""
     assert open_workbench is False
 
 

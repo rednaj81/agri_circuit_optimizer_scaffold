@@ -1164,10 +1164,40 @@ STUDIO_CONTEXT_MENU = [
         "tooltipText": "Duplica a entidade selecionada mantendo-a no canvas principal.",
     },
     {
+        "id": "start-route-from-node",
+        "label": "Iniciar rota daqui",
+        "availableOn": ["node"],
+        "tooltipText": "Marca esta entidade como origem da próxima rota criada direto no canvas.",
+    },
+    {
         "id": "remove-node",
         "label": "Remover entidade",
         "availableOn": ["node"],
         "tooltipText": "Tenta remover a entidade selecionada da malha principal.",
+    },
+    {
+        "id": "create-route-from-edge",
+        "label": "Criar rota deste trecho",
+        "availableOn": ["edge"],
+        "tooltipText": "Cria uma rota de negócio usando a conexão selecionada como origem e destino visíveis.",
+    },
+    {
+        "id": "mark-route-mandatory",
+        "label": "Marcar rota como obrigatória",
+        "availableOn": ["edge"],
+        "tooltipText": "Promove a rota ligada a este trecho para obrigatória sem abrir o workbench.",
+    },
+    {
+        "id": "mark-route-desirable",
+        "label": "Marcar rota como desejável",
+        "availableOn": ["edge"],
+        "tooltipText": "Marca a rota ligada a este trecho como desejável sem endurecer a constraint.",
+    },
+    {
+        "id": "mark-route-optional",
+        "label": "Marcar rota como opcional",
+        "availableOn": ["edge"],
+        "tooltipText": "Mantém a rota ligada a este trecho como opcional na leitura principal.",
     },
     {
         "id": "reverse-edge",
@@ -1247,6 +1277,8 @@ def _studio_quick_link_defaults(
 def _is_internal_studio_node(row: dict[str, Any] | None) -> bool:
     if not row:
         return False
+    if str(row.get("node_type", "")).strip() == "junction":
+        return True
     zone = str(row.get("zone", "")).strip().lower()
     if zone in {"internal", "hub"}:
         return True
@@ -1478,6 +1510,190 @@ def apply_route_studio_edit(
         current["notes"] = str(notes or "").strip()
         updated_rows.append(current)
     return updated_rows, selected_id
+
+
+def _next_route_identifier(route_rows: list[dict[str, Any]]) -> str:
+    numeric_suffixes: list[int] = []
+    existing_ids = {
+        str(row.get("route_id") or "").strip()
+        for row in route_rows
+        if str(row.get("route_id") or "").strip()
+    }
+    for route_id in existing_ids:
+        if route_id.startswith("R") and route_id[1:].isdigit():
+            numeric_suffixes.append(int(route_id[1:]))
+    next_number = max(numeric_suffixes, default=0) + 1
+    candidate = f"R{next_number:03d}"
+    while candidate in existing_ids:
+        next_number += 1
+        candidate = f"R{next_number:03d}"
+    return candidate
+
+
+def _route_ids_for_edge_context(
+    route_rows: list[dict[str, Any]],
+    *,
+    edge_row: dict[str, Any] | None,
+) -> list[str]:
+    if not edge_row:
+        return []
+    from_node = str(edge_row.get("from_node") or "").strip()
+    to_node = str(edge_row.get("to_node") or "").strip()
+    route_ids = [
+        str(route.get("route_id") or "").strip()
+        for route in route_rows
+        if str(route.get("source") or "").strip() == from_node
+        and str(route.get("sink") or "").strip() == to_node
+    ]
+    return [route_id for route_id in route_ids if route_id]
+
+
+def create_route_from_edge_studio_selection(
+    route_rows: list[dict[str, Any]],
+    *,
+    selected_link_id: str | None,
+    candidate_links_rows: list[dict[str, Any]] | None,
+) -> tuple[list[dict[str, Any]], str]:
+    selected_id = _default_edge_studio_selection(candidate_links_rows or [], preferred_link_id=selected_link_id)
+    edge_row = next(
+        (
+            dict(row)
+            for row in (candidate_links_rows or [])
+            if str(row.get("link_id") or "").strip() == selected_id
+        ),
+        None,
+    )
+    if edge_row is None:
+        raise ValueError("Selecione uma conexão visível antes de criar uma rota.")
+    existing_route_ids = _route_ids_for_edge_context(route_rows, edge_row=edge_row)
+    if existing_route_ids:
+        raise ValueError(
+            "Este trecho já possui rota registrada no Studio: "
+            + ", ".join(existing_route_ids[:3])
+        )
+    from_node = str(edge_row.get("from_node") or "").strip()
+    to_node = str(edge_row.get("to_node") or "").strip()
+    if not from_node or not to_node:
+        raise ValueError("A conexão selecionada não possui origem e destino válidos para criar uma rota.")
+    next_route_id = _next_route_identifier(route_rows)
+    new_row = {
+        "route_id": next_route_id,
+        "source": from_node,
+        "sink": to_node,
+        "mandatory": 0,
+        "route_group": "optional",
+        "q_min_delivered_lpm": 10.0,
+        "measurement_required": 0,
+        "dose_min_l": 0.0,
+        "dose_error_max_pct": 0.0,
+        "cleaning_required": 1,
+        "allow_series_pumps": 1,
+        "weight": 5.0,
+        "notes": f"Rota criada no canvas: {from_node} -> {to_node}",
+    }
+    return [*route_rows, new_row], next_route_id
+
+
+def create_route_between_business_nodes(
+    route_rows: list[dict[str, Any]],
+    *,
+    source_node_id: str,
+    sink_node_id: str,
+) -> tuple[list[dict[str, Any]], str]:
+    normalized_source = str(source_node_id or "").strip()
+    normalized_sink = str(sink_node_id or "").strip()
+    if not normalized_source or not normalized_sink:
+        raise ValueError("Selecione origem e destino de negócio antes de criar a rota.")
+    if normalized_source == normalized_sink:
+        raise ValueError("A rota no Studio precisa ligar duas entidades de negócio diferentes.")
+    duplicate_route_id = next(
+        (
+            str(route.get("route_id") or "").strip()
+            for route in route_rows
+            if str(route.get("source") or "").strip() == normalized_source
+            and str(route.get("sink") or "").strip() == normalized_sink
+        ),
+        "",
+    )
+    if duplicate_route_id:
+        raise ValueError(f"Já existe uma rota registrada entre {normalized_source} e {normalized_sink}: {duplicate_route_id}")
+    next_route_id = _next_route_identifier(route_rows)
+    new_row = {
+        "route_id": next_route_id,
+        "source": normalized_source,
+        "sink": normalized_sink,
+        "mandatory": 0,
+        "route_group": "optional",
+        "q_min_delivered_lpm": 10.0,
+        "measurement_required": 0,
+        "dose_min_l": 0.0,
+        "dose_error_max_pct": 0.0,
+        "cleaning_required": 1,
+        "allow_series_pumps": 1,
+        "weight": 5.0,
+        "notes": f"Rota criada no canvas: {normalized_source} -> {normalized_sink}",
+    }
+    return [*route_rows, new_row], next_route_id
+
+
+def apply_route_intent_from_edge_context(
+    route_rows: list[dict[str, Any]],
+    *,
+    selected_link_id: str | None,
+    candidate_links_rows: list[dict[str, Any]] | None,
+    intent: str,
+) -> tuple[list[dict[str, Any]], str]:
+    selected_id = _default_edge_studio_selection(candidate_links_rows or [], preferred_link_id=selected_link_id)
+    edge_row = next(
+        (
+            dict(row)
+            for row in (candidate_links_rows or [])
+            if str(row.get("link_id") or "").strip() == selected_id
+        ),
+        None,
+    )
+    route_ids = _route_ids_for_edge_context(route_rows, edge_row=edge_row)
+    if not route_ids:
+        raise ValueError("Este trecho ainda não possui rota registrada. Crie a rota primeiro no canvas.")
+    return apply_route_studio_edit(
+        route_rows,
+        selected_route_id=route_ids[0],
+        intent=intent,
+        measurement_required=bool(
+            next(
+                (
+                    route.get("measurement_required")
+                    for route in route_rows
+                    if str(route.get("route_id") or "").strip() == route_ids[0]
+                ),
+                False,
+            )
+        ),
+        dose_min_l=next(
+            (
+                route.get("dose_min_l")
+                for route in route_rows
+                if str(route.get("route_id") or "").strip() == route_ids[0]
+            ),
+            0.0,
+        ),
+        q_min_delivered_lpm=next(
+            (
+                route.get("q_min_delivered_lpm")
+                for route in route_rows
+                if str(route.get("route_id") or "").strip() == route_ids[0]
+            ),
+            0.0,
+        ),
+        notes=next(
+            (
+                route.get("notes")
+                for route in route_rows
+                if str(route.get("route_id") or "").strip() == route_ids[0]
+            ),
+            "",
+        ),
+    )
 
 
 def _primary_route_projection_rows(
@@ -2210,6 +2426,7 @@ def render_studio_route_editor_panel(
     node_summary: dict[str, Any],
     edge_summary: dict[str, Any],
     studio_summary: dict[str, Any],
+    route_draft_source_id: str | None = None,
 ) -> Any:
     focus_node_ids = {
         str(node_summary.get("selected_node_id") or "").strip(),
@@ -2221,6 +2438,14 @@ def render_studio_route_editor_panel(
     form_values = _route_studio_form_values(route_rows, focus_node_ids=focus_node_ids)
     focused_routes = _route_focus_rows(route_rows, focus_node_ids=focus_node_ids)
     selected_route_present = bool(form_values.get("route_id"))
+    selected_edge = edge_summary.get("selected_edge") or {}
+    selected_edge_present = bool(selected_edge)
+    route_draft_source = str(route_draft_source_id or "").strip()
+    selected_edge_flow = (
+        f"{str(edge_summary.get('from_label') or '-')} supre {str(edge_summary.get('to_label') or '-')}"
+        if selected_edge_present
+        else "Selecione uma conexão no canvas para criar ou revisar a rota deste trecho."
+    )
     top_route = focused_routes[0] if focused_routes else None
     if top_route is not None:
         route_scope_text = (
@@ -2247,6 +2472,54 @@ def render_studio_route_editor_panel(
         children=[
             html.Div("Rotas que precisam de serviço", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
             html.Div(route_scope_text, style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"}),
+            html.Div(
+                style={**UI_MUTED_CARD_STYLE, "padding": "10px", "marginTop": "10px"},
+                children=[
+                    html.Div("Trecho em foco", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+                    html.Div(selected_edge_flow, style={"fontWeight": 700, "lineHeight": "1.45", "marginTop": "6px"}),
+                    html.Div(
+                        f"Origem de rota em preparo: {route_draft_source}. Selecione o destino no canvas para concluir."
+                        if route_draft_source
+                        else "Ainda não há uma origem de rota em preparo no canvas.",
+                        style={"lineHeight": "1.45", "marginTop": "6px"},
+                    ),
+                    html.Div(
+                        "Use a conexão selecionada para criar a rota deste trecho sem passar pelo workbench."
+                        if selected_edge_present
+                        else "A criação direta de rota fica disponível assim que uma conexão visível for selecionada.",
+                        style={"lineHeight": "1.45", "marginTop": "6px"},
+                    ),
+                    html.Div(
+                        style=UI_ACTION_ROW_STYLE,
+                        children=[
+                            html.Button(
+                                "Criar rota deste trecho",
+                                id="studio-route-create-from-edge-button",
+                                style=UI_BUTTON_STYLE,
+                                disabled=not selected_edge_present,
+                            ),
+                            html.Button(
+                                "Obrigatória",
+                                id="studio-route-intent-mandatory-button",
+                                style=UI_BUTTON_STYLE,
+                                disabled=not selected_route_present,
+                            ),
+                            html.Button(
+                                "Desejável",
+                                id="studio-route-intent-desirable-button",
+                                style=UI_BUTTON_STYLE,
+                                disabled=not selected_route_present,
+                            ),
+                            html.Button(
+                                "Opcional",
+                                id="studio-route-intent-optional-button",
+                                style=UI_BUTTON_STYLE,
+                                disabled=not selected_route_present,
+                            ),
+                        ],
+                    ),
+                ],
+            ),
             html.Div(
                 style={"display": "flex", "gap": "8px", "flexWrap": "wrap", "marginTop": "10px"},
                 children=[
@@ -2373,6 +2646,7 @@ def render_studio_workspace_panel(
     candidate_links_rows: list[dict[str, Any]],
     route_rows: list[dict[str, Any]] | None,
     studio_status_text: str | None,
+    route_draft_source_id: str | None = None,
 ) -> Any:
     status = str(studio_summary.get("status") or "needs_attention")
     background, color = _status_tone(status)
@@ -2406,7 +2680,13 @@ def render_studio_workspace_panel(
         nodes_rows=nodes_rows,
         candidate_links_rows=candidate_links_rows,
     )
-    route_editor_panel = render_studio_route_editor_panel(route_rows, node_summary, edge_summary, studio_summary)
+    route_editor_panel = render_studio_route_editor_panel(
+        route_rows,
+        node_summary,
+        edge_summary,
+        studio_summary,
+        route_draft_source_id=route_draft_source_id,
+    )
     runs_enabled = status == "ready"
     runs_button_label = "Ir para Runs" if runs_enabled else "Runs bloqueado neste estado"
     primary_actions: list[Any]
@@ -4441,6 +4721,7 @@ def build_app(
             dcc.Store(id="run-queue-root", data=str(run_queue_root)),
             dcc.Store(id="node-studio-selected-id", data=initial_node_studio_selected_id),
             dcc.Store(id="edge-studio-selected-id", data=initial_edge_studio_selected_id),
+            dcc.Store(id="studio-route-draft-source-id", data=""),
             dcc.Store(id="studio-status-message", data=""),
             html.Div(
                 style=UI_SHELL_STYLE,
@@ -4592,6 +4873,7 @@ def build_app(
                                                     authoring_payload["nodes_rows"],
                                                     authoring_payload["candidate_links_rows"],
                                                     authoring_payload["route_rows"],
+                                                    "",
                                                     "",
                                                 ),
                                                 style=UI_CARD_STYLE,
@@ -5765,6 +6047,97 @@ def build_app(
         return updated_rows, f"Rota {route_id} atualizada direto no foco do canvas."
 
     @app.callback(
+        Output("routes-grid", "rowData", allow_duplicate=True),
+        Output("studio-status-message", "data", allow_duplicate=True),
+        Input("studio-route-create-from-edge-button", "n_clicks"),
+        Input("studio-route-intent-mandatory-button", "n_clicks"),
+        Input("studio-route-intent-desirable-button", "n_clicks"),
+        Input("studio-route-intent-optional-button", "n_clicks"),
+        State("routes-grid", "rowData"),
+        State("edge-studio-selected-id", "data"),
+        State("candidate-links-grid", "rowData"),
+        State("studio-route-focus-dropdown", "value"),
+        prevent_initial_call=True,
+    )
+    def _apply_route_canvas_quick_actions(
+        create_route_n_clicks: Any,
+        mandatory_n_clicks: Any,
+        desirable_n_clicks: Any,
+        optional_n_clicks: Any,
+        route_rows: list[dict[str, Any]] | None,
+        selected_link_id: str | None,
+        candidate_links_rows: list[dict[str, Any]] | None,
+        selected_route_id: str | None,
+    ) -> tuple[list[dict[str, Any]], str]:
+        click_map = {
+            "create": int(create_route_n_clicks or 0),
+            "mandatory": int(mandatory_n_clicks or 0),
+            "desirable": int(desirable_n_clicks or 0),
+            "optional": int(optional_n_clicks or 0),
+        }
+        action = max(click_map, key=click_map.get)
+        if click_map[action] <= 0:
+            return route_rows or [], ""
+        try:
+            if action == "create":
+                updated_rows, created_route_id = create_route_from_edge_studio_selection(
+                    route_rows or [],
+                    selected_link_id=selected_link_id,
+                    candidate_links_rows=candidate_links_rows or [],
+                )
+                return updated_rows, f"Rota {created_route_id} criada direto do trecho selecionado."
+            if selected_route_id:
+                updated_rows, route_id = apply_route_studio_edit(
+                    route_rows or [],
+                    selected_route_id=selected_route_id,
+                    intent=action,
+                    measurement_required=bool(
+                        next(
+                            (
+                                route.get("measurement_required")
+                                for route in (route_rows or [])
+                                if str(route.get("route_id") or "").strip() == str(selected_route_id or "").strip()
+                            ),
+                            False,
+                        )
+                    ),
+                    dose_min_l=next(
+                        (
+                            route.get("dose_min_l")
+                            for route in (route_rows or [])
+                            if str(route.get("route_id") or "").strip() == str(selected_route_id or "").strip()
+                        ),
+                        0.0,
+                    ),
+                    q_min_delivered_lpm=next(
+                        (
+                            route.get("q_min_delivered_lpm")
+                            for route in (route_rows or [])
+                            if str(route.get("route_id") or "").strip() == str(selected_route_id or "").strip()
+                        ),
+                        0.0,
+                    ),
+                    notes=next(
+                        (
+                            route.get("notes")
+                            for route in (route_rows or [])
+                            if str(route.get("route_id") or "").strip() == str(selected_route_id or "").strip()
+                        ),
+                        "",
+                    ),
+                )
+            else:
+                updated_rows, route_id = apply_route_intent_from_edge_context(
+                    route_rows or [],
+                    selected_link_id=selected_link_id,
+                    candidate_links_rows=candidate_links_rows or [],
+                    intent=action,
+                )
+        except ValueError as exc:
+            return route_rows or [], str(exc)
+        return updated_rows, f"Rota {route_id} marcada como {_route_intent_label(action).lower()} direto no contexto do canvas."
+
+    @app.callback(
         Output("candidate-links-grid", "rowData", allow_duplicate=True),
         Output("edge-studio-selected-id", "data", allow_duplicate=True),
         Output("studio-status-message", "data", allow_duplicate=True),
@@ -5947,6 +6320,7 @@ def build_app(
     @app.callback(
         Output("nodes-grid", "rowData", allow_duplicate=True),
         Output("candidate-links-grid", "rowData", allow_duplicate=True),
+        Output("routes-grid", "rowData", allow_duplicate=True),
         Output("node-studio-selected-id", "data", allow_duplicate=True),
         Output("edge-studio-selected-id", "data", allow_duplicate=True),
         Output("studio-status-message", "data", allow_duplicate=True),
@@ -5966,7 +6340,7 @@ def build_app(
         selected_node_id: str | None,
         selected_link_id: str | None,
         route_rows: list[dict[str, Any]] | None,
-    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], str | None, str | None, str, bool]:
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], str | None, str | None, str, bool]:
         return apply_studio_context_menu_action(
             context_menu_data=context_menu_data,
             nodes_rows=nodes_rows or [],
@@ -5975,6 +6349,53 @@ def build_app(
             selected_link_id=selected_link_id,
             route_rows=route_rows or [],
         )
+
+    @app.callback(
+        Output("studio-route-draft-source-id", "data"),
+        Output("studio-status-message", "data", allow_duplicate=True),
+        Input("node-studio-cytoscape", "contextMenuData"),
+        State("node-studio-selected-id", "data"),
+        prevent_initial_call=True,
+    )
+    def _start_route_draft_from_context_menu(
+        context_menu_data: dict[str, Any] | None,
+        selected_node_id: str | None,
+    ) -> tuple[str, str]:
+        payload = context_menu_data or {}
+        if str(payload.get("menuItemId") or "").strip() != "start-route-from-node":
+            return "", ""
+        source_node_id = str(payload.get("elementId") or selected_node_id or "").strip()
+        if not source_node_id:
+            return "", "Selecione uma entidade antes de iniciar a criação da rota."
+        return source_node_id, f"Origem da rota armada em {source_node_id}. Selecione o destino no canvas."
+
+    @app.callback(
+        Output("routes-grid", "rowData", allow_duplicate=True),
+        Output("studio-route-draft-source-id", "data", allow_duplicate=True),
+        Output("studio-status-message", "data", allow_duplicate=True),
+        Input("node-studio-cytoscape", "tapNodeData"),
+        State("studio-route-draft-source-id", "data"),
+        State("routes-grid", "rowData"),
+        prevent_initial_call=True,
+    )
+    def _complete_route_draft_on_canvas(
+        tap_node_data: dict[str, Any] | None,
+        route_draft_source_id: str | None,
+        route_rows: list[dict[str, Any]] | None,
+    ) -> tuple[list[dict[str, Any]], str, str]:
+        draft_source = str(route_draft_source_id or "").strip()
+        target_node_id = str((tap_node_data or {}).get("id") or (tap_node_data or {}).get("node_id") or "").strip()
+        if not draft_source or not target_node_id or target_node_id == draft_source:
+            return route_rows or [], draft_source, ""
+        try:
+            updated_rows, created_route_id = create_route_between_business_nodes(
+                route_rows or [],
+                source_node_id=draft_source,
+                sink_node_id=target_node_id,
+            )
+        except ValueError as exc:
+            return route_rows or [], "", str(exc)
+        return updated_rows, "", f"Rota {created_route_id} criada direto no canvas entre {draft_source} e {target_node_id}."
 
     @app.callback(
         Output("candidate-links-grid", "rowData", allow_duplicate=True),
@@ -6717,6 +7138,7 @@ def build_app(
         Input("node-studio-summary", "children"),
         Input("edge-studio-summary", "children"),
         Input("studio-status", "children"),
+        Input("studio-route-draft-source-id", "data"),
     )
     def _refresh_studio_panels(
         nodes_rows: list[dict[str, Any]] | None,
@@ -6727,6 +7149,7 @@ def build_app(
         node_summary_text: str | None,
         edge_summary_text: str | None,
         studio_status_text: str | None,
+        route_draft_source_id: str | None,
     ) -> tuple[Any, Any, Any, Any, Any, Any, Any, Any, Any, Any, Any]:
         studio_readiness = build_studio_readiness_summary(nodes_rows or [], candidate_links_rows or [], route_rows or [])
         node_summary = _safe_json_loads(node_summary_text)
@@ -6751,6 +7174,7 @@ def build_app(
                 candidate_links_rows or [],
                 route_rows,
                 studio_status_text,
+                route_draft_source_id,
             ),
             render_studio_readiness_panel(studio_readiness),
             render_studio_projection_panel(
@@ -7597,14 +8021,14 @@ def apply_studio_context_menu_action(
     selected_node_id: str | None,
     selected_link_id: str | None,
     route_rows: list[dict[str, Any]],
-) -> tuple[list[dict[str, Any]], list[dict[str, Any]], str | None, str | None, str, bool]:
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], str | None, str | None, str, bool]:
     payload = context_menu_data or {}
     menu_item_id = str(payload.get("menuItemId") or "").strip()
     element_id = str(payload.get("elementId") or "").strip()
     click_x = payload.get("x")
     click_y = payload.get("y")
     if not menu_item_id:
-        return nodes_rows, candidate_links_rows, selected_node_id, selected_link_id, "", False
+        return nodes_rows, candidate_links_rows, route_rows, selected_node_id, selected_link_id, "", False
     next_node_selection = selected_node_id
     next_edge_selection = selected_link_id
     if menu_item_id.startswith("add-") and menu_item_id.endswith("-node"):
@@ -7621,6 +8045,7 @@ def apply_studio_context_menu_action(
         return (
             updated_nodes,
             candidate_links_rows,
+            route_rows,
             next_node_selection,
             next_edge_selection,
             "Entidade de negócio adicionada pelo menu contextual.",
@@ -7634,6 +8059,7 @@ def apply_studio_context_menu_action(
         return (
             updated_nodes,
             candidate_links_rows,
+            route_rows,
             next_node_selection,
             next_edge_selection,
             "Entidade duplicada pelo menu contextual.",
@@ -7648,10 +8074,11 @@ def apply_studio_context_menu_action(
                 route_rows=route_rows,
             )
         except ValueError as exc:
-            return nodes_rows, candidate_links_rows, selected_node_id, selected_link_id, str(exc), False
+            return nodes_rows, candidate_links_rows, route_rows, selected_node_id, selected_link_id, str(exc), False
         return (
             updated_nodes,
             candidate_links_rows,
+            route_rows,
             next_node_selection,
             next_edge_selection,
             "Entidade removida pelo menu contextual.",
@@ -7665,9 +8092,52 @@ def apply_studio_context_menu_action(
         return (
             nodes_rows,
             updated_links,
+            route_rows,
             next_node_selection,
             next_edge_selection,
             "Conexão removida pelo menu contextual.",
+            False,
+        )
+    if menu_item_id == "create-route-from-edge":
+        try:
+            updated_routes, created_route_id = create_route_from_edge_studio_selection(
+                route_rows,
+                selected_link_id=element_id or selected_link_id,
+                candidate_links_rows=candidate_links_rows,
+            )
+        except ValueError as exc:
+            return nodes_rows, candidate_links_rows, route_rows, selected_node_id, selected_link_id, str(exc), False
+        return (
+            nodes_rows,
+            candidate_links_rows,
+            updated_routes,
+            next_node_selection,
+            element_id or selected_link_id,
+            f"Rota {created_route_id} criada pelo menu contextual deste trecho.",
+            False,
+        )
+    if menu_item_id in {"mark-route-mandatory", "mark-route-desirable", "mark-route-optional"}:
+        intent = {
+            "mark-route-mandatory": "mandatory",
+            "mark-route-desirable": "desirable",
+            "mark-route-optional": "optional",
+        }[menu_item_id]
+        try:
+            updated_routes, selected_route_id = apply_route_intent_from_edge_context(
+                route_rows,
+                selected_link_id=element_id or selected_link_id,
+                candidate_links_rows=candidate_links_rows,
+                intent=intent,
+            )
+        except ValueError as exc:
+            return nodes_rows, candidate_links_rows, route_rows, selected_node_id, selected_link_id, str(exc), False
+        return (
+            nodes_rows,
+            candidate_links_rows,
+            updated_routes,
+            next_node_selection,
+            element_id or selected_link_id,
+            f"Rota {selected_route_id} marcada como {_route_intent_label(intent).lower()} pelo menu contextual.",
             False,
         )
     if menu_item_id == "reverse-edge":
@@ -7680,10 +8150,11 @@ def apply_studio_context_menu_action(
                 message_prefix="Conexão invertida pelo menu contextual.",
             )
         except ValueError as exc:
-            return nodes_rows, candidate_links_rows, selected_node_id, selected_link_id, str(exc), False
+            return nodes_rows, candidate_links_rows, route_rows, selected_node_id, selected_link_id, str(exc), False
         return (
             nodes_rows,
             updated_links,
+            route_rows,
             next_node_selection,
             next_edge_selection,
             status_message,
@@ -7695,8 +8166,8 @@ def apply_studio_context_menu_action(
                 next_node_selection = element_id
             if any(str(row.get("link_id", "")).strip() == element_id for row in candidate_links_rows):
                 next_edge_selection = element_id
-        return nodes_rows, candidate_links_rows, next_node_selection, next_edge_selection, "", True
-    return nodes_rows, candidate_links_rows, next_node_selection, next_edge_selection, "", False
+        return nodes_rows, candidate_links_rows, route_rows, next_node_selection, next_edge_selection, "", True
+    return nodes_rows, candidate_links_rows, route_rows, next_node_selection, next_edge_selection, "", False
 
 
 def delete_node_studio_selection(
@@ -8213,7 +8684,7 @@ def _default_primary_edge_studio_selection(
         link_id = str(row.get("link_id", "")).strip()
         if link_id:
             return link_id
-    return _default_edge_studio_selection(candidate_links_rows, preferred_link_id=preferred_link_id)
+    return None
 
 
 def _node_studio_form_values(nodes_rows: list[dict[str, Any]], selected_node_id: str | None) -> dict[str, Any]:

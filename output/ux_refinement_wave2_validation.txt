@@ -1,0 +1,17 @@
+Wave 2 targeted validation
+
+- python -m py_compile src\decision_platform\ui_dash\app.py
+- $env:PYTHONPATH='C:\d\dev\agri_circuit_optimizer_scaffold'; python -m pytest -q tests/decision_platform/test_studio_structure.py::test_dash_app_exposes_structural_studio_controls tests/decision_platform/test_studio_structure.py::test_create_route_between_business_nodes_adds_visible_route tests/decision_platform/test_studio_structure.py::test_apply_route_intent_from_edge_context_updates_matching_route tests/decision_platform/test_studio_structure.py::test_context_menu_action_starts_route_draft_from_selected_node tests/decision_platform/test_ui_smoke.py::test_studio_primary_surface_exposes_business_command_center
+
+Result:
+
+- 5 passed in 0.64s
+
+Evidence:
+
+- output\ux_refinement_wave2_studio_snapshot.json
+
+Notes:
+
+- Playwright/Chromium screenshot capture failed in this environment with `spawn EPERM`.
+- Browser MCP navigation also returned cancellation, so the wave evidence is a structured Studio snapshot instead of a bitmap screenshot.

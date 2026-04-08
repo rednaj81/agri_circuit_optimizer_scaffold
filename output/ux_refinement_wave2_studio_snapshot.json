@@ -1,0 +1,38 @@
+{
+  "phase": "phase_ux_refinement",
+  "wave": 2,
+  "studio_header": "Command center do StudioDesenhe primeiro as rotas que precisam de serviçoFoco atualTap P1Passagem para RunsContinue no Studio até fechar readiness e conectividade.Intenção das rotasObrigatória, desejável e opcional ficam na mesma superfície para evitar desvio prematuro ao workbench.9 obrigatórias0 desejáveis9 opcionaisR001 · W -> M · ObrigatóriaAdicionar entidades visíveisCrie só fontes, produtos, mistura, serviço e saída. Hubs internos continuam fora do canvas.Nova fonteNovo produtoNovo misturadorNovo serviçoNova saídaLigação rápidaA conexão em foco é Tap P1. Revise este trecho e use a criação rápida apenas para completar o fluxo principal.DeParaTipo de conexãoCriar conexão no canvasAbrir workbench avançadoEntidades de negócio9Só o que o usuário precisa editar.Conexões visíveis18Fluxo principal sem malha interna.Internos ocultos9Nós derivados e hubs fora da superfície principal.Rotas declaradas18Trabalho principal desta etapa do Studio.",
+  "route_panel_text": "Rotas que precisam de serviçoO foco atual toca 6 rota(s). Comece por R001 e ajuste a intenção perto do canvas.Trecho em focoProduto 1 supre Junção 1Ainda não há uma origem de rota em preparo no canvas.Use a conexão selecionada para criar a rota deste trecho sem passar pelo workbench.Criar rota deste trechoObrigatóriaDesejávelOpcionalObrigatóriaDesejávelOpcionalReadiness desta camadaRemover bloqueiosGate para RunsFeche primeiro as rotas obrigatórias e confirme medição direta quando houver dosagem.Rota em focoIntençãoVazão mínima (L/min)Dosagem mínima (L)Observação visível da rotaMedição diretaAplicar rota no focoVer rotas ligadas a este focoR001: W -> M · Obrigatória · Água para misturadorR004: P1 -> M · Obrigatória · Produto 1 para misturadorR002: W -> I · Obrigatória · Água para incorporadorR003: W -> S · Obrigatória · Água para saída",
+  "workspace_text": "Leitura do cenárioExige atençãoAinda há bloqueios estruturais impedindo a passagem segura para Runs.Seleção atualConexão em foco: Produto 1 -> Junção 1.Conectividade em focoTanque de água supre Misturador (rota obrigatória, rotas R001).Readiness localA conexão L011 sai de S, mas S deve aparecer apenas como destino final.Próxima açãoCorrigir regras estruturais e rotas inválidas antes de enfileirar uma nova run.O que precisa de atenção agoraA conexão L011 sai de S, mas S deve aparecer apenas como destino final.Confira comprimento, direção e famílias sugeridas da conexão L001.Ajustes locais do canvasUse estes controles rápidos para ajustes rotineiros sem abrir a bancada avançada.Entidade em focoAtualize o rótulo visível desta entidade sem sair da leitura principal do Studio.Rótulo visívelAplicar rótulo direto no canvasConexão em focoAjuste comprimento, famílias sugeridas ou direção sem abrir a bancada completa.Comprimento (m)Famílias sugeridasAplicar conexãoInverter direçãoFluxo atualProduto 1 supre Junção 1.Se inverter agoraSe inverter agora, Junção 1 passa a suprir Produto 1.Impacto previstoAinda há bloqueios estruturais impedindo a passagem segura para Runs.Rotas tocadasEste trecho toca 3 rota(s) em foco.Há rotas com dosagem ligadas a este trecho; confirme medição direta antes de seguir para Runs.Mover à esquerdaMover acimaMover abaixoDuplicar nó em focoExcluir conexão em focoAbrir bancada completaRotas que precisam de serviçoO foco atual toca 6 rota(s). Comece por R001 e ajuste a intenção perto do canvas.Trecho em focoProduto 1 supre Junção 1Ainda não há uma origem de rota em preparo no canvas.Use a conexão selecionada para criar a rota deste trecho sem passar pelo workbench.Criar rota deste trechoObrigatóriaDesejávelOpcionalObrigatóriaDesejávelOpcionalReadiness desta camadaRemover bloqueiosGate para RunsFeche primeiro as rotas obrigatórias e confirme medição direta quando houver dosagem.Rota em focoIntençãoVazão mínima (L/min)Dosagem mínima (L)Observação visível d",
+  "canvas_guidance_text": "Comece pelo canvasConexão em foco: Tap P1.Ação principal agoraRevise a conexão selecionada, ajuste comprimento ou famílias e inverta a direção direto no primeiro fold quando isso destravar o fluxo.Bloqueio ou liberação localBloqueio local: use esta conexão para destravar a conectividade principal antes de abrir Runs.Gate para RunsAinda há bloqueios estruturais impedindo a passagem segura para Runs.Abrir bancada desta conexãoAbrir orientação deste focoIr para Runs quando o cenário estiver pronto",
+  "context_menu_ids": [
+    "add-source-node",
+    "add-product-node",
+    "add-mixer-node",
+    "add-service-node",
+    "add-outlet-node",
+    "duplicate-node",
+    "start-route-from-node",
+    "remove-node",
+    "create-route-from-edge",
+    "mark-route-mandatory",
+    "mark-route-desirable",
+    "mark-route-optional",
+    "reverse-edge",
+    "remove-edge",
+    "open-workbench"
+  ],
+  "route_local_actions": [
+    "studio-route-create-from-edge-button",
+    "studio-route-intent-mandatory-button",
+    "studio-route-intent-desirable-button",
+    "studio-route-intent-optional-button",
+    "studio-route-apply-button",
+    "start-route-from-node"
+  ],
+  "canvas_style": {
+    "width": "100%",
+    "height": "720px"
+  },
+  "route_draft_store_present": true
+}

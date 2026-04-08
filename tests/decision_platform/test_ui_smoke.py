@@ -231,16 +231,25 @@ def test_studio_primary_surface_exposes_business_command_center() -> None:
     assert _find_component_by_id(app.layout, "studio-route-focus-dropdown") is not None
     assert _find_component_by_id(app.layout, "studio-route-intent") is not None
     assert _find_component_by_id(app.layout, "studio-route-apply-button") is not None
+    assert _find_component_by_id(app.layout, "studio-route-create-from-edge-button") is not None
+    assert _find_component_by_id(app.layout, "studio-route-intent-mandatory-button") is not None
+    assert _find_component_by_id(app.layout, "studio-route-intent-desirable-button") is not None
+    assert _find_component_by_id(app.layout, "studio-route-intent-optional-button") is not None
     cytoscape = _find_component_by_id(app.layout, "node-studio-cytoscape")
     context_menu = getattr(cytoscape, "contextMenu", None)
     assert isinstance(context_menu, list)
     assert any(item.get("id") == "add-product-node" for item in context_menu)
+    assert any(item.get("id") == "create-route-from-edge" for item in context_menu)
+    assert any(item.get("id") == "mark-route-mandatory" for item in context_menu)
     assert any(item.get("id") == "reverse-edge" for item in context_menu)
     assert any(item.get("id") == "open-workbench" for item in context_menu)
 
     studio_text = _collect_text_content(_find_component_by_id(app.layout, "studio-command-center-panel"))
     assert "Desenhe primeiro as rotas que precisam de serviço" in studio_text
     assert "Intenção das rotas" in studio_text
+    route_text = _collect_text_content(_find_component_by_id(app.layout, "studio-route-editor-panel"))
+    assert "Criar rota deste trecho" in route_text
+    assert "Trecho em foco" in route_text
 
 
 def test_product_space_banner_uses_consistent_product_language_for_each_space() -> None:
