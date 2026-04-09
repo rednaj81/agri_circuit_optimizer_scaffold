@@ -825,7 +825,7 @@ def test_runs_workspace_panel_distinguishes_scenario_gate_from_execution_state()
     assert "Limitação agora" in blocked_text
     assert "A limitação principal ainda está no cenário" in blocked_text
     assert "Fila" in blocked_text
-    assert "Resultado útil" in blocked_text
+    assert "Resultado utilizável" in blocked_text
     assert "Gate do cenário e limites desta leitura" in ready_text
     assert "Limitação agora" in ready_text
     assert "O cenário já passou no gate principal" in ready_text
@@ -1260,9 +1260,9 @@ def test_runs_workspace_panel_prioritizes_queue_focus_and_primary_transition() -
     assert "Fila" in panel_text
     assert "Run em foco" in panel_text
     assert "Andamento real" in panel_text
-    assert "Resultado útil" in panel_text
+    assert "Resultado utilizável" in panel_text
     assert "Falha ou recuperação" in panel_text
-    assert "Próxima ação recomendada" in panel_text
+    assert "Próxima ação" in panel_text
     assert "Gate do cenário e limites desta leitura" in panel_text
     assert "Próxima run pronta: run-003." in panel_text
     assert "Resultado utilizável" in panel_text
@@ -1271,6 +1271,81 @@ def test_runs_workspace_panel_prioritizes_queue_focus_and_primary_transition() -
     assert _find_component_by_id(panel, "runs-workspace-open-studio-link") is not None
     assert getattr(_find_component_by_id(panel, "runs-workspace-open-decision-button"), "disabled", None) is False
     assert _find_component_by_id(panel, "runs-workspace-primary-open-decision-button") is not None
+
+
+def test_studio_runs_decision_primary_journey_uses_consistent_transition_language() -> None:
+    studio_panel = render_studio_readiness_panel(
+        {
+            "status": "ready",
+            "readiness_headline": "Cenário pronto para seguir para Runs.",
+            "readiness_stage": "Liberar a fila",
+            "primary_action": "Abra Runs para transformar o cenário pronto em resultado utilizável.",
+            "next_steps": ["Abra Runs para transformar o cenário pronto em resultado utilizável."],
+            "blockers": [],
+            "warnings": [],
+            "blocker_count": 0,
+            "warning_count": 0,
+        }
+    )
+    runs_panel = render_runs_workspace_panel(
+        {
+            "status": "ready",
+            "blocker_count": 0,
+            "warning_count": 0,
+            "readiness_headline": "Cenário pronto para seguir para Runs.",
+        },
+        {
+            "run_count": 2,
+            "next_queued_run_id": None,
+            "active_run_ids": [],
+            "queued_run_ids": [],
+            "latest_run_id": "run-010",
+            "status_counts": {"completed": 1, "failed": 0},
+        },
+        {
+            "selected_candidate_id": "cand-01",
+            "error": None,
+        },
+        {
+            "selected_run_id": "run-010",
+            "status": "completed",
+        },
+    )
+    decision_panel = render_decision_workspace_panel(
+        {
+            "candidate_id": "cand-01",
+            "runner_up_candidate_id": "cand-02",
+            "decision_status": "winner_clear",
+            "technical_tie": False,
+            "feasible": True,
+            "active_profile_id": "balanced",
+            "official_profile_id": "balanced",
+            "official_product_candidate_id": "cand-01",
+            "score_margin_delta": 0.4,
+            "winner_reason_summary": "Lidera por custo, fechamento das rotas e leitura operacional mais estável.",
+        },
+        {
+            "visible_candidate_count": 4,
+            "top_visible_family": "hybrid_free",
+        },
+        {
+            "candidate_id": "cand-01",
+            "topology_family": "hybrid_free",
+        },
+    )
+
+    studio_text = _collect_text_content(studio_panel)
+    runs_text = _collect_text_content(runs_panel)
+    decision_text = _collect_text_content(decision_panel)
+
+    assert "Próxima ação" in studio_text
+    assert "Próxima ação" in runs_text
+    assert "Próxima ação" in decision_text
+    assert "resultado utilizável" in studio_text.lower()
+    assert "resultado utilizável" in runs_text.lower()
+    assert "resultado utilizável" not in decision_text.lower() or "decisão" in decision_text.lower()
+    assert "Leitura humana" in decision_text
+    assert "Referência oficial do produto" in decision_text
 
 
 def test_runs_workspace_panel_distinguishes_failure_recovery_from_decision_ready() -> None:
@@ -1451,7 +1526,7 @@ def test_run_jobs_overview_panel_clarifies_queue_now_vs_recent_history() -> None
     assert "Executando" in panel_text
     assert "Resultado recente" in panel_text
     assert "Falha ou revisão" in panel_text
-    assert "Próxima ação recomendada" in panel_text
+    assert "Próxima ação" in panel_text
     assert "Em execução: run-003" in panel_text
     assert "Próxima a rodar: run-004" in panel_text
     assert "Última run conhecida: run-003" in panel_text
@@ -1806,6 +1881,7 @@ def test_decision_workspace_panel_makes_winner_runner_up_and_tie_legible() -> No
     assert "Faixa decisória" in panel_text
     assert "Runner-up ainda importa porque" in panel_text
     assert "Escolha manual atual" in panel_text
+    assert "Próxima ação" in panel_text
     assert "cand-04" in panel_text
     assert "confirme o contraste antes de substituir a referência oficial" in panel_text.lower()
     assert "revise runner-up e escolha manual antes de exportar" in panel_text.lower()

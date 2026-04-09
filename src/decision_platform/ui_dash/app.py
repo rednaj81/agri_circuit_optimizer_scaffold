@@ -4494,7 +4494,7 @@ def render_run_jobs_overview_panel(summary: dict[str, Any]) -> Any:
                     _guidance_card("Executando", active_label),
                     _guidance_card("Resultado recente", history_label),
                     _guidance_card("Falha ou revisão", recovery_signal),
-                    _guidance_card("Próxima ação recomendada", operator_next_action),
+                    _guidance_card("Próxima ação", operator_next_action),
                 ],
             ),
             html.Div(
@@ -4953,16 +4953,16 @@ def render_runs_workspace_panel(
                     _guidance_card("Fila", queue_focus),
                     _guidance_card("Run em foco", selected_run_id or latest_run_id or "Nenhuma run dominante agora."),
                     _guidance_card("Andamento real", progress_snapshot["signal"]),
-                    _guidance_card("Resultado útil", usable_result),
+                    _guidance_card("Resultado utilizável", usable_result),
                     _guidance_card("Falha ou recuperação", state["recovery_headline"]),
-                    _guidance_card("Próxima ação recomendada", state["next_action"]),
+                    _guidance_card("Próxima ação", state["next_action"]),
                 ],
             ),
             html.Div(
                 id="runs-workspace-next-step-panel",
                 style={**UI_MUTED_CARD_STYLE, "padding": "12px", "marginBottom": "12px"},
                 children=[
-                    html.Div("Próxima ação recomendada", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+                    html.Div("Próxima ação", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
                     html.Div(state["next_action"], style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"}),
                     html.Div(state["decision_gate"], style={"lineHeight": "1.6", "marginTop": "10px"}),
                     html.Div(
@@ -5724,7 +5724,7 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
                             _guidance_card("Referência oficial do produto", f"{official_product_candidate_id or '-'} | {official_profile_label}"),
                             _guidance_card("Escolha manual atual", f"{selected_candidate_id or '-'} | {selected_state_label}. {manual_choice_signal}"),
                             _guidance_card("Runner-up ainda importa porque", runner_up_signal if runner_up_id else "Ainda não há contraste suficiente para pressionar a decisão."),
-                            _guidance_card("Próxima ação recomendada", next_action_signal),
+                            _guidance_card("Próxima ação", next_action_signal),
                         ],
                     ),
                 ],

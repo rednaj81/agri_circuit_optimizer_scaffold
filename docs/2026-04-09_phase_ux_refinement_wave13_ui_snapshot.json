@@ -1,0 +1,41 @@
+{
+  "wave": 13,
+  "phase_id": "phase_ux_refinement",
+  "focus_area": "cross_surface_stabilization",
+  "journey": [
+    {
+      "surface": "studio",
+      "signals": [
+        "Próxima ação",
+        "Readiness",
+        "Passagem para Runs"
+      ]
+    },
+    {
+      "surface": "runs",
+      "signals": [
+        "Próxima ação",
+        "Resultado utilizável",
+        "Decisão disponível"
+      ]
+    },
+    {
+      "surface": "decision",
+      "signals": [
+        "Próxima ação",
+        "Leitura humana",
+        "Referência oficial do produto"
+      ]
+    }
+  ],
+  "stabilization": [
+    "linguagem principal alinhada entre Studio, Runs e Decisão",
+    "gate de resultado utilizável preservado antes da entrada em Decisão",
+    "sem crescimento de densidade na primeira dobra"
+  ],
+  "screenshot": {
+    "attempted": true,
+    "available": false,
+    "reason": "sandbox browser capture unavailable in this session"
+  }
+}
