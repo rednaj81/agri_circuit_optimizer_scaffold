@@ -17,8 +17,9 @@
 
 - `docs/codex_dual_agent_runtime/supervisor_guidance.json`
   - `active_ux_phase_id: ux_phase_3`
+  - `active_ux_phase_state: planned_next_cycle_only`
   - `health_state: stopped`
-  - `stop_reason: governance_stop_max_waves_reached; ux_phase_2 accepted; ux_phase_3 only conceptually opened and must resume in a new authorized cycle`
+  - `stop_reason: governance_stop_max_waves_reached; ux_phase_2 accepted; ux_phase_3 planned_next_cycle_only; no continuation authorized in run-20260409-154356`
 - `docs/ux_refinement_autonomy_bundle/automation/phase_plan.yaml`
   - ciclo atual marcado como `stopped`
   - baseline aceita e regra de retomada futura registradas
@@ -41,5 +42,5 @@
 ## Regra de retomada
 
 - `ux_phase_3` não continua implicitamente deste loop;
+- `ux_phase_3` aparece na fonte operacional apenas como próxima fase prevista (`planned_next_cycle_only`);
 - a retomada exige nova sessão, novo ciclo e novo handoff explícito.
-

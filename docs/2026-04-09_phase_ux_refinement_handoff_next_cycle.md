@@ -3,7 +3,7 @@
 ## Situação ao encerrar este ciclo
 
 - `ux_phase_2` encerrada e aceita;
-- `ux_phase_3` aberta conceitualmente, mas não autorizada a continuar neste mesmo ciclo;
+- `ux_phase_3` é a próxima fase prevista e aparece no runtime como `planned_next_cycle_only`;
 - estado atual parado por governança, não por defeito de produto.
 
 ## O que fica congelado como baseline
@@ -29,6 +29,7 @@
 
 - abrir novo ciclo com governança reiniciada;
 - receber novo handoff explícito para `ux_phase_3`;
+- remover o estado de parada antes de qualquer nova implementação;
 - não reinterpretar a arquitetura nem reabrir `ux_phase_2`.
 
 ## Evidência congelada para partida
@@ -37,4 +38,3 @@
 - `docs/2026-04-09_phase_ux_refinement_phase3_open.md`
 - `docs/2026-04-09_phase_ux_refinement_wave10_handoff.md`
 - `docs/2026-04-09_phase_ux_refinement_wave11_handoff.md`
-

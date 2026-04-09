@@ -212,6 +212,8 @@ current_cycle_governance:
   stop_reason: governance_stop_max_waves_reached
   stopped_after_wave: 11
   max_waves_policy: 10
+  next_phase_planned: ux_phase_3
+  continuation_authorized_in_current_cycle: false
   accepted_baseline:
     studio_phase: ux_phase_2
     studio_exit_doc: docs/2026-04-09_phase_ux_refinement_phase2_exit.md
