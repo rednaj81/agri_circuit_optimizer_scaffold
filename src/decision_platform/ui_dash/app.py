@@ -1885,17 +1885,22 @@ def _edge_route_focus_form_values(
     selected_link_id: str | None,
     candidate_links_rows: list[dict[str, Any]] | None,
 ) -> dict[str, Any]:
-    selected_id = _default_edge_studio_selection(candidate_links_rows or [], preferred_link_id=selected_link_id)
-    edge_row = next(
-        (
-            dict(row)
-            for row in (candidate_links_rows or [])
-            if str(row.get("link_id") or "").strip() == str(selected_id or "").strip()
-        ),
-        None,
-    )
-    route_ids = _route_ids_for_edge_context(route_rows or [], edge_row=edge_row)
-    selected_route_id = route_ids[0] if route_ids else None
+    selected_id = str(selected_link_id or "").strip()
+    selected_route_id: str | None = None
+    if selected_id.startswith("route:"):
+        selected_route_id = selected_id.split("route:", 1)[1].strip() or None
+    else:
+        selected_edge_id = _default_edge_studio_selection(candidate_links_rows or [], preferred_link_id=selected_id)
+        edge_row = next(
+            (
+                dict(row)
+                for row in (candidate_links_rows or [])
+                if str(row.get("link_id") or "").strip() == str(selected_edge_id or "").strip()
+            ),
+            None,
+        )
+        route_ids = _route_ids_for_edge_context(route_rows or [], edge_row=edge_row)
+        selected_route_id = route_ids[0] if route_ids else None
     selected_route_row = next(
         (
             dict(route)
@@ -3866,6 +3871,7 @@ def render_studio_canvas_guidance_panel(
     blocker_count = int(summary.get("blocker_count", 0) or 0)
     warning_count = int(summary.get("warning_count", 0) or 0)
     selected_edge = edge_summary.get("selected_edge") or {}
+    selected_edge_present = bool(selected_edge_id and selected_edge_label)
     focus_node_ids = {
         selected_node_id,
         str(selected_edge.get("from_node") or "").strip(),
@@ -3966,6 +3972,21 @@ def render_studio_canvas_guidance_panel(
         children=[
             html.Div("Comece pelo canvas", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
             html.Div(current_focus, style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"}),
+            html.Div(
+                id="studio-canvas-selected-edge-banner",
+                style={**UI_COMPACT_BANNER_CARD_STYLE, "marginTop": "10px", "display": "block" if selected_edge_present else "none"},
+                children=[
+                    html.Div("Trecho fixado no Studio", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+                    html.Div(
+                        (
+                            f"{selected_edge_label} permanece em foco para sustentar a edição local deste trecho e a leitura de quem supre quem."
+                            if selected_edge_present
+                            else ""
+                        ),
+                        style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"},
+                    ),
+                ],
+            ),
             html.Div(
                 style={**UI_THREE_COLUMN_STYLE, "marginTop": "12px"},
                 children=[
@@ -6416,6 +6437,7 @@ def build_app(
     initial_edge_studio_selected_id = _default_primary_edge_studio_selection(
         authoring_payload["nodes_rows"],
         authoring_payload["candidate_links_rows"],
+        route_rows=authoring_payload["route_rows"],
     )
     initial_node_studio_summary = json.dumps(
         _build_node_studio_summary(authoring_payload["nodes_rows"], initial_node_studio_selected_id),
@@ -6428,6 +6450,7 @@ def build_app(
             authoring_payload["nodes_rows"],
             authoring_payload["candidate_links_rows"],
             initial_edge_studio_selected_id,
+            authoring_payload["route_rows"],
         ),
         indent=2,
         ensure_ascii=False,
@@ -6648,6 +6671,7 @@ def build_app(
                             ),
                             html.Details(
                                 id="studio-context-detailed-panels",
+                                open=bool(initial_edge_studio_selected_id),
                                 style=UI_MUTED_CARD_STYLE,
                                 children=[
                                     html.Summary("Contexto completo do Studio"),
@@ -7355,6 +7379,7 @@ def build_app(
         Input("node-studio-elements-store", "data"),
         Input("nodes-grid", "rowData"),
         Input("candidate-links-grid", "rowData"),
+        Input("routes-grid", "rowData"),
         Input("node-studio-selected-id", "data"),
         Input("edge-studio-selected-id", "data"),
         Input("studio-status-message", "data"),
@@ -7363,31 +7388,36 @@ def build_app(
         _elements: list[dict[str, Any]] | None,
         nodes_rows: list[dict[str, Any]] | None,
         candidate_links_rows: list[dict[str, Any]] | None,
+        route_rows: list[dict[str, Any]] | None,
         selected_node_id: str | None,
         selected_edge_id: str | None,
         studio_status_message: str | None,
     ) -> tuple[list[dict[str, Any]], str, str, str]:
         normalized_nodes = nodes_rows or []
         normalized_links = candidate_links_rows or []
+        normalized_routes = route_rows or []
         selected_id = _default_primary_node_studio_selection(
             normalized_nodes,
             normalized_links,
             preferred_node_id=selected_node_id,
         )
-        focused_link_id = _default_edge_studio_selection(
-            normalized_links,
-            preferred_link_id=selected_edge_id,
-        )
+        focused_link_id = str(selected_edge_id or "").strip()
+        if not focused_link_id:
+            focused_link_id = _default_edge_studio_selection(
+                normalized_links,
+                preferred_link_id=selected_edge_id,
+            )
         selected_link_id = _default_primary_edge_studio_selection(
             normalized_nodes,
             normalized_links,
+            route_rows=normalized_routes,
             preferred_link_id=focused_link_id,
         )
         return (
             _build_node_studio_stylesheet(selected_id, selected_link_id),
             json.dumps(_build_node_studio_summary(normalized_nodes, selected_id), indent=2, ensure_ascii=False),
             json.dumps(
-                _build_edge_studio_summary(normalized_nodes, normalized_links, focused_link_id),
+                _build_edge_studio_summary(normalized_nodes, normalized_links, focused_link_id, normalized_routes),
                 indent=2,
                 ensure_ascii=False,
             ),
@@ -7715,6 +7745,12 @@ def build_app(
             projected_link_id = str(tap_edge_data.get("link_id") or "").strip()
             if projected_link_id:
                 selected_link_id = projected_link_id
+            elif str(tap_edge_data.get("route_id") or "").strip():
+                selected_link_id = f"route:{str(tap_edge_data.get('route_id') or '').strip()}"
+            elif str(tap_edge_data.get("id") or "").strip().startswith("route:"):
+                selected_link_id = str(tap_edge_data.get("id") or "").strip()
+        if str(selected_link_id or "").startswith("route:"):
+            return selected_link_id, "", "", "", "", None, [], ""
         selected_link_id = _default_edge_studio_selection(
             candidate_links_rows or [],
             preferred_link_id=selected_link_id,
@@ -9227,6 +9263,7 @@ def build_app(
         Output("studio-canvas-guidance-panel", "children"),
         Output("studio-command-center-shell", "children"),
         Output("studio-workspace-panel", "children"),
+        Output("studio-context-detailed-panels", "open"),
         Output("studio-readiness-panel", "children"),
         Output("studio-projection-coverage-panel", "children"),
         Output("runs-workspace-panel", "children"),
@@ -9257,7 +9294,7 @@ def build_app(
         edge_summary_text: str | None,
         studio_status_text: str | None,
         route_composer_state: dict[str, Any] | None,
-    ) -> tuple[Any, Any, Any, Any, Any, Any, Any, Any, Any, Any, Any]:
+    ) -> tuple[Any, Any, Any, bool, Any, Any, Any, Any, Any, Any, Any, Any]:
         studio_readiness = build_studio_readiness_summary(nodes_rows or [], candidate_links_rows or [], route_rows or [])
         node_summary = _safe_json_loads(node_summary_text)
         edge_summary = _safe_json_loads(edge_summary_text)
@@ -9291,6 +9328,7 @@ def build_app(
                 studio_status_text,
                 route_composer_state,
             ),
+            bool(str(edge_summary.get("selected_link_id") or "").strip()),
             render_studio_readiness_panel(studio_readiness, route_rows or [], nodes_rows or [], candidate_links_rows or []),
             render_studio_projection_panel(
                 build_studio_projection_summary(nodes_rows or [], candidate_links_rows or [], route_rows or [])
@@ -10931,6 +10969,7 @@ def _default_primary_edge_studio_selection(
     nodes_rows: list[dict[str, Any]],
     candidate_links_rows: list[dict[str, Any]],
     *,
+    route_rows: list[dict[str, Any]] | None = None,
     preferred_link_id: str | None = None,
 ) -> str | None:
     visible_link_ids = {
@@ -10938,13 +10977,22 @@ def _default_primary_edge_studio_selection(
         for row in _visible_studio_edges(nodes_rows, candidate_links_rows)
         if str(row.get("link_id", "")).strip()
     }
+    visible_route_ids = {
+        f"route:{str(route.get('route_id') or '').strip()}"
+        for route in _primary_route_projection_rows(nodes_rows, route_rows)
+        if str(route.get("route_id") or "").strip()
+    }
     preferred = str(preferred_link_id or "").strip()
-    if preferred and preferred in visible_link_ids:
+    if preferred and preferred in visible_link_ids.union(visible_route_ids):
         return preferred
     for row in _visible_studio_edges(nodes_rows, candidate_links_rows):
         link_id = str(row.get("link_id", "")).strip()
         if link_id:
             return link_id
+    for route in _primary_route_projection_rows(nodes_rows, route_rows):
+        route_id = str(route.get("route_id") or "").strip()
+        if route_id:
+            return f"route:{route_id}"
     return None
 
 
@@ -11027,29 +11075,73 @@ def _build_edge_studio_summary(
     nodes_rows: list[dict[str, Any]],
     candidate_links_rows: list[dict[str, Any]],
     selected_link_id: str | None,
+    route_rows: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     preferred_selected_id = str(selected_link_id or "").strip()
+    route_ids = {
+        f"route:{str(route.get('route_id') or '').strip()}"
+        for route in (route_rows or [])
+        if str(route.get("route_id") or "").strip()
+    }
+    candidate_link_ids = {
+        str(item.get("link_id") or "").strip()
+        for item in candidate_links_rows
+        if str(item.get("link_id") or "").strip()
+    }
     selected_id = (
-        _default_edge_studio_selection(candidate_links_rows, preferred_link_id=preferred_selected_id)
-        if preferred_selected_id
-        else None
-    )
-    selected_row = next(
-        (dict(item) for item in candidate_links_rows if str(item.get("link_id", "")).strip() == selected_id),
-        None,
+        preferred_selected_id
+        if preferred_selected_id and preferred_selected_id in candidate_link_ids.union(route_ids)
+        else _default_primary_edge_studio_selection(
+            nodes_rows,
+            candidate_links_rows,
+            route_rows=route_rows,
+            preferred_link_id=preferred_selected_id,
+        )
     )
     node_lookup = {
         str(row.get("node_id", "")).strip(): dict(row)
         for row in nodes_rows
         if str(row.get("node_id", "")).strip()
     }
+    if str(selected_id or "").startswith("route:"):
+        route_id = str(selected_id or "").split("route:", 1)[1].strip()
+        selected_route = next(
+            (dict(route) for route in (route_rows or []) if str(route.get("route_id") or "").strip() == route_id),
+            None,
+        )
+        selected_row = (
+            {
+                "link_id": selected_id,
+                "route_id": route_id,
+                "from_node": str((selected_route or {}).get("source") or "").strip(),
+                "to_node": str((selected_route or {}).get("sink") or "").strip(),
+                "notes": str((selected_route or {}).get("notes") or "").strip(),
+                "projection": True,
+            }
+            if selected_route
+            else None
+        )
+        business_label = _studio_route_primary_label(
+            selected_route,
+            node_lookup=node_lookup,
+            include_intent=True,
+            include_measurement=True,
+        ) if selected_route else "-"
+        role_label = "Rota em foco"
+    else:
+        selected_row = next(
+            (dict(item) for item in candidate_links_rows if str(item.get("link_id", "")).strip() == selected_id),
+            None,
+        )
+        business_label = _studio_edge_business_label(selected_row, node_lookup)
+        role_label = _studio_edge_role_label(selected_row)
     return {
         "edge_count": len(candidate_links_rows),
         "business_edge_count": len(_visible_studio_edges(nodes_rows, candidate_links_rows)),
         "selected_link_id": selected_id,
         "selected_edge": selected_row,
-        "business_label": _studio_edge_business_label(selected_row, node_lookup),
-        "role_label": _studio_edge_role_label(selected_row),
+        "business_label": business_label,
+        "role_label": role_label,
         "from_label": _studio_node_business_label(node_lookup.get(str((selected_row or {}).get("from_node", "")).strip())),
         "to_label": _studio_node_business_label(node_lookup.get(str((selected_row or {}).get("to_node", "")).strip())),
         "is_internal": any(
@@ -11160,7 +11252,17 @@ def _build_node_studio_stylesheet(
                 "style": {
                     "line-color": "#ea580c",
                     "target-arrow-color": "#ea580c",
-                    "width": 5,
+                    "width": 8,
+                    "line-outline-width": 8,
+                    "line-outline-color": "rgba(251, 191, 36, 0.42)",
+                    "z-index": 999,
+                    "label": "data(label)",
+                    "font-size": 11,
+                    "text-background-color": "#fff7ed",
+                    "text-background-opacity": 0.92,
+                    "text-background-padding": "4px",
+                    "text-border-color": "#ea580c",
+                    "text-border-width": 1,
                 },
             }
         )

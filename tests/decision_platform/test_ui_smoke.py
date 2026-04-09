@@ -259,6 +259,8 @@ def test_studio_primary_surface_exposes_business_command_center() -> None:
     assert _find_component_by_id(app.layout, "studio-route-intent-mandatory-button") is not None
     assert _find_component_by_id(app.layout, "studio-route-intent-desirable-button") is not None
     assert _find_component_by_id(app.layout, "studio-route-intent-optional-button") is not None
+    assert _find_component_by_id(app.layout, "studio-canvas-selected-edge-banner") is not None
+    assert getattr(_find_component_by_id(app.layout, "studio-context-detailed-panels"), "open", None) is True
     cytoscape = _find_component_by_id(app.layout, "node-studio-cytoscape")
     context_menu = getattr(cytoscape, "contextMenu", None)
     assert isinstance(context_menu, list)
@@ -287,6 +289,18 @@ def test_studio_primary_surface_exposes_business_command_center() -> None:
     assert "W ->" not in route_text
     assert "Tap" not in route_text
     assert "Junção" not in route_text
+
+
+def test_studio_initial_edge_focus_is_visible_and_not_null() -> None:
+    with diagnostic_runtime_test_mode():
+        app = build_app("data/decision_platform/maquete_v2")
+
+    edge_store = _find_component_by_id(app.layout, "edge-studio-selected-id")
+    banner = _find_component_by_id(app.layout, "studio-canvas-selected-edge-banner")
+
+    assert getattr(edge_store, "data", None)
+    assert str(getattr(edge_store, "data", "")).startswith("route:")
+    assert "Trecho fixado no Studio" in _collect_text_content(banner)
 
 
 def test_studio_primary_workspace_avoids_technical_internal_terms() -> None:
@@ -2939,6 +2953,7 @@ def test_studio_callbacks_round_trip_structural_edits_through_ui_flow() -> None:
             elements,
             nodes_rows,
             candidate_links_rows,
+            route_rows,
             created_node_id,
             created_link_id,
             status,
