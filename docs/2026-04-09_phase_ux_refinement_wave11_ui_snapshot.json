@@ -1,0 +1,35 @@
+{
+  "snapshot_source_commit": "46131facbd3be458cdda962913286a5e0f838520",
+  "decision": {
+    "first_fold_signals": [
+      "Perfil ativo",
+      "Winner",
+      "Runner-up",
+      "Margem",
+      "Technical tie",
+      "Leitura humana",
+      "Faixa decisória"
+    ],
+    "faixa_decisoria": [
+      "Referência oficial do produto",
+      "Escolha manual atual",
+      "Winner x runner-up",
+      "Por que ainda pede leitura humana"
+    ],
+    "secondary_disclosure": [
+      "Comparação assistida e contexto",
+      "Technical tie e trade-offs",
+      "Por que esta leitura lidera"
+    ],
+    "raw_json_primary_surface": false
+  },
+  "integration": {
+    "runs_role": "gate for usable result only",
+    "studio_role": "unchanged in this wave"
+  },
+  "screenshot_attempt": {
+    "target_path": "output/playwright/decision-fullhd-wave11.png",
+    "status": "failed_in_sandbox",
+    "reason": "No stable browser capture session was available in this sandbox during wave 11; structured snapshot retained as honest evidence."
+  }
+}

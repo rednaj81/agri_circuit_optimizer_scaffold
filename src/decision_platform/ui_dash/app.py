@@ -5652,6 +5652,15 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
     else:
         margin_value = "Sem margem"
         margin_note = "Ainda não há separação de score confiável para esta leitura."
+    human_review_signal = (
+        "Empate técnico aberto; winner e runner-up ainda pedem leitura humana."
+        if decision_status == "technical_tie"
+        else f"Winner bloqueado por {_humanize_infeasibility_reason(summary.get('infeasibility_reason'))}."
+        if summary.get("feasible") is False
+        else "Margem curta ou risco relevante; confirme o runner-up antes de oficializar."
+        if margin_value == "Curta" or risk_value not in {"Sem alerta forte", "Margem estável"}
+        else "Contraste suficiente; a leitura humana confirma mais do que descobre."
+    )
     return html.Div(
         children=[
             html.Div("Leitura principal da decisão", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
@@ -5665,49 +5674,57 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
             html.Div(
                 style={**UI_TWO_COLUMN_STYLE, "gridTemplateColumns": "repeat(auto-fit, minmax(210px, 1fr))", "marginBottom": "12px"},
                 children=[
-                    _compact_value_card("Winner atual", candidate_id or "Sem winner", summary.get("topology_family") or "Sem família líder legível", accent="#d7e5c1"),
+                    _compact_value_card("Perfil em leitura", active_profile_label or "-", f"Perfil ativo. Referência oficial: {official_profile_label}", accent="#e8efe8"),
+                    _compact_value_card("Winner", candidate_id or "Sem winner", summary.get("topology_family") or "Sem família líder legível", accent="#d7e5c1"),
                     _compact_value_card("Runner-up", runner_up_id or "Sem runner-up", summary.get("runner_up_topology_family") or "Sem contraste comparável"),
                     _compact_value_card("Margem", margin_value, margin_note),
-                    _compact_value_card("Risco comparativo", risk_value, risk_note),
-                    _compact_value_card("Technical tie", tie_label, "Winner vs runner-up" if decision_status == "technical_tie" else "Sem empate técnico aberto"),
+                    _compact_value_card("Technical tie", tie_label, "Technical tie explícito" if decision_status == "technical_tie" else "Sem empate técnico aberto"),
+                    _compact_value_card("Leitura humana", risk_value, human_review_signal),
                 ],
             ),
             html.Div(
+                id="decision-decision-strip",
                 style={**UI_MUTED_CARD_STYLE, "padding": "12px", "marginBottom": "12px"},
                 children=[
-                    html.Div("O que esta decisão pede agora", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
-                    html.Div(signal_text, style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"}),
-                    html.Div(f"Perfil em leitura: {active_profile_label}. Referência oficial: {official_profile_label} -> {official_product_candidate_id or '-'}.", style={"lineHeight": "1.5", "marginTop": "8px"}),
-                    html.Div(decision_state["contrast_state"], style={"lineHeight": "1.6", "marginTop": "8px"}),
-                ],
-            ),
-            html.H4("Comparação final assistida", style={"marginBottom": "6px"}),
-            html.Div(
-                id="decision-final-comparison-panel",
-                style={**UI_TWO_COLUMN_STYLE, "gridTemplateColumns": "repeat(auto-fit, minmax(220px, 1fr))", "marginBottom": "12px"},
-                children=[
-                    _compact_value_card("Referência oficial do produto", official_product_candidate_id or "-", official_profile_label),
-                    _compact_value_card("Winner x runner-up", candidate_id or "-", f"{runner_up_id or '-'} | {comparison_signal}"),
-                    _compact_value_card("Sinal comparativo", tie_label if decision_status == "technical_tie" else "Contraste principal", _humanize_decision_copy(comparison_difference)),
-                    _compact_value_card("Escolha manual atual", selected_candidate_id or "-", f"{selected_state_label} | {selected_topology_family}"),
-                ],
-            ),
-            html.H4("Perfis explícitos de seleção", style={"marginBottom": "6px"}),
-            html.Div(id="decision-profile-views-panel", style={**UI_TWO_COLUMN_STYLE, "marginBottom": "12px"}, children=_render_decision_profile_cards(profile_views, active_profile_id=active_profile_id, official_profile_id=official_profile_id)),
-            html.Div(
-                id="decision-final-choice-panel",
-                style={**UI_MUTED_CARD_STYLE, "padding": "12px", "marginBottom": "12px"},
-                children=[
-                    html.Div("Escolha final e export", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
-                    html.Div(selected_state_label, style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"}),
-                    html.Div(f"Candidato em foco manual: {selected_candidate_id or '-'} | Família: {selected_topology_family}", style={"lineHeight": "1.6", "marginTop": "8px"}),
-                    html.Div(export_guidance, style={"lineHeight": "1.6", "marginTop": "8px"}),
+                    html.Div("Faixa decisória", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+                    html.Div(
+                        style={**UI_TWO_COLUMN_STYLE, "gridTemplateColumns": "repeat(auto-fit, minmax(220px, 1fr))", "marginTop": "8px"},
+                        children=[
+                            _guidance_card("Referência oficial do produto", f"{official_product_candidate_id or '-'} | {official_profile_label}"),
+                            _guidance_card("Escolha manual atual", f"{selected_candidate_id or '-'} | {selected_state_label}"),
+                            _guidance_card("Winner x runner-up", f"{candidate_id or '-'} vs {runner_up_id or '-'}"),
+                            _guidance_card("Por que ainda pede leitura humana", human_review_signal),
+                        ],
+                    ),
                 ],
             ),
             html.Details(
+                id="decision-comparison-details",
                 style={**UI_MUTED_CARD_STYLE, "padding": "12px"},
                 children=[
-                    html.Summary("Contexto de leitura"),
+                    html.Summary("Comparação assistida e contexto"),
+                    html.Div(
+                        id="decision-final-comparison-panel",
+                        style={**UI_TWO_COLUMN_STYLE, "gridTemplateColumns": "repeat(auto-fit, minmax(220px, 1fr))", "marginTop": "12px", "marginBottom": "12px"},
+                        children=[
+                            _compact_value_card("Referência oficial do produto", official_product_candidate_id or "-", official_profile_label),
+                            _compact_value_card("Winner x runner-up", candidate_id or "-", f"{runner_up_id or '-'} | {comparison_signal}"),
+                            _compact_value_card("Sinal comparativo", tie_label if decision_status == "technical_tie" else "Contraste principal", _humanize_decision_copy(comparison_difference)),
+                            _compact_value_card("Escolha manual atual", selected_candidate_id or "-", f"{selected_state_label} | {selected_topology_family}"),
+                        ],
+                    ),
+                    html.Div("Perfis explícitos de seleção", style={"fontWeight": 700, "marginBottom": "8px"}),
+                    html.Div(id="decision-profile-views-panel", style={**UI_TWO_COLUMN_STYLE, "marginBottom": "12px"}, children=_render_decision_profile_cards(profile_views, active_profile_id=active_profile_id, official_profile_id=official_profile_id)),
+                    html.Div(
+                        id="decision-final-choice-panel",
+                        style={**UI_MUTED_CARD_STYLE, "padding": "12px", "marginBottom": "12px"},
+                        children=[
+                            html.Div("Escolha final e export", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+                            html.Div(selected_state_label, style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"}),
+                            html.Div(f"Candidato em foco manual: {selected_candidate_id or '-'} | Família: {selected_topology_family}", style={"lineHeight": "1.6", "marginTop": "8px"}),
+                            html.Div(export_guidance, style={"lineHeight": "1.6", "marginTop": "8px"}),
+                        ],
+                    ),
                     html.Div(
                         style={**UI_TWO_COLUMN_STYLE, "marginTop": "12px"},
                         children=[
@@ -5874,12 +5891,12 @@ def render_decision_summary_panel(summary: dict[str, Any]) -> Any:
         children=[
             html.H3(panel_title, style={"marginTop": 0}),
             html.Div(
-                style={**UI_THREE_COLUMN_STYLE, "marginBottom": "12px"},
+                style={**UI_TWO_COLUMN_STYLE, "gridTemplateColumns": "repeat(auto-fit, minmax(220px, 1fr))", "marginBottom": "12px"},
                 children=[
                     _guidance_card("Perfil em leitura", _decision_profile_presentation(active_profile_id)["label"]),
                     _guidance_card("Referência oficial do produto", f"{_decision_profile_presentation(official_profile_id)['label']}: {official_product_candidate_id or '-'}"),
                     _guidance_card("Status da decisão", decision_label),
-                    _guidance_card("Por que esta leitura lidera", winner_reason if winner_reason != "Sem justificativa resumida." else priority_signal),
+                    _guidance_card("Leitura humana", priority_signal),
                     _guidance_card("Próxima ação", decision_state["next_action"]),
                 ],
             ),
@@ -5904,11 +5921,12 @@ def render_decision_summary_panel(summary: dict[str, Any]) -> Any:
                 decision_state["contrast_state"],
                 style={"marginTop": "12px", "fontWeight": 700, "lineHeight": "1.5"},
             ),
-            html.P(winner_reason, style={"lineHeight": "1.6"}),
-            html.H4("Próxima ação", style={"marginBottom": "6px"}),
-            html.Div(
-                decision_state["next_action"],
-                style={"lineHeight": "1.6", "fontWeight": 700},
+            html.Details(
+                style={**UI_MUTED_CARD_STYLE, "padding": "12px", "marginTop": "12px"},
+                children=[
+                    html.Summary("Por que esta leitura lidera"),
+                    html.Div(winner_reason, style={"lineHeight": "1.6", "marginTop": "10px"}),
+                ],
             ),
         ]
     )
@@ -5956,17 +5974,10 @@ def render_decision_contrast_panel(summary: dict[str, Any]) -> Any:
     return html.Div(
         children=[
             html.H3("Runner-up e contraste", style={"marginTop": 0}),
-            html.Div(runner_up_id or "-", style={"fontSize": "24px", "fontWeight": 700}),
-            html.Div(
-                style={"display": "flex", "gap": "8px", "flexWrap": "wrap", "marginTop": "8px"},
-                children=[
-                    html.Span(str(summary.get("runner_up_topology_family") or "-"), style=UI_PILL_STYLE),
-                    html.Span("Empate técnico" if decision_status == "technical_tie" else "Alternativa próxima", style=UI_PILL_STYLE),
-                ],
-            ),
             html.Div(
                 style=UI_THREE_COLUMN_STYLE,
                 children=[
+                    _metric_card("Runner-up", runner_up_id or "-"),
                     _metric_card("Margem de score", summary.get("score_margin_delta") or "-"),
                     _metric_card("Score runner-up", summary.get("runner_up_score_final") or "-"),
                     _metric_card("Delta de custo", cost_delta),
@@ -5974,15 +5985,20 @@ def render_decision_contrast_panel(summary: dict[str, Any]) -> Any:
             ),
             html.Div(contrast_summary, style={"marginTop": "12px", "fontWeight": 700, "lineHeight": "1.5"}),
             html.Div(
+                "Empate técnico" if decision_status == "technical_tie" else "Alternativa comparável",
+                style={"marginTop": "8px", "fontWeight": 700, "color": "#496158"},
+            ),
+            html.Details(
                 id="decision-technical-tie-panel",
-                style={**UI_MUTED_CARD_STYLE, "padding": "12px", "marginTop": "12px", "display": "block" if decision_status == "technical_tie" else "none"},
+                style={**UI_MUTED_CARD_STYLE, "padding": "12px", "marginTop": "12px"},
                 children=[
-                    html.Div("Technical tie em leitura humana", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+                    html.Summary("Technical tie e trade-offs"),
+                    html.Div("Technical tie em leitura humana", style={"fontWeight": 700, "marginTop": "10px"}),
                     html.Div(
                         "Não há vencedor inequívoco neste perfil; a escolha final continua dependendo de decisão humana assistida."
                         if decision_status == "technical_tie"
                         else "Sem technical tie ativo nesta leitura.",
-                        style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"},
+                        style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "10px"},
                     ),
                     _bullet_list(
                         tie_dimensions[:3],
@@ -5990,13 +6006,13 @@ def render_decision_contrast_panel(summary: dict[str, Any]) -> Any:
                         if decision_status == "technical_tie"
                         else "Sem dimensão adicional relevante para technical tie.",
                     ),
+                    html.H4("Trade-offs por perfil", style={"marginBottom": "6px", "marginTop": "14px"}),
+                    html.Div(profile_tradeoff_summary, style={"lineHeight": "1.6", "marginBottom": "10px"}),
+                    html.Div(id="decision-profile-tradeoff-panel", style={**UI_TWO_COLUMN_STYLE, "marginBottom": "12px"}, children=_render_decision_tradeoff_cards(profile_views)),
+                    html.H4("Diferenças relevantes", style={"marginBottom": "6px"}),
+                    _bullet_list(difference_lines[:4], "Sem diferença relevante registrada."),
                 ],
             ),
-            html.H4("Trade-offs por perfil", style={"marginBottom": "6px", "marginTop": "14px"}),
-            html.Div(profile_tradeoff_summary, style={"lineHeight": "1.6", "marginBottom": "10px"}),
-            html.Div(id="decision-profile-tradeoff-panel", style={**UI_TWO_COLUMN_STYLE, "marginBottom": "12px"}, children=_render_decision_tradeoff_cards(profile_views)),
-            html.H4("Diferenças relevantes", style={"marginBottom": "6px"}),
-            _bullet_list(difference_lines[:4], "Sem diferença relevante registrada."),
         ]
     )
 

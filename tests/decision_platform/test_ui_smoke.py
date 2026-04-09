@@ -1794,26 +1794,21 @@ def test_decision_workspace_panel_makes_winner_runner_up_and_tie_legible() -> No
     panel_text = _collect_text_content(panel)
 
     assert "Leitura principal da decisão" in panel_text
-    assert "O que esta área resolve" in panel_text
-    assert "Estado atual" in panel_text
     assert "Perfil em leitura" in panel_text
     assert "Referência oficial do produto" in panel_text
-    assert "Winner atual" in panel_text
+    assert "Perfil ativo" in panel_text
+    assert "Winner" in panel_text
     assert "Runner-up" in panel_text
     assert "Margem" in panel_text
     assert "Technical tieExplícito" in panel_text
     assert "Technical tie explícito" in panel_text
-    assert "Comparação final assistida" in panel_text
+    assert "Leitura humana" in panel_text
+    assert "Faixa decisória" in panel_text
     assert "Winner x runner-up" in panel_text
-    assert "Sinal comparativo" in panel_text
-    assert "Risco comparativo" in panel_text
     assert "Escolha manual atual" in panel_text
     assert "cand-04" in panel_text
     assert "sem sobrescrever a referência oficial do produto" in panel_text.lower()
-    assert "Perfis explícitos de seleção" in panel_text
-    assert "Perfil atual" in panel_text
-    assert "Referência oficial" in panel_text
-    assert "Contexto de leitura" in panel_text
+    assert "Comparação assistida e contexto" in panel_text
     assert _find_component_by_id(panel, "decision-workspace-open-runs-link") is not None
     assert _find_component_by_id(panel, "decision-workspace-open-audit-link") is not None
     assert _find_component_by_id(panel, "decision-profile-views-panel") is not None
@@ -1982,7 +1977,7 @@ def test_primary_decision_panels_hide_raw_metric_keys_in_main_surface() -> None:
     assert "Perfil em leitura" in decision_text
     assert "Referência oficial do produto" in decision_text
     assert "Status da decisão" in decision_text
-    assert "Por que esta leitura lidera" in decision_text
+    assert "Leitura humana" in decision_text
     assert "Próxima ação" in decision_text
     assert "winner do perfil atual" in decision_text.lower()
     assert "mantenha o runner-up visível" in decision_text
@@ -1991,7 +1986,7 @@ def test_primary_decision_panels_hide_raw_metric_keys_in_main_surface() -> None:
     assert "Empate técnico" in contrast_text
     assert "Technical tie em leitura humana" in contrast_text
     assert "decisão humana assistida" in contrast_text.lower()
-    assert "Trade-offs por perfil" in contrast_text
+    assert "Technical tie e trade-offs" in contrast_text
     assert "Perfis diferentes estão puxando winners diferentes" in contrast_text
     assert "`" not in decision_text
     assert "`" not in contrast_text
@@ -2036,6 +2031,7 @@ def test_decision_summary_panel_surfaces_infeasible_winner_without_console_langu
     assert "Inviável" in panel_text
     assert "rota obrigatória não conseguiu fechar" in panel_text
     assert "use o motivo de inviabilidade e o runner-up" in panel_text.lower()
+    assert "Leitura humana" in panel_text
 
 
 def test_decision_contrast_panel_guides_when_runner_up_is_missing() -> None:
