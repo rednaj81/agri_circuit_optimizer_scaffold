@@ -5153,7 +5153,7 @@ def _render_decision_tradeoff_cards(profile_views: list[dict[str, Any]]) -> list
     return cards
 
 
-def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: dict[str, Any]) -> Any:
+def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: dict[str, Any], selected_summary: dict[str, Any] | None = None) -> Any:
     decision_state = _decision_primary_state(summary)
     candidate_id = str(summary.get("candidate_id") or "").strip()
     runner_up_id = str(summary.get("runner_up_candidate_id") or "").strip()
@@ -5162,6 +5162,23 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
     official_profile_id = str(summary.get("official_profile_id") or active_profile_id).strip()
     official_product_candidate_id = str(summary.get("official_product_candidate_id") or candidate_id).strip()
     profile_views = list(summary.get("profile_views") or [])
+    selected_summary = selected_summary or {}
+    selected_candidate_id = str(selected_summary.get("candidate_id") or candidate_id).strip()
+    selected_topology_family = str(selected_summary.get("topology_family") or summary.get("topology_family") or "-").strip()
+    selected_state_label = (
+        "Escolha manual alinhada à referência oficial"
+        if selected_candidate_id and selected_candidate_id == official_product_candidate_id
+        else "Escolha manual alinhada ao perfil atual"
+        if selected_candidate_id and selected_candidate_id == candidate_id
+        else "Escolha manual alternativa"
+        if selected_candidate_id
+        else "Escolha manual ainda indefinida"
+    )
+    export_guidance = (
+        f"O export atual seguirá {selected_candidate_id} sem sobrescrever a referência oficial do produto."
+        if selected_candidate_id
+        else "Escolha um candidato manualmente antes de exportar uma decisão assistida."
+    )
     visible_candidate_count = int(catalog_summary.get("visible_candidate_count", 0) or 0) if isinstance(catalog_summary, dict) else 0
     if not candidate_id:
         state_background, state_color = _status_tone("needs_attention")
@@ -5213,8 +5230,29 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
                     html.Div(decision_state["contrast_state"], style={"lineHeight": "1.6", "marginTop": "10px"}),
                 ],
             ),
+            html.H4("Comparação final assistida", style={"marginBottom": "6px"}),
+            html.Div(
+                id="decision-final-comparison-panel",
+                style={**UI_TWO_COLUMN_STYLE, "marginBottom": "12px"},
+                children=[
+                    _guidance_card("Referência oficial do produto", f"{official_product_candidate_id or '-'} no perfil {_decision_profile_presentation(official_profile_id)['label']}."),
+                    _guidance_card("Winner do perfil em leitura", f"{candidate_id or '-'} no perfil {_decision_profile_presentation(active_profile_id)['label']}."),
+                    _guidance_card("Runner-up comparável", runner_up_id or "Ainda sem runner-up legível"),
+                    _guidance_card("Escolha manual atual", f"{selected_candidate_id or '-'} ({selected_state_label.lower()})."),
+                ],
+            ),
             html.H4("Perfis explícitos de seleção", style={"marginBottom": "6px"}),
             html.Div(id="decision-profile-views-panel", style={**UI_TWO_COLUMN_STYLE, "marginBottom": "12px"}, children=_render_decision_profile_cards(profile_views, active_profile_id=active_profile_id, official_profile_id=official_profile_id)),
+            html.Div(
+                id="decision-final-choice-panel",
+                style={**UI_MUTED_CARD_STYLE, "padding": "12px", "marginBottom": "12px"},
+                children=[
+                    html.Div("Escolha final e export", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+                    html.Div(selected_state_label, style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"}),
+                    html.Div(f"Candidato em foco manual: {selected_candidate_id or '-'} | Família: {selected_topology_family}", style={"lineHeight": "1.6", "marginTop": "8px"}),
+                    html.Div(export_guidance, style={"lineHeight": "1.6", "marginTop": "8px"}),
+                ],
+            ),
             html.Div(
                 style=UI_THREE_COLUMN_STYLE,
                 children=[
@@ -5448,6 +5486,7 @@ def render_decision_contrast_panel(summary: dict[str, Any]) -> Any:
         if len(preferred_candidates) > 1
         else "Os perfis convergem para o mesmo winner; o trade-off principal continua concentrado no runner-up e na margem de contraste."
     )
+    tie_dimensions = [str(item.get("summary")) for item in summary.get("key_factors", []) if item.get("summary")]
     return html.Div(
         children=[
             html.H3("Runner-up e contraste", style={"marginTop": 0}),
@@ -5468,6 +5507,25 @@ def render_decision_contrast_panel(summary: dict[str, Any]) -> Any:
                 ],
             ),
             html.Div(contrast_summary, style={"marginTop": "12px", "fontWeight": 700, "lineHeight": "1.5"}),
+            html.Div(
+                id="decision-technical-tie-panel",
+                style={**UI_MUTED_CARD_STYLE, "padding": "12px", "marginTop": "12px", "display": "block" if decision_status == "technical_tie" else "none"},
+                children=[
+                    html.Div("Technical tie em leitura humana", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+                    html.Div(
+                        "Não há vencedor inequívoco neste perfil; a escolha final continua dependendo de decisão humana assistida."
+                        if decision_status == "technical_tie"
+                        else "Sem technical tie ativo nesta leitura.",
+                        style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"},
+                    ),
+                    _bullet_list(
+                        tie_dimensions[:3],
+                        "Os scores e trade-offs principais continuam próximos o suficiente para justificar a comparação aberta."
+                        if decision_status == "technical_tie"
+                        else "Sem dimensão adicional relevante para technical tie.",
+                    ),
+                ],
+            ),
             html.H4("Trade-offs por perfil", style={"marginBottom": "6px", "marginTop": "14px"}),
             html.Div(profile_tradeoff_summary, style={"lineHeight": "1.6", "marginBottom": "10px"}),
             html.Div(id="decision-profile-tradeoff-panel", style={**UI_TWO_COLUMN_STYLE, "marginBottom": "12px"}, children=_render_decision_tradeoff_cards(profile_views)),
@@ -6094,7 +6152,7 @@ def build_app(
                             ),
                             html.Div(
                                 id="decision-workspace-panel",
-                                children=render_decision_workspace_panel(initial_official_summary, _safe_json_loads(initial_catalog_summary)),
+                                children=render_decision_workspace_panel(initial_official_summary, _safe_json_loads(initial_catalog_summary), candidate_details.get("summary", {})),
                                 style=UI_CARD_STYLE,
                             ),
                             html.Details(
@@ -8569,7 +8627,7 @@ def build_app(
         official_payload = _safe_json_loads(official_text)
         catalog_payload = _safe_json_loads(catalog_text)
         return (
-            render_decision_workspace_panel(official_payload, catalog_payload),
+            render_decision_workspace_panel(official_payload, catalog_payload, _safe_json_loads(candidate_text)),
             render_decision_summary_panel(official_payload),
             render_decision_summary_panel(official_payload),
             render_decision_contrast_panel(official_payload),
@@ -8579,6 +8637,29 @@ def build_app(
             render_candidate_summary_panel(_safe_json_loads(candidate_text)),
             render_candidate_breakdown_panel(_safe_json_loads(breakdown_text)),
         )
+
+    @app.callback(
+        Output("export-selected-button", "children"),
+        Output("export-selected-button", "disabled"),
+        Input("selected-candidate-summary", "children"),
+        Input("official-candidate-summary", "children"),
+    )
+    def _refresh_decision_export_cta(
+        selected_text: str | None,
+        official_text: str | None,
+    ) -> tuple[str, bool]:
+        selected_payload = _safe_json_loads(selected_text)
+        official_payload = _safe_json_loads(official_text)
+        selected_candidate_id = str(selected_payload.get("candidate_id") or "").strip()
+        official_candidate_id = str(official_payload.get("official_product_candidate_id") or "").strip()
+        profile_candidate_id = str(official_payload.get("candidate_id") or "").strip()
+        if not selected_candidate_id:
+            return "Exportar escolha manual quando houver contexto", True
+        if selected_candidate_id == official_candidate_id:
+            return f"Exportar referência oficial ({selected_candidate_id})", False
+        if selected_candidate_id == profile_candidate_id:
+            return f"Exportar winner do perfil atual ({selected_candidate_id})", False
+        return f"Exportar escolha manual atual ({selected_candidate_id})", False
 
     _normalize_callback_map_for_testing(app)
     return app

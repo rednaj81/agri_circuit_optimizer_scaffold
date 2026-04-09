@@ -721,6 +721,8 @@ def test_decision_tab_contains_advanced_sections_without_extra_primary_tabs() ->
     assert _find_component_by_id(decision_tab, "decision-signal-panel") is not None
     assert _find_component_by_id(decision_tab, "decision-flow-panel") is not None
     assert _find_component_by_id(decision_tab, "decision-profile-views-panel") is not None
+    assert _find_component_by_id(decision_tab, "decision-final-comparison-panel") is not None
+    assert _find_component_by_id(decision_tab, "decision-final-choice-panel") is not None
     assert _find_component_by_id(decision_tab, "decision-flow-open-runs-link") is not None
     assert _find_component_by_id(decision_tab, "decision-flow-open-audit-link") is not None
     assert _find_component_by_id(decision_tab, "decision-workspace-open-runs-link") is not None
@@ -1642,6 +1644,10 @@ def test_decision_workspace_panel_makes_winner_runner_up_and_tie_legible() -> No
             "visible_candidate_count": 4,
             "top_visible_family": "hybrid_free",
         },
+        {
+            "candidate_id": "cand-04",
+            "topology_family": "branch_loop",
+        },
     )
     panel_text = _collect_text_content(panel)
 
@@ -1654,12 +1660,18 @@ def test_decision_workspace_panel_makes_winner_runner_up_and_tie_legible() -> No
     assert "Runner-up" in panel_text
     assert "Technical tieExplícito" in panel_text
     assert "Technical tie explícito" in panel_text
+    assert "Comparação final assistida" in panel_text
+    assert "Escolha manual atual" in panel_text
+    assert "cand-04" in panel_text
+    assert "sem sobrescrever a referência oficial do produto" in panel_text.lower()
     assert "Perfis explícitos de seleção" in panel_text
     assert "Perfil atual" in panel_text
     assert "Referência oficial" in panel_text
     assert _find_component_by_id(panel, "decision-workspace-open-runs-link") is not None
     assert _find_component_by_id(panel, "decision-workspace-open-audit-link") is not None
     assert _find_component_by_id(panel, "decision-profile-views-panel") is not None
+    assert _find_component_by_id(panel, "decision-final-comparison-panel") is not None
+    assert _find_component_by_id(panel, "decision-final-choice-panel") is not None
 
 
 def test_runs_flow_panel_enables_decision_only_with_usable_execution_result() -> None:
@@ -1761,6 +1773,7 @@ def test_primary_decision_panels_hide_raw_metric_keys_in_main_surface() -> None:
             "profile_views": [
                 {"profile_id": "min_cost", "candidate_id": "cand-01", "runner_up_candidate_id": "cand-02", "technical_tie": False, "feasible": True, "topology_family": "loop_ring", "score_margin_delta": 0.2},
                 {"profile_id": "balanced", "candidate_id": "cand-03", "runner_up_candidate_id": "cand-02", "technical_tie": True, "feasible": True, "topology_family": "hybrid_free", "score_margin_delta": 0.0},
+                {"profile_id": "robust_quality", "candidate_id": "cand-03", "runner_up_candidate_id": "cand-02", "technical_tie": True, "feasible": True, "topology_family": "hybrid_free", "score_margin_delta": 0.0},
             ],
             "decision_status": "technical_tie",
             "technical_tie": True,
@@ -1829,6 +1842,8 @@ def test_primary_decision_panels_hide_raw_metric_keys_in_main_surface() -> None:
     assert "Runner-up e contraste" in contrast_text
     assert "cand-02" in contrast_text
     assert "Empate técnico" in contrast_text
+    assert "Technical tie em leitura humana" in contrast_text
+    assert "decisão humana assistida" in contrast_text.lower()
     assert "Trade-offs por perfil" in contrast_text
     assert "Perfis diferentes estão puxando winners diferentes" in contrast_text
     assert "mandatory_route_failure" not in signal_text
@@ -1921,6 +1936,30 @@ def test_decision_contrast_panel_explains_profile_tradeoffs_without_replacing_of
     assert "Robustez primeiro" in panel_text
     assert "Perfis diferentes estão puxando winners diferentes" in panel_text
     assert _find_component_by_id(panel, "decision-profile-tradeoff-panel") is not None
+
+
+def test_decision_export_cta_tracks_manual_choice_without_overwriting_official_reference() -> None:
+    with diagnostic_runtime_test_mode():
+        app = build_app("data/decision_platform/maquete_v2")
+
+    callback = _get_callback(app, input_id="official-candidate-summary", output_prefix="export-selected-button.children")
+
+    official_result = callback(
+        json.dumps({"candidate_id": "cand-03"}, ensure_ascii=False),
+        json.dumps({"candidate_id": "cand-03", "official_product_candidate_id": "cand-03"}, ensure_ascii=False),
+    )
+    profile_result = callback(
+        json.dumps({"candidate_id": "cand-01"}, ensure_ascii=False),
+        json.dumps({"candidate_id": "cand-01", "official_product_candidate_id": "cand-03"}, ensure_ascii=False),
+    )
+    manual_result = callback(
+        json.dumps({"candidate_id": "cand-09"}, ensure_ascii=False),
+        json.dumps({"candidate_id": "cand-01", "official_product_candidate_id": "cand-03"}, ensure_ascii=False),
+    )
+
+    assert official_result == ("Exportar referência oficial (cand-03)", False)
+    assert profile_result == ("Exportar winner do perfil atual (cand-01)", False)
+    assert manual_result == ("Exportar escolha manual atual (cand-09)", False)
 
 
 def test_candidate_summary_panel_surfaces_primary_blocker_and_next_action() -> None:
