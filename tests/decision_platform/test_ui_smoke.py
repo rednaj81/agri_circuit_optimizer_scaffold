@@ -720,6 +720,7 @@ def test_decision_tab_contains_advanced_sections_without_extra_primary_tabs() ->
     assert _find_component_by_id(decision_tab, "decision-contrast-panel") is not None
     assert _find_component_by_id(decision_tab, "decision-signal-panel") is not None
     assert _find_component_by_id(decision_tab, "decision-flow-panel") is not None
+    assert _find_component_by_id(decision_tab, "decision-profile-views-panel") is not None
     assert _find_component_by_id(decision_tab, "decision-flow-open-runs-link") is not None
     assert _find_component_by_id(decision_tab, "decision-flow-open-audit-link") is not None
     assert _find_component_by_id(decision_tab, "decision-workspace-open-runs-link") is not None
@@ -1587,6 +1588,9 @@ def test_decision_flow_panel_makes_transition_and_next_action_explicit() -> None
         {
             "candidate_id": "cand-01",
             "runner_up_candidate_id": "cand-02",
+            "active_profile_id": "min_cost",
+            "official_profile_id": "balanced",
+            "official_product_candidate_id": "cand-03",
             "decision_status": "technical_tie",
             "technical_tie": True,
             "topology_family": "hybrid_free",
@@ -1605,6 +1609,9 @@ def test_decision_flow_panel_makes_transition_and_next_action_explicit() -> None
     assert "cand-02" in panel_text
     assert "Winner oficial" in panel_text
     assert "Runner-up de referência" in panel_text
+    assert "Perfil em leitura" in panel_text
+    assert "Menor custo" in panel_text
+    assert "Referência oficial: Equilibrado -> cand-03" in panel_text
     assert "Estado da decisão" in panel_text
     assert "Empate técnico ativo" in panel_text
     assert "Empate técnico" in panel_text
@@ -1620,6 +1627,13 @@ def test_decision_workspace_panel_makes_winner_runner_up_and_tie_legible() -> No
         {
             "candidate_id": "cand-01",
             "runner_up_candidate_id": "cand-02",
+            "active_profile_id": "min_cost",
+            "official_profile_id": "balanced",
+            "official_product_candidate_id": "cand-03",
+            "profile_views": [
+                {"profile_id": "min_cost", "candidate_id": "cand-01", "runner_up_candidate_id": "cand-02", "technical_tie": False, "feasible": True, "topology_family": "loop_ring", "score_margin_delta": 0.2},
+                {"profile_id": "balanced", "candidate_id": "cand-03", "runner_up_candidate_id": "cand-02", "technical_tie": True, "feasible": True, "topology_family": "hybrid_free", "score_margin_delta": 0.0},
+            ],
             "decision_status": "technical_tie",
             "technical_tie": True,
             "topology_family": "hybrid_free",
@@ -1634,12 +1648,18 @@ def test_decision_workspace_panel_makes_winner_runner_up_and_tie_legible() -> No
     assert "Leitura principal da decisão" in panel_text
     assert "O que esta área resolve" in panel_text
     assert "Estado atual" in panel_text
+    assert "Perfil em leitura" in panel_text
+    assert "Referência oficial do produto" in panel_text
     assert "Winner atual" in panel_text
     assert "Runner-up" in panel_text
     assert "Technical tieExplícito" in panel_text
     assert "Technical tie explícito" in panel_text
+    assert "Perfis explícitos de seleção" in panel_text
+    assert "Perfil atual" in panel_text
+    assert "Referência oficial" in panel_text
     assert _find_component_by_id(panel, "decision-workspace-open-runs-link") is not None
     assert _find_component_by_id(panel, "decision-workspace-open-audit-link") is not None
+    assert _find_component_by_id(panel, "decision-profile-views-panel") is not None
 
 
 def test_runs_flow_panel_enables_decision_only_with_usable_execution_result() -> None:
@@ -1718,6 +1738,9 @@ def test_primary_decision_panels_hide_raw_metric_keys_in_main_surface() -> None:
     decision_summary_panel = render_decision_summary_panel(
         {
             "candidate_id": "cand-01",
+            "active_profile_id": "min_cost",
+            "official_profile_id": "balanced",
+            "official_product_candidate_id": "cand-03",
             "decision_status": "technical_tie",
             "technical_tie": True,
             "feasible": True,
@@ -1732,6 +1755,13 @@ def test_primary_decision_panels_hide_raw_metric_keys_in_main_surface() -> None:
     contrast_panel = render_decision_contrast_panel(
         {
             "candidate_id": "cand-01",
+            "active_profile_id": "min_cost",
+            "official_profile_id": "balanced",
+            "official_product_candidate_id": "cand-03",
+            "profile_views": [
+                {"profile_id": "min_cost", "candidate_id": "cand-01", "runner_up_candidate_id": "cand-02", "technical_tie": False, "feasible": True, "topology_family": "loop_ring", "score_margin_delta": 0.2},
+                {"profile_id": "balanced", "candidate_id": "cand-03", "runner_up_candidate_id": "cand-02", "technical_tie": True, "feasible": True, "topology_family": "hybrid_free", "score_margin_delta": 0.0},
+            ],
             "decision_status": "technical_tie",
             "technical_tie": True,
             "runner_up_candidate_id": "cand-02",
@@ -1788,14 +1818,19 @@ def test_primary_decision_panels_hide_raw_metric_keys_in_main_surface() -> None:
     breakdown_text = _collect_text_content(breakdown_panel)
 
     assert "Empate técnico" in decision_text
+    assert "Winner do perfil atual" in decision_text
+    assert "Perfil em leitura" in decision_text
+    assert "Referência oficial do produto" in decision_text
     assert "Status da decisão" in decision_text
     assert "Por que esta leitura lidera" in decision_text
     assert "Próxima ação" in decision_text
-    assert "winner oficial" in decision_text.lower()
+    assert "winner do perfil atual" in decision_text.lower()
     assert "mantenha o runner-up visível" in decision_text
     assert "Runner-up e contraste" in contrast_text
     assert "cand-02" in contrast_text
     assert "Empate técnico" in contrast_text
+    assert "Trade-offs por perfil" in contrast_text
+    assert "Perfis diferentes estão puxando winners diferentes" in contrast_text
     assert "mandatory_route_failure" not in signal_text
     assert "rota obrigatória não conseguiu fechar" in signal_text
     assert "Rota crítica R001" in signal_text
@@ -1814,6 +1849,9 @@ def test_decision_summary_panel_surfaces_infeasible_winner_without_console_langu
     panel = render_decision_summary_panel(
         {
             "candidate_id": "cand-01",
+            "active_profile_id": "balanced",
+            "official_profile_id": "balanced",
+            "official_product_candidate_id": "cand-01",
             "decision_status": "winner_clear",
             "technical_tie": False,
             "feasible": False,
@@ -1828,6 +1866,7 @@ def test_decision_summary_panel_surfaces_infeasible_winner_without_console_langu
     panel_text = _collect_text_content(panel)
 
     assert "Winner inviável" in panel_text
+    assert "Winner oficial" in panel_text
     assert "Inviável" in panel_text
     assert "rota obrigatória não conseguiu fechar" in panel_text
     assert "use o motivo de inviabilidade e o runner-up" in panel_text.lower()
@@ -1837,6 +1876,9 @@ def test_decision_contrast_panel_guides_when_runner_up_is_missing() -> None:
     panel = render_decision_contrast_panel(
         {
             "candidate_id": "cand-01",
+            "profile_views": [
+                {"profile_id": "balanced", "candidate_id": "cand-01", "runner_up_candidate_id": None, "technical_tie": False, "feasible": True, "topology_family": "hybrid_free", "score_margin_delta": 0.8},
+            ],
             "decision_status": "winner_clear",
             "technical_tie": False,
             "feasible": True,
@@ -1846,6 +1888,39 @@ def test_decision_contrast_panel_guides_when_runner_up_is_missing() -> None:
 
     assert "winner, mas ainda não existe runner-up comparável" in panel_text.lower()
     assert "Relaxe filtros ou recupere uma execução com contraste suficiente" in panel_text
+
+
+def test_decision_contrast_panel_explains_profile_tradeoffs_without_replacing_official_reference() -> None:
+    panel = render_decision_contrast_panel(
+        {
+            "candidate_id": "cand-01",
+            "runner_up_candidate_id": "cand-02",
+            "active_profile_id": "min_cost",
+            "official_profile_id": "balanced",
+            "official_product_candidate_id": "cand-03",
+            "decision_status": "winner_clear",
+            "technical_tie": False,
+            "runner_up_topology_family": "hybrid_loop",
+            "runner_up_score_final": 90.8,
+            "runner_up_total_cost": 11.0,
+            "total_cost": 10.5,
+            "score_margin_delta": 0.3,
+            "profile_views": [
+                {"profile_id": "min_cost", "candidate_id": "cand-01", "runner_up_candidate_id": "cand-02", "technical_tie": False, "feasible": True, "topology_family": "loop_ring", "score_margin_delta": 0.3},
+                {"profile_id": "balanced", "candidate_id": "cand-03", "runner_up_candidate_id": "cand-02", "technical_tie": True, "feasible": True, "topology_family": "hybrid_free", "score_margin_delta": 0.0},
+                {"profile_id": "robust_quality", "candidate_id": "cand-03", "runner_up_candidate_id": "cand-02", "technical_tie": True, "feasible": True, "topology_family": "hybrid_free", "score_margin_delta": 0.0},
+            ],
+            "key_factors": [{"summary": "o perfil de menor custo aceita um circuito mais barato, enquanto o equilibrado preserva robustez e empate técnico."}],
+        }
+    )
+    panel_text = _collect_text_content(panel)
+
+    assert "Trade-offs por perfil" in panel_text
+    assert "Menor custo" in panel_text
+    assert "Equilibrado" in panel_text
+    assert "Robustez primeiro" in panel_text
+    assert "Perfis diferentes estão puxando winners diferentes" in panel_text
+    assert _find_component_by_id(panel, "decision-profile-tradeoff-panel") is not None
 
 
 def test_candidate_summary_panel_surfaces_primary_blocker_and_next_action() -> None:

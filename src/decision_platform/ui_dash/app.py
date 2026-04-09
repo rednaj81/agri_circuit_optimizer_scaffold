@@ -5062,11 +5062,106 @@ def render_candidate_summary_panel(summary: dict[str, Any]) -> Any:
     )
 
 
+def _decision_profile_presentation(profile_id: str | None) -> dict[str, str]:
+    normalized = str(profile_id or "").strip()
+    presentations = {
+        "min_cost": {
+            "label": "Menor custo",
+            "summary": "Puxa a seleção para custo total mais baixo antes de conforto adicional.",
+        },
+        "balanced": {
+            "label": "Equilibrado",
+            "summary": "Procura balanço entre custo, qualidade hidráulica e operabilidade.",
+        },
+        "robust_quality": {
+            "label": "Robustez primeiro",
+            "summary": "Aceita pagar mais para ganhar resiliência e margem operacional.",
+        },
+        "cleaning_focus": {
+            "label": "Higienização primeiro",
+            "summary": "Prioriza limpeza e manutenção previsível mesmo com trade-off de custo.",
+        },
+    }
+    return presentations.get(normalized, {"label": normalized or "Perfil atual", "summary": "Sem leitura de produto configurada para este perfil."})
+
+
+def _decision_profile_state_label(view: dict[str, Any]) -> str:
+    candidate_id = str(view.get("candidate_id") or "").strip()
+    if not candidate_id:
+        return "Sem resultado"
+    if view.get("technical_tie"):
+        return "Technical tie"
+    if view.get("feasible") is False:
+        return "Winner bloqueado"
+    return "Vencedor claro"
+
+
+def _render_decision_profile_cards(
+    profile_views: list[dict[str, Any]],
+    *,
+    active_profile_id: str | None,
+    official_profile_id: str | None,
+) -> list[Any]:
+    cards = []
+    for view in profile_views:
+        profile_id = str(view.get("profile_id") or "").strip()
+        presentation = _decision_profile_presentation(profile_id)
+        state_label = _decision_profile_state_label(view)
+        badges = []
+        if profile_id == str(active_profile_id or "").strip():
+            badges.append(html.Span("Perfil atual", style=UI_PILL_STYLE))
+        if profile_id == str(official_profile_id or "").strip():
+            badges.append(html.Span("Referência oficial", style={**UI_PILL_STYLE, "background": "#e7efe1", "color": "#355b2b"}))
+        candidate_id = str(view.get("candidate_id") or "").strip() or "Sem candidato utilizável"
+        runner_up_id = str(view.get("runner_up_candidate_id") or "").strip() or "Sem runner-up comparável"
+        cards.append(
+            html.Div(
+                style={**UI_MUTED_CARD_STYLE, "padding": "12px"},
+                children=[
+                    html.Div(presentation["label"], style={"fontWeight": 700, "lineHeight": "1.5"}),
+                    html.Div(style={"display": "flex", "gap": "8px", "flexWrap": "wrap", "marginTop": "8px"}, children=badges or [html.Span(state_label, style=UI_PILL_STYLE)]),
+                    html.Div(presentation["summary"], style={"lineHeight": "1.55", "marginTop": "8px"}),
+                    html.Div(f"Winner: {candidate_id}", style={"fontWeight": 700, "marginTop": "10px"}),
+                    html.Div(f"Runner-up: {runner_up_id}", style={"lineHeight": "1.55", "marginTop": "4px"}),
+                    html.Div(f"Leitura: {state_label}", style={"lineHeight": "1.55", "marginTop": "4px"}),
+                ],
+            )
+        )
+    return cards
+
+
+def _render_decision_tradeoff_cards(profile_views: list[dict[str, Any]]) -> list[Any]:
+    cards = []
+    for view in profile_views:
+        profile_id = str(view.get("profile_id") or "").strip()
+        presentation = _decision_profile_presentation(profile_id)
+        candidate_id = str(view.get("candidate_id") or "").strip() or "Sem resultado utilizável"
+        topology_family = str(view.get("topology_family") or "-")
+        delta = view.get("score_margin_delta")
+        margin_text = delta if delta not in (None, "") else "-"
+        cards.append(
+            html.Div(
+                style={**UI_MUTED_CARD_STYLE, "padding": "12px"},
+                children=[
+                    html.Div(presentation["label"], style={"fontWeight": 700, "lineHeight": "1.5"}),
+                    html.Div(candidate_id, style={"fontSize": "18px", "fontWeight": 700, "marginTop": "8px"}),
+                    html.Div(f"Família: {topology_family}", style={"lineHeight": "1.55", "marginTop": "6px"}),
+                    html.Div(f"Margem para runner-up: {margin_text}", style={"lineHeight": "1.55", "marginTop": "4px"}),
+                ],
+            )
+        )
+    return cards
+
+
 def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: dict[str, Any]) -> Any:
     decision_state = _decision_primary_state(summary)
     candidate_id = str(summary.get("candidate_id") or "").strip()
     runner_up_id = str(summary.get("runner_up_candidate_id") or "").strip()
     decision_status = str(summary.get("decision_status") or ("technical_tie" if summary.get("technical_tie") else "winner_clear"))
+    active_profile_id = str(summary.get("active_profile_id") or summary.get("official_profile_id") or "").strip()
+    official_profile_id = str(summary.get("official_profile_id") or active_profile_id).strip()
+    official_product_candidate_id = str(summary.get("official_product_candidate_id") or candidate_id).strip()
+    profile_views = list(summary.get("profile_views") or [])
     visible_candidate_count = int(catalog_summary.get("visible_candidate_count", 0) or 0) if isinstance(catalog_summary, dict) else 0
     if not candidate_id:
         state_background, state_color = _status_tone("needs_attention")
@@ -5103,6 +5198,8 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
                 children=[
                     _guidance_card("O que esta área resolve", "Transformar a última execução utilizável em leitura comparável entre winner, runner-up e risco principal."),
                     _guidance_card("Estado atual", decision_state["headline"]),
+                    _guidance_card("Perfil em leitura", _decision_profile_presentation(active_profile_id)["label"]),
+                    _guidance_card("Referência oficial do produto", f"{_decision_profile_presentation(official_profile_id)['label']}: {official_product_candidate_id or '-'}"),
                     _guidance_card("Winner atual", candidate_id or "Ainda sem winner oficial legível"),
                     _guidance_card("Runner-up", runner_up_id or "Ainda sem runner-up comparável"),
                     _guidance_card("Próxima ação", decision_state["next_action"]),
@@ -5116,6 +5213,8 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
                     html.Div(decision_state["contrast_state"], style={"lineHeight": "1.6", "marginTop": "10px"}),
                 ],
             ),
+            html.H4("Perfis explícitos de seleção", style={"marginBottom": "6px"}),
+            html.Div(id="decision-profile-views-panel", style={**UI_TWO_COLUMN_STYLE, "marginBottom": "12px"}, children=_render_decision_profile_cards(profile_views, active_profile_id=active_profile_id, official_profile_id=official_profile_id)),
             html.Div(
                 style=UI_THREE_COLUMN_STYLE,
                 children=[
@@ -5143,6 +5242,9 @@ def render_decision_flow_panel(summary: dict[str, Any]) -> Any:
     candidate_id = str(summary.get("candidate_id") or "").strip()
     runner_up_id = str(summary.get("runner_up_candidate_id") or "").strip()
     decision_status = str(summary.get("decision_status") or ("technical_tie" if summary.get("technical_tie") else "winner_clear"))
+    active_profile_id = str(summary.get("active_profile_id") or summary.get("official_profile_id") or "").strip()
+    official_profile_id = str(summary.get("official_profile_id") or active_profile_id).strip()
+    official_product_candidate_id = str(summary.get("official_product_candidate_id") or candidate_id).strip()
     feasible_is_false = summary.get("feasible") is False
     score_margin_delta = _coerce_float_or_none(summary.get("score_margin_delta"))
     winner_penalties = list(summary.get("winner_penalties", []))
@@ -5212,6 +5314,10 @@ def render_decision_flow_panel(summary: dict[str, Any]) -> Any:
                             else decision_state["runner_up_guidance"]
                         ),
                     ),
+                    _guidance_card(
+                        "Perfil em leitura",
+                        f"{_decision_profile_presentation(active_profile_id)['label']}. Referência oficial: {_decision_profile_presentation(official_profile_id)['label']} -> {official_product_candidate_id or '-'}."
+                    ),
                     _guidance_card("Estado da decisão", f"{signal_title}. {signal_text}"),
                 ],
             ),
@@ -5237,7 +5343,11 @@ def render_decision_summary_panel(summary: dict[str, Any]) -> Any:
         )
     decision_state = _decision_primary_state(summary)
     decision_status = str(summary.get("decision_status") or ("technical_tie" if summary.get("technical_tie") else "winner_clear"))
+    active_profile_id = str(summary.get("active_profile_id") or summary.get("official_profile_id") or "").strip()
+    official_profile_id = str(summary.get("official_profile_id") or active_profile_id).strip()
+    official_product_candidate_id = str(summary.get("official_product_candidate_id") or candidate_id).strip()
     decision_label = decision_state["state_label"]
+    panel_title = "Winner oficial" if active_profile_id == official_profile_id else "Winner do perfil atual"
     feasibility_label = "Inviável" if summary.get("feasible") is False else "Viável"
     score_margin_delta = _coerce_float_or_none(summary.get("score_margin_delta"))
     if decision_status == "technical_tie":
@@ -5258,10 +5368,12 @@ def render_decision_summary_panel(summary: dict[str, Any]) -> Any:
         winner_reason = f"{winner_reason} Bloqueio atual: {_humanize_infeasibility_reason(summary.get('infeasibility_reason'))}."
     return html.Div(
         children=[
-            html.H3("Winner oficial", style={"marginTop": 0}),
+            html.H3(panel_title, style={"marginTop": 0}),
             html.Div(
                 style={**UI_THREE_COLUMN_STYLE, "marginBottom": "12px"},
                 children=[
+                    _guidance_card("Perfil em leitura", _decision_profile_presentation(active_profile_id)["label"]),
+                    _guidance_card("Referência oficial do produto", f"{_decision_profile_presentation(official_profile_id)['label']}: {official_product_candidate_id or '-'}"),
                     _guidance_card("Status da decisão", decision_label),
                     _guidance_card("Por que esta leitura lidera", winner_reason if winner_reason != "Sem justificativa resumida." else priority_signal),
                     _guidance_card("Próxima ação", decision_state["next_action"]),
@@ -5301,6 +5413,7 @@ def render_decision_summary_panel(summary: dict[str, Any]) -> Any:
 def render_decision_contrast_panel(summary: dict[str, Any]) -> Any:
     candidate_id = str(summary.get("candidate_id") or "").strip()
     runner_up_id = str(summary.get("runner_up_candidate_id") or "").strip()
+    profile_views = list(summary.get("profile_views") or [])
     if not summary or not candidate_id:
         return _guided_empty_state(
             "Runner-up e contraste",
@@ -5329,6 +5442,12 @@ def render_decision_contrast_panel(summary: dict[str, Any]) -> Any:
         if decision_status == "technical_tie"
         else "O runner-up segue como melhor alternativa comparável, mas abaixo da escolha oficial no ranking."
     )
+    preferred_candidates = {str(view.get("candidate_id") or "").strip() for view in profile_views if str(view.get("candidate_id") or "").strip()}
+    profile_tradeoff_summary = (
+        "Perfis diferentes estão puxando winners diferentes; use esse mapa para entender por que custo, robustez ou higienização podem preferir famílias distintas."
+        if len(preferred_candidates) > 1
+        else "Os perfis convergem para o mesmo winner; o trade-off principal continua concentrado no runner-up e na margem de contraste."
+    )
     return html.Div(
         children=[
             html.H3("Runner-up e contraste", style={"marginTop": 0}),
@@ -5349,6 +5468,9 @@ def render_decision_contrast_panel(summary: dict[str, Any]) -> Any:
                 ],
             ),
             html.Div(contrast_summary, style={"marginTop": "12px", "fontWeight": 700, "lineHeight": "1.5"}),
+            html.H4("Trade-offs por perfil", style={"marginBottom": "6px", "marginTop": "14px"}),
+            html.Div(profile_tradeoff_summary, style={"lineHeight": "1.6", "marginBottom": "10px"}),
+            html.Div(id="decision-profile-tradeoff-panel", style={**UI_TWO_COLUMN_STYLE, "marginBottom": "12px"}, children=_render_decision_tradeoff_cards(profile_views)),
             html.H4("Diferenças relevantes", style={"marginBottom": "6px"}),
             _bullet_list(difference_lines[:4], "Sem diferença relevante registrada."),
         ]
@@ -8734,9 +8856,33 @@ def build_official_candidate_summary(
     metrics = candidate["metrics"]
     winner = explanation.get("winner") or {}
     runner_up = explanation.get("runner_up") or {}
+    catalog_index = {item["candidate_id"]: item for item in result["catalog"]}
+    profile_views = []
+    for available_profile_id in result.get("ranked_profiles", {}).keys():
+        profile_explanation = build_selected_candidate_explanation(result, profile_id=available_profile_id)
+        profile_candidate_id = str(profile_explanation.get("candidate_id") or "").strip()
+        profile_runner_up = profile_explanation.get("runner_up") or {}
+        profile_candidate = catalog_index.get(profile_candidate_id) if profile_candidate_id else None
+        profile_metrics = (profile_candidate or {}).get("metrics", {})
+        profile_views.append(
+            {
+                "profile_id": available_profile_id,
+                "candidate_id": profile_candidate_id,
+                "runner_up_candidate_id": profile_runner_up.get("candidate_id"),
+                "decision_status": profile_explanation.get("decision_status"),
+                "technical_tie": profile_explanation.get("decision_status") == "technical_tie",
+                "topology_family": (profile_candidate or {}).get("topology_family"),
+                "feasible": bool(profile_metrics.get("feasible")) if profile_candidate else False,
+                "total_cost": round(float(profile_metrics.get("install_cost", 0.0)) + float(profile_metrics.get("fallback_cost", 0.0)), 3) if profile_candidate else None,
+                "score_margin_delta": (profile_explanation.get("score_margin") or {}).get("delta"),
+            }
+        )
     return {
         "candidate_id": official_candidate_id,
         "active_profile_id": profile_id,
+        "official_profile_id": result.get("default_profile_id"),
+        "official_product_candidate_id": result.get("selected_candidate_id"),
+        "profile_views": profile_views,
         "decision_status": explanation.get("decision_status"),
         "technical_tie": explanation.get("decision_status") == "technical_tie",
         "topology_family": candidate["topology_family"],
@@ -10173,7 +10319,10 @@ def _requires_diagnostic_python_emulation(bundle: Any) -> bool:
 
 
 def _profile_dropdown_options(bundle: Any) -> list[dict[str, Any]]:
-    return [{"label": profile, "value": profile} for profile in bundle.weight_profiles["profile_id"].tolist()]
+    return [
+        {"label": _decision_profile_presentation(profile)["label"], "value": profile}
+        for profile in bundle.weight_profiles["profile_id"].tolist()
+    ]
 
 
 def _family_dropdown_options(bundle: Any) -> list[dict[str, Any]]:
