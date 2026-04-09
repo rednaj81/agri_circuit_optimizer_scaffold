@@ -248,6 +248,17 @@ def test_phase3_queue_acceptance_run_actions_follow_selected_run_state() -> None
     )
 
 
+@pytest.mark.fast
+def test_phase3_queue_acceptance_workspace_ctas_reuse_run_callbacks() -> None:
+    with diagnostic_runtime_test_mode():
+        app = build_app("data/decision_platform/maquete_v2")
+
+    assert _get_callback(app, input_id="runs-workspace-enqueue-button") is not None
+    assert _get_callback(app, input_id="runs-workspace-run-next-button") is not None
+    assert _get_callback(app, input_id="runs-workspace-refresh-button") is not None
+    assert _get_callback(app, input_id="runs-workspace-rerun-button") is not None
+
+
 @pytest.mark.slow
 def test_phase3_queue_acceptance_serial_jobs_are_isolated_and_auditable() -> None:
     scenario_dir = prepare_maquete_v2_acceptance_scenario(

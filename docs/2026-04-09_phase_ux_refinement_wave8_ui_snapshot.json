@@ -1,0 +1,32 @@
+{
+  "snapshot_source_commit": "5590a807f604ac8cce0e6f33ab99d25cd79ba657",
+  "runs": {
+    "primary_surface_signals": [
+      "Agora",
+      "Fila",
+      "Resultado útil",
+      "Falha ou recuperação",
+      "Próxima ação recomendada"
+    ],
+    "workspace_ctas": {
+      "enqueue": "runs-workspace-enqueue-button",
+      "run_next": "runs-workspace-run-next-button",
+      "refresh": "runs-workspace-refresh-button",
+      "rerun": "runs-workspace-rerun-button",
+      "decision": "runs-workspace-primary-open-decision-button"
+    },
+    "state_mapping": {
+      "studio_blocked": "review scenario in Studio",
+      "preparing_or_running": "refresh current reading",
+      "queue_ready": "run next queued job",
+      "blocked_or_no_usable_result": "rerun selected run",
+      "decision_available": "open Decision"
+    },
+    "technical_logs_primary_surface": false
+  },
+  "screenshot_attempt": {
+    "target_path": "output/playwright/runs-fullhd-wave8.png",
+    "status": "failed_in_sandbox",
+    "reason": "No stable browser capture session was available in this sandbox during wave 8; structured snapshot retained as honest evidence."
+  }
+}

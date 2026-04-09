@@ -1246,6 +1246,10 @@ def test_runs_workspace_panel_prioritizes_queue_focus_and_primary_transition() -
             "selected_candidate_id": "cand-01",
             "error": None,
         },
+        {
+            "selected_run_id": "run-002",
+            "status": "completed",
+        },
     )
     panel_text = _collect_text_content(panel)
 
@@ -1258,8 +1262,10 @@ def test_runs_workspace_panel_prioritizes_queue_focus_and_primary_transition() -
     assert "Gate do cenário e limites desta leitura" in panel_text
     assert "Próxima run pronta: run-003." in panel_text
     assert "Já existe um resultado utilizável" in panel_text
+    assert "Run em foco para recuperação: run-002." in panel_text
     assert _find_component_by_id(panel, "runs-workspace-open-studio-link") is not None
     assert getattr(_find_component_by_id(panel, "runs-workspace-open-decision-button"), "disabled", None) is False
+    assert _find_component_by_id(panel, "runs-workspace-primary-open-decision-button") is not None
 
 
 def test_runs_workspace_panel_distinguishes_failure_recovery_from_decision_ready() -> None:
@@ -1279,6 +1285,10 @@ def test_runs_workspace_panel_distinguishes_failure_recovery_from_decision_ready
         {
             "error": "Falha ao consolidar bundle.",
         },
+        {
+            "selected_run_id": "run-009",
+            "status": "failed",
+        },
     )
     failed_text = _collect_text_content(failed_panel)
 
@@ -1287,6 +1297,33 @@ def test_runs_workspace_panel_distinguishes_failure_recovery_from_decision_ready
     assert "Revisar falha" in failed_text
     assert "ainda não existe resultado utilizável para Decisão" in failed_text
     assert getattr(_find_component_by_id(failed_panel, "runs-workspace-open-decision-button"), "disabled", None) is True
+    assert getattr(_find_component_by_id(failed_panel, "runs-workspace-rerun-button"), "disabled", None) is False
+
+
+def test_runs_workspace_panel_uses_refresh_cta_for_intermediate_execution_states() -> None:
+    panel = render_runs_workspace_panel(
+        {
+            "status": "ready",
+            "readiness_headline": "Cenário pronto para seguir para Runs.",
+        },
+        {
+            "run_count": 2,
+            "next_queued_run_id": None,
+            "active_run_ids": ["run-004"],
+            "queued_run_ids": [],
+            "latest_run_id": "run-003",
+            "status_counts": {"running": 1, "completed": 1},
+        },
+        {},
+        {
+            "selected_run_id": "run-004",
+            "status": "running",
+        },
+    )
+    panel_text = _collect_text_content(panel)
+
+    assert "Aguardar run em foco" in panel_text
+    assert _find_component_by_id(panel, "runs-workspace-refresh-button") is not None
 
 
 def test_primary_runs_panels_hide_raw_backend_keys_in_main_surface() -> None:
@@ -1477,6 +1514,15 @@ def test_primary_surfaces_explain_empty_states_without_debug_language() -> None:
     assert "Ainda não existe decisão utilizável" in _collect_text_content(contrast)
     assert "Ainda não há sinais consolidados" in _collect_text_content(signals)
     assert "Ainda não existe breakdown suficiente" in _collect_text_content(breakdown)
+
+
+def test_runs_tab_keeps_workspace_recovery_ctas_in_primary_surface() -> None:
+    with diagnostic_runtime_test_mode():
+        app = build_app("data/decision_platform/maquete_v2")
+
+    runs_tab = _find_tab_by_label(app.layout, "Runs")
+    assert runs_tab is not None
+    assert _find_component_by_id(runs_tab, "runs-workspace-panel") is not None
 
 
 def test_studio_selection_panel_distinguishes_node_and_edge_editing_guidance() -> None:

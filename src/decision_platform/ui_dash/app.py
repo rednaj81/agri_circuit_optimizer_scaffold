@@ -4592,7 +4592,7 @@ def _runs_primary_state(
         recovery_headline = "Estado intermediário: ainda é cedo para corrigir ou reenfileirar."
         recovery_action = "Aguardar preparação atual"
         primary_cta_label = "Aguardar preparação"
-        primary_cta_target = "wait"
+        primary_cta_target = "refresh"
         wait_state = "Aguardar preparação"
     elif active_run_ids:
         readiness_note = "O cenário já passou pelo gate principal de prontidão do Studio."
@@ -4605,7 +4605,7 @@ def _runs_primary_state(
         recovery_headline = "Estado intermediário: a leitura principal pede espera, não correção imediata."
         recovery_action = "Aguardar execução atual"
         primary_cta_label = "Aguardar run em foco"
-        primary_cta_target = "wait"
+        primary_cta_target = "refresh"
         wait_state = "Aguardar execução"
     elif next_queued_run_id and not decision_available:
         readiness_note = "O cenário já passou pelo gate principal de prontidão do Studio."
@@ -4631,7 +4631,7 @@ def _runs_primary_state(
         recovery_headline = "Há falha ou revisão pendente; o caminho seguro é revisar a execução antes de reenfileirar."
         recovery_action = "Revisar falha e reenfileirar com correção"
         primary_cta_label = "Revisar falha"
-        primary_cta_target = "review"
+        primary_cta_target = "rerun"
         wait_state = "Revisar falha"
     elif decision_available:
         readiness_note = "O cenário já passou pelo gate principal de prontidão do Studio."
@@ -4657,7 +4657,7 @@ def _runs_primary_state(
         recovery_headline = "Há histórico recente, mas ainda sem desfecho útil; a próxima ação é revisar e reenfileirar com intenção clara."
         recovery_action = "Revisar histórico recente"
         primary_cta_label = "Revisar run mais recente"
-        primary_cta_target = "review"
+        primary_cta_target = "rerun"
         wait_state = "Revisar histórico"
     else:
         readiness_note = "O cenário já passou pelo gate principal de prontidão do Studio."
@@ -4699,13 +4699,17 @@ def render_runs_workspace_panel(
     studio_summary: dict[str, Any],
     run_summary: dict[str, Any],
     execution_summary: dict[str, Any] | None = None,
+    selected_run_detail: dict[str, Any] | None = None,
 ) -> Any:
     state = _runs_primary_state(studio_summary, run_summary, execution_summary)
+    selected_run_detail = selected_run_detail or {}
     active_run_ids = list(state["active_run_ids"])
     next_queued_run_id = state["next_queued_run_id"]
     latest_run_id = run_summary.get("latest_run_id") if isinstance(run_summary, dict) else None
     queued_count = len(list((run_summary or {}).get("queued_run_ids", []))) if isinstance(run_summary, dict) else 0
     execution_error = str((execution_summary or {}).get("error") or "").strip()
+    selected_run_id = str(selected_run_detail.get("selected_run_id") or "").strip()
+    selected_run_status = str(selected_run_detail.get("status") or "").strip()
     if active_run_ids:
         queue_focus = f"Execução em foco: {active_run_ids[0]}."
     elif next_queued_run_id:
@@ -4723,9 +4727,27 @@ def render_runs_workspace_panel(
     else:
         usable_result = "Ainda não existe resultado utilizável porque nenhuma run terminou esta trilha."
     if state["primary_cta_target"] == "decision":
-        local_recovery_cta: Any = html.Button(state["primary_cta_label"], id="runs-workspace-primary-recovery-button", style=UI_BUTTON_STYLE, disabled=False)
+        local_recovery_cta: Any = html.Button(state["primary_cta_label"], id="runs-workspace-primary-open-decision-button", style=UI_BUTTON_STYLE, disabled=False)
     elif state["primary_cta_target"] == "studio":
         local_recovery_cta = _button_link(state["primary_cta_label"], "?tab=studio", "runs-workspace-primary-recovery-link")
+    elif state["primary_cta_target"] == "enqueue":
+        local_recovery_cta = html.Button(state["primary_cta_label"], id="runs-workspace-enqueue-button", style=UI_BUTTON_STYLE, disabled=False)
+    elif state["primary_cta_target"] == "run":
+        local_recovery_cta = html.Button(
+            state["primary_cta_label"],
+            id="runs-workspace-run-next-button",
+            style=UI_BUTTON_STYLE,
+            disabled=not bool(next_queued_run_id),
+        )
+    elif state["primary_cta_target"] == "rerun":
+        local_recovery_cta = html.Button(
+            state["primary_cta_label"],
+            id="runs-workspace-rerun-button",
+            style=UI_BUTTON_STYLE,
+            disabled=selected_run_status not in {"completed", "failed", "canceled"},
+        )
+    elif state["primary_cta_target"] == "refresh":
+        local_recovery_cta = html.Button(state["primary_cta_label"], id="runs-workspace-refresh-button", style=UI_BUTTON_STYLE, disabled=False)
     else:
         local_recovery_cta = html.Button(state["primary_cta_label"], id="runs-workspace-primary-recovery-button", style=UI_BUTTON_STYLE, disabled=True)
     if state["decision_enabled"]:
@@ -4768,6 +4790,10 @@ def render_runs_workspace_panel(
                     html.Div("Próxima ação recomendada", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
                     html.Div(state["next_action"], style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"}),
                     html.Div(state["decision_gate"], style={"lineHeight": "1.6", "marginTop": "10px"}),
+                    html.Div(
+                        f"Run em foco para recuperação: {selected_run_id or latest_run_id or 'nenhuma ainda selecionada'}.",
+                        style={"lineHeight": "1.6", "marginTop": "10px", "color": "#496158"},
+                    ),
                     html.Div(style={**UI_ACTION_ROW_STYLE, "marginTop": "12px"}, children=[local_recovery_cta]),
                 ],
             ),
@@ -7989,18 +8015,24 @@ def build_app(
         Output("run-job-detail", "children", allow_duplicate=True),
         Output("run-jobs-status", "children", allow_duplicate=True),
         Input("run-job-enqueue-button", "n_clicks"),
+        Input("runs-workspace-enqueue-button", "n_clicks"),
         State("scenario-dir", "data"),
         State("run-queue-root", "data"),
         prevent_initial_call=True,
     )
     def _enqueue_current_scenario_run_job(
         n_clicks: Any,
-        current_scenario_dir: str,
-        current_run_queue_root: str,
+        workspace_n_clicks: Any = None,
+        current_scenario_dir: str | None = None,
+        current_run_queue_root: str | None = None,
     ) -> tuple[str, list[dict[str, str]], str | None, str, str]:
+        if current_run_queue_root is None and isinstance(workspace_n_clicks, str) and isinstance(current_scenario_dir, str):
+            current_run_queue_root = current_scenario_dir
+            current_scenario_dir = workspace_n_clicks
+            workspace_n_clicks = None
         status_message = ""
         preferred_run_id = None
-        if n_clicks:
+        if n_clicks or workspace_n_clicks:
             try:
                 current_bundle = load_scenario_bundle(current_scenario_dir)
                 queued_job = create_run_job(
@@ -8031,18 +8063,24 @@ def build_app(
         Output("run-job-detail", "children", allow_duplicate=True),
         Output("run-jobs-status", "children", allow_duplicate=True),
         Input("run-jobs-run-next-button", "n_clicks"),
+        Input("runs-workspace-run-next-button", "n_clicks"),
         State("run-job-selected-id", "value"),
         State("run-queue-root", "data"),
         prevent_initial_call=True,
     )
     def _run_next_serial_queue_job(
         n_clicks: Any,
-        selected_run_id: str | None,
-        current_run_queue_root: str,
+        workspace_n_clicks: Any = None,
+        selected_run_id: str | None = None,
+        current_run_queue_root: str | None = None,
     ) -> tuple[str, list[dict[str, str]], str | None, str, str]:
+        if current_run_queue_root is None and isinstance(workspace_n_clicks, str):
+            current_run_queue_root = selected_run_id
+            selected_run_id = workspace_n_clicks
+            workspace_n_clicks = None
         status_message = ""
         preferred_run_id = selected_run_id
-        if n_clicks:
+        if n_clicks or workspace_n_clicks:
             try:
                 executed_job = run_next_queued_job(queue_root=current_run_queue_root)
                 if executed_job is None:
@@ -8068,15 +8106,21 @@ def build_app(
         Output("run-job-detail", "children"),
         Output("run-jobs-status", "children"),
         Input("run-jobs-refresh-button", "n_clicks"),
+        Input("runs-workspace-refresh-button", "n_clicks"),
         State("run-job-selected-id", "value"),
         State("run-queue-root", "data"),
     )
     def _refresh_run_jobs_summary(
         n_clicks: Any,
-        selected_run_id: str | None,
-        current_run_queue_root: str,
+        workspace_n_clicks: Any = None,
+        selected_run_id: str | None = None,
+        current_run_queue_root: str | None = None,
     ) -> tuple[str, list[dict[str, str]], str | None, str, str]:
-        if not n_clicks:
+        if current_run_queue_root is None and isinstance(workspace_n_clicks, str):
+            current_run_queue_root = selected_run_id
+            selected_run_id = workspace_n_clicks
+            workspace_n_clicks = None
+        if not n_clicks and not workspace_n_clicks:
             return (
                 initial_run_jobs_summary,
                 initial_run_job_options,
@@ -8137,18 +8181,24 @@ def build_app(
         Output("run-job-detail", "children", allow_duplicate=True),
         Output("run-jobs-status", "children", allow_duplicate=True),
         Input("run-job-rerun-button", "n_clicks"),
+        Input("runs-workspace-rerun-button", "n_clicks"),
         State("run-job-selected-id", "value"),
         State("run-queue-root", "data"),
         prevent_initial_call=True,
     )
     def _rerun_selected_run_job(
         n_clicks: Any,
-        selected_run_id: str | None,
-        current_run_queue_root: str,
+        workspace_n_clicks: Any = None,
+        selected_run_id: str | None = None,
+        current_run_queue_root: str | None = None,
     ) -> tuple[str, list[dict[str, str]], str | None, str, str]:
+        if current_run_queue_root is None and isinstance(workspace_n_clicks, str):
+            current_run_queue_root = selected_run_id
+            selected_run_id = workspace_n_clicks
+            workspace_n_clicks = None
         status_message = ""
         preferred_run_id = selected_run_id
-        if n_clicks:
+        if n_clicks or workspace_n_clicks:
             if not selected_run_id:
                 status_message = "Nenhuma run selecionada para reexecução."
             else:
@@ -8613,6 +8663,7 @@ def build_app(
         Input("routes-grid", "rowData"),
         Input("run-jobs-summary", "children"),
         Input("execution-summary", "children"),
+        Input("run-job-detail", "children"),
         Input("node-studio-summary", "children"),
         Input("edge-studio-summary", "children"),
         Input("studio-status", "children"),
@@ -8624,6 +8675,7 @@ def build_app(
         route_rows: list[dict[str, Any]] | None,
         run_jobs_summary_text: str | None,
         execution_summary_text: str | None,
+        selected_run_detail_text: str | None,
         node_summary_text: str | None,
         edge_summary_text: str | None,
         studio_status_text: str | None,
@@ -8662,6 +8714,7 @@ def build_app(
                 studio_readiness,
                 run_jobs_summary,
                 execution_summary,
+                _safe_json_loads(selected_run_detail_text),
             ),
             render_runs_flow_panel(
                 studio_readiness,
@@ -8708,6 +8761,7 @@ def build_app(
         Input("studio-open-runs-button", "n_clicks_timestamp"),
         Input("studio-workspace-open-runs-button", "n_clicks_timestamp"),
         Input("runs-workspace-open-decision-button", "n_clicks_timestamp"),
+        Input("runs-workspace-primary-open-decision-button", "n_clicks_timestamp"),
         Input("runs-flow-open-decision-button", "n_clicks_timestamp"),
         Input("execution-open-decision-button", "n_clicks_timestamp"),
         State("primary-navigation-tabs", "value"),
@@ -8718,9 +8772,10 @@ def build_app(
         open_runs_ts: Any,
         workspace_open_runs_ts: Any,
         runs_workspace_open_decision_ts: Any,
-        runs_flow_open_decision_ts: Any,
-        execution_open_decision_ts: Any,
-        current_tab: str | None,
+        runs_workspace_primary_open_decision_ts: Any = None,
+        runs_flow_open_decision_ts: Any = None,
+        execution_open_decision_ts: Any = None,
+        current_tab: str | None = None,
     ) -> str:
         latest_click = max(
             [
@@ -8728,6 +8783,7 @@ def build_app(
                 (_timestamp_or_zero(open_runs_ts), "runs"),
                 (_timestamp_or_zero(workspace_open_runs_ts), "runs"),
                 (_timestamp_or_zero(runs_workspace_open_decision_ts), "decision"),
+                (_timestamp_or_zero(runs_workspace_primary_open_decision_ts), "decision"),
                 (_timestamp_or_zero(runs_flow_open_decision_ts), "decision"),
                 (_timestamp_or_zero(execution_open_decision_ts), "decision"),
             ],
