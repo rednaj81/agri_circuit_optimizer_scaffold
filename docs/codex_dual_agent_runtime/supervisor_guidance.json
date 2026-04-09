@@ -1,31 +1,37 @@
 {
-    "updated_at":  "2026-04-06T08:00:59.4649794Z",
+    "updated_at":  "2026-04-09T22:18:19.7990089Z",
     "mode":  "ux_refinement",
     "source_bundle":  "docs/ux_refinement_autonomy_bundle",
     "source_zip":  "docs/ux_refinement_autonomy_bundle.zip",
     "phase_plan":  "docs/ux_refinement_autonomy_bundle/automation/phase_plan.yaml",
     "bootstrap_prompt":  "docs/ux_refinement_autonomy_bundle/prompts/PROMPT_SHORT_BOOTSTRAP_UI_REFINEMENT.md",
     "full_prompt":  "docs/ux_refinement_autonomy_bundle/prompts/PROMPT_FULL_AUTONOMOUS_UI_REFINEMENT.md",
-    "current_repo_head":  "cb16f11a8d3a80a4496489c808cbbcc745647b16",
+    "current_repo_head":  "3fb51ea331f16d824524576f8e90063a05a6a905",
     "current_branch":  "codex/new-architecture-platform",
-    "active_ux_phase_id":  "ux_phase_1",
+    "active_ux_phase_id":  "ux_phase_2",
     "active_ux_phase":  {
-                            "id":  "ux_phase_1",
-                            "name":  "Navigation and information architecture cleanup",
+                            "id":  "ux_phase_2",
+                            "name":  "Studio refinement and connectivity-first workflow",
                             "focus":  [
-                                          "main navigation",
-                                          "screen purpose clarity",
-                                          "reduction of noisy technical surfaces",
-                                          "market-grade product shell"
+                                          "business graph only",
+                                          "route-first canvas",
+                                          "node/edge editing UX",
+                                          "direct manipulation on canvas",
+                                          "properties panel",
+                                          "mandatory routes",
+                                          "optional and desirable routes",
+                                          "route particularities",
+                                          "pre-run validation",
+                                          "connectivity guidance"
                                       ],
                             "expected_outcomes":  [
-                                                      "clearer IA",
-                                                      "fewer ambiguous entry points",
-                                                      "better main user path",
-                                                      "less console-like feel"
+                                                      "scenario readiness clarity",
+                                                      "fewer preventable invalid runs",
+                                                      "studio no longer exposes technical graph internals",
+                                                      "first Studio surface centered on routes to be served, not strategic helper entities"
                                                   ]
                         },
-    "next_ux_phase_id":  "ux_phase_2",
+    "next_ux_phase_id":  "ux_phase_3",
     "phase_sequence":  [
                            {
                                "id":  "ux_phase_1",
@@ -49,19 +55,25 @@
                            }
                        ],
     "current_focus":  {
-                          "active_wave_index":  4,
+                          "active_wave_index":  12,
                           "active_role":  "developer",
-                          "waves_completed":  3,
-                          "health_state":  "running",
-                          "run_id":  "run-20260406-042100",
-                          "stop_reason":  ""
+                          "waves_completed":  11,
+                          "health_state":  "terminal",
+                          "run_id":  "run-20260409-154356",
+                          "stop_reason":  "governance_stop_max_waves_reached; ux_phase_2 accepted; ux_phase_3 only conceptually opened and must resume in a new authorized cycle"
                       },
     "directives":  [
                        "Do not reopen architecture or replace the current Dash/Cytoscape stack.",
                        "Use decision_platform as the product surface and preserve Julia-only official execution.",
                        "Treat Studio, Runs, Decision and Audit as the main product spaces.",
-                       "Keep the Studio focused on the business graph only; technical internal hubs and derived nodes must stay hidden from the primary surface.",
+                       "Keep the Studio focused on the business graph only; technical internal hubs, centrais and derived nodes must stay hidden from the primary surface.",
                        "Prefer direct manipulation on the canvas over fragmented raw forms whenever the Studio changes.",
+                       "Treat the initial Studio workflow as route definition first: the operator should draw the routes that must be served and edit route particularities before touching advanced logic.",
+                       "Do not surface strategic helper entities as editable first-class objects on the initial Studio screen; the first surface should stay centered on business routes and endpoint relationships.",
+                       "Support route intent in product language, including mandatory, optional and desirable routes, without forcing every route to be a hard constraint.",
+                       "Prioritize the Studio interaction model before more shell polish: local canvas actions, context menu, reposition/edit flows, and visible supply-chain relationships.",
+                       "Make who supplies whom explicit on the primary Studio surface; do not force the user to infer business flow from technical metadata.",
+                       "Do not accept another UX wave that mainly rearranges cards, headers, or wording while routine Studio editing still depends on advanced workbench paths.",
                        "Reduce html.Pre and raw JSON as primary UI surfaces; use progressive disclosure instead.",
                        "Do not allow orphan nodes or technical clutter in the main final visualization.",
                        "Prioritize user-facing flow clarity over backend-only refinements.",
@@ -79,6 +91,8 @@
     "acceptance_targets":  [
                                "navigation clarity",
                                "scenario readiness feedback",
+                               "business supply-flow readability",
+                               "direct canvas editing for common tasks",
                                "queue/runs readability",
                                "winner vs runner-up visibility",
                                "technical tie explicitness",
@@ -91,14 +105,14 @@
                                   "visual evidence via screenshot or structured UI snapshot when possible"
                               ],
     "recent_commit_subjects":  [
-                                   "wave1 align primary workspace hierarchy",
-                                   "wave1 clarify studio first-fold journey",
-                                   "wave3 persist active shell framing",
-                                   "wave2 clarify first-fold product states",
-                                   "wave10 finalize ux refinement stabilization",
-                                   "wave1 clarify primary product journey",
-                                   "wave9 harmonize product language and state labels",
-                                   "wave8 clarify decision assisted choice states"
+                                   "wave11 open runs ux phase",
+                                   "wave10 close studio ux phase exit",
+                                   "wave9 clarify studio action affordances",
+                                   "wave8 add direct studio readiness actions",
+                                   "wave7 shorten studio sidebar journey",
+                                   "wave6 stabilize studio ergonomics",
+                                   "wave5 add direct studio focus switching",
+                                   "wave4 stabilize selected edge studio flow"
                                ],
     "repo_overlay":  {
                          "root_agents":  "AGENTS.md",

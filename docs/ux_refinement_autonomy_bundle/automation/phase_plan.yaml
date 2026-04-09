@@ -21,16 +21,20 @@ phases:
     name: Studio refinement and connectivity-first workflow
     focus:
       - business graph only
+      - route-first canvas
       - node/edge editing UX
       - direct manipulation on canvas
       - properties panel
       - mandatory routes
+      - optional and desirable routes
+      - route particularities
       - pre-run validation
       - connectivity guidance
     expected_outcomes:
       - scenario readiness clarity
       - fewer preventable invalid runs
       - studio no longer exposes technical graph internals
+      - first Studio surface centered on routes to be served, not strategic helper entities
 
   - id: ux_phase_3
     name: Runs queue and execution UX
@@ -201,3 +205,17 @@ wave_journal:
       ui_snapshot: docs/2026-04-06_phase_ux_refinement_wave10_ui_snapshot.json
       validation_command: "$env:PYTHONPATH='src;.'; .\\.venv\\Scripts\\python.exe -m pytest tests/decision_platform/test_ui_smoke.py tests/decision_platform/test_studio_structure.py -q -p no:cacheprovider --basetemp tests/_tmp/pytest-basetemp-ux-wave10-final"
       validation_result: "71 passed in 508.02s (0:08:28)"
+
+current_cycle_governance:
+  cycle_id: run-20260409-154356
+  status: stopped
+  stop_reason: governance_stop_max_waves_reached
+  stopped_after_wave: 11
+  max_waves_policy: 10
+  accepted_baseline:
+    studio_phase: ux_phase_2
+    studio_exit_doc: docs/2026-04-09_phase_ux_refinement_phase2_exit.md
+    runs_open_doc: docs/2026-04-09_phase_ux_refinement_phase3_open.md
+  stop_record: docs/2026-04-09_phase_ux_refinement_stop.md
+  next_cycle_handoff: docs/2026-04-09_phase_ux_refinement_handoff_next_cycle.md
+  resume_rule: "ux_phase_3 may continue only in a new authorized session/cycle."
