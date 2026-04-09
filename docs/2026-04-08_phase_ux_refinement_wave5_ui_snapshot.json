@@ -1,0 +1,76 @@
+{
+  "phase_id": "phase_ux_refinement",
+  "wave_index": 5,
+  "captured_at": "2026-04-08",
+  "capture_method": {
+    "type": "structured_dash_layout_snapshot",
+    "source": "build_app('data/decision_platform/maquete_v2').server.test_client().get('/_dash-layout')",
+    "why": "The environment blocked honest browser bitmap capture, so the evidence was extracted from the actual Dash layout served by the current app."
+  },
+  "primary_fold": {
+    "studio-readiness-panel": [
+      "Readiness do cenário",
+      "Exige atenção",
+      "Ainda há bloqueios estruturais impedindo a passagem segura para Runs.",
+      "Estado dominante",
+      "Bloqueado no Studio",
+      "Objetivo desta área",
+      "Confirmar se o cenário já pode sair do Studio sem depender da trilha técnica.",
+      "Próxima ação",
+      "Corrigir regras estruturais e rotas inválidas antes de enfileirar uma nova run.",
+      "Bloqueio principal",
+      "A conexão L011 sai de Saída externa, mas Saída externa deve aparecer apenas como destino final.",
+      "Impacto operacional",
+      "Impede Runs porque Saída externa é ponto terminal e não pode originar fluxo visível.",
+      "Fila local de correção",
+      "Bloqueio 1",
+      "A conexão L011 sai de Saída externa, mas Saída externa deve aparecer apenas como destino final.",
+      "Saída externa tenta suprir Junção 4.",
+      "Impacto em Runs",
+      "Impede Runs porque Saída externa é ponto terminal e não pode originar fluxo visível.",
+      "Próximo gesto no canvas",
+      "Abra este trecho no canvas e corrija a direção da conexão antes de seguir.",
+      "Trazer para o canvas"
+    ],
+    "studio-readiness-action-queue": [
+      "Bloqueio 1",
+      "A conexão L011 sai de Saída externa, mas Saída externa deve aparecer apenas como destino final.",
+      "Saída externa tenta suprir Junção 4.",
+      "Bloqueio 2",
+      "A conexão L012 sai de Saída externa, mas Saída externa deve aparecer apenas como destino final.",
+      "Saída externa tenta suprir Bypass superior 3.",
+      "Espaço 3",
+      "Sem item dominante nesta posição.",
+      "Espaço 4",
+      "Sem item dominante nesta posição."
+    ],
+    "studio-focus-panel": [
+      "Foco do canvas",
+      "Nó em foco",
+      "Tanque de água já orienta a próxima revisão no canvas.",
+      "Problema ou oportunidade",
+      "Usar a seleção atual para validar conectividade, regras obrigatórias e readiness sem sair do canvas."
+    ],
+    "studio-route-editor-panel": [
+      "Rotas que precisam de serviço",
+      "Quem supre quem agora",
+      "Composer local da rota",
+      "Usar esta entidade como origem",
+      "Usar esta entidade como destino",
+      "Trazer este trecho para o composer",
+      "Confirmar rota no canvas"
+    ]
+  },
+  "capture_attempts": [
+    {
+      "type": "chrome_headless_screenshot",
+      "target": "output/playwright/studio-wave5-fullhd.png",
+      "result": "failed",
+      "detail": "Chrome headless failed with `CreateFile: Acesso negado. (0x5)` and did not produce the PNG."
+    }
+  ],
+  "supporting_logs": [
+    "output/playwright/wave5-ui-server.out.log",
+    "output/playwright/wave5-ui-server.err.log"
+  ]
+}

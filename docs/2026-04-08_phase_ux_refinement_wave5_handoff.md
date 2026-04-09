@@ -2,49 +2,54 @@
 
 ## Escopo executado
 
-- Consolidei guard-rails automatizados de saída da `ux_phase_2` para impedir retorno de IDs crus e setas técnicas no primeiro fold do Studio.
-- Gereei um snapshot final de transição da fase com o baseline route-first, business graph only e readiness preventivo já estabilizados.
-- Revalidei o Studio no estado atual com foco em command center, dropdown de rotas, foco contextual, conectividade e readiness antes da passagem para Runs.
+- Transformei a readiness do Studio em uma fila local de correção orientada por negócio, com itens acionáveis que levam o operador de volta ao trecho certo do canvas.
+- Fechei o round-trip entre blocker e edição local: o item da readiness agora reposiciona o foco do Studio em conexão ou entidade relevante, mantendo a correção no fluxo principal sem workbench obrigatório.
+- Reforcei a explicação de impacto operacional na primeira dobra, mostrando quem deixa de suprir quem, por que Runs continua travado e qual é o próximo gesto recomendado no canvas.
+- Mantive a superfície principal no grafo de negócio e adicionei evidência estrutural nova da dobra principal com a fila acionável em `docs/2026-04-08_phase_ux_refinement_wave5_ui_snapshot.json`.
 
 ## Mudanças principais
 
-- `tests/decision_platform/test_studio_structure.py`
-  - adiciona regressão direta para garantir que `_route_choice_options(...)` prefira rótulos de negócio em vez de `R001` ou `->`
+- `src/decision_platform/ui_dash/app.py`
+  - adiciona helpers para derivar itens acionáveis da readiness a partir de bloqueios e avisos reais;
+  - introduz a seção `Fila local de correção` no `studio-readiness-panel`, com cards de bloqueio/aviso, impacto em Runs e próximo gesto no canvas;
+  - conecta os botões `Trazer para o canvas` ao foco atual do Studio, selecionando o trecho relevante no grafo e atualizando a mensagem operacional local;
+  - amplia o painel de readiness com `Impacto operacional`, sem reexpor hubs, nós internos ou JSON cru.
 - `tests/decision_platform/test_ui_smoke.py`
-  - adiciona regressão no app montado para garantir que o dropdown primário de rotas e o painel de readiness não recaiam para IDs crus ou setas técnicas
-- `output/ux_refinement_wave5_phase_exit_snapshot.json`
-  - registra o estado de saída da fase com checklist objetivo de transição para `ux_phase_3`
+  - cobre a nova fila acionável, o texto preventivo da readiness e o callback que leva um bloqueio estrutural direto ao foco do canvas.
+- `tests/decision_platform/test_studio_structure.py`
+  - protege a presença estrutural da fila de correção e dos botões acionáveis do painel de readiness.
+- `docs/2026-04-08_phase_ux_refinement_wave5_ui_snapshot.json`
+  - registra o estado real da primeira dobra do Studio com a fila de correção acionável e o bloqueio honesto de captura rasterizada.
 
 ## Validação executada
 
-- `$env:PYTHONPATH='C:\d\dev\agri_circuit_optimizer_scaffold'; python -m pytest -q tests/decision_platform/test_studio_structure.py::test_dash_app_exposes_structural_studio_controls tests/decision_platform/test_studio_structure.py::test_route_choice_options_use_business_labels_before_technical_ids tests/decision_platform/test_studio_structure.py::test_create_route_between_business_nodes_adds_visible_route tests/decision_platform/test_studio_structure.py::test_apply_route_intent_from_edge_context_updates_matching_route tests/decision_platform/test_studio_structure.py::test_context_menu_action_starts_route_draft_from_selected_node tests/decision_platform/test_ui_smoke.py::test_studio_primary_surface_exposes_business_command_center tests/decision_platform/test_ui_smoke.py::test_studio_primary_workspace_avoids_technical_internal_terms tests/decision_platform/test_ui_smoke.py::test_studio_route_focus_dropdown_keeps_business_language_in_primary_surface tests/decision_platform/test_ui_smoke.py::test_studio_connectivity_panel_surfaces_routes_and_measurement_near_canvas tests/decision_platform/test_ui_smoke.py::test_studio_focus_panel_uses_canvas_selection_as_primary_context tests/decision_platform/test_ui_smoke.py::test_studio_readiness_panel_humanizes_primary_blockers_and_warnings tests/decision_platform/test_ui_smoke.py::test_studio_workspace_panel_unifies_focus_connectivity_and_runs_gate tests/decision_platform/test_ui_smoke.py::test_studio_connectivity_panel_previews_reverse_action_in_business_language`
+- `PYTHONPATH=. pytest tests/decision_platform/test_ui_smoke.py tests/decision_platform/test_studio_structure.py -q`
 
 Resultado:
 
-- `13 passed in 1.54s`
+- `99 passed, 1 skipped in 485.41s`
 
 ## Evidência gerada
 
-- `output/ux_refinement_wave5_phase_exit_snapshot.json`
-  - confirma a baseline obrigatória da fase: business graph only, criação/edição contextual de rotas, supply-flow legível e readiness preventivo
-  - registra um checklist explícito de transição para `ux_phase_3`
-
-## Encerramento de fase
-
-- A baseline de `ux_phase_2` fica consolidada como obrigatória para as próximas ondas:
-  - Studio abre em linguagem de negócio
-  - canvas principal mantém apenas o business graph editável
-  - criação e edição de rotas permanecem contextuais e próximas ao grafo
-  - leitura `quem supre quem` permanece visível no primeiro fold
-  - readiness preventivo continua antes da passagem para Runs
+- `docs/2026-04-08_phase_ux_refinement_wave5_ui_snapshot.json`
+  - snapshot estrutural extraído do layout servido pelo próprio app;
+  - registra o texto real do `studio-readiness-panel`, da `studio-readiness-action-queue`, do `studio-focus-panel` e do `studio-route-editor-panel`;
+  - confirma que a primeira dobra agora mostra a fila local de correção com impacto em Runs e ação direta `Trazer para o canvas`.
 
 ## Limites honestos
 
-- Não consegui anexar `output/playwright/studio-fullhd-wave5.png`.
-- A exigência de screenshot bitmap Full HD continua bloqueada pelo ambiente atual.
-- Nesta onda, novas tentativas com navegador headless do sistema não geraram PNG verificável do Studio.
-- Assim, `ux_phase_2` fica tecnicamente consolidada por testes e snapshot estruturado, mas ainda sem prova rasterizada honesta neste runtime.
+- Não consegui gerar `output/playwright/studio-wave5-fullhd.png`.
+- O Chrome headless local falhou repetidamente com `CreateFile: Acesso negado. (0x5)` ao tentar lançar o fluxo de captura neste ambiente.
+- A evidência desta onda ficou estrutural e verificável, mas não rasterizada.
+
+## Encerramento de fase
+
+- Do ponto de vista funcional, `ux_phase_2` fica pronta para transição:
+  - Studio abre com grafo de negócio como superfície principal;
+  - fluxo route-first segue local ao canvas;
+  - readiness deixou de ser leitura passiva e virou trilha acionável de correção;
+  - as correções mais comuns continuam possíveis sem retorno obrigatório ao workbench.
 
 ## Próximo passo sugerido
 
-- Avançar para `ux_phase_3` somente se o supervisor aceitar o bloqueio ambiental da evidência bitmap como exceção operacional documentada; caso contrário, tratar a captura rasterizada como impedimento externo verificável e não como lacuna de fluxo do produto.
+- Migrar para `ux_phase_3` e aplicar o mesmo padrão em Runs: fila legível, próxima ação operacional clara e logs técnicos apenas por disclosure progressivo.

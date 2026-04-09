@@ -770,6 +770,7 @@ def test_studio_readiness_panel_surfaces_runs_transition_with_real_readiness() -
     assert "Objetivo desta área" in panel_text
     assert "Próxima ação" in panel_text
     assert "Fluxo principal" in panel_text
+    assert "Fila local de correção" in panel_text
     assert "Agora no Studio" in panel_text
     assert "Destino seguinte" in panel_text
     assert "ainda não tem fluxo suficiente" in panel_text.lower()
@@ -779,6 +780,7 @@ def test_studio_readiness_panel_surfaces_runs_transition_with_real_readiness() -
     assert "Abrir Runs quando o cenário estiver pronto" in panel_text
     assert _find_component_by_id(panel, "studio-open-runs-button") is not None
     assert _find_component_by_id(panel, "studio-readiness-open-workbench-button") is not None
+    assert _find_component_by_id(panel, "studio-readiness-action-0-button") is not None
     assert getattr(_find_component_by_id(panel, "studio-readiness-open-audit-link"), "href", None) == "?tab=audit"
 
 
@@ -814,6 +816,8 @@ def test_studio_readiness_panel_humanizes_primary_blockers_and_warnings() -> Non
     assert "Bloqueado no Studio" in panel_text
     assert "Corrigir no canvas" in panel_text
     assert "Abrir Runs com bloqueios" in panel_text
+    assert "Impacto operacional" in panel_text
+    assert "Trazer para o canvas" in panel_text
 
 
 def test_studio_readiness_panel_surfaces_primary_blocker_before_detailed_lists() -> None:
@@ -1406,6 +1410,40 @@ def test_route_panel_callbacks_manage_composer_and_confirm_route_without_workben
     assert canceled_state["source_node_id"] == ""
     assert canceled_state["sink_node_id"] == ""
     assert cancel_status == "Composer local da rota limpo no canvas."
+
+
+def test_readiness_action_callback_brings_blocker_into_canvas_focus() -> None:
+    with diagnostic_runtime_test_mode():
+        app = build_app("data/decision_platform/maquete_v2")
+
+    callback = _get_callback(app, input_id="studio-readiness-action-0-button")
+    nodes_rows = [
+        {"node_id": "W", "label": "Tanque de água", "node_type": "water_tank", "zone": "supply"},
+        {"node_id": "P1", "label": "Produto 1", "node_type": "product_tank", "zone": "process"},
+    ]
+    candidate_links_rows = [
+        {"link_id": "L900", "from_node": "P1", "to_node": "W", "length_m": 1.0, "bidirectional": False, "family_hint": "", "archetype": "vertical_link"},
+    ]
+    route_rows = [
+        {"route_id": "R900", "source": "P1", "sink": "W", "mandatory": True, "measurement_required": True, "dose_min_l": 0.0},
+    ]
+
+    next_node_id, next_edge_id, status = callback(
+        100,
+        None,
+        None,
+        None,
+        nodes_rows,
+        candidate_links_rows,
+        route_rows,
+        None,
+        None,
+    )
+
+    assert next_node_id == "P1"
+    assert next_edge_id == "L900"
+    assert "A conexão L900 termina em Tanque de água" in status
+    assert "inversão de direção" in status
 
 
 def test_focus_edge_quick_edit_callback_updates_length_and_family_without_workbench() -> None:

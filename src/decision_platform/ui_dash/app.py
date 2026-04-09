@@ -183,6 +183,7 @@ UI_DEBUG_PRE_STYLE = {
     "overflowX": "auto",
     "fontSize": "12px",
 }
+READINESS_ACTION_SLOT_COUNT = 4
 
 
 def _safe_json_loads(text: Any) -> dict[str, Any]:
@@ -1032,6 +1033,232 @@ def _humanize_readiness_issue(
         )
         return f"Ainda existem entidades sem conexão na leitura principal do grafo: {node_labels or node_ids}."
     return text
+
+
+def _candidate_link_for_route(
+    route: dict[str, Any] | None,
+    candidate_links_rows: list[dict[str, Any]] | None,
+) -> dict[str, Any] | None:
+    route = route or {}
+    source = str(route.get("source") or "").strip()
+    sink = str(route.get("sink") or "").strip()
+    if not source or not sink:
+        return None
+    for row in candidate_links_rows or []:
+        from_node = str(row.get("from_node") or "").strip()
+        to_node = str(row.get("to_node") or "").strip()
+        if from_node == source and to_node == sink:
+            return row
+    for row in candidate_links_rows or []:
+        from_node = str(row.get("from_node") or "").strip()
+        to_node = str(row.get("to_node") or "").strip()
+        if {from_node, to_node} == {source, sink}:
+            return row
+    return None
+
+
+def _readiness_action_item(
+    issue: str,
+    *,
+    level: str,
+    route_rows: list[dict[str, Any]] | None = None,
+    nodes_rows: list[dict[str, Any]] | None = None,
+    candidate_links_rows: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    node_lookup = {
+        str(row.get("node_id") or "").strip(): dict(row)
+        for row in (nodes_rows or [])
+        if str(row.get("node_id") or "").strip()
+    }
+    route_lookup = {
+        str(route.get("route_id") or "").strip(): route
+        for route in route_rows or []
+        if str(route.get("route_id") or "").strip()
+    }
+    issue_text = str(issue or "").strip()
+    payload = {
+        "level": level,
+        "issue": issue_text,
+        "title": _humanize_readiness_issue(issue_text, route_rows=route_rows, nodes_rows=nodes_rows),
+        "impact": "Este item ainda pede revisão no canvas antes da passagem segura para Runs.",
+        "next_action": "Selecione o trecho correspondente no canvas e finalize a correção sem depender do workbench avançado.",
+        "flow_label": "Fluxo operacional ainda não identificado para este item.",
+        "target_node_id": "",
+        "target_edge_id": "",
+        "target_route_id": "",
+    }
+    if issue_text.endswith(" entra em W"):
+        link_id = issue_text.split(" ", 1)[0].strip()
+        link_row = next(
+            (row for row in (candidate_links_rows or []) if str(row.get("link_id") or "").strip() == link_id),
+            None,
+        )
+        from_node = str((link_row or {}).get("from_node") or "").strip()
+        to_node = str((link_row or {}).get("to_node") or "").strip()
+        from_label = _studio_node_business_label_from_lookup(from_node, node_lookup)
+        to_label = _studio_node_business_label_from_lookup(to_node, node_lookup)
+        payload.update(
+            {
+                "flow_label": f"{from_label} tenta suprir {to_label}.",
+                "impact": f"Impede Runs porque {to_label} deve permanecer como origem de abastecimento, não como destino.",
+                "next_action": "Traga esta conexão para o canvas e use a inversão de direção ou remova o trecho inválido.",
+                "target_edge_id": link_id,
+                "target_node_id": from_node or to_node,
+            }
+        )
+        return payload
+    if issue_text.endswith(" sai de S"):
+        link_id = issue_text.split(" ", 1)[0].strip()
+        link_row = next(
+            (row for row in (candidate_links_rows or []) if str(row.get("link_id") or "").strip() == link_id),
+            None,
+        )
+        from_node = str((link_row or {}).get("from_node") or "").strip()
+        to_node = str((link_row or {}).get("to_node") or "").strip()
+        from_label = _studio_node_business_label_from_lookup(from_node, node_lookup)
+        to_label = _studio_node_business_label_from_lookup(to_node, node_lookup)
+        payload.update(
+            {
+                "flow_label": f"{from_label} tenta suprir {to_label}.",
+                "impact": f"Impede Runs porque {from_label} é ponto terminal e não pode originar fluxo visível.",
+                "next_action": "Abra este trecho no canvas e corrija a direção da conexão antes de seguir.",
+                "target_edge_id": link_id,
+                "target_node_id": to_node or from_node,
+            }
+        )
+        return payload
+    if issue_text.startswith("Rotas com dosagem sem medicao direta:"):
+        route_ids = [item.strip() for item in issue_text.split(":", 1)[1].split(",") if item.strip()]
+        route_id = route_ids[0] if route_ids else ""
+        route = route_lookup.get(route_id)
+        route_label = _studio_route_primary_label(route or {"route_id": route_id}, node_lookup=node_lookup, include_intent=True)
+        source = str((route or {}).get("source") or "").strip()
+        sink = str((route or {}).get("sink") or "").strip()
+        link_row = _candidate_link_for_route(route, candidate_links_rows)
+        payload.update(
+            {
+                "flow_label": f"{_studio_node_business_label_from_lookup(source, node_lookup)} precisa suprir {_studio_node_business_label_from_lookup(sink, node_lookup)} com dosagem.",
+                "impact": f"Impede Runs porque {route_label} ainda usa dosagem sem medição direta compatível.",
+                "next_action": "Leve a rota para o foco local e marque medição direta ou revise a dosagem no editor de rotas.",
+                "target_route_id": route_id,
+                "target_node_id": source or sink,
+                "target_edge_id": str((link_row or {}).get('link_id') or ''),
+            }
+        )
+        return payload
+    if " referencia source inexistente:" in issue_text:
+        route_id, missing_source = issue_text.split(" referencia source inexistente:", 1)
+        route_id = route_id.strip()
+        missing_source = missing_source.strip()
+        route = route_lookup.get(route_id)
+        sink = str((route or {}).get("sink") or "").strip()
+        route_label = _studio_route_primary_label(route or {"route_id": route_id}, node_lookup=node_lookup, include_intent=True)
+        payload.update(
+            {
+                "flow_label": f"{route_label} perdeu a origem {missing_source}.",
+                "impact": "Impede Runs porque a rota não consegue mais localizar quem deveria suprir o destino esperado.",
+                "next_action": "Reaponte a origem desta rota no fluxo local ou recupere a entidade de negócio correspondente no canvas.",
+                "target_route_id": route_id,
+                "target_node_id": sink,
+            }
+        )
+        return payload
+    if " referencia sink inexistente:" in issue_text:
+        route_id, missing_sink = issue_text.split(" referencia sink inexistente:", 1)
+        route_id = route_id.strip()
+        missing_sink = missing_sink.strip()
+        route = route_lookup.get(route_id)
+        source = str((route or {}).get("source") or "").strip()
+        route_label = _studio_route_primary_label(route or {"route_id": route_id}, node_lookup=node_lookup, include_intent=True)
+        payload.update(
+            {
+                "flow_label": f"{route_label} ficou sem destino {missing_sink}.",
+                "impact": "Impede Runs porque a rota não consegue mais apontar quem deve receber o suprimento esperado.",
+                "next_action": "Revisite o destino desta rota no canvas e reconcilie a entidade faltante antes da fila.",
+                "target_route_id": route_id,
+                "target_node_id": source,
+            }
+        )
+        return payload
+    if " ainda nao tem saida conectada a partir de " in issue_text:
+        route_id, source = issue_text.split(" ainda nao tem saida conectada a partir de ", 1)
+        route_id = route_id.strip()
+        source = source.strip()
+        route = route_lookup.get(route_id)
+        sink = str((route or {}).get("sink") or "").strip()
+        route_label = _studio_route_primary_label(route or {"route_id": route_id}, node_lookup=node_lookup, include_intent=True)
+        payload.update(
+            {
+                "flow_label": f"{_studio_node_business_label_from_lookup(source, node_lookup)} ainda não alcança {_studio_node_business_label_from_lookup(sink, node_lookup)}.",
+                "impact": f"Este aviso mostra que {route_label} ainda não tem trecho visível suficiente para sustentar a passagem para Runs.",
+                "next_action": "Use a criação rápida de conexão ou o composer local para fechar a saída deste atendimento no canvas.",
+                "target_route_id": route_id,
+                "target_node_id": source,
+            }
+        )
+        return payload
+    if " ainda nao tem entrada conectada em " in issue_text:
+        route_id, sink = issue_text.split(" ainda nao tem entrada conectada em ", 1)
+        route_id = route_id.strip()
+        sink = sink.strip()
+        route = route_lookup.get(route_id)
+        source = str((route or {}).get("source") or "").strip()
+        payload.update(
+            {
+                "flow_label": f"{_studio_node_business_label_from_lookup(source, node_lookup)} ainda não chega em {_studio_node_business_label_from_lookup(sink, node_lookup)}.",
+                "impact": "Este aviso indica que o destino ainda não recebe suprimento visível no grafo principal.",
+                "next_action": "Selecione o destino no canvas e complete a chegada desse atendimento no fluxo local.",
+                "target_route_id": route_id,
+                "target_node_id": sink,
+            }
+        )
+        return payload
+    if issue_text.startswith("Nos sem conexao no grafo visivel:"):
+        node_ids = [item.strip() for item in issue_text.split(":", 1)[1].split(",") if item.strip()]
+        node_id = node_ids[0] if node_ids else ""
+        node_label = _studio_node_business_label_from_lookup(node_id, node_lookup)
+        payload.update(
+            {
+                "flow_label": f"{node_label} ainda não participa do fluxo principal.",
+                "impact": "Este aviso mantém a leitura operacional incompleta e tende a empurrar retrabalho para Runs.",
+                "next_action": "Traga esta entidade para o foco e crie ou ajuste uma conexão visível a partir do canvas.",
+                "target_node_id": node_id,
+            }
+        )
+        return payload
+    return payload
+
+
+def _build_readiness_action_queue(
+    summary: dict[str, Any],
+    *,
+    route_rows: list[dict[str, Any]] | None = None,
+    nodes_rows: list[dict[str, Any]] | None = None,
+    candidate_links_rows: list[dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
+    items: list[dict[str, Any]] = []
+    seen_keys: set[str] = set()
+    for level, issues in (
+        ("blocker", list(summary.get("blockers", []))),
+        ("warning", list(summary.get("warnings", []))),
+    ):
+        for issue in issues:
+            issue_text = str(issue or "").strip()
+            if not issue_text or issue_text in seen_keys:
+                continue
+            seen_keys.add(issue_text)
+            items.append(
+                _readiness_action_item(
+                    issue_text,
+                    level=level,
+                    route_rows=route_rows,
+                    nodes_rows=nodes_rows,
+                    candidate_links_rows=candidate_links_rows,
+                )
+            )
+            if len(items) >= READINESS_ACTION_SLOT_COUNT:
+                return items
+    return items
 
 
 def _guided_empty_state(title: str, headline: str, next_action: str, *, tone: str = "needs_attention") -> Any:
@@ -2273,12 +2500,20 @@ def render_studio_readiness_panel(
     summary: dict[str, Any],
     route_rows: list[dict[str, Any]] | None = None,
     nodes_rows: list[dict[str, Any]] | None = None,
+    candidate_links_rows: list[dict[str, Any]] | None = None,
 ) -> Any:
     status = str(summary.get("status") or "needs_attention")
     background, color = _status_tone(status)
     blocker_count = int(summary.get("blocker_count", 0) or 0)
     warning_count = int(summary.get("warning_count", 0) or 0)
     next_step = str((summary.get("next_steps") or ["Feche a leitura principal do Studio antes de seguir."])[0])
+    action_queue = _build_readiness_action_queue(
+        summary,
+        route_rows=route_rows,
+        nodes_rows=nodes_rows,
+        candidate_links_rows=candidate_links_rows,
+    )
+    primary_action_item = action_queue[0] if action_queue else {}
     if summary.get("blockers"):
         primary_blocker = _humanize_readiness_issue(list(summary.get("blockers", []))[0], route_rows=route_rows, nodes_rows=nodes_rows)
     elif summary.get("warnings"):
@@ -2314,6 +2549,7 @@ def render_studio_readiness_panel(
                     _guidance_card("Objetivo desta área", "Confirmar se o cenário já pode sair do Studio sem depender da trilha técnica."),
                     _guidance_card("Próxima ação", str(summary.get("primary_action") or "Revise a camada principal antes de abrir Runs.")),
                     _guidance_card("Bloqueio principal", primary_blocker),
+                    _guidance_card("Impacto operacional", str(primary_action_item.get("impact") or "Sem impacto dominante adicional neste momento.")),
                 ],
             ),
             html.Div(
@@ -2342,6 +2578,52 @@ def render_studio_readiness_panel(
                     _metric_card("Rotas obrigatorias", summary.get("mandatory_route_count", 0)),
                     _metric_card("Bloqueios", summary.get("blocker_count", 0), "Impedem seguir direto para Runs."),
                     _metric_card("Avisos", warning_count, "Podem pedir revisão antes do enfileiramento."),
+                ],
+            ),
+            html.H4("Fila local de correção", style={"marginBottom": "6px", "marginTop": "14px"}),
+            html.Div(
+                id="studio-readiness-action-queue",
+                style={**UI_TWO_COLUMN_STYLE, "marginBottom": "12px"},
+                children=[
+                    html.Div(
+                        id=f"studio-readiness-action-card-{index}",
+                        style={
+                            **UI_MUTED_CARD_STYLE,
+                            "padding": "14px",
+                            "border": (
+                                "1px solid rgba(140, 56, 25, 0.22)"
+                                if (action_queue[index]["level"] if index < len(action_queue) else "") == "blocker"
+                                else "1px solid rgba(16, 59, 53, 0.12)"
+                            ),
+                        },
+                        children=(
+                            [
+                                html.Div(
+                                    f"{'Bloqueio' if action_queue[index]['level'] == 'blocker' else 'Aviso'} {index + 1}",
+                                    style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"},
+                                ),
+                                html.Div(action_queue[index]["title"], style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"}),
+                                html.Div(action_queue[index]["flow_label"], style={"lineHeight": "1.5", "marginTop": "6px"}),
+                                _guidance_card("Impacto em Runs", action_queue[index]["impact"]),
+                                _guidance_card("Próximo gesto no canvas", action_queue[index]["next_action"]),
+                                html.Button("Trazer para o canvas", id=f"studio-readiness-action-{index}-button", style=UI_BUTTON_STYLE),
+                            ]
+                            if index < len(action_queue)
+                            else [
+                                html.Div(
+                                    f"Espaço {index + 1}",
+                                    style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"},
+                                ),
+                                html.Div("Sem item dominante nesta posição.", style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"}),
+                                html.Div(
+                                    "Quando novos bloqueios ou avisos surgirem, eles aparecerão aqui com foco direto no canvas.",
+                                    style={"lineHeight": "1.5", "marginTop": "6px"},
+                                ),
+                                html.Button("Trazer para o canvas", id=f"studio-readiness-action-{index}-button", style=UI_BUTTON_STYLE, disabled=True),
+                            ]
+                        ),
+                    )
+                    for index in range(READINESS_ACTION_SLOT_COUNT)
                 ],
             ),
             html.H4("Passagem para Runs", style={"marginBottom": "6px"}),
@@ -5317,6 +5599,7 @@ def build_app(
                                                     initial_studio_readiness,
                                                     authoring_payload["route_rows"],
                                                     authoring_payload["nodes_rows"],
+                                                    authoring_payload["candidate_links_rows"],
                                                 ),
                                                 style=UI_CARD_STYLE,
                                             ),
@@ -7046,6 +7329,57 @@ def build_app(
         return updated_rows, next_selected_link_id, ""
 
     @app.callback(
+        Output("node-studio-selected-id", "data", allow_duplicate=True),
+        Output("edge-studio-selected-id", "data", allow_duplicate=True),
+        Output("studio-status-message", "data", allow_duplicate=True),
+        Input("studio-readiness-action-0-button", "n_clicks_timestamp"),
+        Input("studio-readiness-action-1-button", "n_clicks_timestamp"),
+        Input("studio-readiness-action-2-button", "n_clicks_timestamp"),
+        Input("studio-readiness-action-3-button", "n_clicks_timestamp"),
+        State("nodes-grid", "rowData"),
+        State("candidate-links-grid", "rowData"),
+        State("routes-grid", "rowData"),
+        State("node-studio-selected-id", "data"),
+        State("edge-studio-selected-id", "data"),
+        prevent_initial_call=True,
+    )
+    def _focus_readiness_action_on_canvas(
+        action_0_ts: Any,
+        action_1_ts: Any,
+        action_2_ts: Any,
+        action_3_ts: Any,
+        nodes_rows: list[dict[str, Any]] | None,
+        candidate_links_rows: list[dict[str, Any]] | None,
+        route_rows: list[dict[str, Any]] | None,
+        current_selected_node_id: str | None,
+        current_selected_edge_id: str | None,
+    ) -> tuple[str | None, str | None, str]:
+        timestamps = [action_0_ts, action_1_ts, action_2_ts, action_3_ts]
+        indexed_timestamps = [
+            (index, int(value))
+            for index, value in enumerate(timestamps)
+            if value not in (None, "", 0)
+        ]
+        if not indexed_timestamps:
+            return current_selected_node_id, current_selected_edge_id, ""
+        selected_index = max(indexed_timestamps, key=lambda item: item[1])[0]
+        summary = build_studio_readiness_summary(nodes_rows or [], candidate_links_rows or [], route_rows or [])
+        action_queue = _build_readiness_action_queue(
+            summary,
+            route_rows=route_rows,
+            nodes_rows=nodes_rows,
+            candidate_links_rows=candidate_links_rows,
+        )
+        if selected_index >= len(action_queue):
+            return current_selected_node_id, current_selected_edge_id, "Nenhum item de readiness está disponível nessa posição."
+        action_item = action_queue[selected_index]
+        next_node_id = str(action_item.get("target_node_id") or "").strip() or current_selected_node_id
+        next_edge_id = str(action_item.get("target_edge_id") or "").strip() or current_selected_edge_id
+        title = str(action_item.get("title") or "Item de readiness")
+        next_action = str(action_item.get("next_action") or "Revise o trecho no canvas.")
+        return next_node_id, next_edge_id, f"{title} em foco no canvas. {next_action}"
+
+    @app.callback(
         Output("studio-editor-workbench", "open"),
         Input("studio-canvas-open-workbench-button", "n_clicks"),
         Input("studio-readiness-open-workbench-button", "n_clicks"),
@@ -7744,7 +8078,7 @@ def build_app(
                 studio_status_text,
                 route_composer_state,
             ),
-            render_studio_readiness_panel(studio_readiness, route_rows or [], nodes_rows or []),
+            render_studio_readiness_panel(studio_readiness, route_rows or [], nodes_rows or [], candidate_links_rows or []),
             render_studio_projection_panel(
                 build_studio_projection_summary(nodes_rows or [], candidate_links_rows or [], route_rows or [])
             ),
