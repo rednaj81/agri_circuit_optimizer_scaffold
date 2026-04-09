@@ -4443,9 +4443,24 @@ def render_run_jobs_overview_panel(summary: dict[str, Any]) -> Any:
     else:
         queue_headline = "Nenhuma execução registrada"
         queue_guidance = "Nenhuma run registrada ainda. Enfileire o cenário atual para iniciar a trilha operacional."
-    active_label = active_run_ids[0] if active_run_ids else "Nenhuma run executando agora."
-    queued_label = next_queued_run_id or "Nenhuma run aguardando na fila."
-    history_label = latest_run_id or "Ainda não existe histórico recente."
+    active_label = f"{active_run_ids[0]} em execução agora." if active_run_ids else "Nenhuma run executando agora."
+    queued_label = f"{next_queued_run_id} pronta para rodar." if next_queued_run_id else "Nenhuma run aguardando na fila."
+    if failed_count and latest_run_id:
+        history_label = f"{latest_run_id} encerrou a leitura recente com falha ou revisão pendente."
+    elif latest_run_id:
+        history_label = f"{latest_run_id} é a referência mais recente desta fila."
+    else:
+        history_label = "Ainda não existe histórico recente."
+    if active_run_ids:
+        operator_next_action = f"Aguarde {active_run_ids[0]} consolidar resultado antes de abrir outra rodada."
+    elif next_queued_run_id:
+        operator_next_action = f"Execute {next_queued_run_id} quando quiser transformar cenário pronto em resultado utilizável."
+    elif failed_count and run_count:
+        operator_next_action = "Revise a run mais recente, corrija o cenário se preciso e só então reenfileire."
+    elif run_count:
+        operator_next_action = "Use a run mais recente para decidir se já vale abrir Decisão ou preparar nova rodada."
+    else:
+        operator_next_action = "Enfileire o cenário atual para abrir a primeira leitura operacional desta área."
     return html.Div(
         children=[
             html.H3("Resumo da fila", style={"marginTop": 0}),
@@ -4461,25 +4476,10 @@ def render_run_jobs_overview_panel(summary: dict[str, Any]) -> Any:
                 id="run-jobs-operational-lanes",
                 style={**UI_TWO_COLUMN_STYLE, "marginBottom": "12px"},
                 children=[
-                    _guidance_card("Fila pendente", queued_label),
-                    _guidance_card("Execução agora", active_label),
-                    _guidance_card("Histórico recente", history_label),
-                    _guidance_card(
-                        "Próximo gesto do operador",
-                        (
-                            f"Acompanhe {active_run_ids[0]} até consolidar resultado."
-                            if active_run_ids
-                            else (
-                                f"Execute {next_queued_run_id} quando a fila estiver liberada."
-                                if next_queued_run_id
-                                else (
-                                    "Revise a última run antes de reenfileirar."
-                                    if run_count
-                                    else "Enfileire o cenário atual para abrir a primeira leitura operacional."
-                                )
-                            )
-                        ),
-                    ),
+                    _guidance_card("Na fila", queued_label),
+                    _guidance_card("Executando", active_label),
+                    _guidance_card("Resultado recente", history_label),
+                    _guidance_card("Próxima ação recomendada", operator_next_action),
                 ],
             ),
             html.Div(
@@ -4498,7 +4498,7 @@ def render_run_jobs_overview_panel(summary: dict[str, Any]) -> Any:
                 id="run-jobs-overview-history-details",
                 style={**UI_MUTED_CARD_STYLE, "marginTop": "14px"},
                 children=[
-                    html.Summary("Leitura operacional detalhada"),
+                    html.Summary("Ver fila e histórico detalhados"),
                     html.Div(
                         id="run-jobs-overview-history-block",
                         children=[
@@ -4634,6 +4634,7 @@ def render_runs_workspace_panel(
     next_queued_run_id = state["next_queued_run_id"]
     latest_run_id = run_summary.get("latest_run_id") if isinstance(run_summary, dict) else None
     queued_count = len(list((run_summary or {}).get("queued_run_ids", []))) if isinstance(run_summary, dict) else 0
+    execution_error = str((execution_summary or {}).get("error") or "").strip()
     if active_run_ids:
         queue_focus = f"Execução em foco: {active_run_ids[0]}."
     elif next_queued_run_id:
@@ -4642,6 +4643,14 @@ def render_runs_workspace_panel(
         queue_focus = f"Última run observada: {latest_run_id}."
     else:
         queue_focus = "Nenhuma run registrada ainda."
+    if execution_error:
+        usable_result = "A última run terminou bloqueada; ainda não existe resultado utilizável para Decisão."
+    elif state["decision_enabled"]:
+        usable_result = "Já existe resultado utilizável para abrir Decisão sem depender de leitura técnica."
+    elif latest_run_id:
+        usable_result = f"{latest_run_id} ainda não liberou contexto suficiente para decisão assistida."
+    else:
+        usable_result = "Ainda não existe resultado utilizável porque nenhuma run terminou esta trilha."
     if state["decision_enabled"]:
         decision_cta: Any = html.Button("Ir para Decisão", id="runs-workspace-open-decision-button", style=UI_BUTTON_STYLE, disabled=False)
     else:
@@ -4668,21 +4677,33 @@ def render_runs_workspace_panel(
             html.Div(
                 style={**UI_TWO_COLUMN_STYLE, "marginBottom": "12px"},
                 children=[
-                    _guidance_card("O que esta área resolve", "Transformar readiness do Studio em fila, execução e próxima ação legíveis, sem depender de logs brutos."),
-                    _guidance_card("Estado atual", state["headline"]),
-                    _guidance_card("Gate do cenário", str(studio_summary.get("readiness_headline") or state["readiness_note"])),
-                    _guidance_card("Fila agora", queue_focus),
-                    _guidance_card("Limitação agora", scenario_vs_run_limit),
-                    _guidance_card("Próxima ação", state["next_action"]),
+                    _guidance_card("Agora", state["headline"]),
+                    _guidance_card("Fila", queue_focus),
+                    _guidance_card("Resultado útil", usable_result),
+                    _guidance_card("Próxima ação recomendada", state["next_action"]),
                 ],
             ),
             html.Div(
                 id="runs-workspace-next-step-panel",
                 style={**UI_MUTED_CARD_STYLE, "padding": "12px", "marginBottom": "12px"},
                 children=[
-                    html.Div("O que move a jornada agora", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
-                    html.Div(state["decision_gate"], style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"}),
-                    html.Div(queue_focus, style={"lineHeight": "1.6", "marginTop": "10px"}),
+                    html.Div("Próxima ação recomendada", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+                    html.Div(state["next_action"], style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"}),
+                    html.Div(state["decision_gate"], style={"lineHeight": "1.6", "marginTop": "10px"}),
+                ],
+            ),
+            html.Details(
+                id="runs-workspace-scenario-gate-details",
+                style={**UI_MUTED_CARD_STYLE, "padding": "12px", "marginBottom": "12px"},
+                children=[
+                    html.Summary("Gate do cenário e limites desta leitura"),
+                    html.Div(
+                        style={**UI_TWO_COLUMN_STYLE, "marginTop": "12px"},
+                        children=[
+                            _guidance_card("Gate do cenário", str(studio_summary.get("readiness_headline") or state["readiness_note"])),
+                            _guidance_card("Limitação agora", scenario_vs_run_limit),
+                        ],
+                    ),
                 ],
             ),
             html.Div(

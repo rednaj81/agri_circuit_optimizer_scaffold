@@ -176,12 +176,14 @@ def test_phase3_queue_acceptance_runs_ui_surfaces_operational_queue_and_detail_l
     overview_text = _collect_text(overview)
     detail_text = _collect_text(detail)
 
+    assert "Gate do cenário e limites desta leitura" in workspace_text
     assert "Limitação agora" in workspace_text
     assert "O cenário já passou no gate principal" in workspace_text
-    assert "Fila pendente" in overview_text
-    assert "Execução agora" in overview_text
-    assert "Histórico recente" in overview_text
-    assert "Próximo gesto do operador" in overview_text
+    assert "Resultado útil" in workspace_text
+    assert "Na fila" in overview_text
+    assert "Executando" in overview_text
+    assert "Resultado recente" in overview_text
+    assert "Próxima ação recomendada" in overview_text
     assert "Eventos relevantes" in detail_text
     assert "Resultado e artefatos" in detail_text
     assert "Pode agir agora" in detail_text

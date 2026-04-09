@@ -821,9 +821,12 @@ def test_runs_workspace_panel_distinguishes_scenario_gate_from_execution_state()
     blocked_text = _collect_text_content(blocked_panel)
     ready_text = _collect_text_content(ready_panel)
 
+    assert "Gate do cenário e limites desta leitura" in blocked_text
     assert "Limitação agora" in blocked_text
     assert "A limitação principal ainda está no cenário" in blocked_text
-    assert "Fila agora" in blocked_text
+    assert "Fila" in blocked_text
+    assert "Resultado útil" in blocked_text
+    assert "Gate do cenário e limites desta leitura" in ready_text
     assert "Limitação agora" in ready_text
     assert "O cenário já passou no gate principal" in ready_text
     assert "Execução em foco: run-002." in ready_text
@@ -1247,11 +1250,11 @@ def test_runs_workspace_panel_prioritizes_queue_focus_and_primary_transition() -
     panel_text = _collect_text_content(panel)
 
     assert "Leitura operacional de Runs" in panel_text
-    assert "O que esta área resolve" in panel_text
-    assert "Estado atual" in panel_text
-    assert "Gate do cenário" in panel_text
-    assert "Fila agora" in panel_text
-    assert "O que move a jornada agora" in panel_text
+    assert "Agora" in panel_text
+    assert "Fila" in panel_text
+    assert "Resultado útil" in panel_text
+    assert "Próxima ação recomendada" in panel_text
+    assert "Gate do cenário e limites desta leitura" in panel_text
     assert "Próxima run pronta: run-003." in panel_text
     assert "Já existe um resultado utilizável" in panel_text
     assert _find_component_by_id(panel, "runs-workspace-open-studio-link") is not None
@@ -1299,7 +1302,7 @@ def test_primary_runs_panels_hide_raw_backend_keys_in_main_surface() -> None:
     detail_text = _collect_text_content(detail_panel)
     execution_text = _collect_text_content(execution_panel)
 
-    assert "Leitura operacional detalhada" in overview_text
+    assert "Ver fila e histórico detalhados" in overview_text
     assert "official_gate_valid:" not in detail_text
     assert "policy_mode:" not in detail_text
     assert "duracao_s:" not in detail_text
@@ -1366,7 +1369,10 @@ def test_run_jobs_overview_panel_clarifies_queue_now_vs_recent_history() -> None
 
     assert "Execução em andamento" in panel_text
     assert "Fila agora" in panel_text
-    assert "Histórico recente" in panel_text
+    assert "Na fila" in panel_text
+    assert "Executando" in panel_text
+    assert "Resultado recente" in panel_text
+    assert "Próxima ação recomendada" in panel_text
     assert "Em execução: run-003" in panel_text
     assert "Próxima a rodar: run-004" in panel_text
     assert "Última run conhecida: run-003" in panel_text

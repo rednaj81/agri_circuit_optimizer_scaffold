@@ -1,0 +1,36 @@
+{
+  "snapshot_source_commit": "90fd7e0592d1ab6a423c7e4c20b2a8516a3f539e",
+  "phase_redirect": {
+    "from": "ux_phase_2",
+    "to": "ux_phase_3",
+    "basis": "Runs became the primary UX surface for queue, execution focus, result usefulness and next operator action."
+  },
+  "runs": {
+    "first_fold_signals": [
+      "Agora",
+      "Fila",
+      "Resultado útil",
+      "Próxima ação recomendada"
+    ],
+    "secondary_disclosure": [
+      "Gate do cenário",
+      "Limitação agora"
+    ],
+    "overview_lanes": [
+      "Na fila",
+      "Executando",
+      "Resultado recente",
+      "Próxima ação recomendada"
+    ],
+    "raw_logs_primary_surface": false
+  },
+  "integration": {
+    "studio_to_runs_language": "scenario readiness becomes queue and execution reading",
+    "runs_to_decision_language": "decision opens only after usable result"
+  },
+  "screenshot_attempt": {
+    "target_path": "output/playwright/runs-fullhd-wave6.png",
+    "status": "failed_in_sandbox",
+    "reason": "No stable browser capture session was available in this sandbox during wave 6; structured snapshot retained as honest evidence."
+  }
+}
