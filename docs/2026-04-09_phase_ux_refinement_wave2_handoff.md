@@ -1,32 +1,39 @@
-# Phase UX Refinement - Wave 2 Handoff
+# Phase UX Refinement Wave 2 - Studio First-Fold Simplification
 
-## Escopo executado
+## Objective
 
-- Rebaixei o `command center` do Studio para disclosure e deixei o painel lateral primário centrado em foco local, ajustes rápidos, composer e leitura de supply-flow.
-- Encurtei o topo do `studio-workspace` para três sinais compactos: seleção atual, quem supre quem e gesto principal, com readiness crítico só quando há bloqueio real.
-- Enxuguei a `Decisão` removendo repetição entre cartões superiores e comparação final; a leitura inicial agora abre com perfil ativo, winner, runner-up e technical tie, enquanto a comparação final concentra referência oficial, contraste e escolha manual.
+Advance `ux_phase_2` by reducing first-fold density in the Studio, keeping more common node and edge actions on the primary surface, and tightening the route-first editing hierarchy without reopening architecture.
 
-## O que ficou melhor para o operador comum
+## Delivered
 
-- Em Full HD, o Studio disputa menos a primeira dobra com a lateral: o canvas continua dominante e a criação rápida deixou de competir como painel principal.
-- O operador vê no topo lateral só o contexto mínimo para agir no trecho selecionado e abrir o composer sem precisar atravessar blocos equivalentes.
-- A Decisão repete menos os mesmos sinais e fica mais direta para comparar contraste, referência oficial e escolha manual.
+- The Studio workspace now exposes a compact `Ajustes locais do canvas` action rail with direct left/right move, duplicate, reverse-edge and delete-edge actions, so frequent edits no longer compete with larger form blocks on the first fold.
+- Fine-grained node and edge editing stayed in the Studio but moved under `Ajustes finos do foco`, which keeps the first fold lighter while preserving direct label, length and family edits outside the advanced workbench.
+- The route editor now keeps intent, next-step guidance and main route actions on the first fold, while route particularities for both the draft and the selected route moved into disclosure blocks (`Particularidades da rota em preparo` and `Particularidades da rota em foco`).
+- The route-first CTA logic from wave 1 remains intact and now sits in a clearer visual hierarchy: supply chain, route draft state and readiness still lead the first reading, but with fewer competing expanded blocks.
+- UI smoke coverage was updated to assert the new disclosure panels, the visible move-right action and the simplified local-edit structure.
 
-## Evidência da onda
+## Validation
 
-- Snapshot estruturado: `docs/2026-04-09_phase_ux_refinement_wave2_ui_snapshot.json`
-- Documentação da onda: `docs/2026-04-09_phase_ux_refinement_wave2_handoff.md`
-- Validação executada:
-  - `python -m pytest tests/decision_platform/test_ui_smoke.py tests/decision_platform/test_studio_structure.py -m "not slow"`
-  - Resultado: `93 passed, 12 deselected`
+```powershell
+$env:PYTHONPATH='src;.'; .\.venv\Scripts\python.exe -m pytest tests/decision_platform/test_ui_smoke.py -q -p no:cacheprovider --basetemp tests/_tmp/pytest-basetemp-ux-wave2-current
+```
 
-## Limitações honestas
+Result:
 
-- A evidência visual ficou em snapshot estruturado, não screenshot bitmap; isso respeita a instrução de não gastar a onda em plumbing de captura.
-- O `workbench avançado` continua existindo e acessível; a melhoria desta onda foi tirá-lo do caminho padrão, não eliminá-lo.
-- Não rodei a suíte lenta completa dos arquivos-alvo nesta sessão.
+- `96 passed in 435.90s (0:07:15)`
 
-## Próximo passo sugerido
+## Evidence
 
-- Se a fase continuar em `Studio`, o passo natural é aproximar ainda mais ações de criação/edição ao foco do canvas sem aumentar ruído lateral.
-- Se o supervisor liberar a próxima fase, a frente seguinte pode migrar para `Runs`, preservando o Studio já mais enxuto.
+- Browser-ready first-fold export: `output/playwright/wave2-studio-first-fold.html`
+- Capture attempt log: `output/playwright/wave2-studio-first-fold-meta.json`
+
+## Scope Guardrails
+
+- No architecture reopening.
+- No stack change beyond the current Dash/Cytoscape Studio.
+- No reintroduction of technical helper entities into the primary Studio surface.
+- No functional redesign of Runs, Decision or Audit.
+
+## Honest Handoff
+
+This wave makes the Studio first fold easier to parse and act on: the operator now sees a shorter action rail for common edits, while detailed route and focus fields stay one disclosure away instead of occupying the same visual priority as readiness and supply flow. I did not fully satisfy the ideal evidence path of a live-browser screenshot against a running local Dash server: `playwright` was unavailable in Python, Selenium could not resolve a local driver in the sandbox, and the MCP browser navigation session was cancelled before capture. To avoid fabricating proof, I recorded a browser-ready HTML export plus the failed-capture log and kept the limitation explicit.

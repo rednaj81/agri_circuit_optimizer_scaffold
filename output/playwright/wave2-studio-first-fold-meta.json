@@ -1,0 +1,22 @@
+{
+  "artifact_type": "browser_ready_html_export",
+  "html_export": "output/playwright/wave2-studio-first-fold.html",
+  "capture_attempts": [
+    {
+      "method": "python_playwright",
+      "status": "failed",
+      "reason": "playwright Python package not installed in the virtual environment"
+    },
+    {
+      "method": "selenium_edge",
+      "status": "failed",
+      "reason": "webdriver resolution failed inside sandbox due unavailable driver download/cache path"
+    },
+    {
+      "method": "mcp_playwright_browser_navigate",
+      "status": "cancelled",
+      "reason": "tool session was cancelled before navigation completed"
+    }
+  ],
+  "validation_result": "96 passed in 435.90s (0:07:15)"
+}

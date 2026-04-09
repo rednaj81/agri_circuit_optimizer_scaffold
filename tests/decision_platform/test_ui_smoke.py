@@ -253,6 +253,8 @@ def test_studio_primary_surface_exposes_business_command_center() -> None:
     assert _find_component_by_id(app.layout, "studio-route-compose-measurement-required") is not None
     assert _find_component_by_id(app.layout, "studio-route-compose-confirm-button") is not None
     assert _find_component_by_id(app.layout, "studio-route-composer-preview-panel") is not None
+    assert _find_component_by_id(app.layout, "studio-route-composer-particularities") is not None
+    assert _find_component_by_id(app.layout, "studio-route-particularities-panel") is not None
     assert _find_component_by_id(app.layout, "studio-route-draft-source-id") is None
     assert _find_component_by_id(app.layout, "studio-route-intent-mandatory-button") is not None
     assert _find_component_by_id(app.layout, "studio-route-intent-desirable-button") is not None
@@ -280,6 +282,8 @@ def test_studio_primary_surface_exposes_business_command_center() -> None:
     assert "Quem supre quem agora" in route_text
     assert "Composer local da rota" in route_text
     assert "Confirmar rota no canvas" in route_text
+    assert "Particularidades da rota em preparo" in route_text
+    assert "Particularidades da rota em foco" in route_text
     assert "W ->" not in route_text
     assert "Tap" not in route_text
     assert "Junção" not in route_text
@@ -711,6 +715,7 @@ def test_studio_workspace_panel_unifies_focus_connectivity_and_runs_gate() -> No
     assert "Tanque de água supre Bomba principal." in panel_text
     assert "Bomba principal" in panel_text
     assert "Ajustes locais do canvas" in panel_text
+    assert "Ajustes finos do foco" in panel_text
     assert "Fluxo atual" in panel_text
     assert "Impacto previsto" in panel_text
     assert "Corrigir no canvas" in panel_text
@@ -727,9 +732,11 @@ def test_studio_workspace_panel_unifies_focus_connectivity_and_runs_gate() -> No
     assert _find_component_by_id(panel, "studio-focus-edge-reverse-button") is not None
     assert _find_component_by_id(panel, "studio-focus-edge-flow-preview") is not None
     assert _find_component_by_id(panel, "studio-focus-move-left-button") is not None
+    assert _find_component_by_id(panel, "studio-focus-move-right-button") is not None
     assert _find_component_by_id(panel, "studio-focus-duplicate-node-button") is not None
     assert _find_component_by_id(panel, "studio-focus-delete-edge-button") is not None
     assert _find_component_by_id(panel, "studio-focus-open-workbench-button") is not None
+    assert _find_component_by_id(panel, "studio-workspace-fine-tuning-panel") is not None
 
 
 def test_studio_primary_canvas_hides_internal_and_hub_nodes() -> None:

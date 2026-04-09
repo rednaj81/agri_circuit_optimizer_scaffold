@@ -2924,17 +2924,6 @@ def _studio_workspace_quick_edit_cards(
                         style={"width": "100%"},
                     ),
                 ),
-                html.Div(
-                    style=UI_ACTION_ROW_STYLE,
-                    children=[
-                        html.Button(
-                            "Aplicar rótulo direto no canvas",
-                            id="studio-focus-node-apply-button",
-                            style=UI_BUTTON_STYLE,
-                            disabled=not selected_node_present,
-                        ),
-                    ],
-                ),
             ],
         ),
         html.Div(
@@ -2973,23 +2962,6 @@ def _studio_workspace_quick_edit_cards(
                                 persistence_type="session",
                                 style={"width": "100%"},
                             ),
-                        ),
-                    ],
-                ),
-                html.Div(
-                    style=UI_ACTION_ROW_STYLE,
-                    children=[
-                        html.Button(
-                            "Aplicar conexão",
-                            id="studio-focus-edge-apply-button",
-                            style=UI_BUTTON_STYLE,
-                            disabled=not selected_edge_present,
-                        ),
-                        html.Button(
-                            "Inverter direção",
-                            id="studio-focus-edge-reverse-button",
-                            style=UI_BUTTON_STYLE,
-                            disabled=not selected_edge_present,
                         ),
                     ],
                 ),
@@ -3108,67 +3080,25 @@ def render_studio_route_editor_panel(
                             _guidance_card("Dosagem mínima", f"{float(composer_data.get('dose_min_l') or 0.0):.1f} L"),
                         ],
                     ),
-                    _field_block(
-                        "Intenção em preparo",
-                        dcc.Dropdown(
-                            id="studio-route-compose-intent",
-                            options=[
-                                {"label": "Obrigatória", "value": "mandatory"},
-                                {"label": "Desejável", "value": "desirable"},
-                                {"label": "Opcional", "value": "optional"},
-                            ],
-                            value=composer_data.get("intent"),
-                            persistence=True,
-                            persistence_type="session",
-                        ),
-                    ),
                     html.Div(
-                        style={**UI_THREE_COLUMN_STYLE, "marginTop": "8px"},
+                        style={**UI_TWO_COLUMN_STYLE, "marginTop": "10px", "gridTemplateColumns": "minmax(0, 1.1fr) minmax(0, 0.9fr)"},
                         children=[
                             _field_block(
-                                "Vazão mínima do preview (L/min)",
-                                dcc.Input(
-                                    id="studio-route-compose-q-min-lpm",
-                                    type="number",
-                                    value=composer_data.get("q_min_delivered_lpm"),
+                                "Intenção em preparo",
+                                dcc.Dropdown(
+                                    id="studio-route-compose-intent",
+                                    options=[
+                                        {"label": "Obrigatória", "value": "mandatory"},
+                                        {"label": "Desejável", "value": "desirable"},
+                                        {"label": "Opcional", "value": "optional"},
+                                    ],
+                                    value=composer_data.get("intent"),
                                     persistence=True,
                                     persistence_type="session",
-                                    style={"width": "100%"},
                                 ),
                             ),
-                            _field_block(
-                                "Dosagem mínima do preview (L)",
-                                dcc.Input(
-                                    id="studio-route-compose-dose-min-l",
-                                    type="number",
-                                    value=composer_data.get("dose_min_l"),
-                                    persistence=True,
-                                    persistence_type="session",
-                                    style={"width": "100%"},
-                                ),
-                            ),
-                            _field_block(
-                                "Observação do preview",
-                                dcc.Input(
-                                    id="studio-route-compose-notes",
-                                    type="text",
-                                    value=composer_data.get("notes"),
-                                    persistence=True,
-                                    persistence_type="session",
-                                    style={"width": "100%"},
-                                ),
-                            ),
+                            _guidance_card("Próximo passo do composer", str(composer_preview.get("next_action") or "Selecione origem e destino para continuar.")),
                         ],
-                    ),
-                    _field_block(
-                        "Medição direta do preview",
-                        dcc.Checklist(
-                            id="studio-route-compose-measurement-required",
-                            options=[{"label": "Exigir medição direta nesta rota em preparo", "value": "measurement_required"}],
-                            value=["measurement_required"] if bool(composer_data.get("measurement_required")) else [],
-                            persistence=True,
-                            persistence_type="session",
-                        ),
                     ),
                     html.Div(
                         style=UI_ACTION_ROW_STYLE,
@@ -3223,6 +3153,61 @@ def render_studio_route_editor_panel(
                             ),
                         ],
                     ),
+                    html.Details(
+                        id="studio-route-composer-particularities",
+                        style={**UI_MUTED_CARD_STYLE, "padding": "10px", "marginTop": "10px"},
+                        children=[
+                            html.Summary("Particularidades da rota em preparo"),
+                            html.Div(
+                                style={**UI_THREE_COLUMN_STYLE, "marginTop": "10px"},
+                                children=[
+                                    _field_block(
+                                        "Vazão mínima do preview (L/min)",
+                                        dcc.Input(
+                                            id="studio-route-compose-q-min-lpm",
+                                            type="number",
+                                            value=composer_data.get("q_min_delivered_lpm"),
+                                            persistence=True,
+                                            persistence_type="session",
+                                            style={"width": "100%"},
+                                        ),
+                                    ),
+                                    _field_block(
+                                        "Dosagem mínima do preview (L)",
+                                        dcc.Input(
+                                            id="studio-route-compose-dose-min-l",
+                                            type="number",
+                                            value=composer_data.get("dose_min_l"),
+                                            persistence=True,
+                                            persistence_type="session",
+                                            style={"width": "100%"},
+                                        ),
+                                    ),
+                                    _field_block(
+                                        "Observação do preview",
+                                        dcc.Input(
+                                            id="studio-route-compose-notes",
+                                            type="text",
+                                            value=composer_data.get("notes"),
+                                            persistence=True,
+                                            persistence_type="session",
+                                            style={"width": "100%"},
+                                        ),
+                                    ),
+                                ],
+                            ),
+                            _field_block(
+                                "Medição direta do preview",
+                                dcc.Checklist(
+                                    id="studio-route-compose-measurement-required",
+                                    options=[{"label": "Exigir medição direta nesta rota em preparo", "value": "measurement_required"}],
+                                    value=["measurement_required"] if bool(composer_data.get("measurement_required")) else [],
+                                    persistence=True,
+                                    persistence_type="session",
+                                ),
+                            ),
+                        ],
+                    ),
                 ],
             ),
             html.Div(
@@ -3252,7 +3237,7 @@ def render_studio_route_editor_panel(
                 ),
             ),
             html.Div(
-                style={**UI_THREE_COLUMN_STYLE, "marginTop": "8px"},
+                style={**UI_TWO_COLUMN_STYLE, "marginTop": "8px", "gridTemplateColumns": "repeat(auto-fit, minmax(220px, 1fr))"},
                 children=[
                     _field_block(
                         "Intenção",
@@ -3269,53 +3254,8 @@ def render_studio_route_editor_panel(
                             persistence_type="session",
                         ),
                     ),
-                    _field_block(
-                        "Vazão mínima (L/min)",
-                        dcc.Input(
-                            id="studio-route-q-min-lpm",
-                            type="number",
-                            value=form_values.get("q_min_delivered_lpm"),
-                            disabled=not selected_route_present,
-                            persistence=True,
-                            persistence_type="session",
-                            style={"width": "100%"},
-                        ),
-                    ),
-                    _field_block(
-                        "Dosagem mínima (L)",
-                        dcc.Input(
-                            id="studio-route-dose-min-l",
-                            type="number",
-                            value=form_values.get("dose_min_l"),
-                            disabled=not selected_route_present,
-                            persistence=True,
-                            persistence_type="session",
-                            style={"width": "100%"},
-                        ),
-                    ),
+                    _guidance_card("Leitura rápida da rota", route_scope_text),
                 ],
-            ),
-            _field_block(
-                "Observação visível da rota",
-                dcc.Input(
-                    id="studio-route-notes",
-                    type="text",
-                    value=form_values.get("notes"),
-                    disabled=not selected_route_present,
-                    persistence=True,
-                    persistence_type="session",
-                    style={"width": "100%"},
-                ),
-            ),
-            _field_block(
-                "Medição direta",
-                dcc.Checklist(
-                    id="studio-route-measurement-required",
-                    options=[{"label": "Exigir medição direta nesta rota", "value": "measurement_required"}],
-                    value=form_values.get("measurement_required"),
-                    persistence=True,
-                    persistence_type="session",
-                ),
             ),
             html.Div(
                 style=UI_ACTION_ROW_STYLE,
@@ -3325,6 +3265,64 @@ def render_studio_route_editor_panel(
                         id="studio-route-apply-button",
                         style=UI_BUTTON_STYLE,
                         disabled=not selected_route_present,
+                    ),
+                ],
+            ),
+            html.Details(
+                id="studio-route-particularities-panel",
+                style={**UI_MUTED_CARD_STYLE, "padding": "10px", "marginTop": "10px"},
+                children=[
+                    html.Summary("Particularidades da rota em foco"),
+                    html.Div(
+                        style={**UI_THREE_COLUMN_STYLE, "marginTop": "10px"},
+                        children=[
+                            _field_block(
+                                "Vazão mínima (L/min)",
+                                dcc.Input(
+                                    id="studio-route-q-min-lpm",
+                                    type="number",
+                                    value=form_values.get("q_min_delivered_lpm"),
+                                    disabled=not selected_route_present,
+                                    persistence=True,
+                                    persistence_type="session",
+                                    style={"width": "100%"},
+                                ),
+                            ),
+                            _field_block(
+                                "Dosagem mínima (L)",
+                                dcc.Input(
+                                    id="studio-route-dose-min-l",
+                                    type="number",
+                                    value=form_values.get("dose_min_l"),
+                                    disabled=not selected_route_present,
+                                    persistence=True,
+                                    persistence_type="session",
+                                    style={"width": "100%"},
+                                ),
+                            ),
+                            _field_block(
+                                "Observação visível da rota",
+                                dcc.Input(
+                                    id="studio-route-notes",
+                                    type="text",
+                                    value=form_values.get("notes"),
+                                    disabled=not selected_route_present,
+                                    persistence=True,
+                                    persistence_type="session",
+                                    style={"width": "100%"},
+                                ),
+                            ),
+                        ],
+                    ),
+                    _field_block(
+                        "Medição direta",
+                        dcc.Checklist(
+                            id="studio-route-measurement-required",
+                            options=[{"label": "Exigir medição direta nesta rota", "value": "measurement_required"}],
+                            value=form_values.get("measurement_required"),
+                            persistence=True,
+                            persistence_type="session",
+                        ),
                     ),
                 ],
             ),
@@ -3459,29 +3457,34 @@ def render_studio_workspace_panel(
                 children=[
                     html.Div("Ajustes locais do canvas", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
                     html.Div(
-                        "Use estes controles rápidos para ajustes rotineiros sem abrir a bancada avançada."
+                        "As ações mais comuns ficam aqui no primeiro fold; abra os ajustes finos só quando precisar de detalhes."
                         if selected_node_present or selected_edge_present
                         else "Selecione um nó ou uma conexão no canvas para destravar os ajustes rápidos locais.",
                         style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"},
                     ),
-                    html.Div(style={**UI_TWO_COLUMN_STYLE, "marginTop": "12px"}, children=quick_edit_cards),
                     html.Div(
                         id="studio-workspace-local-actions-panel",
                         style={**UI_ACTION_ROW_STYLE, "marginTop": "12px"},
                         children=[
                             html.Button("Mover à esquerda", id="studio-focus-move-left-button", style=UI_BUTTON_STYLE, disabled=not selected_node_present),
+                            html.Button("Mover à direita", id="studio-focus-move-right-button", style=UI_BUTTON_STYLE, disabled=not selected_node_present),
                             html.Button("Duplicar nó em foco", id="studio-focus-duplicate-node-button", style=UI_BUTTON_STYLE, disabled=not selected_node_present),
+                            html.Button("Inverter conexão", id="studio-focus-edge-reverse-button", style=UI_BUTTON_STYLE, disabled=not selected_edge_present),
                             html.Button("Excluir conexão em foco", id="studio-focus-delete-edge-button", style=UI_BUTTON_STYLE, disabled=not selected_edge_present),
                             html.Button("Abrir bancada completa", id="studio-focus-open-workbench-button", style=UI_BUTTON_STYLE),
                         ],
                     ),
                     html.Details(
+                        id="studio-workspace-fine-tuning-panel",
                         style={**UI_MUTED_CARD_STYLE, "padding": "10px", "marginTop": "12px"},
                         children=[
-                            html.Summary("Mais movimentos"),
+                            html.Summary("Ajustes finos do foco"),
+                            html.Div(style={**UI_TWO_COLUMN_STYLE, "marginTop": "10px"}, children=quick_edit_cards),
                             html.Div(
                                 style={**UI_ACTION_ROW_STYLE, "marginTop": "10px"},
                                 children=[
+                                    html.Button("Aplicar rótulo", id="studio-focus-node-apply-button", style=UI_BUTTON_STYLE, disabled=not selected_node_present),
+                                    html.Button("Aplicar conexão", id="studio-focus-edge-apply-button", style=UI_BUTTON_STYLE, disabled=not selected_edge_present),
                                     html.Button("Mover acima", id="studio-focus-move-up-button", style=UI_BUTTON_STYLE, disabled=not selected_node_present),
                                     html.Button("Mover abaixo", id="studio-focus-move-down-button", style=UI_BUTTON_STYLE, disabled=not selected_node_present),
                                 ],
