@@ -2796,7 +2796,7 @@ def _studio_workspace_focus_summary(
         elif from_node == "S":
             recommended_action = "Remova ou redirecione esta conexão: S não deve iniciar fluxo na superfície principal."
         else:
-            recommended_action = f"Confira comprimento, direção e famílias sugeridas da conexão {edge_summary.get('selected_link_id') or label}."
+            recommended_action = f"Confira comprimento, direção e famílias sugeridas de {label}."
         return {
             "label": label,
             "headline": f"Conexão em foco: {from_label} -> {to_label}.",
@@ -3467,19 +3467,6 @@ def render_studio_workspace_panel(
         if selected_node_present or selected_edge_present
         else str(connection_preview)
     )
-    supply_strip_cards = [
-        _compact_value_card("Quem supre este foco", str(business_flow.get("supplied_by_label") or "Ainda não recebe suprimento visível."), supply_flow_summary),
-        _compact_value_card("Quem este foco supre", str(business_flow.get("supplies_label") or "Ainda não abastece outra entidade visível."), connection_preview),
-        _compact_value_card(
-            "Trecho mais legível",
-            connection_preview,
-            (
-                f"{len(connection_lines)} leitura(s) de suprimento já aparecem na camada principal."
-                if connection_lines
-                else "Desenhe uma conexão no canvas para abrir a cadeia de suprimento principal."
-            ),
-        ),
-    ]
     quick_edit_cards = _studio_workspace_quick_edit_cards(
         node_summary,
         edge_summary,
@@ -3498,6 +3485,7 @@ def render_studio_workspace_panel(
     )
     composer_state = _normalize_route_composer_state(composer_state)
     composer_active = bool(str(composer_state.get("source_node_id") or "").strip() or str(composer_state.get("sink_node_id") or "").strip())
+    composer_preview = _build_route_composer_preview(composer_state, nodes_rows=nodes_rows)
     route_focus_row = _selected_route_row_from_edge_focus(
         route_rows,
         selected_link_id=str(edge_summary.get("selected_link_id") or "").strip() or None,
@@ -3516,6 +3504,16 @@ def render_studio_workspace_panel(
         )
         if route_focus_row
         else "Abra o editor local da rota quando precisar ajustar intenção ou particularidades."
+    )
+    dominant_readiness_signal = (
+        top_issue
+        if blocker_count > 0 or warning_count > 0
+        else str(studio_summary.get("readiness_headline") or "Sem bloqueio dominante neste momento.")
+    )
+    dominant_route_copy = (
+        route_focus_label
+        if route_focus_row
+        else str(composer_preview.get("headline") or "Abra a rota em foco apenas quando precisar concluir o composer ou ajustar particularidades.")
     )
     runs_enabled = status == "ready"
     runs_button_label = "Ir para Runs" if runs_enabled else "Runs bloqueado neste estado"
@@ -3541,22 +3539,46 @@ def render_studio_workspace_panel(
                 ],
             ),
             html.Div(
-                style={**UI_TWO_COLUMN_STYLE, "gridTemplateColumns": "repeat(auto-fit, minmax(220px, 1fr))", "marginBottom": "12px"},
+                id="studio-workspace-context-panel",
+                style={**UI_MUTED_CARD_STYLE, "padding": "12px", "marginBottom": "12px"},
                 children=[
-                    _compact_value_card("Seleção atual", focus_summary["headline"], focus_summary["recommended_action"], accent="rgba(16, 59, 53, 0.18)"),
-                    _compact_value_card("Próximo gesto", "Ajustar rota no foco", str(studio_summary.get("primary_action") or focus_summary["recommended_action"])),
+                    html.Div("Contexto dominante do Studio", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+                    html.Div(focus_summary["headline"], style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"}),
+                    html.Div(
+                        style={**UI_THREE_COLUMN_STYLE, "marginTop": "10px"},
+                        children=[
+                            _guidance_card("Ação dominante", focus_summary["recommended_action"]),
+                            _guidance_card("Readiness agora", dominant_readiness_signal),
+                            _guidance_card(
+                                "Rota ou composer",
+                                dominant_route_copy or "Abra a rota em foco apenas quando precisar concluir o composer ou ajustar particularidades.",
+                            ),
+                        ],
+                    ),
                 ],
             ),
-            html.Div(
+            html.Details(
                 id="studio-workspace-supply-strip",
-                style={**UI_THREE_COLUMN_STYLE, "marginBottom": "12px"},
-                children=supply_strip_cards,
-            ),
-            html.Div(
-                style={**UI_COMPACT_BANNER_CARD_STYLE, "marginBottom": "12px", "display": "block" if blocker_count > 0 else "none"},
+                open=False,
+                style={**UI_MUTED_CARD_STYLE, "padding": "12px", "marginBottom": "12px"},
                 children=[
-                    html.Div("Readiness crítico", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
-                    html.Div(top_issue, style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"}),
+                    html.Summary("Cadeia visível deste foco"),
+                    html.Div(
+                        style={**UI_THREE_COLUMN_STYLE, "marginTop": "12px"},
+                        children=[
+                            _compact_value_card("Quem supre este foco", str(business_flow.get("supplied_by_label") or "Ainda não recebe suprimento visível."), supply_flow_summary),
+                            _compact_value_card("Quem este foco supre", str(business_flow.get("supplies_label") or "Ainda não abastece outra entidade visível."), connection_preview),
+                            _compact_value_card(
+                                "Trecho mais legível",
+                                connection_preview,
+                                (
+                                    f"{len(connection_lines)} leitura(s) de suprimento já aparecem na camada principal."
+                                    if connection_lines
+                                    else "Desenhe uma conexão no canvas para abrir a cadeia de suprimento principal."
+                                ),
+                            ),
+                        ],
+                    ),
                 ],
             ),
             html.Div(
@@ -3625,6 +3647,7 @@ def render_studio_workspace_panel(
             html.Div(style={**UI_ACTION_ROW_STYLE, "marginTop": "12px"}, children=[*primary_actions, _button_link("Abrir Auditoria", "?tab=audit", "studio-workspace-open-audit-link")]),
             html.Details(
                 id="studio-business-flow-panel",
+                open=False,
                 style={**UI_MUTED_CARD_STYLE, "padding": "12px", "marginBottom": "12px"},
                 children=[
                     html.Summary("Cadeia de suprimento e saída do Studio"),
@@ -6875,7 +6898,7 @@ def build_app(
                             ),
                             html.Details(
                                 id="studio-context-detailed-panels",
-                                open=bool(initial_edge_studio_selected_id),
+                                open=False,
                                 style=UI_MUTED_CARD_STYLE,
                                 children=[
                                     html.Summary("Contexto completo do Studio"),
@@ -9626,7 +9649,7 @@ def build_app(
                 studio_status_text,
                 route_composer_state,
             ),
-            bool(str(edge_summary.get("selected_link_id") or "").strip()),
+            False,
             render_studio_readiness_panel(studio_readiness, route_rows or [], nodes_rows or [], candidate_links_rows or []),
             render_studio_projection_panel(
                 build_studio_projection_summary(nodes_rows or [], candidate_links_rows or [], route_rows or [])

@@ -277,7 +277,7 @@ def test_studio_primary_surface_exposes_business_command_center() -> None:
     assert _find_component_by_id(app.layout, "studio-canvas-selected-edge-banner") is not None
     assert _find_component_by_id(app.layout, "studio-primary-route-focus-dropdown") is not None
     assert _find_component_by_id(app.layout, "studio-primary-route-focus-apply-button") is not None
-    assert getattr(_find_component_by_id(app.layout, "studio-context-detailed-panels"), "open", None) is True
+    assert getattr(_find_component_by_id(app.layout, "studio-context-detailed-panels"), "open", None) is False
     cytoscape = _find_component_by_id(app.layout, "node-studio-cytoscape")
     context_menu = getattr(cytoscape, "contextMenu", None)
     assert isinstance(context_menu, list)
@@ -582,6 +582,7 @@ def test_studio_tab_surfaces_readiness_and_selection_context() -> None:
     assert _find_component_by_id(studio_tab, "studio-canvas-open-technical-guide-button") is not None
     assert _find_component_by_id(studio_tab, "studio-canvas-open-runs-link") is not None
     assert _find_component_by_id(studio_tab, "studio-workspace-panel") is not None
+    assert _find_component_by_id(studio_tab, "studio-workspace-context-panel") is not None
     assert _find_component_by_id(studio_tab, "studio-workspace-quick-edit-panel") is not None
     assert _find_component_by_id(studio_tab, "studio-workspace-local-actions-panel") is not None
     assert _find_component_by_id(studio_tab, "studio-context-detailed-panels") is not None
@@ -619,6 +620,9 @@ def test_studio_tab_surfaces_readiness_and_selection_context() -> None:
     assert _find_component_by_id(studio_tab, "studio-focus-edge-apply-button") is not None
     assert _find_component_by_id(studio_tab, "studio-focus-edge-reverse-button") is not None
     assert _find_component_by_id(studio_tab, "studio-focus-open-workbench-button") is not None
+    assert getattr(_find_component_by_id(studio_tab, "studio-context-detailed-panels"), "open", None) is False
+    assert getattr(_find_component_by_id(studio_tab, "studio-workspace-supply-strip"), "open", None) is False
+    assert getattr(_find_component_by_id(studio_tab, "studio-business-flow-panel"), "open", None) is False
 
 
 def test_studio_canvas_guidance_panel_keeps_canvas_as_primary_entry() -> None:
@@ -808,17 +812,13 @@ def test_studio_workspace_panel_unifies_focus_connectivity_and_runs_gate() -> No
     panel_text = _collect_text_content(panel)
 
     assert "Leitura do cenário" in panel_text
-    assert "Seleção atual" in panel_text
-    assert "Quem supre este foco" in panel_text
-    assert "Quem este foco supre" in panel_text
-    assert "Trecho mais legível" in panel_text
+    assert "Contexto dominante do Studio" in panel_text
+    assert "Ação dominante" in panel_text
+    assert "Readiness agora" in panel_text
+    assert "Rota ou composer" in panel_text
     assert "Cadeia de suprimento e saída do Studio" in panel_text
-    assert "Próximo gesto" in panel_text
-    assert "Readiness crítico" in panel_text
     assert "A conexão L900 termina em Tanque de água" in panel_text
-    assert "Quem supre quem na camada principal" in panel_text
-    assert "Bomba principal é suprido por Tanque de água e supre Misturador." in panel_text
-    assert "Tanque de água supre Bomba principal." in panel_text
+    assert "Cadeia visível deste foco" in panel_text
     assert "Bomba principal" in panel_text
     assert "Ajustes locais do canvas" in panel_text
     assert "Ajustes finos do foco" in panel_text
@@ -830,6 +830,8 @@ def test_studio_workspace_panel_unifies_focus_connectivity_and_runs_gate() -> No
     assert getattr(_find_component_by_id(panel, "studio-workspace-open-runs-button"), "disabled", None) is True
     assert _find_component_by_id(panel, "studio-business-flow-panel") is not None
     assert _find_component_by_id(panel, "studio-workspace-supply-strip") is not None
+    assert getattr(_find_component_by_id(panel, "studio-workspace-supply-strip"), "open", None) is False
+    assert getattr(_find_component_by_id(panel, "studio-business-flow-panel"), "open", None) is False
     assert _find_component_by_id(panel, "studio-focus-node-label") is not None
     assert _find_component_by_id(panel, "studio-focus-node-apply-button") is not None
     assert _find_component_by_id(panel, "studio-focus-edge-length-m") is not None
@@ -976,6 +978,9 @@ def test_studio_first_fold_pushes_route_editor_and_destructive_actions_below_dis
     assert _component_id_is_inside_details(studio_tab, "studio-route-editor-panel") is True
     assert _component_id_is_inside_details(studio_tab, "studio-focus-duplicate-node-button") is True
     assert _component_id_is_inside_details(studio_tab, "studio-focus-delete-edge-button") is True
+    assert _component_id_is_inside_details(studio_tab, "studio-readiness-panel") is True
+    assert _component_id_is_inside_details(studio_tab, "studio-focus-panel") is True
+    assert _component_id_is_inside_details(studio_tab, "studio-connectivity-panel") is True
 
 
 def test_edge_focus_switch_keeps_primary_node_positions_stable() -> None:

@@ -1,26 +1,29 @@
-# Phase UX Refinement - Wave 7 Handoff
+# Phase UX Refinement Wave 7 Handoff
 
-## Escopo executado
+## Objetivo da onda
 
-- Aprofundei a frente de Runs para separar melhor estados intermediários, falhos e de recuperação na superfície principal.
-- Mantive Studio e Decisão fora do centro desta wave; os ajustes ficaram restritos à transição de jornada.
-- Reforcei CTAs locais de recuperação em Runs para que o operador entenda quando deve aguardar, revisar falha, reenfileirar ou abrir Decisão.
+Encurtar a lateral do Studio de forma real depois da estabilização do canvas, deixando a primeira dobra mais contextual e rebaixando o restante do conteúdo para fallback secundário.
 
-## O que ficou melhor para o operador comum
+## Implementação
 
-- Runs agora distingue mais claramente fila/preparação, execução ativa, resultado útil e falha ou revisão pendente.
-- A leitura principal deixa mais explícito se a ação correta é esperar, revisar uma falha ou abrir a Decisão, sem empurrar cedo para Auditoria.
-- A run em foco passou a expor um sinal curto de recuperação da própria rodada, além do estado do resultado.
+- simplificado `render_studio_workspace_panel` em `src/decision_platform/ui_dash/app.py` para abrir a lateral com um único bloco dominante de contexto, reunindo foco atual, sinal de readiness e rota/composer em vez de repetir essas mensagens em faixas paralelas
+- `studio-workspace-supply-strip`, `studio-business-flow-panel` e `studio-context-detailed-panels` passaram a iniciar fechados, deixando cadeia detalhada, readiness completo, foco estendido e conectividade como camada secundária real
+- mantidas as ações diretas do canvas na primeira dobra, mas sem recolocar duplicação de readiness crítico ou cadeia de suprimento como blocos sempre visíveis
+- removido vazamento de `route:R...` do texto dominante da sidebar ao usar a leitura de conexão em foco
 
-## Evidência da onda
+## Validação
 
-- Snapshot estruturado: `docs/2026-04-09_phase_ux_refinement_wave7_ui_snapshot.json`
-- Documentação da onda: `docs/2026-04-09_phase_ux_refinement_wave7_handoff.md`
-- Validação executada:
-  - `python -m pytest tests/decision_platform/test_ui_smoke.py tests/decision_platform/test_phase3_queue_acceptance.py -m "not slow"`
+- `PYTHONPATH='src;.' .\.venv\Scripts\python.exe -m pytest tests/decision_platform/test_ui_smoke.py tests/decision_platform/test_studio_structure.py -q -p no:cacheprovider --basetemp tests/_tmp/pytest-basetemp-ux-wave7-full-rerun`
+- resultado: `121 passed in 408.49s (0:06:48)`
 
-## Limitações honestas
+## Evidência de apoio
 
-- Não houve screenshot bitmap utilizável nesta sessão; o snapshot estruturado registra a tentativa como indisponível no sandbox.
-- Ainda existe um script temporário não versionado em `output/capture_wave3_studio.ps1`, fora dos commits desta wave.
-- Não rodei a suíte lenta completa nesta sessão.
+- `output/playwright/wave7-studio-sidebar-state.json`
+  - confirma `studio-context-detailed-panels`, `studio-workspace-supply-strip`, `studio-route-editor-shell` e `studio-business-flow-panel` fechados no estado inicial
+  - registra o texto do novo bloco `studio-workspace-context-panel` sem ids crus como leitura principal
+
+## Limitações
+
+- a onda não altera o modelo funcional do Studio; o ganho é estrutural e ergonômico na lateral
+- o contexto detalhado continua existindo inteiro sob disclosure, então ainda há bastante conteúdo avançado disponível quando o usuário expande essa trilha
+- o worktree do repositório segue com alterações não relacionadas fora dos arquivos desta wave

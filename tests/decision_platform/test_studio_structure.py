@@ -57,6 +57,7 @@ def test_dash_app_exposes_structural_studio_controls() -> None:
     assert "studio-quick-link-target" in layout_repr
     assert "studio-quick-link-create-button" in layout_repr
     assert "studio-workspace-panel" in layout_repr
+    assert "studio-workspace-context-panel" in layout_repr
     assert "studio-workspace-quick-edit-panel" in layout_repr
     assert "studio-workspace-local-actions-panel" in layout_repr
     assert "studio-route-editor-shell" in layout_repr
