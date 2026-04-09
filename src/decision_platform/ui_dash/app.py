@@ -1879,6 +1879,50 @@ def _route_studio_form_values(
     }
 
 
+def _edge_route_focus_form_values(
+    route_rows: list[dict[str, Any]] | None,
+    *,
+    selected_link_id: str | None,
+    candidate_links_rows: list[dict[str, Any]] | None,
+) -> dict[str, Any]:
+    selected_id = _default_edge_studio_selection(candidate_links_rows or [], preferred_link_id=selected_link_id)
+    edge_row = next(
+        (
+            dict(row)
+            for row in (candidate_links_rows or [])
+            if str(row.get("link_id") or "").strip() == str(selected_id or "").strip()
+        ),
+        None,
+    )
+    route_ids = _route_ids_for_edge_context(route_rows or [], edge_row=edge_row)
+    selected_route_id = route_ids[0] if route_ids else None
+    selected_route_row = next(
+        (
+            dict(route)
+            for route in (route_rows or [])
+            if str(route.get("route_id") or "").strip() == str(selected_route_id or "").strip()
+        ),
+        None,
+    )
+    if selected_route_row is None:
+        return {
+            "route_id": None,
+            "intent": "optional",
+            "measurement_required": [],
+            "dose_min_l": None,
+            "q_min_delivered_lpm": None,
+            "notes": "",
+        }
+    return {
+        "route_id": selected_route_id,
+        "intent": _route_intent_value(selected_route_row),
+        "measurement_required": ["measurement_required"] if _coerce_truthy(selected_route_row.get("measurement_required")) else [],
+        "dose_min_l": float(selected_route_row.get("dose_min_l") or 0.0),
+        "q_min_delivered_lpm": float(selected_route_row.get("q_min_delivered_lpm") or 0.0),
+        "notes": str(selected_route_row.get("notes") or "").strip(),
+    }
+
+
 def apply_route_studio_edit(
     route_rows: list[dict[str, Any]],
     *,
@@ -4115,6 +4159,12 @@ def render_studio_connectivity_panel(
             nodes_rows=nodes_rows,
             candidate_links_rows=candidate_links_rows,
         )
+        edge_route_form = _edge_route_focus_form_values(
+            route_rows,
+            selected_link_id=str(edge_summary.get("selected_link_id") or "").strip(),
+            candidate_links_rows=candidate_links_rows,
+        )
+        direct_route_present = bool(edge_route_form.get("route_id"))
         menu_actions = [
             "Abra o menu contextual desta conexão e use Inverter direção para corrigir o fluxo sem abrir o workbench.",
             "Use Remover conexão no mesmo menu apenas se este trecho não fizer mais parte do fluxo principal.",
@@ -4142,6 +4192,110 @@ def render_studio_connectivity_panel(
                 ),
                 html.Div("Ações diretas no menu desta conexão", style={"fontWeight": 700, "marginTop": "12px", "marginBottom": "6px"}),
                 _bullet_list(menu_actions, "Abra o menu contextual da conexão para agir diretamente no canvas."),
+                html.Div(
+                    id="studio-connectivity-route-direct-panel",
+                    style={**UI_MUTED_CARD_STYLE, "padding": "12px", "marginTop": "12px"},
+                    children=[
+                        html.Div("Particularidades diretas deste trecho", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+                        html.Div(
+                            (
+                                f"Edite {edge_route_form['route_id']} direto neste foco para fechar readiness e particularidades sem abrir a bancada avançada."
+                                if direct_route_present
+                                else "Este trecho ainda não tem rota operacional registrada. Crie a rota a partir desta conexão e continue no foco local."
+                            ),
+                            style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"},
+                        ),
+                        html.Div(
+                            style={**UI_TWO_COLUMN_STYLE, "marginTop": "10px", "gridTemplateColumns": "repeat(auto-fit, minmax(220px, 1fr))"},
+                            children=[
+                                _field_block(
+                                    "Intenção do trecho",
+                                    dcc.Dropdown(
+                                        id="studio-connectivity-route-intent",
+                                        options=[
+                                            {"label": "Obrigatória", "value": "mandatory"},
+                                            {"label": "Desejável", "value": "desirable"},
+                                            {"label": "Opcional", "value": "optional"},
+                                        ],
+                                        value=edge_route_form.get("intent"),
+                                        disabled=not direct_route_present,
+                                        persistence=True,
+                                        persistence_type="session",
+                                    ),
+                                ),
+                                _field_block(
+                                    "Vazão mínima (L/min)",
+                                    dcc.Input(
+                                        id="studio-connectivity-route-q-min-lpm",
+                                        type="number",
+                                        value=edge_route_form.get("q_min_delivered_lpm"),
+                                        disabled=not direct_route_present,
+                                        persistence=True,
+                                        persistence_type="session",
+                                        style={"width": "100%"},
+                                    ),
+                                ),
+                                _field_block(
+                                    "Dosagem mínima (L)",
+                                    dcc.Input(
+                                        id="studio-connectivity-route-dose-min-l",
+                                        type="number",
+                                        value=edge_route_form.get("dose_min_l"),
+                                        disabled=not direct_route_present,
+                                        persistence=True,
+                                        persistence_type="session",
+                                        style={"width": "100%"},
+                                    ),
+                                ),
+                            ],
+                        ),
+                        _field_block(
+                            "Medição direta deste trecho",
+                            dcc.Checklist(
+                                id="studio-connectivity-route-measurement-required",
+                                options=[{"label": "Exigir medição direta neste trecho", "value": "measurement_required"}],
+                                value=edge_route_form.get("measurement_required"),
+                                persistence=True,
+                                persistence_type="session",
+                            ),
+                        ),
+                        _field_block(
+                            "Observação do trecho",
+                            dcc.Input(
+                                id="studio-connectivity-route-notes",
+                                type="text",
+                                value=edge_route_form.get("notes"),
+                                disabled=not direct_route_present,
+                                persistence=True,
+                                persistence_type="session",
+                                style={"width": "100%"},
+                            ),
+                        ),
+                        html.Div(
+                            style=UI_ACTION_ROW_STYLE,
+                            children=[
+                                html.Button(
+                                    "Aplicar neste trecho",
+                                    id="studio-connectivity-route-apply-button",
+                                    style=UI_BUTTON_STYLE,
+                                    disabled=not direct_route_present,
+                                ),
+                                html.Button(
+                                    "Exigir medição direta",
+                                    id="studio-connectivity-route-measurement-button",
+                                    style=UI_BUTTON_STYLE,
+                                    disabled=not direct_route_present,
+                                ),
+                                html.Button(
+                                    "Criar rota a partir deste trecho",
+                                    id="studio-connectivity-route-create-button",
+                                    style=UI_BUTTON_STYLE,
+                                    disabled=direct_route_present,
+                                ),
+                            ],
+                        ),
+                    ],
+                ),
             ],
         )
     return html.Div(
@@ -7715,6 +7869,7 @@ def build_app(
         Output("studio-status-message", "data", allow_duplicate=True),
         Input("studio-route-create-from-edge-button", "n_clicks"),
         Input("studio-canvas-load-edge-button", "n_clicks"),
+        Input("studio-connectivity-route-create-button", "n_clicks"),
         State("edge-studio-selected-id", "data"),
         State("candidate-links-grid", "rowData"),
         State("studio-route-composer-state", "data"),
@@ -7723,12 +7878,13 @@ def build_app(
     def _load_selected_edge_into_route_composer(
         n_clicks: Any,
         canvas_n_clicks: Any,
+        connectivity_n_clicks: Any,
         selected_link_id: str | None,
         candidate_links_rows: list[dict[str, Any]] | None,
         composer_state: dict[str, Any] | None,
     ) -> tuple[dict[str, Any], str]:
         state = _normalize_route_composer_state(composer_state)
-        if max(int(n_clicks or 0), int(canvas_n_clicks or 0)) <= 0:
+        if max(int(n_clicks or 0), int(canvas_n_clicks or 0), int(connectivity_n_clicks or 0)) <= 0:
             return state, ""
         selected_id = _default_edge_studio_selection(candidate_links_rows or [], preferred_link_id=selected_link_id)
         edge_row = next(
@@ -7744,6 +7900,34 @@ def build_app(
         state["source_node_id"] = str(edge_row.get("from_node") or "").strip()
         state["sink_node_id"] = str(edge_row.get("to_node") or "").strip()
         return state, f"Trecho {selected_id} carregado no composer. Revise intenção e readiness antes de confirmar."
+
+    @app.callback(
+        Output("studio-connectivity-route-intent", "value"),
+        Output("studio-connectivity-route-q-min-lpm", "value"),
+        Output("studio-connectivity-route-dose-min-l", "value"),
+        Output("studio-connectivity-route-notes", "value"),
+        Output("studio-connectivity-route-measurement-required", "value"),
+        Input("edge-studio-selected-id", "data"),
+        Input("routes-grid", "rowData"),
+        Input("candidate-links-grid", "rowData"),
+    )
+    def _sync_connectivity_route_controls(
+        selected_link_id: str | None,
+        route_rows: list[dict[str, Any]] | None,
+        candidate_links_rows: list[dict[str, Any]] | None,
+    ) -> tuple[str, Any, Any, str, list[str]]:
+        form_values = _edge_route_focus_form_values(
+            route_rows,
+            selected_link_id=selected_link_id,
+            candidate_links_rows=candidate_links_rows,
+        )
+        return (
+            str(form_values.get("intent") or "optional"),
+            form_values.get("q_min_delivered_lpm"),
+            form_values.get("dose_min_l"),
+            str(form_values.get("notes") or ""),
+            list(form_values.get("measurement_required") or []),
+        )
 
     @app.callback(
         Output("studio-route-composer-state", "data", allow_duplicate=True),
@@ -7860,6 +8044,65 @@ def build_app(
         except ValueError as exc:
             return route_rows or [], str(exc)
         return updated_rows, f"Rota {route_id} atualizada direto no foco do canvas."
+
+    @app.callback(
+        Output("routes-grid", "rowData", allow_duplicate=True),
+        Output("studio-status-message", "data", allow_duplicate=True),
+        Input("studio-connectivity-route-apply-button", "n_clicks"),
+        Input("studio-connectivity-route-measurement-button", "n_clicks"),
+        State("routes-grid", "rowData"),
+        State("edge-studio-selected-id", "data"),
+        State("candidate-links-grid", "rowData"),
+        State("studio-connectivity-route-intent", "value"),
+        State("studio-connectivity-route-measurement-required", "value"),
+        State("studio-connectivity-route-dose-min-l", "value"),
+        State("studio-connectivity-route-q-min-lpm", "value"),
+        State("studio-connectivity-route-notes", "value"),
+        prevent_initial_call=True,
+    )
+    def _apply_connectivity_route_edit(
+        apply_n_clicks: Any,
+        measurement_n_clicks: Any,
+        route_rows: list[dict[str, Any]] | None,
+        selected_link_id: str | None,
+        candidate_links_rows: list[dict[str, Any]] | None,
+        intent: str | None,
+        measurement_required: list[str] | None,
+        dose_min_l: Any,
+        q_min_delivered_lpm: Any,
+        notes: str | None,
+    ) -> tuple[list[dict[str, Any]], str]:
+        if max(int(apply_n_clicks or 0), int(measurement_n_clicks or 0)) <= 0:
+            return route_rows or [], ""
+        form_values = _edge_route_focus_form_values(
+            route_rows,
+            selected_link_id=selected_link_id,
+            candidate_links_rows=candidate_links_rows,
+        )
+        selected_route_id = str(form_values.get("route_id") or "").strip()
+        if not selected_route_id:
+            return route_rows or [], "Selecione uma conexão com rota operacional antes de editar este trecho."
+        measurement_required_value = "measurement_required" in (measurement_required or [])
+        if int(measurement_n_clicks or 0) > int(apply_n_clicks or 0):
+            measurement_required_value = True
+        try:
+            updated_rows, route_id = apply_route_studio_edit(
+                route_rows or [],
+                selected_route_id=selected_route_id,
+                intent=intent,
+                measurement_required=measurement_required_value,
+                dose_min_l=dose_min_l,
+                q_min_delivered_lpm=q_min_delivered_lpm,
+                notes=notes,
+            )
+        except ValueError as exc:
+            return route_rows or [], str(exc)
+        status_message = (
+            f"Rota {route_id} agora exige medição direta no trecho em foco."
+            if int(measurement_n_clicks or 0) > int(apply_n_clicks or 0)
+            else f"Rota {route_id} atualizada direto no painel de conectividade."
+        )
+        return updated_rows, status_message
 
     @app.callback(
         Output("routes-grid", "rowData", allow_duplicate=True),

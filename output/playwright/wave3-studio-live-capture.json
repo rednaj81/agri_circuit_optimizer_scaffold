@@ -1,0 +1,9 @@
+{
+  "url": "http://127.0.0.1:8064/?tab=studio",
+  "captured_at": "2026-04-09T19:47:52Z",
+  "artifacts": [
+    "output/playwright/wave3-studio-live-layout.json",
+    "output/playwright/wave3-studio-live-index.html"
+  ],
+  "capture_type": "live_app_structured_export"
+}

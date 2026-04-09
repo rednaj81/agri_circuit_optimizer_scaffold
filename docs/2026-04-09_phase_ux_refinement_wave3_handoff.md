@@ -1,32 +1,40 @@
-# Phase UX Refinement - Wave 3 Handoff
+# Phase UX Refinement Wave 3 - Direct Route Editing From Edge Context
 
-## Escopo executado
+## Objective
 
-- Coloquei mais ações rotineiras diretamente na orientação do canvas: usar nó como origem, usar nó como destino, trazer trecho, inverter direção e marcar rota obrigatória sem atravessar o workbench.
-- Mantive o `studio-workspace` como suporte do foco atual, com leitura curta, ações locais e readiness crítico apenas quando necessário.
-- Reforcei a `Decisão` com um sinal compacto de risco comparativo, para que margem, rota crítica ou penalidade continuem legíveis mesmo quando o texto de diferença estiver fraco.
+Advance `ux_phase_2` with a real Studio interaction gain by letting the operator resolve a frequent edge-focused task locally, instead of relying on the advanced workbench or a separate heavier edit path.
 
-## O que ficou melhor para o operador comum
+## Delivered
 
-- O primeiro gesto no Studio ficou ainda mais direto: selecionar no canvas e agir dali mesmo.
-- A lateral continua subordinada ao canvas, enquanto a orientação do foco já oferece atalhos para montar e ajustar a rota.
-- A Decisão agora mostra um risco comparativo explícito em linguagem curta, sem depender só de narrativa.
+- The connectivity panel now exposes `Particularidades diretas deste trecho` whenever a visible connection is selected, turning the edge context into an operational editor for the linked business route.
+- From that local edge context, the operator can now update route intent, minimum flow, minimum dose, measurement requirement and notes directly on the selected route, without leaving the current connection review.
+- When the selected connection still has no route, the same local panel now offers `Criar rota a partir deste trecho`, sending the connection directly into the route composer from the connectivity context.
+- The direct measurement action `Exigir medição direta` closes one of the most common preventable readiness blockers from the local panel instead of pushing the operator into the heavier route editing path.
+- The Studio remains business-graph-first: no technical helpers were surfaced, and the supply-flow reading plus route-first framing stayed explicit on the primary surface.
 
-## Evidência da onda
+## Validation
 
-- Snapshot estruturado: `docs/2026-04-09_phase_ux_refinement_wave3_ui_snapshot.json`
-- Documentação da onda: `docs/2026-04-09_phase_ux_refinement_wave3_handoff.md`
-- Validação executada:
-  - `python -m pytest tests/decision_platform/test_ui_smoke.py tests/decision_platform/test_studio_structure.py -m "not slow"`
-  - Resultado: `93 passed, 12 deselected`
+```powershell
+$env:PYTHONPATH='src;.'; .\.venv\Scripts\python.exe -m pytest tests/decision_platform/test_ui_smoke.py -q -p no:cacheprovider --basetemp tests/_tmp/pytest-basetemp-ux-wave3-current
+```
 
-## Limitações honestas
+Result:
 
-- A captura bitmap Full HD tentada para `output/playwright/studio-fullhd-wave3.png` falhou no sandbox por crash do browser headless; registrei isso no snapshot estruturado em vez de forçar um artefato enganoso.
-- O workbench avançado segue existente para casos mais profundos; a onda reduziu mais uma vez sua necessidade no fluxo comum, mas não o removeu.
-- Não rodei a suíte lenta completa nesta sessão.
+- `97 passed in 341.53s (0:05:41)`
 
-## Próximo passo sugerido
+## Evidence
 
-- Se houver mais uma onda em `ux_phase_2`, o ganho restante está em consolidar ainda mais confirmação de rota e intenção diretamente no foco local, sem crescer a lateral.
-- Caso a fase avance, a próxima frente natural continua sendo `Runs`.
+- Live app structured capture: `output/playwright/wave3-studio-live-layout.json`
+- Live app index capture: `output/playwright/wave3-studio-live-index.html`
+- Capture metadata: `output/playwright/wave3-studio-live-capture.json`
+
+## Scope Guardrails
+
+- No architecture reopening.
+- No stack replacement beyond the current Dash/Cytoscape Studio.
+- No exposure of technical internal hubs, centrais or derived entities on the primary Studio surface.
+- No broad Runs, Decision or Audit redesign.
+
+## Honest Handoff
+
+This wave changes behaviour, not only structure: selecting a connection now opens a local operational route editor capable of fixing measurement and route particularities directly from the edge context, which is a more meaningful Studio interaction gain than another card/disclosure pass. The evidence is live and tied to the app in execution through a local Dash server capture of `/?tab=studio` and `/_dash-layout`. I still did not obtain a literal browser screenshot because the sandboxed browser toolchain remained blocked, so the proof is a live structured capture rather than a PNG.
