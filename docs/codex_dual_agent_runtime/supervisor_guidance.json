@@ -1,29 +1,36 @@
 {
-    "updated_at":  "2026-04-09T22:36:08.1083505Z",
+    "updated_at":  "2026-04-09T22:37:50.6599224Z",
     "mode":  "ux_refinement",
     "source_bundle":  "docs/ux_refinement_autonomy_bundle",
     "source_zip":  "docs/ux_refinement_autonomy_bundle.zip",
     "phase_plan":  "docs/ux_refinement_autonomy_bundle/automation/phase_plan.yaml",
     "bootstrap_prompt":  "docs/ux_refinement_autonomy_bundle/prompts/PROMPT_SHORT_BOOTSTRAP_UI_REFINEMENT.md",
     "full_prompt":  "docs/ux_refinement_autonomy_bundle/prompts/PROMPT_FULL_AUTONOMOUS_UI_REFINEMENT.md",
-    "current_repo_head":  "a5363c46f20c3762e60391fe16bb76733da7a1b2",
+    "current_repo_head":  "b8f2e9c8b523728c7baaf3435367ae86d4c0c629",
     "current_branch":  "codex/new-architecture-platform",
-    "active_ux_phase_id":  "ux_phase_3",
+    "active_ux_phase_id":  "ux_phase_2",
     "active_ux_phase":  {
-                            "id":  "ux_phase_3",
-                            "name":  "Runs queue and execution UX",
+                            "id":  "ux_phase_2",
+                            "name":  "Studio refinement and connectivity-first workflow",
                             "focus":  [
-                                          "queue readability",
-                                          "run statuses",
-                                          "progress",
-                                          "run detail view",
-                                          "scenario/run separation"
+                                          "business graph only",
+                                          "route-first canvas",
+                                          "node/edge editing UX",
+                                          "direct manipulation on canvas",
+                                          "properties panel",
+                                          "mandatory routes",
+                                          "optional and desirable routes",
+                                          "route particularities",
+                                          "pre-run validation",
+                                          "connectivity guidance"
                                       ],
                             "expected_outcomes":  [
-                                                      "clean understanding of background processing"
+                                                      "scenario readiness clarity",
+                                                      "fewer preventable invalid runs",
+                                                      "studio no longer exposes technical graph internals",
+                                                      "first Studio surface centered on routes to be served, not strategic helper entities"
                                                   ]
                         },
-    "active_ux_phase_state":  "planned_next_cycle_only",
     "next_ux_phase_id":  "ux_phase_3",
     "phase_sequence":  [
                            {
@@ -48,12 +55,12 @@
                            }
                        ],
     "current_focus":  {
-                          "active_wave_index":  22,
+                          "active_wave_index":  23,
                           "active_role":  "developer",
-                          "waves_completed":  21,
-                          "health_state":  "stopped",
+                          "waves_completed":  22,
+                          "health_state":  "running",
                           "run_id":  "run-20260409-154356",
-                          "stop_reason":  "governance_stop_max_waves_reached; ux_phase_2 accepted; ux_phase_3 planned_next_cycle_only; no continuation authorized in run-20260409-154356"
+                          "stop_reason":  ""
                       },
     "directives":  [
                        "Do not reopen architecture or replace the current Dash/Cytoscape stack.",
@@ -98,14 +105,14 @@
                                   "visual evidence via screenshot or structured UI snapshot when possible"
                               ],
     "recent_commit_subjects":  [
+                                   "wave22 restore ux refinement canonical stop",
                                    "wave21 keep ux refinement loop stopped",
                                    "wave20 enforce ux refinement stop source",
                                    "wave18 preserve ux refinement stopped state",
                                    "wave17 reclose ux refinement stop state",
                                    "wave16 restabilize ux refinement stop state",
                                    "wave14 close ux refinement stop record",
-                                   "wave13 reconcile ux refinement stop state",
-                                   "wave12 record ux refinement governance stop"
+                                   "wave13 reconcile ux refinement stop state"
                                ],
     "repo_overlay":  {
                          "root_agents":  "AGENTS.md",
