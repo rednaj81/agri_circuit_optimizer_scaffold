@@ -410,6 +410,24 @@ def test_product_journey_panel_summarizes_all_primary_spaces() -> None:
     assert getattr(_find_component_by_id(panel, "product-journey-open-runs-link"), "href", None) == "?tab=decision"
 
 
+def test_shell_chrome_compacts_studio_and_decision_first_fold() -> None:
+    with diagnostic_runtime_test_mode():
+        app = build_app("data/decision_platform/maquete_v2")
+
+    callback = _get_callback(app, output_prefix="..shell-hero-panel.style...product-journey-panel.style...product-space-banner.style..")
+
+    studio_styles = callback("studio")
+    decision_styles = callback("decision")
+    runs_styles = callback("runs")
+
+    assert studio_styles[0]["padding"] == "14px 16px"
+    assert studio_styles[1]["display"] == "none"
+    assert studio_styles[2]["padding"] == "12px 14px"
+    assert decision_styles[1]["display"] == "none"
+    assert runs_styles[0]["padding"] == "20px"
+    assert runs_styles[1].get("display") != "none"
+
+
 def test_product_space_banner_callback_tracks_active_primary_tab() -> None:
     with diagnostic_runtime_test_mode():
         app = build_app("data/decision_platform/maquete_v2")
@@ -1668,6 +1686,7 @@ def test_decision_workspace_panel_makes_winner_runner_up_and_tie_legible() -> No
     assert "Perfis explícitos de seleção" in panel_text
     assert "Perfil atual" in panel_text
     assert "Referência oficial" in panel_text
+    assert "Contexto de leitura" in panel_text
     assert _find_component_by_id(panel, "decision-workspace-open-runs-link") is not None
     assert _find_component_by_id(panel, "decision-workspace-open-audit-link") is not None
     assert _find_component_by_id(panel, "decision-profile-views-panel") is not None

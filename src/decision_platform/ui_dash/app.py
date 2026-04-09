@@ -48,6 +48,11 @@ UI_HERO_STYLE = {
     "boxShadow": "0 18px 40px rgba(16, 59, 53, 0.16)",
     "marginBottom": "14px",
 }
+UI_HERO_COMPACT_STYLE = {
+    **UI_HERO_STYLE,
+    "padding": "14px 16px",
+    "borderRadius": "20px",
+}
 UI_CARD_STYLE = {
     "background": "rgba(255, 255, 255, 0.92)",
     "border": "1px solid rgba(16, 59, 53, 0.12)",
@@ -123,6 +128,9 @@ UI_JOURNEY_PANEL_STYLE = {
     **UI_CARD_STYLE,
     "marginBottom": "12px",
 }
+UI_CHROME_HIDDEN_STYLE = {
+    "display": "none",
+}
 UI_JOURNEY_CARD_STYLE = {
     **UI_MUTED_CARD_STYLE,
     "padding": "14px",
@@ -145,9 +153,13 @@ UI_PERSISTENT_BANNER_STYLE = {
     "zIndex": 10,
     "backdropFilter": "blur(18px)",
 }
+UI_PERSISTENT_BANNER_COMPACT_STYLE = {
+    **UI_PERSISTENT_BANNER_STYLE,
+    "padding": "12px 14px",
+}
 UI_STUDIO_MAIN_GRID_STYLE = {
     "display": "grid",
-    "gridTemplateColumns": "minmax(0, 1.75fr) minmax(360px, 430px)",
+    "gridTemplateColumns": "minmax(0, 2.35fr) minmax(320px, 380px)",
     "gap": "18px",
     "alignItems": "start",
 }
@@ -158,11 +170,17 @@ UI_STUDIO_SIDEBAR_STYLE = {
 }
 UI_STUDIO_CANVAS_CARD_STYLE = {
     **UI_CARD_STYLE,
-    "padding": "16px",
+    "padding": "14px",
 }
 UI_COMPACT_BANNER_CARD_STYLE = {
     **UI_MUTED_CARD_STYLE,
     "padding": "12px 14px",
+}
+UI_COMPACT_VALUE_CARD_STYLE = {
+    **UI_MUTED_CARD_STYLE,
+    "padding": "12px",
+    "display": "grid",
+    "gap": "6px",
 }
 UI_PILL_STYLE = {
     "display": "inline-flex",
@@ -336,6 +354,13 @@ def _product_space_content(space: str | None) -> dict[str, str]:
         "objective": "Deixar o cenário claro o suficiente para seguir para Runs sem depender da trilha técnica como superfície principal.",
         "next_action": "Resolva readiness, projeção e foco do canvas antes de abrir a fila.",
     }
+
+
+def _shell_chrome_styles_for_space(space: str | None) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    normalized = str(space or "studio").strip().lower()
+    if normalized in {"studio", "decision"}:
+        return UI_HERO_COMPACT_STYLE, UI_CHROME_HIDDEN_STYLE, UI_PERSISTENT_BANNER_COMPACT_STYLE
+    return UI_HERO_STYLE, UI_JOURNEY_PANEL_STYLE, UI_PERSISTENT_BANNER_STYLE
 
 
 def _journey_space_state(space: str, studio_summary: dict[str, Any], run_summary: dict[str, Any], decision_summary: dict[str, Any]) -> dict[str, str]:
@@ -779,6 +804,21 @@ def _metric_card(label: str, value: Any, note: str | None = None) -> Any:
             html.Div(label, style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.08em", "color": "#5b756d"}),
             html.Div(str(value), style={"fontSize": "24px", "fontWeight": 700, "marginTop": "6px"}),
             html.Div(note or "", style={"fontSize": "13px", "lineHeight": "1.5", "marginTop": "4px", "color": "#496158"}),
+        ],
+    )
+
+
+def _compact_value_card(label: str, value: Any, note: str | None = None, *, accent: str | None = None) -> Any:
+    return html.Div(
+        style={
+            **UI_COMPACT_VALUE_CARD_STYLE,
+            "border": f"1px solid {accent}" if accent else UI_COMPACT_VALUE_CARD_STYLE.get("border"),
+            "boxShadow": "none",
+        },
+        children=[
+            html.Div(label, style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+            html.Div(str(value or "-"), style={"fontSize": "22px", "fontWeight": 700, "lineHeight": "1.15"}),
+            html.Div(note or "", style={"fontSize": "13px", "lineHeight": "1.45", "color": "#496158"}),
         ],
     )
 
@@ -3386,14 +3426,6 @@ def render_studio_workspace_panel(
                 ],
             ),
             html.Div(
-                style={**UI_COMPACT_BANNER_CARD_STYLE, "marginBottom": "12px"},
-                children=[
-                    html.Div("O que precisa de atenção agora", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
-                    html.Div(top_issue, style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"}),
-                    html.Div(focus_summary["recommended_action"], style={"lineHeight": "1.45", "marginTop": "8px"}),
-                ],
-            ),
-            html.Div(
                 id="studio-workspace-quick-edit-panel",
                 style={**UI_MUTED_CARD_STYLE, "padding": "12px", "marginBottom": "12px"},
                 children=[
@@ -3445,23 +3477,29 @@ def render_studio_workspace_panel(
                     ),
                 ],
             ),
-            html.Div(
-                style=UI_THREE_COLUMN_STYLE,
-                children=[
-                    _metric_card("Bloqueios", blocker_count, "Impedem liberar a passagem para Runs."),
-                    _metric_card("Avisos", warning_count, "Pedem revisão antes de enfileirar."),
-                    _metric_card("Rotas obrigatórias", studio_summary.get("mandatory_route_count", 0), "Base mínima da conectividade principal."),
-                    _metric_card("Rotas desejáveis", studio_summary.get("desirable_route_count", 0), "Desejos explícitos sem virar hard constraint."),
-                    _metric_card("Rotas opcionais", studio_summary.get("optional_route_count", 0), "Alternativas que não travam a saída para Runs."),
-                ],
-            ),
             html.Div(style={**UI_ACTION_ROW_STYLE, "marginTop": "12px"}, children=[*primary_actions, _button_link("Abrir Auditoria", "?tab=audit", "studio-workspace-open-audit-link")]),
-            html.Div(
-                style={**UI_COMPACT_BANNER_CARD_STYLE, "marginTop": "12px"},
+            html.Details(
+                style={**UI_MUTED_CARD_STYLE, "padding": "12px", "marginTop": "12px"},
                 children=[
-                    html.Div("Sinal de saída desta área", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
-                    html.Div(str((studio_summary.get("next_steps") or ["Feche a leitura principal do Studio antes de sair."])[0]), style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"}),
-                    render_status_banner(studio_status_text),
+                    html.Summary("Readiness e saída do Studio"),
+                    html.Div(
+                        style={**UI_THREE_COLUMN_STYLE, "marginTop": "12px"},
+                        children=[
+                            _metric_card("Bloqueios", blocker_count, "Impedem liberar a passagem para Runs."),
+                            _metric_card("Avisos", warning_count, "Pedem revisão antes de enfileirar."),
+                            _metric_card("Rotas obrigatórias", studio_summary.get("mandatory_route_count", 0), "Base mínima da conectividade principal."),
+                            _metric_card("Rotas desejáveis", studio_summary.get("desirable_route_count", 0), "Desejos explícitos sem virar hard constraint."),
+                            _metric_card("Rotas opcionais", studio_summary.get("optional_route_count", 0), "Alternativas que não travam a saída para Runs."),
+                        ],
+                    ),
+                    html.Div(
+                        style={**UI_COMPACT_BANNER_CARD_STYLE, "marginTop": "12px"},
+                        children=[
+                            html.Div("Sinal de saída desta área", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+                            html.Div(str((studio_summary.get("next_steps") or ["Feche a leitura principal do Studio antes de sair."])[0]), style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"}),
+                            render_status_banner(studio_status_text),
+                        ],
+                    ),
                 ],
             ),
         ]
@@ -5213,6 +5251,9 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
         signal_text = "Winner e runner-up já aparecem com leitura utilizável; aprofunde Auditoria só se precisar reconciliar a trilha técnica."
         runs_label = "Voltar para Runs"
         audit_primary = True
+    tie_label = "Explícito" if decision_status == "technical_tie" else "Não ativo"
+    official_profile_label = _decision_profile_presentation(official_profile_id)["label"]
+    active_profile_label = _decision_profile_presentation(active_profile_id)["label"]
     return html.Div(
         children=[
             html.Div("Leitura principal da decisão", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
@@ -5224,15 +5265,14 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
                 ],
             ),
             html.Div(
-                style={**UI_TWO_COLUMN_STYLE, "marginBottom": "12px"},
+                style={**UI_THREE_COLUMN_STYLE, "marginBottom": "12px"},
                 children=[
-                    _guidance_card("O que esta área resolve", "Transformar a última execução utilizável em leitura comparável entre winner, runner-up e risco principal."),
-                    _guidance_card("Estado atual", decision_state["headline"]),
-                    _guidance_card("Perfil em leitura", _decision_profile_presentation(active_profile_id)["label"]),
-                    _guidance_card("Referência oficial do produto", f"{_decision_profile_presentation(official_profile_id)['label']}: {official_product_candidate_id or '-'}"),
-                    _guidance_card("Winner atual", candidate_id or "Ainda sem winner oficial legível"),
-                    _guidance_card("Runner-up", runner_up_id or "Ainda sem runner-up comparável"),
-                    _guidance_card("Próxima ação", decision_state["next_action"]),
+                    _compact_value_card("Perfil em leitura", active_profile_label, "Filtro ativo para esta comparação.", accent="rgba(16, 59, 53, 0.18)"),
+                    _compact_value_card("Winner atual", candidate_id or "Sem winner", summary.get("topology_family") or "Sem família líder legível", accent="#d7e5c1"),
+                    _compact_value_card("Runner-up", runner_up_id or "Sem runner-up", summary.get("runner_up_topology_family") or "Sem contraste comparável"),
+                    _compact_value_card("Technical tie", tie_label, "Winner vs runner-up" if decision_status == "technical_tie" else "Sem empate técnico aberto"),
+                    _compact_value_card("Referência oficial do produto", official_product_candidate_id or "-", official_profile_label),
+                    _compact_value_card("Escolha manual atual", selected_candidate_id or "-", selected_state_label),
                 ],
             ),
             html.Div(
@@ -5240,18 +5280,18 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
                 children=[
                     html.Div("O que esta decisão pede agora", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
                     html.Div(signal_text, style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"}),
-                    html.Div(decision_state["contrast_state"], style={"lineHeight": "1.6", "marginTop": "10px"}),
+                    html.Div(decision_state["contrast_state"], style={"lineHeight": "1.6", "marginTop": "8px"}),
                 ],
             ),
             html.H4("Comparação final assistida", style={"marginBottom": "6px"}),
             html.Div(
                 id="decision-final-comparison-panel",
-                style={**UI_TWO_COLUMN_STYLE, "marginBottom": "12px"},
+                style={**UI_TWO_COLUMN_STYLE, "gridTemplateColumns": "repeat(auto-fit, minmax(220px, 1fr))", "marginBottom": "12px"},
                 children=[
-                    _guidance_card("Referência oficial do produto", f"{official_product_candidate_id or '-'} no perfil {_decision_profile_presentation(official_profile_id)['label']}."),
-                    _guidance_card("Winner do perfil em leitura", f"{candidate_id or '-'} no perfil {_decision_profile_presentation(active_profile_id)['label']}."),
-                    _guidance_card("Runner-up comparável", runner_up_id or "Ainda sem runner-up legível"),
-                    _guidance_card("Escolha manual atual", f"{selected_candidate_id or '-'} ({selected_state_label.lower()})."),
+                    _compact_value_card("Referência oficial do produto", official_product_candidate_id or "-", official_profile_label),
+                    _compact_value_card("Winner do perfil em leitura", candidate_id or "-", active_profile_label),
+                    _compact_value_card("Runner-up comparável", runner_up_id or "-", "Empate técnico" if decision_status == "technical_tie" else "Alternativa próxima"),
+                    _compact_value_card("Escolha manual atual", selected_candidate_id or "-", selected_topology_family),
                 ],
             ),
             html.H4("Perfis explícitos de seleção", style={"marginBottom": "6px"}),
@@ -5266,15 +5306,30 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
                     html.Div(export_guidance, style={"lineHeight": "1.6", "marginTop": "8px"}),
                 ],
             ),
-            html.Div(
-                style=UI_THREE_COLUMN_STYLE,
+            html.Details(
+                style={**UI_MUTED_CARD_STYLE, "padding": "12px"},
                 children=[
-                    _metric_card("Estado dominante", decision_state["state_label"]),
-                    _metric_card("Candidatos visíveis", visible_candidate_count),
-                    _metric_card("Technical tie", "Explícito" if decision_status == "technical_tie" else "Não ativo"),
-                    _metric_card("Winner", candidate_id or "-"),
-                    _metric_card("Runner-up", runner_up_id or "-"),
-                    _metric_card("Família líder", summary.get("topology_family") or catalog_summary.get("top_visible_family") or "-"),
+                    html.Summary("Contexto de leitura"),
+                    html.Div(
+                        style={**UI_TWO_COLUMN_STYLE, "marginTop": "12px"},
+                        children=[
+                            _guidance_card("O que esta área resolve", "Transformar a última execução utilizável em leitura comparável entre winner, runner-up e risco principal."),
+                            _guidance_card("Estado atual", decision_state["headline"]),
+                            _guidance_card("Próxima ação", decision_state["next_action"]),
+                            _guidance_card("Referência oficial do produto", f"{official_profile_label}: {official_product_candidate_id or '-'}"),
+                        ],
+                    ),
+                    html.Div(
+                        style={**UI_THREE_COLUMN_STYLE, "marginTop": "12px"},
+                        children=[
+                            _metric_card("Estado dominante", decision_state["state_label"]),
+                            _metric_card("Candidatos visíveis", visible_candidate_count),
+                            _metric_card("Technical tie", tie_label),
+                            _metric_card("Winner", candidate_id or "-"),
+                            _metric_card("Runner-up", runner_up_id or "-"),
+                            _metric_card("Família líder", summary.get("topology_family") or catalog_summary.get("top_visible_family") or "-"),
+                        ],
+                    ),
                 ],
             ),
             html.Div(
@@ -5736,6 +5791,7 @@ def build_app(
         authoring_payload["candidate_links_rows"],
         authoring_payload["route_rows"],
     )
+    initial_hero_style, initial_journey_style, initial_banner_style = _shell_chrome_styles_for_space("studio")
 
     app = Dash(__name__)
     app.layout = html.Div(
@@ -5752,13 +5808,14 @@ def build_app(
                 style=UI_SHELL_STYLE,
                 children=[
                     html.Div(
-                        style=UI_HERO_STYLE,
+                        id="shell-hero-panel",
+                        style=initial_hero_style,
                         children=[
                             html.Div("Decision Platform", style={"fontSize": "13px", "letterSpacing": "0.14em", "textTransform": "uppercase", "opacity": 0.78}),
                             html.H1("Studio, runs e decisão numa jornada única", style={"margin": "6px 0 8px", "fontSize": "30px", "lineHeight": "1.05"}),
                             html.P(
                                 "A interface principal foi reorganizada para deixar explícito quando editar o cenário, quando acompanhar a fila, quando decidir entre alternativas e quando abrir a trilha técnica.",
-                                style={"maxWidth": "860px", "fontSize": "14px", "lineHeight": "1.45", "margin": "0 0 12px"},
+                                style={"maxWidth": "860px", "fontSize": "14px", "lineHeight": "1.45", "margin": "0 0 10px"},
                             ),
                             html.Div(
                                 style={"display": "grid", "gridTemplateColumns": "repeat(auto-fit, minmax(180px, 1fr))", "gap": "10px"},
@@ -5788,7 +5845,7 @@ def build_app(
                             initial_run_jobs_snapshot["summary"],
                             initial_official_summary,
                         ),
-                        style=UI_JOURNEY_PANEL_STYLE,
+                        style=initial_journey_style,
                     ),
                     html.Div(
                         id="product-space-banner",
@@ -5798,7 +5855,7 @@ def build_app(
                             initial_run_jobs_snapshot["summary"],
                             initial_official_summary,
                         ),
-                        style=UI_PERSISTENT_BANNER_STYLE,
+                        style=initial_banner_style,
                     ),
                     dcc.Tabs(
                         id="primary-navigation-tabs",
@@ -5810,21 +5867,16 @@ def build_app(
                         value="studio",
                         children=[
                             html.Div(
-                                style={**UI_COMPACT_BANNER_CARD_STYLE, "marginBottom": "14px"},
+                                style={**UI_COMPACT_BANNER_CARD_STYLE, "marginBottom": "12px"},
                                 children=[
-                                    html.Div("Studio", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#47665d"}),
-                                    html.Div("Desenhe primeiro as rotas de negócio e ajuste a intenção perto do canvas.", style={"fontWeight": 700, "fontSize": "22px", "lineHeight": "1.25", "marginTop": "6px"}),
+                                    html.Div("Studio", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#47665d"}),
+                                    html.Div("Canvas primeiro: desenhe rotas, ajuste intenção e corrija bloqueios perto do grafo.", style={"fontWeight": 700, "fontSize": "18px", "lineHeight": "1.25", "marginTop": "6px"}),
                                     html.Div(
-                                        style={**UI_TWO_COLUMN_STYLE, "gridTemplateColumns": "minmax(0, 1fr) minmax(280px, 360px)", "marginTop": "10px"},
+                                        style={"display": "flex", "gap": "8px", "flexWrap": "wrap", "marginTop": "10px"},
                                         children=[
-                                            html.Div("A superfície principal mantém rotas, entidades e conexões de negócio. Hubs internos, contratos crus e JSON ficam fora da primeira dobra.", style={"lineHeight": "1.45"}),
-                                            html.Div(
-                                                style={**UI_MUTED_CARD_STYLE, "padding": "10px"},
-                                                children=[
-                                                    html.Div("Prioridade agora", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
-                                                    html.Div("Defina as rotas a servir, ajuste intenção e conectividade no canvas e use a bancada avançada só quando a ação direta não bastar.", style={"fontWeight": 700, "lineHeight": "1.45", "marginTop": "6px"}),
-                                                ],
-                                            ),
+                                            html.Span("Endpoints e tanques relevantes", style=UI_PILL_STYLE),
+                                            html.Span("Rotas e intenção visíveis", style=UI_PILL_STYLE),
+                                            html.Span("Workbench avançado abaixo da dobra", style=UI_PILL_STYLE),
                                         ],
                                     ),
                                 ],
@@ -5844,13 +5896,7 @@ def build_app(
                                                             html.Div("Use esta área para enxergar quem supre quem, desenhar os trechos principais e revisar a intenção das rotas.", style={"lineHeight": "1.45", "color": "#496158"}),
                                                         ]
                                                     ),
-                                                    html.Div(
-                                                        style={**UI_MUTED_CARD_STYLE, "padding": "10px", "minWidth": "240px"},
-                                                        children=[
-                                                            html.Div("Visibilidade principal", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
-                                                            html.Div("Somente entidades, conexões e projeções de rota de negócio aparecem aqui.", style={"fontWeight": 700, "lineHeight": "1.45", "marginTop": "6px"}),
-                                                        ],
-                                                    ),
+                                                    html.Div(style={"display": "flex", "gap": "8px", "flexWrap": "wrap"}, children=[html.Span("Quem supre quem", style=UI_PILL_STYLE), html.Span("Ações diretas no canvas", style=UI_PILL_STYLE)]),
                                                 ],
                                             ),
                                             html.Div(
@@ -5865,7 +5911,7 @@ def build_app(
                                                 id="node-studio-cytoscape",
                                                 elements=initial_node_studio_elements,
                                                 layout={"name": "preset"},
-                                                style={"width": "100%", "height": "720px"},
+                                                style={"width": "100%", "height": "820px"},
                                                 contextMenu=STUDIO_CONTEXT_MENU,
                                                 stylesheet=_build_node_studio_stylesheet(
                                                     initial_node_studio_selected_id,
@@ -8484,6 +8530,15 @@ def build_app(
         if search:
             return _primary_tab_from_search(search, default=str(current_tab or "studio"))
         return str(current_tab or "studio")
+
+    @app.callback(
+        Output("shell-hero-panel", "style"),
+        Output("product-journey-panel", "style"),
+        Output("product-space-banner", "style"),
+        Input("primary-navigation-tabs", "value"),
+    )
+    def _refresh_shell_chrome_styles(current_tab: str | None) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+        return _shell_chrome_styles_for_space(current_tab)
 
     @app.callback(
         Output("product-journey-panel", "children"),
