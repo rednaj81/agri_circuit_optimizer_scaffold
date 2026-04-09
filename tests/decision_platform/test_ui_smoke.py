@@ -820,6 +820,10 @@ def test_studio_workspace_panel_unifies_focus_connectivity_and_runs_gate() -> No
     assert "Ação dominante" in panel_text
     assert "Readiness agora" in panel_text
     assert "Rota ou composer" in panel_text
+    assert "Próxima ação disponível" in panel_text
+    assert "O que libera a seguinte" in panel_text
+    assert "Passagem para Runs" in panel_text
+    assert "Ações contextuais deste foco" in panel_text
     assert "Cadeia de suprimento e saída do Studio" in panel_text
     assert "A conexão L900 termina em Tanque de água" in panel_text
     assert "Cadeia visível deste foco" in panel_text
@@ -891,11 +895,51 @@ def test_studio_workspace_panel_promotes_direct_measurement_fix_in_primary_conte
     measurement_button = _find_component_by_id(panel, "studio-workspace-require-measurement-button")
     create_route_button = _find_component_by_id(panel, "studio-workspace-create-route-button")
 
-    assert "Exigir medição direta agora" in panel_text
+    assert "Exigir medição direta" in panel_text
+    assert "Próxima ação disponível" in panel_text
+    assert "Disponível agora neste trecho com dosagem." in panel_text
     assert measurement_button is not None
     assert getattr(measurement_button, "disabled", None) is False
     assert create_route_button is not None
     assert getattr(create_route_button, "disabled", None) is True
+
+
+def test_studio_workspace_panel_keeps_context_actions_discoverable_when_not_applicable() -> None:
+    panel = render_studio_workspace_panel(
+        {
+            "status": "needs_attention",
+            "readiness_headline": "Ainda há bloqueios estruturais impedindo a passagem segura para Runs.",
+            "primary_action": "Corrigir regras estruturais e rotas inválidas antes de enfileirar uma nova run.",
+            "blocker_count": 1,
+            "warning_count": 0,
+            "mandatory_route_count": 0,
+            "blockers": ["Falta definir pelo menos uma rota obrigatória"],
+            "warnings": [],
+            "next_steps": ["Defina uma rota principal antes de abrir Runs."],
+        },
+        {
+            "selected_node_id": "P1",
+            "business_label": "Bomba principal",
+        },
+        {},
+        [
+            {"node_id": "P1", "label": "Bomba principal", "node_type": "pump", "zone": "process"},
+            {"node_id": "M", "label": "Misturador", "node_type": "mixer", "zone": "process"},
+        ],
+        [],
+        [],
+        "Selecione um trecho para seguir.",
+    )
+    panel_text = _collect_text_content(panel)
+
+    assert "Ações contextuais deste foco" in panel_text
+    assert "Selecione uma conexão do canvas para revisar medição direta." in panel_text
+    assert "Selecione uma conexão do canvas para criar uma rota a partir dela." in panel_text
+    assert "Selecione uma conexão do canvas para revisar a direção deste trecho." in panel_text
+    assert "Corrigir no canvas" in panel_text
+    assert getattr(_find_component_by_id(panel, "studio-workspace-require-measurement-button"), "disabled", None) is True
+    assert getattr(_find_component_by_id(panel, "studio-workspace-create-route-button"), "disabled", None) is True
+    assert getattr(_find_component_by_id(panel, "studio-workspace-reverse-edge-button"), "disabled", None) is True
 
 
 def test_studio_primary_canvas_hides_internal_and_hub_nodes() -> None:

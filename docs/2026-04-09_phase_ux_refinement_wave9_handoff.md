@@ -1,26 +1,46 @@
-# Phase UX Refinement - Wave 9 Handoff
+# Phase UX Refinement Wave 9 Handoff
 
-## Escopo executado
+## Escopo entregue
 
-- Consolidei a leitura de progresso e de foco da run na superfície principal de Runs.
-- Mantive Studio e Decisão fora do centro desta wave; os ajustes ficaram restritos à integração mínima necessária.
-- Reforcei a seleção da run certa priorizando a rodada ativa, a próxima da fila ou a terminal mais útil antes de cair em histórico genérico.
+- Transformei as ações contextuais do primeiro fold do Studio em affordances previsíveis: elas continuam curtas, mas deixam de sumir sem explicação.
+- Fechei a leitura da passagem Studio -> Runs no próprio painel dominante, sem reabrir a lateral nem voltar a multiplicar painéis.
 
-## O que ficou melhor para o operador comum
+## Implementação
 
-- Runs agora deixa mais claro qual run está em foco, por que ela é a rodada certa para agir e quanto já avançou no fluxo.
-- Estados intermediários ganharam leitura curta de progresso, reduzindo a sensação de que `refresh` é o único sinal disponível.
-- Estados terminais distinguem melhor saída reaproveitável, terminal sem resultado útil e execução interrompida.
+- `src/decision_platform/ui_dash/app.py`
+  - O painel `studio-workspace-context-panel` agora mostra:
+    - `Próxima ação disponível`
+    - `O que libera a seguinte`
+    - `Passagem para Runs`
+  - Mantive os botões contextuais do foco sempre visíveis no primeiro fold:
+    - `studio-workspace-require-measurement-button`
+    - `studio-workspace-create-route-button`
+    - `studio-workspace-reverse-edge-button`
+  - Cada ação passou a ter affordance contextual explícita no bloco `studio-workspace-context-affordances`, deixando claro quando está disponível, quando já foi satisfeita e quando depende de uma condição ainda não atendida.
+  - O gate para Runs ficou resumido no próprio contexto dominante, sem exigir disclosure adicional para entender se o operador deve seguir ou continuar corrigindo o Studio.
 
-## Evidência da onda
+- `tests/decision_platform/test_ui_smoke.py`
+  - Cobertura dos novos estados de descoberta no primeiro fold.
+  - Cobertura do cenário sem conexão em foco, garantindo que os controles não desapareçam sem orientação.
 
-- Snapshot estruturado: `docs/2026-04-09_phase_ux_refinement_wave9_ui_snapshot.json`
-- Documentação da onda: `docs/2026-04-09_phase_ux_refinement_wave9_handoff.md`
-- Validação executada:
-  - `python -m pytest tests/decision_platform/test_ui_smoke.py tests/decision_platform/test_phase3_queue_acceptance.py -m "not slow"`
+## Validação
 
-## Limitações honestas
+Executado:
 
-- Não houve screenshot bitmap utilizável nesta sessão; o snapshot estruturado registra a tentativa como indisponível no sandbox.
-- Ainda existe um script temporário não versionado em `output/capture_wave3_studio.ps1`, fora dos commits desta wave.
-- Não rodei a suíte lenta completa nesta sessão.
+```powershell
+$env:PYTHONPATH='src;.'; .\.venv\Scripts\python.exe -m pytest tests/decision_platform/test_ui_smoke.py tests/decision_platform/test_studio_structure.py -q -p no:cacheprovider --basetemp tests/_tmp/pytest-basetemp-ux-wave9-full
+```
+
+Resultado:
+
+- `124 passed in 368.92s (0:06:08)`
+
+## Evidência
+
+- `output/playwright/wave9-studio-context-affordances.json`
+
+## Limitações
+
+- A wave melhora previsibilidade e descoberta no primeiro fold, mas não muda o escopo funcional do Studio.
+- A evidência permanece estrutural; não houve screenshot literal do app nesta rodada.
+

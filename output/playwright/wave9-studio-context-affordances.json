@@ -1,0 +1,28 @@
+{
+  "wave": 9,
+  "phase_id": "phase_ux_refinement",
+  "focus": "studio context affordances",
+  "first_fold_signals": [
+    "Próxima ação disponível",
+    "O que libera a seguinte",
+    "Passagem para Runs"
+  ],
+  "context_actions": [
+    {
+      "id": "studio-workspace-require-measurement-button",
+      "affordance": "explica quando dosagem ainda depende de medição direta"
+    },
+    {
+      "id": "studio-workspace-create-route-button",
+      "affordance": "explica quando o trecho ainda não tem rota operacional"
+    },
+    {
+      "id": "studio-workspace-reverse-edge-button",
+      "affordance": "explica quando a direção do trecho exige correção"
+    }
+  ],
+  "validation": {
+    "command": "$env:PYTHONPATH='src;.'; .\\.venv\\Scripts\\python.exe -m pytest tests/decision_platform/test_ui_smoke.py tests/decision_platform/test_studio_structure.py -q -p no:cacheprovider --basetemp tests/_tmp/pytest-basetemp-ux-wave9-full",
+    "result": "124 passed in 368.92s (0:06:08)"
+  }
+}

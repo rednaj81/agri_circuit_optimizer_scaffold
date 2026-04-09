@@ -3529,28 +3529,94 @@ def render_studio_workspace_panel(
         if route_focus_row
         else str(composer_preview.get("headline") or "Abra a rota em foco apenas quando precisar concluir o composer ou ajustar particularidades.")
     )
+    runs_enabled = status == "ready"
+    runs_button_label = "Ir para Runs" if runs_enabled else "Runs bloqueado neste estado"
+    measurement_affordance = (
+        "Disponível agora neste trecho com dosagem."
+        if can_require_measurement_directly
+        else (
+            "Este trecho já exige medição direta."
+            if focused_route_id and focused_route_requires_measurement
+            else (
+                "Só libera quando o trecho em foco combinar dosagem com falta de medição direta."
+                if focused_route_id and not focused_route_has_dose
+                else (
+                    "Crie ou selecione uma rota neste trecho antes de exigir medição direta."
+                    if selected_edge_present
+                    else "Selecione uma conexão do canvas para revisar medição direta."
+                )
+            )
+        )
+    )
+    route_creation_affordance = (
+        "Disponível agora para transformar este trecho em rota operacional."
+        if can_create_route_from_focus
+        else (
+            "Este trecho já tem rota operacional vinculada."
+            if focused_route_id
+            else "Selecione uma conexão do canvas para criar uma rota a partir dela."
+        )
+    )
+    reverse_affordance = (
+        "Disponível agora para corrigir a direção crítica deste trecho."
+        if can_reverse_directly
+        else (
+            "Este foco já respeita a direção principal do Studio."
+            if selected_edge_present
+            else "Selecione uma conexão do canvas para revisar a direção deste trecho."
+        )
+    )
+    next_available_action = (
+        "Exigir medição direta agora"
+        if can_require_measurement_directly
+        else (
+            "Criar rota deste trecho"
+            if can_create_route_from_focus
+            else (
+                "Inverter trecho crítico"
+                if can_reverse_directly
+                else ("Ir para Runs" if runs_enabled else "Corrigir no canvas")
+            )
+        )
+    )
+    next_unlock_condition = (
+        "Nenhuma condição pendente neste foco."
+        if can_require_measurement_directly or can_create_route_from_focus or can_reverse_directly or runs_enabled
+        else (
+            measurement_affordance
+            if selected_edge_present and not focused_route_id
+            else (
+                "Remova o bloqueio dominante do Studio antes de seguir para Runs."
+                if not selected_edge_present
+                else top_issue
+            )
+        )
+    )
+    runs_gate_copy = (
+        "Pronto para sair do Studio e seguir para Runs."
+        if runs_enabled
+        else f"Continue no Studio: {dominant_readiness_signal}"
+    )
     context_direct_actions = [
         html.Button(
-            "Exigir medição direta agora",
+            "Exigir medição direta",
             id="studio-workspace-require-measurement-button",
-            style={**UI_BUTTON_STYLE, **({} if can_require_measurement_directly else {"display": "none"})},
+            style=UI_BUTTON_STYLE,
             disabled=not can_require_measurement_directly,
         ),
         html.Button(
             "Criar rota deste trecho",
             id="studio-workspace-create-route-button",
-            style={**UI_BUTTON_STYLE, **({} if can_create_route_from_focus else {"display": "none"})},
+            style=UI_BUTTON_STYLE,
             disabled=not can_create_route_from_focus,
         ),
         html.Button(
-            "Inverter trecho crítico",
+            "Inverter trecho",
             id="studio-workspace-reverse-edge-button",
-            style={**UI_BUTTON_STYLE, **({} if can_reverse_directly else {"display": "none"})},
+            style=UI_BUTTON_STYLE,
             disabled=not can_reverse_directly,
         ),
     ]
-    runs_enabled = status == "ready"
-    runs_button_label = "Ir para Runs" if runs_enabled else "Runs bloqueado neste estado"
     primary_actions: list[Any]
     if runs_enabled:
         primary_actions = [
@@ -3587,17 +3653,26 @@ def render_studio_workspace_panel(
                                 "Rota ou composer",
                                 dominant_route_copy or "Abra a rota em foco apenas quando precisar concluir o composer ou ajustar particularidades.",
                             ),
+                            _guidance_card("Próxima ação disponível", next_available_action),
+                            _guidance_card("O que libera a seguinte", next_unlock_condition),
+                            _guidance_card("Passagem para Runs", runs_gate_copy),
                         ],
                     ),
+                    html.Div("Ações contextuais deste foco", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d", "marginTop": "10px"}),
                     html.Div(
                         id="studio-workspace-context-direct-actions",
-                        style={
-                            **UI_ACTION_ROW_STYLE,
-                            "marginTop": "10px",
-                            **({} if (can_require_measurement_directly or can_create_route_from_focus or can_reverse_directly) else {"display": "none"}),
-                        },
+                        style={**UI_ACTION_ROW_STYLE, "marginTop": "8px"},
                         children=context_direct_actions,
-                    )
+                    ),
+                    html.Div(
+                        id="studio-workspace-context-affordances",
+                        style={**UI_THREE_COLUMN_STYLE, "marginTop": "10px"},
+                        children=[
+                            _guidance_card("Medição direta", measurement_affordance),
+                            _guidance_card("Criar rota", route_creation_affordance),
+                            _guidance_card("Direção do trecho", reverse_affordance),
+                        ],
+                    ),
                 ],
             ),
             html.Details(
