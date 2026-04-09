@@ -863,7 +863,9 @@ def test_run_job_detail_panel_prioritizes_events_and_artifacts_over_logs() -> No
     assert "Timeline operacional" in panel_text
     assert "Eventos relevantes" in panel_text
     assert "Resultado e artefatos" in panel_text
+    assert "Progresso desta run" in panel_text
     assert "Pode agir agora" in panel_text
+    assert "O que falta" in panel_text
     assert "Cenário de origem" in panel_text
     assert "Execução específica" in panel_text
     assert "Resultado agora" in panel_text
@@ -1256,6 +1258,8 @@ def test_runs_workspace_panel_prioritizes_queue_focus_and_primary_transition() -
     assert "Leitura operacional de Runs" in panel_text
     assert "Agora" in panel_text
     assert "Fila" in panel_text
+    assert "Run em foco" in panel_text
+    assert "Andamento real" in panel_text
     assert "Resultado útil" in panel_text
     assert "Falha ou recuperação" in panel_text
     assert "Próxima ação recomendada" in panel_text
@@ -1405,9 +1409,11 @@ def test_run_job_detail_panel_covers_preparing_and_exporting_states() -> None:
 
     assert "preparando artefatos" in preparing_text.lower()
     assert "Em preparação" in preparing_text
+    assert "1/5 etapas em andamento" in preparing_text
     assert "Run em foco" in preparing_text
     assert "finalizando artefatos" in exporting_text.lower()
     assert "Consolidando saída" in exporting_text
+    assert "4/5 etapas em andamento" in exporting_text
     assert "Timeline operacional" in exporting_text
     assert "Agora" in exporting_text
 

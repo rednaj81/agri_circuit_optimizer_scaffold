@@ -1,0 +1,33 @@
+{
+  "snapshot_source_commit": "d312c2d523ce7fb95b96b76fd1e9cc05f266a5fd",
+  "runs": {
+    "first_fold_signals": [
+      "Agora",
+      "Fila",
+      "Run em foco",
+      "Andamento real",
+      "Resultado útil",
+      "Falha ou recuperação",
+      "Próxima ação recomendada"
+    ],
+    "focus_priority": [
+      "preferred run id",
+      "active run",
+      "next queued run",
+      "latest run",
+      "latest terminal run"
+    ],
+    "detail_signals": [
+      "Progresso desta run",
+      "O que falta",
+      "Recuperação desta run",
+      "Resultado agora"
+    ],
+    "technical_logs_primary_surface": false
+  },
+  "screenshot_attempt": {
+    "target_path": "output/playwright/runs-fullhd-wave9.png",
+    "status": "failed_in_sandbox",
+    "reason": "No stable browser capture session was available in this sandbox during wave 9; structured snapshot retained as honest evidence."
+  }
+}
