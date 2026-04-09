@@ -1,0 +1,35 @@
+{
+  "wave": 12,
+  "phase_id": "phase_ux_refinement",
+  "focus_area": "decision",
+  "snapshot_type": "structured",
+  "first_fold": {
+    "compact_cards": [
+      "Perfil em leitura",
+      "Winner",
+      "Runner-up",
+      "Margem",
+      "Technical tie",
+      "Leitura humana"
+    ],
+    "decision_strip": [
+      "Referência oficial do produto",
+      "Escolha manual atual",
+      "Runner-up ainda importa porque",
+      "Próxima ação recomendada"
+    ],
+    "disclosures": [
+      "Comparação assistida e contexto"
+    ]
+  },
+  "improvements": [
+    "runner-up tratado como quase vencedor útil",
+    "motivo de leitura humana diferenciado por empate técnico, fallback, inviabilidade e margem curta",
+    "escolha manual ligada explicitamente à referência oficial e à exportação"
+  ],
+  "screenshot": {
+    "attempted": true,
+    "available": false,
+    "reason": "sandbox browser capture unavailable in this session"
+  }
+}

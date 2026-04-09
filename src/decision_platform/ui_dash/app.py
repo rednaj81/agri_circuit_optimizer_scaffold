@@ -5627,6 +5627,7 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
         or summary.get("contrast_state")
         or decision_state["contrast_state"]
     )
+    fallback_count = int(summary.get("fallback_component_count") or 0)
     if critical_routes:
         top_route = critical_routes[0]
         risk_value = f"Rota {top_route.get('route_id') or '-'}"
@@ -5653,13 +5654,43 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
         margin_value = "Sem margem"
         margin_note = "Ainda não há separação de score confiável para esta leitura."
     human_review_signal = (
-        "Empate técnico aberto; winner e runner-up ainda pedem leitura humana."
+        "Empate técnico aberto; compare runner-up e winner antes da escolha manual."
         if decision_status == "technical_tie"
-        else f"Winner bloqueado por {_humanize_infeasibility_reason(summary.get('infeasibility_reason'))}."
+        else f"Winner bloqueado por {_humanize_infeasibility_reason(summary.get('infeasibility_reason'))}; valide a alternativa utilizável."
         if summary.get("feasible") is False
-        else "Margem curta ou risco relevante; confirme o runner-up antes de oficializar."
+        else "Fallback ativo; confirme se o runner-up perde apenas por dependência de fallback."
+        if fallback_count > 0
+        else "Margem curta ou risco relevante; revise o runner-up antes de oficializar."
         if margin_value == "Curta" or risk_value not in {"Sem alerta forte", "Margem estável"}
-        else "Contraste suficiente; a leitura humana confirma mais do que descobre."
+        else "Contraste suficiente; a leitura humana só confirma a escolha final."
+    )
+    winner_short_reason = _humanize_decision_copy(summary.get("winner_reason_summary") or "")
+    if not winner_short_reason:
+        winner_short_reason = human_review_signal if decision_status != "winner_clear" else "Lidera com a melhor combinação de score e leitura operacional."
+    runner_up_signal = (
+        "Quase vence; o empate técnico ainda está aberto."
+        if decision_status == "technical_tie"
+        else "Pressiona a decisão porque o winner está bloqueado."
+        if summary.get("feasible") is False
+        else "Segue forte por depender menos de fallback."
+        if fallback_count > 0
+        else "Perde por margem curta, mas segue como quase vencedor."
+        if margin_value == "Curta"
+        else "Segue como contraste principal, mas ainda abaixo do winner."
+    )
+    manual_choice_signal = (
+        "Escolha manual alinhada com a referência oficial; prossiga para exportação quando a leitura humana confirmar."
+        if selected_candidate_id and selected_candidate_id == official_product_candidate_id
+        else "Escolha manual divergente; confirme o contraste antes de substituir a referência oficial."
+        if selected_candidate_id and official_product_candidate_id
+        else "Ainda sem escolha manual final; use winner e runner-up para fechar a decisão."
+    )
+    next_action_signal = (
+        "Revise runner-up e escolha manual antes de exportar."
+        if selected_candidate_id and selected_candidate_id != official_product_candidate_id
+        else "Confirme a referência oficial e siga para exportação."
+        if official_product_candidate_id
+        else decision_state["next_action"]
     )
     return html.Div(
         children=[
@@ -5675,8 +5706,8 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
                 style={**UI_TWO_COLUMN_STYLE, "gridTemplateColumns": "repeat(auto-fit, minmax(210px, 1fr))", "marginBottom": "12px"},
                 children=[
                     _compact_value_card("Perfil em leitura", active_profile_label or "-", f"Perfil ativo. Referência oficial: {official_profile_label}", accent="#e8efe8"),
-                    _compact_value_card("Winner", candidate_id or "Sem winner", summary.get("topology_family") or "Sem família líder legível", accent="#d7e5c1"),
-                    _compact_value_card("Runner-up", runner_up_id or "Sem runner-up", summary.get("runner_up_topology_family") or "Sem contraste comparável"),
+                    _compact_value_card("Winner", candidate_id or "Sem winner", winner_short_reason, accent="#d7e5c1"),
+                    _compact_value_card("Runner-up", runner_up_id or "Sem runner-up", runner_up_signal if runner_up_id else "Sem runner-up para pressionar a decisão"),
                     _compact_value_card("Margem", margin_value, margin_note),
                     _compact_value_card("Technical tie", tie_label, "Technical tie explícito" if decision_status == "technical_tie" else "Sem empate técnico aberto"),
                     _compact_value_card("Leitura humana", risk_value, human_review_signal),
@@ -5691,9 +5722,9 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
                         style={**UI_TWO_COLUMN_STYLE, "gridTemplateColumns": "repeat(auto-fit, minmax(220px, 1fr))", "marginTop": "8px"},
                         children=[
                             _guidance_card("Referência oficial do produto", f"{official_product_candidate_id or '-'} | {official_profile_label}"),
-                            _guidance_card("Escolha manual atual", f"{selected_candidate_id or '-'} | {selected_state_label}"),
-                            _guidance_card("Winner x runner-up", f"{candidate_id or '-'} vs {runner_up_id or '-'}"),
-                            _guidance_card("Por que ainda pede leitura humana", human_review_signal),
+                            _guidance_card("Escolha manual atual", f"{selected_candidate_id or '-'} | {selected_state_label}. {manual_choice_signal}"),
+                            _guidance_card("Runner-up ainda importa porque", runner_up_signal if runner_up_id else "Ainda não há contraste suficiente para pressionar a decisão."),
+                            _guidance_card("Próxima ação recomendada", next_action_signal),
                         ],
                     ),
                 ],

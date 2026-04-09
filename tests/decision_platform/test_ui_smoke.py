@@ -1804,10 +1804,11 @@ def test_decision_workspace_panel_makes_winner_runner_up_and_tie_legible() -> No
     assert "Technical tie explícito" in panel_text
     assert "Leitura humana" in panel_text
     assert "Faixa decisória" in panel_text
-    assert "Winner x runner-up" in panel_text
+    assert "Runner-up ainda importa porque" in panel_text
     assert "Escolha manual atual" in panel_text
     assert "cand-04" in panel_text
-    assert "sem sobrescrever a referência oficial do produto" in panel_text.lower()
+    assert "confirme o contraste antes de substituir a referência oficial" in panel_text.lower()
+    assert "revise runner-up e escolha manual antes de exportar" in panel_text.lower()
     assert "Comparação assistida e contexto" in panel_text
     assert _find_component_by_id(panel, "decision-workspace-open-runs-link") is not None
     assert _find_component_by_id(panel, "decision-workspace-open-audit-link") is not None
