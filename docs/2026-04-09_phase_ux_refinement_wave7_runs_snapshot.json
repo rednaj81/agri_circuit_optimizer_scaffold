@@ -1,0 +1,22 @@
+{
+  "runs-workspace-panel": {
+    "present": true,
+    "text": "Leitura operacional de Runs Aguardando readiness do Studio Ainda h\u00e1 bloqueios estruturais impedindo a passagem segura para Runs. O que esta \u00e1rea resolve Transformar readiness do Studio em fila, execu\u00e7\u00e3o e pr\u00f3xima a\u00e7\u00e3o leg\u00edveis, sem depender de logs brutos. Estado atual Ainda h\u00e1 bloqueios estruturais impedindo a passagem segura para Runs. Gate do cen\u00e1rio Ainda h\u00e1 bloqueios estruturais impedindo a passagem segura para Runs. Fila agora Nenhuma run registrada ainda. Limita\u00e7\u00e3o agora A limita\u00e7\u00e3o principal ainda est\u00e1 no cen\u00e1rio; corrija o Studio antes de culpar a fila ou a execu\u00e7\u00e3o. Pr\u00f3xima a\u00e7\u00e3o Volte ao Studio para corrigir conectividade, regras obrigat\u00f3rias e medi\u00e7\u00e3o direta antes de abrir uma nova run. O que move a jornada agora A passagem para Decis\u00e3o continua secund\u00e1ria at\u00e9 o Studio liberar o gate principal de readiness. Nenhuma run registrada ainda. Estado dominante Aguardando readiness do Studio  Runs locais 0  Na fila 0  Em execu\u00e7\u00e3o 0  Falhas recentes 0  Pr\u00f3xima run -  Voltar ao Studio Decis\u00e3o ainda secund\u00e1ria Abrir Auditoria"
+  },
+  "run-jobs-overview-panel": {
+    "present": true,
+    "text": "Resumo da fila Nenhuma execu\u00e7\u00e3o registrada Objetivo desta \u00e1rea Entender o que j\u00e1 rodou, o que ainda est\u00e1 na fila e qual run merece sua aten\u00e7\u00e3o agora. Pr\u00f3xima a\u00e7\u00e3o Nenhuma run registrada ainda. Enfileire o cen\u00e1rio atual para iniciar a trilha operacional. Fila pendente Nenhuma run aguardando na fila. Execu\u00e7\u00e3o agora Nenhuma run executando agora. Hist\u00f3rico recente Ainda n\u00e3o existe hist\u00f3rico recente. Pr\u00f3ximo gesto do operador Enfileire o cen\u00e1rio atual para abrir a primeira leitura operacional. Runs 0 Total observavel na fila local. Estado da fila Pronto fila serial local Em execu\u00e7\u00e3o 0  Na fila 0  Conclu\u00eddas 0  Falhas 0  Pr\u00f3xima run - Entrada seguinte da fila Leitura operacional detalhada Fila agora   Hist\u00f3rico recente   Runs terminais registradas: 0 Status por quantidade Na fila: 0 preparing: 0 Em execu\u00e7\u00e3o: 0 exporting: 0 Conclu\u00edda: 0 Falhou: 0 Cancelada: 0 Contexto operacional Worker local: serial"
+  },
+  "run-jobs-operational-lanes": {
+    "present": true,
+    "text": "Fila pendente Nenhuma run aguardando na fila. Execu\u00e7\u00e3o agora Nenhuma run executando agora. Hist\u00f3rico recente Ainda n\u00e3o existe hist\u00f3rico recente. Pr\u00f3ximo gesto do operador Enfileire o cen\u00e1rio atual para abrir a primeira leitura operacional."
+  },
+  "run-job-detail-panel": {
+    "present": true,
+    "text": "Run em foco Aguardando contexto Ainda n\u00e3o existe uma run em foco para leitura operacional. Pr\u00f3xima a\u00e7\u00e3o Selecione uma run da fila ou enfileire o cen\u00e1rio atual para abrir este espa\u00e7o com contexto real."
+  },
+  "execution-summary-panel": {
+    "present": true,
+    "text": "Resumo executivo \u00daltima execu\u00e7\u00e3o dispon\u00edvel para decis\u00e3o Estado dominante Decis\u00e3o dispon\u00edvel Objetivo desta \u00e1rea Mostrar se a \u00faltima execu\u00e7\u00e3o j\u00e1 gerou contexto suficiente para entrar em Decis\u00e3o. Pr\u00f3xima a\u00e7\u00e3o Revise o candidato oficial e siga para a compara\u00e7\u00e3o lado a lado quando precisar confirmar a escolha. Candidatos 76  Vi\u00e1veis 49  Selecionado bus_with_pump_islands__g18m1_1 balanced Contexto t\u00e9cnico secund\u00e1rio desta execu\u00e7\u00e3o Bundle analisado:  C:\\d\\dev\\agri_circuit_optimizer_scaffold\\data\\decision_platform\\maquete_v2 Perfil padr\u00e3o:  balanced Erro operacional:  sem bloqueio cr\u00edtico Abrir Decis\u00e3o desta execu\u00e7\u00e3o"
+  }
+}

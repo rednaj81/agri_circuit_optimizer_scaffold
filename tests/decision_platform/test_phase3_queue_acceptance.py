@@ -51,14 +51,16 @@ RUN_DETAIL_TELEMETRY_FIELDS = (
 )
 
 
-def _get_callback(app: object, *, input_id: str) -> Callable[..., Any]:
+def _get_callback(app: object, *, input_id: str, output_prefix: str | None = None) -> Callable[..., Any]:
     callback_map = getattr(app, "callback_map", {})
-    for metadata in callback_map.values():
+    for callback_key, metadata in callback_map.items():
+        if output_prefix is not None and not str(callback_key).startswith(output_prefix):
+            continue
         if any(item["id"] == input_id for item in metadata.get("inputs", [])):
             callback = metadata.get("callback")
             if callback is not None:
                 return getattr(callback, "__wrapped__", callback)
-    raise KeyError(f"Callback not found for input_id={input_id!r}")
+    raise KeyError(f"Callback not found for input_id={input_id!r} output_prefix={output_prefix!r}")
 
 
 def _collect_text(component: object) -> str:
@@ -184,6 +186,61 @@ def test_phase3_queue_acceptance_runs_ui_surfaces_operational_queue_and_detail_l
     assert "Resultado e artefatos" in detail_text
     assert "Pode agir agora" in detail_text
     assert "Contexto técnico secundário desta run" in detail_text
+
+
+@pytest.mark.fast
+def test_phase3_queue_acceptance_run_actions_follow_selected_run_state() -> None:
+    with diagnostic_runtime_test_mode():
+        app = build_app("data/decision_platform/maquete_v2")
+
+    callback = _get_callback(app, input_id="run-job-detail", output_prefix="run-jobs-run-next-button.children")
+
+    queued_result = callback(
+        [{"node_id": "W"}, {"node_id": "P1"}],
+        [{"link_id": "L001", "from_node": "W", "to_node": "P1"}],
+        [{"route_id": "R001", "source": "W", "sink": "P1", "mandatory": True}],
+        json.dumps({"next_queued_run_id": "run-002", "active_run_ids": [], "queued_run_ids": ["run-002"]}, ensure_ascii=False),
+        json.dumps({"selected_run_id": "run-002", "status": "queued"}, ensure_ascii=False),
+    )
+    running_result = callback(
+        [{"node_id": "W"}, {"node_id": "P1"}],
+        [{"link_id": "L001", "from_node": "W", "to_node": "P1"}],
+        [{"route_id": "R001", "source": "W", "sink": "P1", "mandatory": True}],
+        json.dumps({"next_queued_run_id": None, "active_run_ids": ["run-002"], "queued_run_ids": []}, ensure_ascii=False),
+        json.dumps({"selected_run_id": "run-002", "status": "running"}, ensure_ascii=False),
+    )
+    completed_result = callback(
+        [{"node_id": "W"}, {"node_id": "P1"}],
+        [{"link_id": "L001", "from_node": "W", "to_node": "P1"}],
+        [{"route_id": "R001", "source": "W", "sink": "P1", "mandatory": True}],
+        json.dumps({"next_queued_run_id": None, "active_run_ids": [], "queued_run_ids": []}, ensure_ascii=False),
+        json.dumps({"selected_run_id": "run-002", "status": "completed"}, ensure_ascii=False),
+    )
+
+    assert queued_result == (
+        "Executar próxima run (run-002)",
+        False,
+        "Cancelar esta run",
+        False,
+        "Reexecução indisponível neste estado",
+        True,
+    )
+    assert running_result == (
+        "Aguardar execução atual",
+        True,
+        "Cancelar esta run",
+        False,
+        "Reexecução indisponível neste estado",
+        True,
+    )
+    assert completed_result == (
+        "Sem próxima run na fila",
+        True,
+        "Cancelamento indisponível neste estado",
+        True,
+        "Reexecutar esta run",
+        False,
+    )
 
 
 @pytest.mark.slow

@@ -830,12 +830,17 @@ def test_run_job_detail_panel_prioritizes_events_and_artifacts_over_logs() -> No
     )
     panel_text = _collect_text_content(panel)
 
+    assert "Timeline operacional" in panel_text
     assert "Eventos relevantes" in panel_text
     assert "Resultado e artefatos" in panel_text
     assert "Pode agir agora" in panel_text
+    assert "Cenário de origem" in panel_text
+    assert "Execução específica" in panel_text
+    assert "Resultado agora" in panel_text
     assert "Resumo executivo disponível." in panel_text
     assert "Candidato selecionado disponível." in panel_text
     assert "Logs" not in panel_text
+    assert _find_component_by_id(panel, "run-job-detail-timeline") is not None
     assert _find_component_by_id(panel, "run-job-detail-technical-details") is not None
 
 
@@ -1306,7 +1311,8 @@ def test_run_job_detail_panel_covers_preparing_and_exporting_states() -> None:
     assert "preparando artefatos" in preparing_text.lower()
     assert "Run em foco" in preparing_text
     assert "finalizando artefatos" in exporting_text.lower()
-    assert "Concluída" not in exporting_text
+    assert "Timeline operacional" in exporting_text
+    assert "Agora" in exporting_text
 
 
 def test_run_jobs_overview_panel_clarifies_queue_now_vs_recent_history() -> None:

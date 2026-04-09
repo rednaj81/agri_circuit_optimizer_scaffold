@@ -4698,6 +4698,7 @@ def render_run_job_detail_panel(detail: dict[str, Any]) -> Any:
         next_action = "Confirme o estado desta run antes de decidir entre executar, cancelar ou reprocessar."
     events = list(detail.get("events") or [])
     event_lines = []
+    event_statuses = [str(event.get("status") or "").strip() for event in events if str(event.get("status") or "").strip()]
     for event in events[-3:]:
         event_status = _humanize_run_status(event.get("status"))
         message = str(event.get("message") or "").strip()
@@ -4722,6 +4723,43 @@ def render_run_job_detail_panel(detail: dict[str, Any]) -> Any:
         action_guidance = "Revisar resultado e, se fizer sentido, abrir Decisão ou reenfileirar uma nova rodada mais consciente."
     else:
         action_guidance = "Revisar falha ou cancelamento antes de reenfileirar, para não repetir a mesma rodada sem correção."
+    result_state = (
+        "Resultado utilizável disponível."
+        if artifacts.get("summary_json") or artifacts.get("selected_candidate_json")
+        else "Ainda sem resultado utilizável nesta run."
+    )
+    timeline_order = ["queued", "preparing", "running", "exporting", "completed"]
+    current_position = timeline_order.index(status) if status in timeline_order else None
+    timeline_cards = []
+    for index, step in enumerate(timeline_order):
+        if step in event_statuses or (current_position is not None and index < current_position):
+            tone = {"background": "#dfeee7", "color": "#104338"}
+            state_label = "Concluído"
+        elif status == step:
+            tone = {"background": "#f3e7c8", "color": "#7b4d11"}
+            state_label = "Agora"
+        else:
+            tone = {"background": "#edf1ee", "color": "#5b756d"}
+            state_label = "Pendente"
+        timeline_cards.append(
+            html.Div(
+                style={**UI_MUTED_CARD_STYLE, "padding": "12px"},
+                children=[
+                    html.Div(_humanize_run_status(step), style={"fontWeight": 700, "lineHeight": "1.5"}),
+                    html.Span(state_label, style={**UI_PILL_STYLE, **tone, "marginTop": "8px"}),
+                ],
+            )
+        )
+    if status in {"failed", "canceled"}:
+        timeline_cards.append(
+            html.Div(
+                style={**UI_MUTED_CARD_STYLE, "padding": "12px"},
+                children=[
+                    html.Div(_humanize_run_status(status), style={"fontWeight": 700, "lineHeight": "1.5"}),
+                    html.Span("Estado final", style={**UI_PILL_STYLE, "background": "#f3d8d0", "color": "#8c3819", "marginTop": "8px"}),
+                ],
+            )
+        )
     return html.Div(
         children=[
             html.H3("Run em foco", style={"marginTop": 0}),
@@ -4741,14 +4779,18 @@ def render_run_job_detail_panel(detail: dict[str, Any]) -> Any:
                     _metric_card("Modo da rodada", detail.get("policy_mode") or "-"),
                 ],
             ),
+            html.H4("Timeline operacional", style={"marginBottom": "6px", "marginTop": "14px"}),
+            html.Div(id="run-job-detail-timeline", style=UI_THREE_COLUMN_STYLE, children=timeline_cards),
             html.Div(
                 id="run-job-detail-operational-summary",
                 style={**UI_TWO_COLUMN_STYLE, "marginTop": "12px"},
                 children=[
                     _guidance_card("Leitura operacional", next_action),
                     _guidance_card("Pode agir agora", action_guidance),
-                    _guidance_card("Bundle de origem", str(detail.get("source_bundle_root") or "-")),
+                    _guidance_card("Cenário de origem", str(detail.get("source_bundle_root") or "-")),
+                    _guidance_card("Execução específica", str(detail.get("selected_run_id") or "-")),
                     _guidance_card("Execução pedida", str(detail.get("requested_execution_mode") or detail.get("execution_mode") or "-")),
+                    _guidance_card("Resultado agora", result_state),
                 ],
             ),
             html.H4("Eventos relevantes", style={"marginBottom": "6px", "marginTop": "14px"}),
@@ -8318,6 +8360,52 @@ def build_app(
             render_run_job_detail_panel(_safe_json_loads(detail_text)),
             render_status_banner(status_text),
         )
+
+    @app.callback(
+        Output("run-jobs-run-next-button", "children"),
+        Output("run-jobs-run-next-button", "disabled"),
+        Output("run-job-cancel-button", "children"),
+        Output("run-job-cancel-button", "disabled"),
+        Output("run-job-rerun-button", "children"),
+        Output("run-job-rerun-button", "disabled"),
+        Input("nodes-grid", "rowData"),
+        Input("candidate-links-grid", "rowData"),
+        Input("routes-grid", "rowData"),
+        Input("run-jobs-summary", "children"),
+        Input("run-job-detail", "children"),
+    )
+    def _refresh_run_action_buttons(
+        nodes_rows: list[dict[str, Any]] | None,
+        candidate_links_rows: list[dict[str, Any]] | None,
+        route_rows: list[dict[str, Any]] | None,
+        summary_text: str | None,
+        detail_text: str | None,
+    ) -> tuple[str, bool, str, bool, str, bool]:
+        studio_summary = build_studio_readiness_summary(nodes_rows or [], candidate_links_rows or [], route_rows or [])
+        run_summary = _safe_json_loads(summary_text)
+        detail = _safe_json_loads(detail_text)
+        studio_ready = str(studio_summary.get("status") or "") == "ready"
+        active_run_ids = list(run_summary.get("active_run_ids", [])) if isinstance(run_summary, dict) else []
+        next_queued_run_id = str(run_summary.get("next_queued_run_id") or "").strip() if isinstance(run_summary, dict) else ""
+        selected_status = str(detail.get("status") or "").strip()
+
+        can_run_next = studio_ready and bool(next_queued_run_id) and not active_run_ids
+        if not studio_ready:
+            run_next_label = "Executar próxima run após liberar o Studio"
+        elif active_run_ids:
+            run_next_label = "Aguardar execução atual"
+        elif next_queued_run_id:
+            run_next_label = f"Executar próxima run ({next_queued_run_id})"
+        else:
+            run_next_label = "Sem próxima run na fila"
+
+        can_cancel = selected_status in {"queued", "preparing", "running", "exporting"}
+        cancel_label = "Cancelar esta run" if can_cancel else "Cancelamento indisponível neste estado"
+
+        can_rerun = selected_status in {"completed", "failed", "canceled"}
+        rerun_label = "Reexecutar esta run" if can_rerun else "Reexecução indisponível neste estado"
+
+        return run_next_label, (not can_run_next), cancel_label, (not can_cancel), rerun_label, (not can_rerun)
 
     @app.callback(
         Output("execution-summary-panel", "children"),
