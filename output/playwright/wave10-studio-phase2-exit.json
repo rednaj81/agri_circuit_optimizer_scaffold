@@ -1,0 +1,24 @@
+{
+  "wave": 10,
+  "phase_id": "phase_ux_refinement",
+  "focus": "studio phase2 exit",
+  "priority_flow": [
+    "Agora no Studio",
+    "Próxima ação",
+    "Passagem para Runs"
+  ],
+  "phase2_exit": {
+    "business_graph_only": true,
+    "route_first_sufficient": true,
+    "direct_canvas_editing_common_tasks": true,
+    "readiness_more_legible": true,
+    "no_internal_entities_primary_surface": true,
+    "canvas_stable": true,
+    "sidebar_short_default": true,
+    "ready_for_ux_phase_3": true
+  },
+  "validation": {
+    "command": "$env:PYTHONPATH='src;.'; .\\.venv\\Scripts\\python.exe -m pytest tests/decision_platform/test_ui_smoke.py tests/decision_platform/test_studio_structure.py -q -p no:cacheprovider --basetemp tests/_tmp/pytest-basetemp-ux-wave10-full",
+    "result": "124 passed in 326.06s (0:05:26)"
+  }
+}

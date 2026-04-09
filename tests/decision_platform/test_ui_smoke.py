@@ -817,11 +817,8 @@ def test_studio_workspace_panel_unifies_focus_connectivity_and_runs_gate() -> No
 
     assert "Leitura do cenário" in panel_text
     assert "Contexto dominante do Studio" in panel_text
-    assert "Ação dominante" in panel_text
-    assert "Readiness agora" in panel_text
-    assert "Rota ou composer" in panel_text
-    assert "Próxima ação disponível" in panel_text
-    assert "O que libera a seguinte" in panel_text
+    assert "Agora no Studio" in panel_text
+    assert "Próxima ação" in panel_text
     assert "Passagem para Runs" in panel_text
     assert "Ações contextuais deste foco" in panel_text
     assert "Cadeia de suprimento e saída do Studio" in panel_text
@@ -853,6 +850,7 @@ def test_studio_workspace_panel_unifies_focus_connectivity_and_runs_gate() -> No
     assert _find_component_by_id(panel, "studio-focus-delete-edge-button") is not None
     assert _find_component_by_id(panel, "studio-focus-open-workbench-button") is not None
     assert _find_component_by_id(panel, "studio-workspace-fine-tuning-panel") is not None
+    assert _find_component_by_id(panel, "studio-workspace-priority-flow") is not None
 
 
 def test_studio_workspace_panel_promotes_direct_measurement_fix_in_primary_context() -> None:
@@ -896,7 +894,7 @@ def test_studio_workspace_panel_promotes_direct_measurement_fix_in_primary_conte
     create_route_button = _find_component_by_id(panel, "studio-workspace-create-route-button")
 
     assert "Exigir medição direta" in panel_text
-    assert "Próxima ação disponível" in panel_text
+    assert "Próxima ação" in panel_text
     assert "Disponível agora neste trecho com dosagem." in panel_text
     assert measurement_button is not None
     assert getattr(measurement_button, "disabled", None) is False
@@ -936,6 +934,7 @@ def test_studio_workspace_panel_keeps_context_actions_discoverable_when_not_appl
     assert "Selecione uma conexão do canvas para revisar medição direta." in panel_text
     assert "Selecione uma conexão do canvas para criar uma rota a partir dela." in panel_text
     assert "Selecione uma conexão do canvas para revisar a direção deste trecho." in panel_text
+    assert "Passagem para Runs" in panel_text
     assert "Corrigir no canvas" in panel_text
     assert getattr(_find_component_by_id(panel, "studio-workspace-require-measurement-button"), "disabled", None) is True
     assert getattr(_find_component_by_id(panel, "studio-workspace-create-route-button"), "disabled", None) is True

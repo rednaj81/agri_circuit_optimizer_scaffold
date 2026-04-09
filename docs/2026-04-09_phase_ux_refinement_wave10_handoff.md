@@ -1,27 +1,47 @@
-# Phase UX Refinement - Wave 10 Handoff
+# Phase UX Refinement Wave 10 Handoff
 
-## Escopo executado
+## Escopo entregue
 
-- Endureci a lógica da run em foco para priorizar a rodada ativa ou terminal realmente útil antes de cair em fila bruta ou histórico genérico.
-- Tornei o sinal de progresso mais confiável na superfície principal, separando espera sem avanço, andamento real, consolidação, término sem resultado útil e resultado utilizável.
-- Mantive Studio e Decisão fora do centro desta wave; os ajustes ficaram no nível mínimo para preservar a transição Runs -> Decisão.
+- Fechei o primeiro fold do Studio como fluxo curto de saída de fase: estado atual, próxima ação e passagem para Runs.
+- Preservei a lateral curta, os disclosures fechados por padrão, o canvas estabilizado e a edição direta já conquistada.
 
-## O que ficou melhor para o operador comum
+## Implementação
 
-- A run em foco agora ficou mais defensável: a UI tende a abrir a rodada que realmente ajuda a agir, não apenas a mais recente por ordem cronológica.
-- O progresso deixou de ser uma leitura puramente heurística da tela; a superfície principal comunica melhor quando há avanço real, espera sem avanço, término sem utilidade e saída já reaproveitável.
-- Os CTAs continuam executáveis, mas aparecem apoiados por um estado mais confiável da fila e da run selecionada.
+- `src/decision_platform/ui_dash/app.py`
+  - O contexto dominante do Studio foi comprimido no bloco `studio-workspace-priority-flow`.
+  - O primeiro fold agora resume a jornada em três sinais:
+    - `Agora no Studio`
+    - `Próxima ação`
+    - `Passagem para Runs`
+  - Mantive as ações contextuais diretas no primeiro fold e preservei as affordances curtas logo abaixo delas, sem reintroduzir painéis paralelos.
+  - O texto residual foi reduzido sem perder legibilidade operacional.
 
-## Evidência da wave
+- `tests/decision_platform/test_ui_smoke.py`
+  - Ajustada a cobertura para o novo fluxo compacto do primeiro fold.
+  - Mantida a proteção de estados bloqueados, ações diretas e lateral inicial curta.
 
-- Snapshot estruturado: `docs/2026-04-09_phase_ux_refinement_wave10_ui_snapshot.json`
-- Documentação da wave: `docs/2026-04-09_phase_ux_refinement_wave10_handoff.md`
-- Candidato de saída da fase: `docs/2026-04-09_phase_ux_refinement_wave10_exit_candidate.md`
-- Validação executada:
-  - `python -m pytest tests/decision_platform/test_ui_smoke.py tests/decision_platform/test_phase3_queue_acceptance.py -m "not slow"`
+- `tests/decision_platform/test_studio_structure.py`
+  - Cobertura estrutural do novo bloco `studio-workspace-priority-flow`.
 
-## Limitações honestas
+## Validação
 
-- Não houve screenshot bitmap utilizável nesta sessão; o snapshot estruturado registra a tentativa como indisponível no sandbox.
-- Ainda existe um script temporário não versionado em `output/capture_wave3_studio.ps1`, fora dos commits desta wave.
-- Não rodei a suíte lenta completa nesta sessão.
+Executado:
+
+```powershell
+$env:PYTHONPATH='src;.'; .\.venv\Scripts\python.exe -m pytest tests/decision_platform/test_ui_smoke.py tests/decision_platform/test_studio_structure.py -q -p no:cacheprovider --basetemp tests/_tmp/pytest-basetemp-ux-wave10-full
+```
+
+Resultado:
+
+- `124 passed in 326.06s (0:05:26)`
+
+## Saída de fase
+
+- `docs/2026-04-09_phase_ux_refinement_phase2_exit.md` registra a verificação explícita dos critérios de saída de `ux_phase_2`.
+- Com base nesta wave, a fase de Studio fica pronta para transição para `ux_phase_3`, com riscos residuais documentados.
+
+## Limitações
+
+- O fechamento desta wave é de estabilização e consolidação; não amplia o escopo funcional do Studio.
+- A validação continua estrutural e de smoke, não automação visual interativa completa em navegador.
+

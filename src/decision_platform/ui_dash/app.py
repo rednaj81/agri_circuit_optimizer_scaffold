@@ -3566,6 +3566,11 @@ def render_studio_workspace_panel(
             else "Selecione uma conexão do canvas para revisar a direção deste trecho."
         )
     )
+    current_step_copy = (
+        dominant_readiness_signal
+        if blocker_count > 0 or warning_count > 0
+        else focus_summary["recommended_action"]
+    )
     next_available_action = (
         "Exigir medição direta agora"
         if can_require_measurement_directly
@@ -3596,6 +3601,11 @@ def render_studio_workspace_panel(
         "Pronto para sair do Studio e seguir para Runs."
         if runs_enabled
         else f"Continue no Studio: {dominant_readiness_signal}"
+    )
+    next_action_copy = (
+        next_available_action
+        if next_unlock_condition == "Nenhuma condição pendente neste foco."
+        else f"{next_available_action}. {next_unlock_condition}"
     )
     context_direct_actions = [
         html.Button(
@@ -3645,16 +3655,11 @@ def render_studio_workspace_panel(
                     html.Div("Contexto dominante do Studio", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
                     html.Div(focus_summary["headline"], style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"}),
                     html.Div(
+                        id="studio-workspace-priority-flow",
                         style={**UI_THREE_COLUMN_STYLE, "marginTop": "10px"},
                         children=[
-                            _guidance_card("Ação dominante", focus_summary["recommended_action"]),
-                            _guidance_card("Readiness agora", dominant_readiness_signal),
-                            _guidance_card(
-                                "Rota ou composer",
-                                dominant_route_copy or "Abra a rota em foco apenas quando precisar concluir o composer ou ajustar particularidades.",
-                            ),
-                            _guidance_card("Próxima ação disponível", next_available_action),
-                            _guidance_card("O que libera a seguinte", next_unlock_condition),
+                            _guidance_card("Agora no Studio", current_step_copy),
+                            _guidance_card("Próxima ação", next_action_copy),
                             _guidance_card("Passagem para Runs", runs_gate_copy),
                         ],
                     ),
@@ -3670,7 +3675,7 @@ def render_studio_workspace_panel(
                         children=[
                             _guidance_card("Medição direta", measurement_affordance),
                             _guidance_card("Criar rota", route_creation_affordance),
-                            _guidance_card("Direção do trecho", reverse_affordance),
+                            _guidance_card("Direção", reverse_affordance),
                         ],
                     ),
                 ],
