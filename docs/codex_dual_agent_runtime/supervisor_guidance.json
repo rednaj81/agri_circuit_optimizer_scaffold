@@ -1,12 +1,12 @@
 {
-    "updated_at":  "2026-04-09T22:32:43.9990976Z",
+    "updated_at":  "2026-04-09T22:34:26.6436288Z",
     "mode":  "ux_refinement",
     "source_bundle":  "docs/ux_refinement_autonomy_bundle",
     "source_zip":  "docs/ux_refinement_autonomy_bundle.zip",
     "phase_plan":  "docs/ux_refinement_autonomy_bundle/automation/phase_plan.yaml",
     "bootstrap_prompt":  "docs/ux_refinement_autonomy_bundle/prompts/PROMPT_SHORT_BOOTSTRAP_UI_REFINEMENT.md",
     "full_prompt":  "docs/ux_refinement_autonomy_bundle/prompts/PROMPT_FULL_AUTONOMOUS_UI_REFINEMENT.md",
-    "current_repo_head":  "201a1a95ede77bb6e3a2b601fa8d670c936852b8",
+    "current_repo_head":  "2bcaafab3ae824c35712c7d92fe3b48fc354dec3",
     "current_branch":  "codex/new-architecture-platform",
     "active_ux_phase_id":  "ux_phase_3",
     "active_ux_phase":  {
@@ -48,9 +48,9 @@
                            }
                        ],
     "current_focus":  {
-                          "active_wave_index":  20,
+                          "active_wave_index":  21,
                           "active_role":  "developer",
-                          "waves_completed":  19,
+                          "waves_completed":  20,
                           "health_state":  "stopped",
                           "run_id":  "run-20260409-154356",
                           "stop_reason":  "governance_stop_max_waves_reached; ux_phase_2 accepted; ux_phase_3 planned_next_cycle_only; no continuation authorized in run-20260409-154356"
@@ -98,14 +98,14 @@
                                   "visual evidence via screenshot or structured UI snapshot when possible"
                               ],
     "recent_commit_subjects":  [
+                                   "wave20 enforce ux refinement stop source",
                                    "wave18 preserve ux refinement stopped state",
                                    "wave17 reclose ux refinement stop state",
                                    "wave16 restabilize ux refinement stop state",
                                    "wave14 close ux refinement stop record",
                                    "wave13 reconcile ux refinement stop state",
                                    "wave12 record ux refinement governance stop",
-                                   "wave11 open runs ux phase",
-                                   "wave10 close studio ux phase exit"
+                                   "wave11 open runs ux phase"
                                ],
     "repo_overlay":  {
                          "root_agents":  "AGENTS.md",
