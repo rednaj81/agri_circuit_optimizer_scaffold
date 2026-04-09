@@ -4362,6 +4362,9 @@ def render_run_jobs_overview_panel(summary: dict[str, Any]) -> Any:
     else:
         queue_headline = "Nenhuma execução registrada"
         queue_guidance = "Nenhuma run registrada ainda. Enfileire o cenário atual para iniciar a trilha operacional."
+    active_label = active_run_ids[0] if active_run_ids else "Nenhuma run executando agora."
+    queued_label = next_queued_run_id or "Nenhuma run aguardando na fila."
+    history_label = latest_run_id or "Ainda não existe histórico recente."
     return html.Div(
         children=[
             html.H3("Resumo da fila", style={"marginTop": 0}),
@@ -4371,6 +4374,31 @@ def render_run_jobs_overview_panel(summary: dict[str, Any]) -> Any:
                 children=[
                     _guidance_card("Objetivo desta área", "Entender o que já rodou, o que ainda está na fila e qual run merece sua atenção agora."),
                     _guidance_card("Próxima ação", queue_guidance),
+                ],
+            ),
+            html.Div(
+                id="run-jobs-operational-lanes",
+                style={**UI_TWO_COLUMN_STYLE, "marginBottom": "12px"},
+                children=[
+                    _guidance_card("Fila pendente", queued_label),
+                    _guidance_card("Execução agora", active_label),
+                    _guidance_card("Histórico recente", history_label),
+                    _guidance_card(
+                        "Próximo gesto do operador",
+                        (
+                            f"Acompanhe {active_run_ids[0]} até consolidar resultado."
+                            if active_run_ids
+                            else (
+                                f"Execute {next_queued_run_id} quando a fila estiver liberada."
+                                if next_queued_run_id
+                                else (
+                                    "Revise a última run antes de reenfileirar."
+                                    if run_count
+                                    else "Enfileire o cenário atual para abrir a primeira leitura operacional."
+                                )
+                            )
+                        ),
+                    ),
                 ],
             ),
             html.Div(
@@ -4537,6 +4565,15 @@ def render_runs_workspace_panel(
         decision_cta: Any = html.Button("Ir para Decisão", id="runs-workspace-open-decision-button", style=UI_BUTTON_STYLE, disabled=False)
     else:
         decision_cta = html.Button(state["decision_button_label"], id="runs-workspace-open-decision-button", style=UI_BUTTON_STYLE, disabled=True)
+    scenario_vs_run_limit = (
+        "A limitação principal ainda está no cenário; corrija o Studio antes de culpar a fila ou a execução."
+        if state["studio_status"] != "ready"
+        else (
+            "O cenário já passou no gate principal; o foco agora está na fila e na execução em si."
+            if active_run_ids or next_queued_run_id or state["run_count"]
+            else "O cenário está pronto, mas ainda falta a primeira run para abrir leitura operacional útil."
+        )
+    )
     return html.Div(
         children=[
             html.Div("Leitura operacional de Runs", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
@@ -4554,10 +4591,12 @@ def render_runs_workspace_panel(
                     _guidance_card("Estado atual", state["headline"]),
                     _guidance_card("Gate do cenário", str(studio_summary.get("readiness_headline") or state["readiness_note"])),
                     _guidance_card("Fila agora", queue_focus),
+                    _guidance_card("Limitação agora", scenario_vs_run_limit),
                     _guidance_card("Próxima ação", state["next_action"]),
                 ],
             ),
             html.Div(
+                id="runs-workspace-next-step-panel",
                 style={**UI_MUTED_CARD_STYLE, "padding": "12px", "marginBottom": "12px"},
                 children=[
                     html.Div("O que move a jornada agora", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
@@ -4657,6 +4696,32 @@ def render_run_job_detail_panel(detail: dict[str, Any]) -> Any:
         next_action = "Revise o bundle e o status técnico antes de reexecutar esta run."
     else:
         next_action = "Confirme o estado desta run antes de decidir entre executar, cancelar ou reprocessar."
+    events = list(detail.get("events") or [])
+    event_lines = []
+    for event in events[-3:]:
+        event_status = _humanize_run_status(event.get("status"))
+        message = str(event.get("message") or "").strip()
+        event_lines.append(f"{event_status}: {message}" if message else event_status)
+    if not event_lines:
+        event_lines = ["Ainda não há eventos relevantes persistidos para esta run."]
+    artifacts = detail.get("artifacts") or {}
+    artifact_lines = [
+        "Resumo executivo disponível." if artifacts.get("summary_json") else "",
+        "Candidato selecionado disponível." if artifacts.get("selected_candidate_json") else "",
+        "Catálogo exportado disponível." if artifacts.get("catalog_csv") else "",
+        f"Diretório de artefatos: {artifacts.get('artifacts_dir')}" if artifacts.get("artifacts_dir") else "",
+    ]
+    artifact_lines = [line for line in artifact_lines if line]
+    if not artifact_lines:
+        artifact_lines = ["Esta run ainda não expôs artefatos executivos suficientes."]
+    if status in {"queued", "preparing"}:
+        action_guidance = "Acompanhar esta run e decidir se ainda faz sentido manter a fila ou cancelar antes da execução completa."
+    elif status in {"running", "exporting"}:
+        action_guidance = "Acompanhar a execução atual; cancelar ou abrir outra rodada agora tende a gerar ruído desnecessário."
+    elif status == "completed":
+        action_guidance = "Revisar resultado e, se fizer sentido, abrir Decisão ou reenfileirar uma nova rodada mais consciente."
+    else:
+        action_guidance = "Revisar falha ou cancelamento antes de reenfileirar, para não repetir a mesma rodada sem correção."
     return html.Div(
         children=[
             html.H3("Run em foco", style={"marginTop": 0}),
@@ -4676,16 +4741,38 @@ def render_run_job_detail_panel(detail: dict[str, Any]) -> Any:
                     _metric_card("Modo da rodada", detail.get("policy_mode") or "-"),
                 ],
             ),
-            html.H4("Leitura operacional", style={"marginBottom": "6px"}),
-            _label_value_list(
-                [
-                    ("Bundle de origem", detail.get("source_bundle_root")),
-                    ("Engine utilizado", detail.get("engine_used")),
-                    ("Execução pedida", detail.get("requested_execution_mode") or detail.get("execution_mode")),
-                ]
+            html.Div(
+                id="run-job-detail-operational-summary",
+                style={**UI_TWO_COLUMN_STYLE, "marginTop": "12px"},
+                children=[
+                    _guidance_card("Leitura operacional", next_action),
+                    _guidance_card("Pode agir agora", action_guidance),
+                    _guidance_card("Bundle de origem", str(detail.get("source_bundle_root") or "-")),
+                    _guidance_card("Execução pedida", str(detail.get("requested_execution_mode") or detail.get("execution_mode") or "-")),
+                ],
             ),
+            html.H4("Eventos relevantes", style={"marginBottom": "6px", "marginTop": "14px"}),
+            html.Div(id="run-job-detail-events", children=_bullet_list(event_lines, "Sem evento relevante disponível.")),
+            html.H4("Resultado e artefatos", style={"marginBottom": "6px", "marginTop": "14px"}),
+            html.Div(id="run-job-detail-artifacts", children=_bullet_list(artifact_lines, "Sem artefato executivo disponível.")),
             html.H4("Próxima ação", style={"marginBottom": "6px", "marginTop": "14px"}),
             html.Div(next_action, style={"lineHeight": "1.6", "fontWeight": 700}),
+            html.Details(
+                id="run-job-detail-technical-details",
+                style={**UI_MUTED_CARD_STYLE, "marginTop": "14px"},
+                children=[
+                    html.Summary("Contexto técnico secundário desta run"),
+                    _label_value_list(
+                        [
+                            ("Engine utilizado", detail.get("engine_used")),
+                            ("Erro operacional", detail.get("error")),
+                            ("Failure reason", detail.get("failure_reason")),
+                            ("Events path", detail.get("events_path")),
+                            ("Log path", detail.get("log_path")),
+                        ]
+                    ),
+                ],
+            ),
         ]
     )
 

@@ -17,7 +17,14 @@ from decision_platform.api.run_pipeline import (
     summarize_run_jobs,
 )
 from decision_platform.julia_bridge import bridge
-from decision_platform.ui_dash.app import build_app, build_run_job_detail_summary, build_run_jobs_snapshot
+from decision_platform.ui_dash.app import (
+    build_app,
+    build_run_job_detail_summary,
+    build_run_jobs_snapshot,
+    render_run_job_detail_panel,
+    render_run_jobs_overview_panel,
+    render_runs_workspace_panel,
+)
 from tests.decision_platform.scenario_utils import (
     cleanup_scenario_copy,
     diagnostic_runtime_test_mode,
@@ -52,6 +59,20 @@ def _get_callback(app: object, *, input_id: str) -> Callable[..., Any]:
             if callback is not None:
                 return getattr(callback, "__wrapped__", callback)
     raise KeyError(f"Callback not found for input_id={input_id!r}")
+
+
+def _collect_text(component: object) -> str:
+    if component is None:
+        return ""
+    if isinstance(component, str):
+        return component
+    if isinstance(component, (int, float, bool)):
+        return str(component)
+    children = getattr(component, "children", None)
+    if children is None:
+        return ""
+    child_items = children if isinstance(children, (list, tuple)) else [children]
+    return "".join(_collect_text(child) for child in child_items)
 
 
 def _assert_run_detail_has_telemetry(detail: dict[str, Any]) -> None:
@@ -94,6 +115,75 @@ def _assert_persisted_queue_summary(
     assert queue_summary["lineage"]["source_run_id"] == source_run_id
     assert queue_summary["evidence_summary"]["final_status_recorded"] is True
     return queue_summary
+
+
+@pytest.mark.fast
+def test_phase3_queue_acceptance_runs_ui_surfaces_operational_queue_and_detail_language() -> None:
+    workspace = render_runs_workspace_panel(
+        {
+            "status": "ready",
+            "readiness_headline": "Cenário pronto para seguir para Runs.",
+        },
+        {
+            "run_count": 3,
+            "next_queued_run_id": "run-003",
+            "active_run_ids": ["run-002"],
+            "queued_run_ids": ["run-003"],
+            "latest_run_id": "run-001",
+            "status_counts": {"completed": 1, "failed": 1},
+        },
+        {},
+    )
+    overview = render_run_jobs_overview_panel(
+        {
+            "run_count": 3,
+            "queue_state": "running",
+            "next_queued_run_id": "run-003",
+            "active_run_ids": ["run-002"],
+            "queued_run_ids": ["run-003"],
+            "latest_run_id": "run-001",
+            "latest_updated_at": "2026-04-09T00:00:00Z",
+            "terminal_run_ids": ["run-001"],
+            "status_counts": {"completed": 1, "failed": 1},
+            "worker_mode": "serial",
+        }
+    )
+    detail = render_run_job_detail_panel(
+        {
+            "selected_run_id": "run-002",
+            "status": "running",
+            "requested_execution_mode": "diagnostic",
+            "official_gate_valid": False,
+            "duration_s": 9.4,
+            "policy_mode": "diagnostic_override_probe_disabled",
+            "source_bundle_root": "data/decision_platform/maquete_v2",
+            "engine_used": "python_emulated_julia",
+            "events": [
+                {"status": "queued", "message": "Run criada."},
+                {"status": "running", "message": "Execução principal em andamento."},
+            ],
+            "artifacts": {
+                "artifacts_dir": "artifacts/run-002",
+            },
+            "events_path": "events.jsonl",
+            "log_path": "run.log",
+        }
+    )
+
+    workspace_text = _collect_text(workspace)
+    overview_text = _collect_text(overview)
+    detail_text = _collect_text(detail)
+
+    assert "Limitação agora" in workspace_text
+    assert "O cenário já passou no gate principal" in workspace_text
+    assert "Fila pendente" in overview_text
+    assert "Execução agora" in overview_text
+    assert "Histórico recente" in overview_text
+    assert "Próximo gesto do operador" in overview_text
+    assert "Eventos relevantes" in detail_text
+    assert "Resultado e artefatos" in detail_text
+    assert "Pode agir agora" in detail_text
+    assert "Contexto técnico secundário desta run" in detail_text
 
 
 @pytest.mark.slow

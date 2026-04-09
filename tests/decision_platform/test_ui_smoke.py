@@ -743,18 +743,100 @@ def test_runs_tab_combines_queue_and_execution_summary() -> None:
     assert _find_component_by_id(runs_tab, "runs-workspace-panel") is not None
     assert _find_component_by_id(runs_tab, "runs-context-detailed-panels") is not None
     assert _find_component_by_id(runs_tab, "run-jobs-overview-panel") is not None
+    assert _find_component_by_id(runs_tab, "run-jobs-operational-lanes") is not None
     assert _find_component_by_id(runs_tab, "runs-flow-panel") is not None
     assert _find_component_by_id(runs_tab, "runs-flow-open-studio-link") is not None
     assert _find_component_by_id(runs_tab, "runs-flow-open-decision-button") is not None
     assert _find_component_by_id(runs_tab, "runs-workspace-open-studio-link") is not None
     assert _find_component_by_id(runs_tab, "runs-workspace-open-decision-button") is not None
+    assert _find_component_by_id(runs_tab, "runs-workspace-next-step-panel") is not None
     assert _find_component_by_id(runs_tab, "execution-summary-panel") is not None
     assert _find_component_by_id(runs_tab, "run-jobs-status-banner") is not None
+    assert _find_component_by_id(runs_tab, "run-job-detail-panel") is not None
     assert _find_component_by_id(runs_tab, "runs-open-studio-button") is None
     assert _find_component_by_id(runs_tab, "runs-open-decision-button") is None
     assert _find_component_by_id(runs_tab, "execution-open-decision-button") is not None
     assert _find_component_by_id(runs_tab, "run-button") is not None
     assert _find_component_by_id(runs_tab, "runs-operations-details") is not None
+
+
+def test_runs_workspace_panel_distinguishes_scenario_gate_from_execution_state() -> None:
+    blocked_panel = render_runs_workspace_panel(
+        {
+            "status": "needs_attention",
+            "readiness_headline": "Ainda há bloqueios estruturais impedindo a passagem segura para Runs.",
+        },
+        {
+            "run_count": 2,
+            "next_queued_run_id": "run-002",
+            "active_run_ids": [],
+            "queued_run_ids": ["run-002"],
+            "latest_run_id": "run-001",
+            "status_counts": {"completed": 1, "failed": 0},
+        },
+        {},
+    )
+    ready_panel = render_runs_workspace_panel(
+        {
+            "status": "ready",
+            "readiness_headline": "Cenário pronto para seguir para Runs.",
+        },
+        {
+            "run_count": 3,
+            "next_queued_run_id": "run-003",
+            "active_run_ids": ["run-002"],
+            "queued_run_ids": ["run-003"],
+            "latest_run_id": "run-001",
+            "status_counts": {"completed": 1, "failed": 1},
+        },
+        {},
+    )
+    blocked_text = _collect_text_content(blocked_panel)
+    ready_text = _collect_text_content(ready_panel)
+
+    assert "Limitação agora" in blocked_text
+    assert "A limitação principal ainda está no cenário" in blocked_text
+    assert "Fila agora" in blocked_text
+    assert "Limitação agora" in ready_text
+    assert "O cenário já passou no gate principal" in ready_text
+    assert "Execução em foco: run-002." in ready_text
+
+
+def test_run_job_detail_panel_prioritizes_events_and_artifacts_over_logs() -> None:
+    panel = render_run_job_detail_panel(
+        {
+            "selected_run_id": "run-007",
+            "status": "completed",
+            "requested_execution_mode": "diagnostic",
+            "official_gate_valid": False,
+            "duration_s": 12.5,
+            "policy_mode": "diagnostic_override_probe_disabled",
+            "source_bundle_root": "data/decision_platform/maquete_v2",
+            "engine_used": "python_emulated_julia",
+            "events": [
+                {"status": "queued", "message": "Run criada na fila local."},
+                {"status": "running", "message": "Execução principal em andamento."},
+                {"status": "completed", "message": "Resumo executivo consolidado."},
+            ],
+            "artifacts": {
+                "summary_json": "summary.json",
+                "selected_candidate_json": "selected_candidate.json",
+                "catalog_csv": "catalog.csv",
+                "artifacts_dir": "artifacts",
+            },
+            "events_path": "events.jsonl",
+            "log_path": "run.log",
+        }
+    )
+    panel_text = _collect_text_content(panel)
+
+    assert "Eventos relevantes" in panel_text
+    assert "Resultado e artefatos" in panel_text
+    assert "Pode agir agora" in panel_text
+    assert "Resumo executivo disponível." in panel_text
+    assert "Candidato selecionado disponível." in panel_text
+    assert "Logs" not in panel_text
+    assert _find_component_by_id(panel, "run-job-detail-technical-details") is not None
 
 
 def test_studio_readiness_panel_surfaces_runs_transition_with_real_readiness() -> None:
