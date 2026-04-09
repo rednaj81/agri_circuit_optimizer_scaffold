@@ -1,0 +1,41 @@
+{
+  "wave": 14,
+  "phase_id": "phase_ux_refinement",
+  "snapshot_type": "structured_final",
+  "status": "closed",
+  "baseline": {
+    "studio": [
+      "canvas-first",
+      "business graph only",
+      "readiness explícito",
+      "ações principais locais"
+    ],
+    "runs": [
+      "fila legível",
+      "run em foco",
+      "recuperação prática",
+      "resultado utilizável como gate"
+    ],
+    "decision": [
+      "winner e runner-up comparáveis",
+      "margem e technical tie compactos",
+      "leitura humana acionável",
+      "primeira dobra sem densidade adicional"
+    ],
+    "journey": [
+      "Próxima ação",
+      "resultado utilizável",
+      "passagem segura Studio -> Runs -> Decisão"
+    ]
+  },
+  "residuals": [
+    "screenshot bitmap indisponível no sandbox",
+    "sem nova mudança material de UX nesta wave final",
+    "ganhos adicionais exigem nova frente ou manutenção incremental"
+  ],
+  "screenshot": {
+    "attempted": true,
+    "available": false,
+    "reason": "sandbox browser capture unavailable in this session"
+  }
+}
