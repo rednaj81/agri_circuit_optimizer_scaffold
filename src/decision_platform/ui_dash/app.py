@@ -159,7 +159,7 @@ UI_PERSISTENT_BANNER_COMPACT_STYLE = {
 }
 UI_STUDIO_MAIN_GRID_STYLE = {
     "display": "grid",
-    "gridTemplateColumns": "minmax(0, 2.35fr) minmax(320px, 380px)",
+    "gridTemplateColumns": "minmax(0, 2.45fr) minmax(300px, 352px)",
     "gap": "18px",
     "alignItems": "start",
 }
@@ -3382,6 +3382,19 @@ def render_studio_workspace_panel(
         if selected_node_present or selected_edge_present
         else str(connection_preview)
     )
+    supply_strip_cards = [
+        _compact_value_card("Quem supre este foco", str(business_flow.get("supplied_by_label") or "Ainda não recebe suprimento visível."), supply_flow_summary),
+        _compact_value_card("Quem este foco supre", str(business_flow.get("supplies_label") or "Ainda não abastece outra entidade visível."), connection_preview),
+        _compact_value_card(
+            "Trecho mais legível",
+            connection_preview,
+            (
+                f"{len(connection_lines)} leitura(s) de suprimento já aparecem na camada principal."
+                if connection_lines
+                else "Desenhe uma conexão no canvas para abrir a cadeia de suprimento principal."
+            ),
+        ),
+    ]
     quick_edit_cards = _studio_workspace_quick_edit_cards(
         node_summary,
         edge_summary,
@@ -3422,12 +3435,16 @@ def render_studio_workspace_panel(
                 ],
             ),
             html.Div(
-                style={**UI_THREE_COLUMN_STYLE, "marginBottom": "12px"},
+                style={**UI_TWO_COLUMN_STYLE, "gridTemplateColumns": "repeat(auto-fit, minmax(220px, 1fr))", "marginBottom": "12px"},
                 children=[
                     _compact_value_card("Seleção atual", focus_summary["headline"], focus_summary["recommended_action"], accent="rgba(16, 59, 53, 0.18)"),
-                    _compact_value_card("Quem supre quem", supply_flow_summary, business_flow.get("supplied_by_label") or "Sem suprimento visível"),
-                    _compact_value_card("Gesto principal", "Ajustar rota no foco", str(studio_summary.get("primary_action") or focus_summary["recommended_action"])),
+                    _compact_value_card("Próximo gesto", "Ajustar rota no foco", str(studio_summary.get("primary_action") or focus_summary["recommended_action"])),
                 ],
+            ),
+            html.Div(
+                id="studio-workspace-supply-strip",
+                style={**UI_THREE_COLUMN_STYLE, "marginBottom": "12px"},
+                children=supply_strip_cards,
             ),
             html.Div(
                 style={**UI_COMPACT_BANNER_CARD_STYLE, "marginBottom": "12px", "display": "block" if blocker_count > 0 else "none"},
@@ -3453,22 +3470,35 @@ def render_studio_workspace_panel(
                         style={**UI_ACTION_ROW_STYLE, "marginTop": "12px"},
                         children=[
                             html.Button("Mover à esquerda", id="studio-focus-move-left-button", style=UI_BUTTON_STYLE, disabled=not selected_node_present),
-                            html.Button("Mover acima", id="studio-focus-move-up-button", style=UI_BUTTON_STYLE, disabled=not selected_node_present),
-                            html.Button("Mover abaixo", id="studio-focus-move-down-button", style=UI_BUTTON_STYLE, disabled=not selected_node_present),
                             html.Button("Duplicar nó em foco", id="studio-focus-duplicate-node-button", style=UI_BUTTON_STYLE, disabled=not selected_node_present),
                             html.Button("Excluir conexão em foco", id="studio-focus-delete-edge-button", style=UI_BUTTON_STYLE, disabled=not selected_edge_present),
                             html.Button("Abrir bancada completa", id="studio-focus-open-workbench-button", style=UI_BUTTON_STYLE),
                         ],
                     ),
+                    html.Details(
+                        style={**UI_MUTED_CARD_STYLE, "padding": "10px", "marginTop": "12px"},
+                        children=[
+                            html.Summary("Mais movimentos"),
+                            html.Div(
+                                style={**UI_ACTION_ROW_STYLE, "marginTop": "10px"},
+                                children=[
+                                    html.Button("Mover acima", id="studio-focus-move-up-button", style=UI_BUTTON_STYLE, disabled=not selected_node_present),
+                                    html.Button("Mover abaixo", id="studio-focus-move-down-button", style=UI_BUTTON_STYLE, disabled=not selected_node_present),
+                                ],
+                            ),
+                        ],
+                    ),
                 ],
             ),
             route_editor_panel,
-            html.Div(
+            html.Div(style={**UI_ACTION_ROW_STYLE, "marginTop": "12px"}, children=[*primary_actions, _button_link("Abrir Auditoria", "?tab=audit", "studio-workspace-open-audit-link")]),
+            html.Details(
                 id="studio-business-flow-panel",
                 style={**UI_MUTED_CARD_STYLE, "padding": "12px", "marginBottom": "12px"},
                 children=[
-                    html.Div("Quem supre quem na camada principal", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
-                    html.Div(str(business_flow.get("headline") or "Sem cadeia principal visível."), style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"}),
+                    html.Summary("Cadeia de suprimento e saída do Studio"),
+                    html.Div("Quem supre quem na camada principal", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d", "marginTop": "12px"}),
+                    html.Div(str(business_flow.get("headline") or supply_flow_summary or "Sem cadeia principal visível."), style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"}),
                     html.Div(
                         style={**UI_TWO_COLUMN_STYLE, "gridTemplateColumns": "repeat(2, minmax(0, 1fr))", "marginTop": "10px"},
                         children=[
@@ -3486,21 +3516,12 @@ def render_studio_workspace_panel(
                             ),
                         ],
                     ),
-                ],
-            ),
-            html.Div(style={**UI_ACTION_ROW_STYLE, "marginTop": "12px"}, children=[*primary_actions, _button_link("Abrir Auditoria", "?tab=audit", "studio-workspace-open-audit-link")]),
-            html.Details(
-                style={**UI_MUTED_CARD_STYLE, "padding": "12px", "marginTop": "12px"},
-                children=[
-                    html.Summary("Readiness e saída do Studio"),
                     html.Div(
                         style={**UI_THREE_COLUMN_STYLE, "marginTop": "12px"},
                         children=[
                             _metric_card("Bloqueios", blocker_count, "Impedem liberar a passagem para Runs."),
                             _metric_card("Avisos", warning_count, "Pedem revisão antes de enfileirar."),
                             _metric_card("Rotas obrigatórias", studio_summary.get("mandatory_route_count", 0), "Base mínima da conectividade principal."),
-                            _metric_card("Rotas desejáveis", studio_summary.get("desirable_route_count", 0), "Desejos explícitos sem virar hard constraint."),
-                            _metric_card("Rotas opcionais", studio_summary.get("optional_route_count", 0), "Alternativas que não travam a saída para Runs."),
                         ],
                     ),
                     html.Div(
@@ -3783,7 +3804,14 @@ def render_studio_canvas_guidance_panel(
     summary: dict[str, Any],
     node_summary: dict[str, Any],
     edge_summary: dict[str, Any],
+    composer_state: dict[str, Any] | None = None,
+    nodes_rows: list[dict[str, Any]] | None = None,
+    candidate_links_rows: list[dict[str, Any]] | None = None,
+    route_rows: list[dict[str, Any]] | None = None,
 ) -> Any:
+    nodes_rows = nodes_rows or []
+    candidate_links_rows = candidate_links_rows or []
+    route_rows = route_rows or []
     selected_node_id = str(node_summary.get("selected_node_id") or "").strip()
     selected_edge_id = str(edge_summary.get("selected_link_id") or "").strip()
     selected_node_label = str(node_summary.get("business_label") or selected_node_id or "").strip()
@@ -3791,6 +3819,35 @@ def render_studio_canvas_guidance_panel(
     blocker_count = int(summary.get("blocker_count", 0) or 0)
     warning_count = int(summary.get("warning_count", 0) or 0)
     selected_edge = edge_summary.get("selected_edge") or {}
+    focus_node_ids = {
+        selected_node_id,
+        str(selected_edge.get("from_node") or "").strip(),
+        str(selected_edge.get("to_node") or "").strip(),
+    }
+    focus_node_ids = {node_id for node_id in focus_node_ids if node_id}
+    business_flow = build_studio_business_flow_summary(
+        nodes_rows,
+        candidate_links_rows,
+        route_rows,
+        focus_node_ids=focus_node_ids,
+    )
+    node_lookup = {
+        str(row.get("node_id", "")).strip(): dict(row)
+        for row in _visible_studio_nodes(nodes_rows)
+        if str(row.get("node_id", "")).strip()
+    }
+    composer_preview = _build_route_composer_preview(composer_state, nodes_rows=nodes_rows)
+    composer_data = composer_preview.get("state") or {}
+    route_draft_source = str(composer_data.get("source_node_id") or "").strip()
+    focused_route_lines = [
+        _studio_route_primary_label(
+            route,
+            node_lookup=node_lookup,
+            include_intent=True,
+            include_measurement=True,
+        )
+        for route in _route_focus_rows(route_rows, focus_node_ids=focus_node_ids)[:3]
+    ]
     selected_edge_from_label = _studio_node_business_label_from_lookup(str(selected_edge.get("from_node") or "").strip())
     selected_edge_to_label = _studio_node_business_label_from_lookup(str(selected_edge.get("to_node") or "").strip())
     if selected_edge_id and selected_edge_label:
@@ -3820,20 +3877,30 @@ def render_studio_canvas_guidance_panel(
         secondary_actions_hint = "Use estas ações depois de revisar o gesto principal deste trecho."
     elif selected_node_id and selected_node_label:
         current_focus = f"Entidade em foco: {selected_node_label}."
-        canvas_action = "Use a entidade selecionada para reposicionar, revisar conectividade e validar o papel dela antes de abrir Runs."
+        if route_draft_source and selected_node_id != route_draft_source:
+            canvas_action = f"Use {selected_node_label} como destino para concluir a rota em preparo direto no canvas."
+            primary_action_button = html.Button("Usar como destino", id="studio-canvas-arm-target-button", style=UI_BUTTON_STYLE)
+            secondary_action_buttons = [
+                html.Button("Trocar a origem", id="studio-canvas-arm-source-button", style=UI_BUTTON_STYLE),
+                html.Button("Abrir bancada desta entidade", id="studio-canvas-open-workbench-button", style=UI_BUTTON_STYLE),
+            ]
+            secondary_actions_summary = "Mais ações: origem e bancada"
+            secondary_actions_hint = "Abra estas ações se precisar trocar a origem ou sair do fluxo direto no canvas."
+        else:
+            canvas_action = "Use a entidade selecionada para reposicionar, revisar conectividade e validar o papel dela antes de abrir Runs."
+            primary_action_button = html.Button("Usar como origem", id="studio-canvas-arm-source-button", style=UI_BUTTON_STYLE)
+            secondary_action_buttons = [
+                html.Button("Usar como destino", id="studio-canvas-arm-target-button", style=UI_BUTTON_STYLE),
+                html.Button("Abrir bancada desta entidade", id="studio-canvas-open-workbench-button", style=UI_BUTTON_STYLE),
+            ]
+            secondary_actions_summary = "Mais ações: destino e bancada"
+            secondary_actions_hint = "Abra estas ações quando o próximo passo não for iniciar a rota a partir deste ponto."
         if blocker_count > 0:
             local_blocker = "Bloqueio local: este nó ajuda a localizar a próxima correção estrutural no grafo principal."
         elif warning_count > 0:
             local_blocker = "Aviso local: confirme as conexões deste nó antes de enfileirar uma nova run."
         else:
             local_blocker = "Este nó já pode ser usado como ponto de conferência final antes de abrir Runs."
-        primary_action_button = html.Button("Usar como origem", id="studio-canvas-arm-source-button", style=UI_BUTTON_STYLE)
-        secondary_action_buttons = [
-            html.Button("Usar como destino", id="studio-canvas-arm-target-button", style=UI_BUTTON_STYLE),
-            html.Button("Abrir bancada desta entidade", id="studio-canvas-open-workbench-button", style=UI_BUTTON_STYLE),
-        ]
-        secondary_actions_summary = "Mais ações: destino e bancada"
-        secondary_actions_hint = "Abra estas ações quando o próximo passo não for iniciar a rota a partir deste ponto."
     else:
         current_focus = "Nenhum foco ativo no canvas."
         canvas_action = "Clique em uma entidade ou conexão do grafo para abrir o contexto principal desta revisão."
@@ -3860,6 +3927,37 @@ def render_studio_canvas_guidance_panel(
                     _guidance_card(
                         "Gate para Runs",
                         str(summary.get("readiness_headline") or "Revise o readiness do cenário antes de abrir a fila."),
+                    ),
+                ],
+            ),
+            html.Div(
+                id="studio-canvas-supply-chain-panel",
+                style={**UI_MUTED_CARD_STYLE, "padding": "12px", "marginTop": "12px"},
+                children=[
+                    html.Div("Cadeia visível neste foco", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+                    html.Div(
+                        str(business_flow.get("headline") or "Sem leitura explícita de suprimento neste foco."),
+                        style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"},
+                    ),
+                    html.Div(
+                        style={**UI_TWO_COLUMN_STYLE, "gridTemplateColumns": "repeat(auto-fit, minmax(220px, 1fr))", "marginTop": "10px"},
+                        children=[
+                            _guidance_card("Quem supre este foco", str(business_flow.get("supplied_by_label") or "Ainda não recebe suprimento visível.")),
+                            _guidance_card("Quem este foco supre", str(business_flow.get("supplies_label") or "Ainda não abastece outra entidade visível.")),
+                            _guidance_card("Rota em preparo", str(composer_preview.get("headline") or "Sem rota em preparo no canvas.")),
+                            _guidance_card("Estado do composer", str(composer_preview.get("status_label") or "Composer vazio")),
+                        ],
+                    ),
+                    html.Details(
+                        id="studio-canvas-route-visibility-panel",
+                        style={**UI_MUTED_CARD_STYLE, "padding": "10px", "marginTop": "10px"},
+                        children=[
+                            html.Summary("Ver trechos legíveis deste foco"),
+                            _bullet_list(
+                                focused_route_lines or list(business_flow.get("connection_lines") or [])[:4],
+                                "Selecione um trecho no canvas para ver quem supre quem nesta leitura.",
+                            ),
+                        ],
                     ),
                 ],
             ),
@@ -4327,7 +4425,7 @@ def render_studio_focus_panel(
                 children=[
                     html.Div("Controles rápidos já estão no primeiro fold do Studio.", style={"fontWeight": 700, "lineHeight": "1.5"}),
                     html.Div(
-                        "Use o painel local ao lado do canvas para editar rótulo, comprimento, famílias, direção e movimentos comuns sem abrir a bancada avançada.",
+                        "Use o painel local ao lado do canvas para editar rótulo, comprimento, famílias e direção sem reabrir a bancada avançada.",
                         style={"lineHeight": "1.6", "marginTop": "8px"},
                     ),
                 ],
@@ -5703,14 +5801,13 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
                 ],
             ),
             html.Div(
-                style={**UI_TWO_COLUMN_STYLE, "gridTemplateColumns": "repeat(auto-fit, minmax(210px, 1fr))", "marginBottom": "12px"},
+                style={**UI_TWO_COLUMN_STYLE, "gridTemplateColumns": "repeat(auto-fit, minmax(220px, 1fr))", "marginBottom": "12px"},
                 children=[
-                    _compact_value_card("Perfil em leitura", active_profile_label or "-", f"Perfil ativo. Referência oficial: {official_profile_label}", accent="#e8efe8"),
                     _compact_value_card("Winner", candidate_id or "Sem winner", winner_short_reason, accent="#d7e5c1"),
                     _compact_value_card("Runner-up", runner_up_id or "Sem runner-up", runner_up_signal if runner_up_id else "Sem runner-up para pressionar a decisão"),
-                    _compact_value_card("Margem", margin_value, margin_note),
+                    _compact_value_card("Margem", tie_label if decision_status == "technical_tie" else margin_value, _humanize_decision_copy(comparison_difference)),
                     _compact_value_card("Technical tie", tie_label, "Technical tie explícito" if decision_status == "technical_tie" else "Sem empate técnico aberto"),
-                    _compact_value_card("Leitura humana", risk_value, human_review_signal),
+                    _compact_value_card("Leitura humana", risk_value, f"{human_review_signal} Perfil em leitura: {active_profile_label or '-'} | Perfil ativo e referência oficial: {official_profile_label}."),
                 ],
             ),
             html.Div(
@@ -5730,7 +5827,7 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
                 ],
             ),
             html.Details(
-                id="decision-comparison-details",
+                id="decision-workspace-comparison-details",
                 style={**UI_MUTED_CARD_STYLE, "padding": "12px"},
                 children=[
                     html.Summary("Comparação assistida e contexto"),
@@ -5738,7 +5835,6 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
                         id="decision-final-comparison-panel",
                         style={**UI_TWO_COLUMN_STYLE, "gridTemplateColumns": "repeat(auto-fit, minmax(220px, 1fr))", "marginTop": "12px", "marginBottom": "12px"},
                         children=[
-                            _compact_value_card("Referência oficial do produto", official_product_candidate_id or "-", official_profile_label),
                             _compact_value_card("Winner x runner-up", candidate_id or "-", f"{runner_up_id or '-'} | {comparison_signal}"),
                             _compact_value_card("Sinal comparativo", tie_label if decision_status == "technical_tie" else "Contraste principal", _humanize_decision_copy(comparison_difference)),
                             _compact_value_card("Escolha manual atual", selected_candidate_id or "-", f"{selected_state_label} | {selected_topology_family}"),
@@ -5756,26 +5852,7 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
                             html.Div(export_guidance, style={"lineHeight": "1.6", "marginTop": "8px"}),
                         ],
                     ),
-                    html.Div(
-                        style={**UI_TWO_COLUMN_STYLE, "marginTop": "12px"},
-                        children=[
-                            _guidance_card("O que esta área resolve", "Transformar a última execução utilizável em leitura comparável entre winner, runner-up e risco principal."),
-                            _guidance_card("Estado atual", decision_state["headline"]),
-                            _guidance_card("Próxima ação", decision_state["next_action"]),
-                            _guidance_card("Referência oficial do produto", f"{official_profile_label}: {official_product_candidate_id or '-'}"),
-                        ],
-                    ),
-                    html.Div(
-                        style={**UI_THREE_COLUMN_STYLE, "marginTop": "12px"},
-                        children=[
-                            _metric_card("Estado dominante", decision_state["state_label"]),
-                            _metric_card("Candidatos visíveis", visible_candidate_count),
-                            _metric_card("Technical tie", tie_label),
-                            _metric_card("Winner", candidate_id or "-"),
-                            _metric_card("Runner-up", runner_up_id or "-"),
-                            _metric_card("Família líder", summary.get("topology_family") or catalog_summary.get("top_visible_family") or "-"),
-                        ],
-                    ),
+                    html.Div(style={**UI_THREE_COLUMN_STYLE, "marginTop": "12px"}, children=[_metric_card("Estado dominante", decision_state["state_label"]), _metric_card("Candidatos visíveis", visible_candidate_count), _metric_card("Família líder", summary.get("topology_family") or catalog_summary.get("top_visible_family") or "-")]),
                 ],
             ),
             html.Div(
@@ -6245,6 +6322,7 @@ def build_app(
             dcc.Location(id="ui-location", refresh=False),
             dcc.Store(id="scenario-dir", data=str(Path(scenario_dir))),
             dcc.Store(id="run-queue-root", data=str(run_queue_root)),
+            dcc.Store(id="node-studio-elements-store", data=initial_node_studio_elements),
             dcc.Store(id="node-studio-selected-id", data=initial_node_studio_selected_id),
             dcc.Store(id="edge-studio-selected-id", data=initial_edge_studio_selected_id),
             dcc.Store(id="studio-route-composer-state", data=initial_route_composer_state),
@@ -6350,14 +6428,21 @@ def build_app(
                                                     initial_studio_readiness,
                                                     _safe_json_loads(initial_node_studio_summary),
                                                     _safe_json_loads(initial_edge_studio_summary),
+                                                    initial_route_composer_state,
+                                                    authoring_payload["nodes_rows"],
+                                                    authoring_payload["candidate_links_rows"],
+                                                    authoring_payload["route_rows"],
                                                 ),
                                             ),
                                             cyto.Cytoscape(
                                                 id="node-studio-cytoscape",
                                                 elements=initial_node_studio_elements,
-                                                layout={"name": "preset"},
+                                                layout={"name": "preset", "fit": False, "padding": 24},
                                                 style={"width": "100%", "height": "820px"},
                                                 contextMenu=STUDIO_CONTEXT_MENU,
+                                                minZoom=0.45,
+                                                maxZoom=1.6,
+                                                wheelSensitivity=0.18,
                                                 stylesheet=_build_node_studio_stylesheet(
                                                     initial_node_studio_selected_id,
                                                     initial_edge_studio_selected_id,
@@ -7077,31 +7162,56 @@ def build_app(
             )
 
     @app.callback(
+        Output("node-studio-elements-store", "data"),
+        Input("nodes-grid", "rowData"),
+        Input("candidate-links-grid", "rowData"),
+        Input("routes-grid", "rowData"),
+        Input("studio-route-composer-state", "data"),
+    )
+    def _refresh_node_studio_elements(
+        nodes_rows: list[dict[str, Any]] | None,
+        candidate_links_rows: list[dict[str, Any]] | None,
+        route_rows: list[dict[str, Any]] | None,
+        route_composer_state: dict[str, Any] | None,
+    ) -> list[dict[str, Any]]:
+        return build_primary_node_studio_elements(
+            nodes_rows or [],
+            candidate_links_rows or [],
+            route_rows or [],
+            route_composer_state=route_composer_state,
+        )
+
+    @app.callback(
         Output("node-studio-cytoscape", "elements"),
+        Input("node-studio-elements-store", "data"),
+    )
+    def _push_node_studio_elements_to_canvas(
+        elements: list[dict[str, Any]] | None,
+    ) -> list[dict[str, Any]]:
+        return elements or []
+
+    @app.callback(
         Output("node-studio-cytoscape", "stylesheet"),
         Output("node-studio-summary", "children"),
         Output("edge-studio-summary", "children"),
         Output("studio-status", "children"),
+        Input("node-studio-elements-store", "data"),
         Input("nodes-grid", "rowData"),
         Input("candidate-links-grid", "rowData"),
-        Input("routes-grid", "rowData"),
         Input("node-studio-selected-id", "data"),
         Input("edge-studio-selected-id", "data"),
-        Input("studio-route-composer-state", "data"),
         Input("studio-status-message", "data"),
     )
     def _refresh_node_studio(
+        _elements: list[dict[str, Any]] | None,
         nodes_rows: list[dict[str, Any]] | None,
         candidate_links_rows: list[dict[str, Any]] | None,
-        route_rows: list[dict[str, Any]] | None,
         selected_node_id: str | None,
         selected_edge_id: str | None,
-        route_composer_state: dict[str, Any] | None,
         studio_status_message: str | None,
-    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], str, str, str]:
+    ) -> tuple[list[dict[str, Any]], str, str, str]:
         normalized_nodes = nodes_rows or []
         normalized_links = candidate_links_rows or []
-        normalized_routes = route_rows or []
         selected_id = _default_primary_node_studio_selection(
             normalized_nodes,
             normalized_links,
@@ -7117,12 +7227,6 @@ def build_app(
             preferred_link_id=focused_link_id,
         )
         return (
-            build_primary_node_studio_elements(
-                normalized_nodes,
-                normalized_links,
-                normalized_routes,
-                route_composer_state=route_composer_state,
-            ),
             _build_node_studio_stylesheet(selected_id, selected_link_id),
             json.dumps(_build_node_studio_summary(normalized_nodes, selected_id), indent=2, ensure_ascii=False),
             json.dumps(
@@ -8914,7 +9018,15 @@ def build_app(
         run_jobs_summary = _safe_json_loads(run_jobs_summary_text)
         execution_summary = _safe_json_loads(execution_summary_text)
         return (
-            render_studio_canvas_guidance_panel(studio_readiness, node_summary, edge_summary),
+            render_studio_canvas_guidance_panel(
+                studio_readiness,
+                node_summary,
+                edge_summary,
+                route_composer_state,
+                nodes_rows or [],
+                candidate_links_rows or [],
+                route_rows or [],
+            ),
             render_studio_command_center_panel(
                 studio_readiness,
                 node_summary,

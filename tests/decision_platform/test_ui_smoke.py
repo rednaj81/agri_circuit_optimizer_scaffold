@@ -92,6 +92,18 @@ def _collect_components_by_class_name(component: object, class_name: str) -> lis
     return matches
 
 
+def _collect_component_ids(component: object) -> list[str]:
+    component_id = getattr(component, "id", None)
+    collected = [str(component_id)] if component_id else []
+    children = getattr(component, "children", None)
+    if children is None:
+        return collected
+    child_items = children if isinstance(children, (list, tuple)) else [children]
+    for child in child_items:
+        collected.extend(_collect_component_ids(child))
+    return collected
+
+
 def _visible_tab_labels(component: object) -> list[str]:
     labels: list[str] = []
     for tab in _collect_components_by_class_name(component, "Tab"):
@@ -561,7 +573,16 @@ def test_studio_canvas_guidance_panel_keeps_canvas_as_primary_entry() -> None:
         {
             "selected_link_id": "L001",
             "business_label": "Bomba -> Misturador",
+            "selected_edge": {"from_node": "P1", "to_node": "M"},
         },
+        {"source_node_id": "P1", "sink_node_id": "M", "intent": "mandatory"},
+        [
+            {"node_id": "W", "label": "Tanque de água", "node_type": "water_tank", "zone": "supply"},
+            {"node_id": "P1", "label": "Bomba principal", "node_type": "pump", "zone": "process"},
+            {"node_id": "M", "label": "Misturador", "node_type": "mixer", "zone": "process"},
+        ],
+        [{"link_id": "L001", "from_node": "P1", "to_node": "M", "archetype": "bus_segment"}],
+        [{"route_id": "R001", "source": "P1", "sink": "M", "mandatory": True, "measurement_required": 0, "dose_min_l": 0}],
     )
     without_focus_text = _collect_text_content(panel_without_focus)
     with_edge_focus_text = _collect_text_content(panel_with_edge_focus)
@@ -571,6 +592,7 @@ def test_studio_canvas_guidance_panel_keeps_canvas_as_primary_entry() -> None:
     assert "Bloqueio ou liberação local" in without_focus_text
     assert "Clique em uma entidade ou conexão do grafo" in without_focus_text
     assert "Gate para Runs" in without_focus_text
+    assert "Cadeia visível neste foco" in without_focus_text
     assert "Abrir bancada completa" in without_focus_text
     assert "Conexão em foco: Bomba -> Misturador." in with_edge_focus_text
     assert "inverta a direção direto no primeiro fold" in with_edge_focus_text.lower()
@@ -579,6 +601,10 @@ def test_studio_canvas_guidance_panel_keeps_canvas_as_primary_entry() -> None:
     assert "Abrir bancada desta conexão" in with_edge_focus_text
     assert "Abrir orientação deste foco" in with_edge_focus_text
     assert "Cenário pronto para seguir para Runs." in with_edge_focus_text
+    assert "Quem supre este foco" in with_edge_focus_text
+    assert "Quem este foco supre" in with_edge_focus_text
+    assert "Rota em preparo" in with_edge_focus_text
+    assert "Ver trechos legíveis deste foco" in with_edge_focus_text
 
 
 def test_studio_canvas_guidance_panel_surfaces_contextual_blocker_and_runs_gate() -> None:
@@ -606,6 +632,35 @@ def test_studio_canvas_guidance_panel_surfaces_contextual_blocker_and_runs_gate(
     assert "Ir para Runs quando o cenário estiver pronto" in panel_text
     assert _find_component_by_id(panel, "studio-canvas-reverse-edge-button") is not None
     assert _find_component_by_id(panel, "studio-canvas-intent-mandatory-button") is not None
+    assert _find_component_by_id(panel, "studio-canvas-supply-chain-panel") is not None
+
+
+def test_studio_canvas_guidance_promotes_route_completion_when_draft_source_exists() -> None:
+    panel = render_studio_canvas_guidance_panel(
+        {
+            "status": "needs_attention",
+            "warning_count": 1,
+            "readiness_headline": "O cenário já pode avançar, mas ainda vale fechar avisos antes de rodar.",
+        },
+        {
+            "selected_node_id": "M",
+            "business_label": "Misturador",
+        },
+        {},
+        {"source_node_id": "W", "sink_node_id": "", "intent": "desirable"},
+        [
+            {"node_id": "W", "label": "Tanque de água", "node_type": "water_tank", "zone": "supply"},
+            {"node_id": "M", "label": "Misturador", "node_type": "mixer", "zone": "process"},
+        ],
+        [{"link_id": "L001", "from_node": "W", "to_node": "M", "archetype": "bus_segment"}],
+        [{"route_id": "R001", "source": "W", "sink": "M", "mandatory": False, "measurement_required": 0, "dose_min_l": 0}],
+    )
+
+    panel_text = _collect_text_content(panel)
+
+    assert "Use Misturador como destino para concluir a rota em preparo direto no canvas." in panel_text
+    assert "Tanque de água já está armado como origem; falta escolher o destino." in panel_text
+    assert _find_component_by_id(panel, "studio-canvas-arm-target-button") is not None
 
 
 def test_studio_workspace_panel_unifies_focus_connectivity_and_runs_gate() -> None:
@@ -644,8 +699,11 @@ def test_studio_workspace_panel_unifies_focus_connectivity_and_runs_gate() -> No
 
     assert "Leitura do cenário" in panel_text
     assert "Seleção atual" in panel_text
-    assert "Quem supre quem" in panel_text
-    assert "Gesto principal" in panel_text
+    assert "Quem supre este foco" in panel_text
+    assert "Quem este foco supre" in panel_text
+    assert "Trecho mais legível" in panel_text
+    assert "Cadeia de suprimento e saída do Studio" in panel_text
+    assert "Próximo gesto" in panel_text
     assert "Readiness crítico" in panel_text
     assert "A conexão L900 termina em Tanque de água" in panel_text
     assert "Quem supre quem na camada principal" in panel_text
@@ -657,9 +715,10 @@ def test_studio_workspace_panel_unifies_focus_connectivity_and_runs_gate() -> No
     assert "Impacto previsto" in panel_text
     assert "Corrigir no canvas" in panel_text
     assert "Runs bloqueado neste estado" in panel_text
-    assert "Readiness e saída do Studio" in panel_text
+    assert "Sinal de saída desta área" in panel_text
     assert getattr(_find_component_by_id(panel, "studio-workspace-open-runs-button"), "disabled", None) is True
     assert _find_component_by_id(panel, "studio-business-flow-panel") is not None
+    assert _find_component_by_id(panel, "studio-workspace-supply-strip") is not None
     assert _find_component_by_id(panel, "studio-focus-node-label") is not None
     assert _find_component_by_id(panel, "studio-focus-node-apply-button") is not None
     assert _find_component_by_id(panel, "studio-focus-edge-length-m") is not None
@@ -686,6 +745,19 @@ def test_studio_primary_canvas_hides_internal_and_hub_nodes() -> None:
     assert node_ids.isdisjoint({"HS", "HD", "J1", "J2", "J3", "J4", "U1", "U2", "U3"})
     assert "route:R001" in edge_ids
     assert "route:R009" in edge_ids
+
+
+def test_studio_canvas_uses_stable_zoom_bounds_for_full_hd() -> None:
+    with diagnostic_runtime_test_mode():
+        app = build_app("data/decision_platform/maquete_v2")
+
+    studio_tab = _find_tab_by_label(app.layout, "Studio")
+    cytoscape = _find_component_by_id(studio_tab, "node-studio-cytoscape")
+    assert cytoscape is not None
+    assert getattr(cytoscape, "minZoom", None) == 0.45
+    assert getattr(cytoscape, "maxZoom", None) == 1.6
+    assert getattr(cytoscape, "wheelSensitivity", None) == 0.18
+    assert getattr(cytoscape, "layout", {}).get("fit") is False
 
 
 def test_studio_primary_editors_push_technical_fields_into_disclosure() -> None:
@@ -759,6 +831,16 @@ def test_decision_tab_contains_advanced_sections_without_extra_primary_tabs() ->
     assert _find_component_by_id(decision_tab, "candidate-breakdown-panel") is not None
     assert _find_component_by_id(decision_tab, "decision-ranking-details") is not None
     assert _find_component_by_id(decision_tab, "decision-comparison-details") is not None
+    assert _find_component_by_id(decision_tab, "decision-workspace-comparison-details") is not None
+
+
+def test_app_layout_does_not_repeat_component_ids() -> None:
+    with diagnostic_runtime_test_mode():
+        app = build_app("data/decision_platform/maquete_v2")
+
+    component_ids = _collect_component_ids(app.layout)
+    duplicates = sorted({component_id for component_id in component_ids if component_ids.count(component_id) > 1})
+    assert duplicates == []
 
 
 def test_runs_tab_combines_queue_and_execution_summary() -> None:
@@ -2702,7 +2784,8 @@ def test_studio_callbacks_round_trip_structural_edits_through_ui_flow() -> None:
         quick_delete_edge_callback = _get_callback(app, input_id="studio-focus-recommended-delete-edge-button")
         open_workbench_callback = _get_callback(app, input_id="studio-focus-open-workbench-button")
         sync_edge_callback = _get_callback(app, output_prefix="..edge-studio-selected-id.data")
-        refresh_studio_callback = _get_callback(app, output_prefix="..node-studio-cytoscape.elements")
+        refresh_studio_elements_callback = _get_callback(app, output_prefix="node-studio-elements-store.data")
+        refresh_studio_callback = _get_callback(app, output_prefix="..node-studio-cytoscape.stylesheet")
         save_callback = _get_callback(app, input_id="save-reopen-bundle-button")
 
         nodes_rows = bundle.nodes.to_dict("records")
@@ -2794,13 +2877,18 @@ def test_studio_callbacks_round_trip_structural_edits_through_ui_flow() -> None:
         )
         assert status == ""
 
-        elements, _, node_summary_text, edge_summary_text, studio_status = refresh_studio_callback(
+        elements = refresh_studio_elements_callback(
             nodes_rows,
             candidate_links_rows,
             route_rows,
+            {"source_node_id": created_node_id, "sink_node_id": duplicated_node_id, "intent": "mandatory"},
+        )
+        _, node_summary_text, edge_summary_text, studio_status = refresh_studio_callback(
+            elements,
+            nodes_rows,
+            candidate_links_rows,
             created_node_id,
             created_link_id,
-            {"source_node_id": created_node_id, "sink_node_id": duplicated_node_id, "intent": "mandatory"},
             status,
         )
         node_summary = json.loads(node_summary_text)
