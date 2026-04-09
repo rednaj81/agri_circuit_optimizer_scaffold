@@ -1168,18 +1168,19 @@ def test_runs_workspace_panel_distinguishes_scenario_gate_from_execution_state()
     blocked_text = _collect_text_content(blocked_panel)
     ready_text = _collect_text_content(ready_panel)
 
-    assert "O que está na fila" in blocked_text
-    assert "O que está rodando" in blocked_text
-    assert "O que falhou" in blocked_text
-    assert "O que pode fazer agora" in blocked_text
+    assert "Histórico recente" in blocked_text
+    assert "Ao vivo" in blocked_text
+    assert "Fila agora" in blocked_text
+    assert "Run em foco" in blocked_text
+    assert "Leituras separadas" in blocked_text
     assert "Gate do cenário e limites desta leitura" in blocked_text
     assert "Limitação agora" in blocked_text
     assert "A limitação principal ainda está no cenário" in blocked_text
-    assert "Resultado pronto" in blocked_text
+    assert "Histórico útil" in blocked_text
     assert "Gate do cenário e limites desta leitura" in ready_text
     assert "Limitação agora" in ready_text
     assert "O cenário já passou no gate principal" in ready_text
-    assert "O que está rodando" in ready_text
+    assert "Run em foco" in ready_text
     assert "run-002" in ready_text
 
 
@@ -1683,14 +1684,15 @@ def test_runs_workspace_panel_prioritizes_queue_focus_and_primary_transition() -
     panel_text = _collect_text_content(panel)
 
     assert "Leitura operacional de Runs" in panel_text
-    assert "O que está na fila" in panel_text
-    assert "O que está rodando" in panel_text
-    assert "O que falhou" in panel_text
-    assert "O que pode fazer agora" in panel_text
+    assert "Histórico recente" in panel_text
+    assert "Ao vivo" in panel_text
+    assert "Fila agora" in panel_text
+    assert "Run em foco" in panel_text
+    assert "Leituras separadas" in panel_text
     assert "Próxima ação" in panel_text
     assert "Gate do cenário e limites desta leitura" in panel_text
     assert "run-003" in panel_text
-    assert "Já existe um resultado utilizável" in panel_text
+    assert "resultado utilizável" in panel_text.lower()
     assert "Run/job" in panel_text
     assert _find_component_by_id(panel, "runs-workspace-operational-lanes") is not None
     assert _find_component_by_id(panel, "runs-workspace-open-studio-link") is not None
@@ -1798,8 +1800,8 @@ def test_runs_workspace_panel_distinguishes_failure_recovery_from_decision_ready
     failed_text = _collect_text_content(failed_panel)
 
     assert "Resultado bloqueado" in failed_text
-    assert "O que falhou" in failed_text
-    assert "Execução interrompida" in failed_text
+    assert "Histórico recente" in failed_text
+    assert "run-009" in failed_text
     assert "Revisar falha" in failed_text
     assert "ainda não existe resultado utilizável para Decisão" in failed_text
     assert getattr(_find_component_by_id(failed_panel, "runs-workspace-open-decision-button"), "disabled", None) is True
@@ -1829,7 +1831,8 @@ def test_runs_workspace_panel_uses_refresh_cta_for_intermediate_execution_states
     panel_text = _collect_text_content(panel)
 
     assert "Aguardar run em foco" in panel_text
-    assert "andamento real em execução" in panel_text.lower()
+    assert "Run em foco" in panel_text
+    assert "Em execução" in panel_text
     assert _find_component_by_id(panel, "runs-workspace-refresh-button") is not None
 
 
@@ -1947,7 +1950,8 @@ def test_run_jobs_overview_panel_clarifies_queue_now_vs_recent_history() -> None
 
     assert "Execução em andamento" in panel_text
     assert "Fila agora" in panel_text
-    assert "Rodando agora" in panel_text
+    assert "Execução agora" in panel_text
+    assert "Histórico recente" in panel_text
     assert "Falhou" in panel_text
     assert "Pode fazer agora" in panel_text
     assert "Em execução: run-003" in panel_text

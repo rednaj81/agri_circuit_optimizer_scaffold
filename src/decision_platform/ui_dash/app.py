@@ -841,6 +841,11 @@ def _signal_card(label: str, value: Any, note: str | None = None, *, tone: str |
     )
 
 
+def _toned_pill(label: str, tone: str | None = None) -> Any:
+    background, color = _status_tone(tone)
+    return html.Span(label, style={**UI_PILL_STYLE, "background": background, "color": color})
+
+
 def _bullet_list(items: list[str], empty_label: str) -> Any:
     if not items:
         return html.Div(empty_label, style={"color": "#496158"})
@@ -853,6 +858,81 @@ def _latest_run_with_status(summary: dict[str, Any] | None, statuses: set[str]) 
         if str(run.get("status") or "").strip() in statuses:
             return run
     return None
+
+
+def _run_has_usable_result(run: dict[str, Any] | None) -> bool:
+    run = run or {}
+    evidence = run.get("evidence_summary") or {}
+    artifacts = run.get("artifacts") or {}
+    return bool(
+        evidence.get("has_selected_candidate_json")
+        or evidence.get("has_summary_json")
+        or artifacts.get("selected_candidate_json")
+        or artifacts.get("summary_json")
+    )
+
+
+def _recent_runs_for_history(summary: dict[str, Any] | None, *, limit: int = 3) -> list[dict[str, Any]]:
+    runs = list((summary or {}).get("runs", [])) if isinstance(summary, dict) else []
+    if not runs:
+        return []
+    terminal_runs = [
+        run
+        for run in reversed(runs)
+        if str(run.get("status") or "").strip() in {"completed", "failed", "canceled"} or _run_has_usable_result(run)
+    ]
+    if terminal_runs:
+        return terminal_runs[:limit]
+    return list(reversed(runs[-limit:]))
+
+
+def _run_history_note(run: dict[str, Any] | None) -> str:
+    run = run or {}
+    status = str(run.get("status") or "").strip().lower()
+    lineage = run.get("lineage") or {}
+    notes: list[str] = []
+    if lineage.get("is_rerun"):
+        source_run_id = str(lineage.get("source_run_id") or "").strip()
+        notes.append(f"re-run de {source_run_id}" if source_run_id else "re-run")
+    if status == "completed":
+        notes.append("resultado pronto" if _run_has_usable_result(run) else "concluída sem resultado executivo")
+    elif status == "failed":
+        notes.append("falhou antes de liberar resultado")
+    elif status == "canceled":
+        notes.append("cancelada antes do desfecho")
+    elif status == "running":
+        notes.append("execução ainda aberta")
+    elif status == "queued":
+        notes.append("aguardando vez na fila")
+    elif status == "preparing":
+        notes.append("preparando artefatos")
+    return " | ".join(notes) or "sem leitura adicional"
+
+
+def _run_history_entry(run: dict[str, Any], *, latest: bool = False) -> Any:
+    status = str(run.get("status") or "unknown").strip().lower()
+    result_ready = _run_has_usable_result(run)
+    state_label = "Resultado pronto" if status == "completed" and result_ready else _humanize_run_status(status)
+    tone = "ready" if result_ready else ("running" if status in {"running", "preparing"} else ("queued" if status == "queued" else status))
+    return html.Div(
+        style={**UI_MUTED_CARD_STYLE, "padding": "12px", "border": "1px solid rgba(16, 59, 53, 0.08)" if latest else UI_MUTED_CARD_STYLE.get("border")},
+        children=[
+            html.Div(
+                style={"display": "flex", "alignItems": "center", "justifyContent": "space-between", "gap": "8px", "flexWrap": "wrap"},
+                children=[
+                    html.Div(str(run.get("run_id") or "-"), style={"fontWeight": 700, "fontSize": "16px"}),
+                    html.Div(
+                        style={"display": "flex", "gap": "8px", "flexWrap": "wrap"},
+                        children=[
+                            _toned_pill(state_label, tone),
+                            _toned_pill("re-run", "needs_attention") if (run.get("lineage") or {}).get("is_rerun") else None,
+                        ],
+                    ),
+                ],
+            ),
+            html.Div(_run_history_note(run), style={"lineHeight": "1.5", "marginTop": "8px", "color": "#496158"}),
+        ],
+    )
 
 
 def _label_value_list(items: list[tuple[str, Any]]) -> Any:
@@ -5011,6 +5091,8 @@ def render_run_jobs_overview_panel(summary: dict[str, Any]) -> Any:
     queue_state = _humanize_run_status(summary.get("queue_state", "idle")) if isinstance(summary, dict) else "Sem leitura"
     latest_failed_run = _latest_run_with_status(summary, {"failed", "canceled"})
     latest_completed_run = _latest_run_with_status(summary, {"completed"})
+    recent_runs = _recent_runs_for_history(summary, limit=3)
+    latest_recent_run = recent_runs[0] if recent_runs else None
     if preparing_count and not active_run_ids:
         queue_headline = "Preparação em andamento"
         queue_guidance = "Há run saindo da fila e preparando artefatos. Aguarde essa etapa antes de cobrar resultado ou reenfileirar."
@@ -5039,47 +5121,71 @@ def render_run_jobs_overview_panel(summary: dict[str, Any]) -> Any:
         recovery_signal = "Ainda não há histórico suficiente para falar em recuperação ou reaproveitamento."
     return html.Div(
         children=[
-            html.H3("Fila em um olhar", style={"marginTop": 0}),
-            html.Div(queue_headline, style={"fontWeight": 700, "lineHeight": "1.5", "marginBottom": "10px"}),
+            html.H3("Painel operacional detalhado", style={"marginTop": 0}),
+            html.Div(queue_headline, style={"fontWeight": 700, "lineHeight": "1.5", "marginBottom": "12px"}),
             html.Div(
-                id="run-jobs-overview-signals",
-                style={**UI_TWO_COLUMN_STYLE, "marginBottom": "12px"},
+                style={**UI_TWO_COLUMN_STYLE, "marginBottom": "12px", "alignItems": "start"},
                 children=[
-                    _signal_card(
-                        "Fila agora",
-                        next_queued_run_id or ("Preparando" if preparing_count and not active_run_ids else "Vazia"),
-                        (
-                            f"{len(queued_run_ids)} aguardando"
-                            if next_queued_run_id
-                            else ("Sem próxima run pronta" if not preparing_count else f"{preparing_count} preparando")
-                        ),
-                        tone="queued" if next_queued_run_id or preparing_count else "idle",
+                    html.Div(
+                        id="run-jobs-overview-signals",
+                        style={**UI_CARD_STYLE, "padding": "14px"},
+                        children=[
+                            html.Div("Fila agora", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+                            html.Div(
+                                style={**UI_TWO_COLUMN_STYLE, "marginTop": "10px"},
+                                children=[
+                                    _signal_card(
+                                        "Próxima run",
+                                        next_queued_run_id or ("Preparando" if preparing_count and not active_run_ids else "Vazia"),
+                                        (
+                                            f"{len(queued_run_ids)} aguardando"
+                                            if next_queued_run_id
+                                            else ("Sem próxima run pronta" if not preparing_count else f"{preparing_count} preparando")
+                                        ),
+                                        tone="queued" if next_queued_run_id or preparing_count else "idle",
+                                    ),
+                                    _signal_card(
+                                        "Execução agora",
+                                        active_run_ids[0] if active_run_ids else ("Preparando" if preparing_count else "Nada"),
+                                        "Run em foco da fila serial" if active_run_ids else ("Aguardando saída da preparação" if preparing_count else "Sem execução ativa"),
+                                        tone="running" if active_run_ids or preparing_count else "idle",
+                                    ),
+                                ],
+                            ),
+                            html.Div(
+                                style={"display": "flex", "gap": "8px", "flexWrap": "wrap", "marginTop": "10px"},
+                                children=[
+                                    _toned_pill(queue_state, "running" if active_run_ids or preparing_count else ("queued" if next_queued_run_id else "idle")),
+                                    _toned_pill("worker serial", "idle"),
+                                ],
+                            ),
+                            html.Div(queue_guidance, style={"lineHeight": "1.55", "marginTop": "10px", "color": "#496158"}),
+                        ],
                     ),
-                    _signal_card(
-                        "Rodando agora",
-                        active_run_ids[0] if active_run_ids else ("Preparando" if preparing_count else "Nada"),
-                        "Run em foco da fila serial" if active_run_ids else ("Aguardando saída da preparação" if preparing_count else "Sem execução ativa"),
-                        tone="running" if active_run_ids or preparing_count else "idle",
-                    ),
-                    _signal_card(
-                        "Falhou",
-                        str(latest_failed_run.get("run_id") or failed_count or "Nada") if latest_failed_run else ("Nada" if failed_count == 0 else failed_count),
-                        (
-                            f"{failed_count} no histórico recente"
-                            if failed_count
-                            else "Sem falhas recentes"
-                        ),
-                        tone="failed" if failed_count else "ready",
-                    ),
-                    _signal_card(
-                        "Pode fazer agora",
-                        (
-                            "Aguardar"
-                            if active_run_ids or preparing_count
-                            else ("Executar próxima" if next_queued_run_id else ("Revisar falha" if failed_count else ("Ler resultado" if latest_completed_run else "Enfileirar cenário")))
-                        ),
-                        queue_guidance,
-                        tone="needs_attention" if not latest_completed_run else "ready",
+                    html.Div(
+                        id="run-jobs-overview-history-panel",
+                        style={**UI_CARD_STYLE, "padding": "14px"},
+                        children=[
+                            html.Div("Histórico recente", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+                            html.Div(
+                                (
+                                    f"Último encerramento: {latest_recent_run.get('run_id')}"
+                                    if latest_recent_run
+                                    else "Ainda não existe encerramento recente."
+                                ),
+                                style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"},
+                            ),
+                            html.Div(
+                                recovery_signal,
+                                style={"lineHeight": "1.55", "marginTop": "8px", "color": "#496158"},
+                            ),
+                            html.Div(
+                                id="run-jobs-overview-history-list",
+                                style={"display": "grid", "gap": "10px", "marginTop": "12px"},
+                                children=[_run_history_entry(run, latest=index == 0) for index, run in enumerate(recent_runs)]
+                                or [html.Div("Ainda não há histórico recente para leitura.", style={"color": "#496158"})],
+                            ),
+                        ],
                     ),
                 ],
             ),
@@ -5091,7 +5197,15 @@ def render_run_jobs_overview_panel(summary: dict[str, Any]) -> Any:
                     _metric_card("Em execução", len(active_run_ids)),
                     _metric_card("Falhas", failed_count),
                     _metric_card("Concluídas", completed_count),
-                    _metric_card("Estado da fila", queue_state, "Leitura agregada"),
+                    _metric_card(
+                        "Pode fazer agora",
+                        (
+                            "Aguardar"
+                            if active_run_ids or preparing_count
+                            else ("Executar próxima" if next_queued_run_id else ("Revisar falha" if latest_failed_run else ("Ler resultado" if latest_completed_run else "Enfileirar cenário")))
+                        ),
+                        "Próximo gesto dominante",
+                    ),
                 ],
             ),
             html.Details(
@@ -5467,7 +5581,8 @@ def render_runs_workspace_panel(
         detail_for_progress["artifacts"] = artifacts
     progress_snapshot = _run_progress_snapshot(detail_for_progress)
     focus_reason = _run_summary_focus_reason(selected_run_summary)
-    latest_failed_run = _latest_run_with_status(run_summary, {"failed", "canceled"})
+    recent_runs = _recent_runs_for_history(run_summary, limit=3)
+    latest_recent_run = recent_runs[0] if recent_runs else None
     if active_run_ids:
         queue_focus = f"Execução em foco: {active_run_ids[0]}."
     elif next_queued_run_id:
@@ -5526,12 +5641,6 @@ def render_runs_workspace_panel(
         if state["run_count"] or next_queued_run_id or active_run_ids
         else "Nenhuma run entrou na fila ainda; a leitura operacional começa quando o cenário for enfileirado."
     )
-    focused_execution_copy = selected_run_id or fallback_focus_run_id or "Nenhuma"
-    failure_signal_value = (
-        str(latest_failed_run.get("run_id") or state["failed_count"] or "Nada")
-        if latest_failed_run
-        else ("Nada" if state["failed_count"] == 0 else state["failed_count"])
-    )
     action_signal_value = (
         "Corrigir Studio"
         if state["primary_cta_target"] == "studio"
@@ -5545,6 +5654,8 @@ def render_runs_workspace_panel(
             )
         )
     )
+    focus_run_label = selected_run_id or fallback_focus_run_id or "Nenhuma"
+    focus_status_label = _humanize_run_status(selected_run_status or detail_for_progress.get("status"))
     return html.Div(
         children=[
             html.Div("Leitura operacional de Runs", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
@@ -5556,66 +5667,100 @@ def render_runs_workspace_panel(
                 ],
             ),
             html.Div(
-                id="runs-workspace-operational-lanes",
-                style={**UI_TWO_COLUMN_STYLE, "marginBottom": "12px"},
+                id="runs-workspace-mission-grid",
+                style={**UI_TWO_COLUMN_STYLE, "marginBottom": "12px", "alignItems": "start"},
                 children=[
-                    _signal_card(
-                        "O que está na fila",
-                        next_queued_run_id or ("Preparando" if state["preparing_count"] and not active_run_ids else "Vazia"),
-                        queue_lane_copy,
-                        tone="queued" if next_queued_run_id or state["preparing_count"] else "idle",
+                    html.Div(
+                        id="runs-workspace-history-panel",
+                        style={**UI_CARD_STYLE, "padding": "14px"},
+                        children=[
+                            html.Div("Histórico recente", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+                            html.Div(
+                                (
+                                    f"Último desfecho: {latest_recent_run.get('run_id')}"
+                                    if latest_recent_run
+                                    else "Ainda não existe histórico recente encerrado."
+                                ),
+                                style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"},
+                            ),
+                            html.Div(
+                                usable_result if latest_recent_run else "Enfileire a primeira run para abrir histórico operacional reaproveitável.",
+                                style={"lineHeight": "1.55", "marginTop": "8px", "color": "#496158"},
+                            ),
+                            html.Div(
+                                id="runs-workspace-history-list",
+                                style={"display": "grid", "gap": "10px", "marginTop": "12px"},
+                                children=[_run_history_entry(run, latest=index == 0) for index, run in enumerate(recent_runs)]
+                                or [html.Div("Ainda não há histórico recente para leitura.", style={"color": "#496158"})],
+                            ),
+                        ],
                     ),
-                    _signal_card(
-                        "O que está rodando",
-                        active_run_ids[0] if active_run_ids else ("Preparando" if state["preparing_count"] else focused_execution_copy),
-                        (
-                            f"{progress_snapshot['signal']}. {focus_reason}"
-                            if focused_execution_copy != "Nenhuma"
-                            else "Nenhuma execução em foco agora."
-                        ),
-                        tone="running" if active_run_ids or state["preparing_count"] else "idle",
+                    html.Div(
+                        id="runs-workspace-operational-lanes",
+                        style={"display": "grid", "gap": "12px"},
+                        children=[
+                            html.Div(
+                                id="runs-workspace-live-strip",
+                                style={**UI_CARD_STYLE, "padding": "14px"},
+                                children=[
+                                    html.Div("Ao vivo", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+                                    html.Div(
+                                        style={**UI_TWO_COLUMN_STYLE, "marginTop": "10px"},
+                                        children=[
+                                            _signal_card(
+                                                "Fila agora",
+                                                next_queued_run_id or ("Preparando" if state["preparing_count"] and not active_run_ids else "Vazia"),
+                                                queue_lane_copy,
+                                                tone="queued" if next_queued_run_id or state["preparing_count"] else "idle",
+                                            ),
+                                            _signal_card(
+                                                "Run em foco",
+                                                active_run_ids[0] if active_run_ids else ("Preparando" if state["preparing_count"] else focus_run_label),
+                                                (
+                                                    f"{focus_status_label}. {focus_reason}"
+                                                    if focus_run_label != "Nenhuma"
+                                                    else "Nenhuma execução em foco agora."
+                                                ),
+                                                tone="running" if active_run_ids or state["preparing_count"] else "idle",
+                                            ),
+                                        ],
+                                    ),
+                                ],
+                            ),
+                            html.Div(
+                                id="runs-workspace-next-step-panel",
+                                style={**UI_MUTED_CARD_STYLE, "padding": "14px"},
+                                children=[
+                                    html.Div("Próxima ação", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+                                    html.Div(action_signal_value, style={"fontSize": "22px", "fontWeight": 700, "marginTop": "6px"}),
+                                    html.Div(state["next_action"], style={"lineHeight": "1.55", "marginTop": "8px"}),
+                                    html.Div(style={**UI_ACTION_ROW_STYLE, "marginTop": "12px"}, children=[local_recovery_cta]),
+                                    html.Div(
+                                        style={"display": "flex", "gap": "8px", "flexWrap": "wrap", "marginTop": "12px"},
+                                        children=[
+                                            _toned_pill(focus_status_label, "running" if active_run_ids or state["preparing_count"] else ("failed" if state["failed_count"] else "idle")),
+                                            _toned_pill("resultado pronto" if state["decision_enabled"] else "sem resultado pronto", "ready" if state["decision_enabled"] else "needs_attention"),
+                                        ],
+                                    ),
+                                ],
+                            ),
+                            html.Div(
+                                id="runs-workspace-context-strip",
+                                style={**UI_MUTED_CARD_STYLE, "padding": "14px"},
+                                children=[
+                                    html.Div("Leituras separadas", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+                                    html.Div(
+                                        style={**UI_THREE_COLUMN_STYLE, "marginTop": "10px"},
+                                        children=[
+                                            _compact_value_card("Cenário", _humanize_readiness_status(state["studio_status"]), str(studio_summary.get("readiness_headline") or state["readiness_note"])),
+                                            _compact_value_card("Run/job", focus_run_label, focus_status_label),
+                                            _compact_value_card("Resultado", "Pronto" if state["decision_enabled"] else "Pendente", usable_result),
+                                        ],
+                                    ),
+                                ],
+                            ),
+                        ],
                     ),
-                    _signal_card(
-                        "O que falhou",
-                        failure_signal_value,
-                        recovery_headline if (recovery_headline := state["recovery_headline"]) else "Sem falhas recentes.",
-                        tone="failed" if state["failed_count"] else "ready",
-                    ),
-                    _signal_card(
-                        "O que pode fazer agora",
-                        action_signal_value,
-                        state["next_action"],
-                        tone="needs_attention" if not state["decision_enabled"] else "ready",
-                    ),
-                ],
-            ),
-            html.Div(
-                id="runs-workspace-scenario-run-result-panel",
-                style={**UI_THREE_COLUMN_STYLE, "marginBottom": "12px"},
-                children=[
-                    _guidance_card(
-                        "Cenário",
-                        str(studio_summary.get("readiness_headline") or state["readiness_note"]),
-                    ),
-                    _guidance_card(
-                        "Run/job",
-                        (
-                            f"{selected_run_id or latest_run_id or next_queued_run_id or '-'} | {_humanize_run_status(selected_run_status or detail_for_progress.get('status'))}"
-                            if selected_run_id or latest_run_id or next_queued_run_id
-                            else "Nenhuma run selecionada ainda."
-                        ),
-                    ),
-                    _guidance_card("Resultado", usable_result),
-                ],
-            ),
-            html.Div(
-                id="runs-workspace-next-step-panel",
-                style={**UI_MUTED_CARD_STYLE, "padding": "12px", "marginBottom": "12px"},
-                children=[
-                    html.Div("Próxima ação", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
-                    html.Div(state["next_action"], style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"}),
-                    html.Div(state["decision_gate"], style={"lineHeight": "1.6", "marginTop": "10px"}),
-                    html.Div(style={**UI_ACTION_ROW_STYLE, "marginTop": "12px"}, children=[local_recovery_cta]),
                 ],
             ),
             html.Details(
@@ -5635,12 +5780,12 @@ def render_runs_workspace_panel(
             html.Div(
                 style=UI_THREE_COLUMN_STYLE,
                 children=[
-                    _metric_card("Estado dominante", state["flow_state"]),
-                    _metric_card("Runs locais", state["run_count"]),
+                    _metric_card("Fila", next_queued_run_id or ("Preparando" if state["preparing_count"] else "Vazia")),
+                    _metric_card("Run em foco", focus_run_label, focus_status_label),
+                    _metric_card("Histórico útil", latest_recent_run.get("run_id") if latest_recent_run else "-", _run_history_note(latest_recent_run) if latest_recent_run else "Sem encerramento recente"),
                     _metric_card("Na fila", queued_count),
                     _metric_card("Em execução", len(active_run_ids)),
-                    _metric_card("Falhas recentes", state["failed_count"]),
-                    _metric_card("Resultado pronto", "Sim" if state["decision_enabled"] else "Não", state["decision_gate"]),
+                    _metric_card("Falhas recentes", state["failed_count"], recovery_headline if (recovery_headline := state["recovery_headline"]) else ""),
                 ],
             ),
             html.Div(
@@ -5828,11 +5973,10 @@ def render_run_job_detail_panel(detail: dict[str, Any]) -> Any:
                 id="run-job-detail-operational-summary",
                 style={**UI_TWO_COLUMN_STYLE, "marginTop": "12px"},
                 children=[
-                    _guidance_card("Progresso desta run", progress_snapshot["progress_label"]),
-                    _guidance_card("Sinal de progresso", progress_snapshot["signal"]),
+                    _signal_card("Progresso desta run", progress_snapshot["progress_label"], progress_snapshot["signal"], tone="running" if status in {"running", "preparing", "exporting"} else ("ready" if status == "completed" else ("failed" if status in {"failed", "canceled"} else "queued"))),
+                    _signal_card("Recuperação desta run", recovery_label, recovery_text, tone="failed" if status in {"failed", "canceled"} else ("ready" if status == "completed" else "needs_attention")),
                     _guidance_card("Pode agir agora", action_guidance),
                     _guidance_card("O que falta", progress_snapshot["progress_text"]),
-                    _guidance_card("Recuperação desta run", recovery_text),
                     _guidance_card("Cenário", str(detail.get("source_bundle_root") or "-")),
                     _guidance_card(
                         "Run/job",

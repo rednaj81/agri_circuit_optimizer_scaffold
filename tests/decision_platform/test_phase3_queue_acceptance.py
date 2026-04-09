@@ -176,16 +176,18 @@ def test_phase3_queue_acceptance_runs_ui_surfaces_operational_queue_and_detail_l
     overview_text = _collect_text(overview)
     detail_text = _collect_text(detail)
 
-    assert "O que está na fila" in workspace_text
-    assert "O que está rodando" in workspace_text
-    assert "O que falhou" in workspace_text
-    assert "O que pode fazer agora" in workspace_text
+    assert "Histórico recente" in workspace_text
+    assert "Ao vivo" in workspace_text
+    assert "Fila agora" in workspace_text
+    assert "Run em foco" in workspace_text
+    assert "Leituras separadas" in workspace_text
     assert "Cenário" in workspace_text
     assert "Run/job" in workspace_text
     assert "Resultado" in workspace_text
-    assert "Andamento real em execução" in workspace_text
+    assert "Em execução" in workspace_text
     assert "Fila agora" in overview_text
-    assert "Rodando agora" in overview_text
+    assert "Execução agora" in overview_text
+    assert "Histórico recente" in overview_text
     assert "Falhou" in overview_text
     assert "Pode fazer agora" in overview_text
     assert "Eventos relevantes" in detail_text
