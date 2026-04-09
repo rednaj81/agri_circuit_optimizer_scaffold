@@ -183,6 +183,7 @@ def test_phase3_queue_acceptance_runs_ui_surfaces_operational_queue_and_detail_l
     assert "Andamento real" in workspace_text
     assert "Resultado útil" in workspace_text
     assert "Falha ou recuperação" in workspace_text
+    assert "Andamento real em execução" in workspace_text
     assert "Na fila ou preparando" in overview_text
     assert "Executando" in overview_text
     assert "Resultado recente" in overview_text
@@ -646,6 +647,7 @@ def test_phase3_queue_acceptance_reopens_persisted_run_state_for_inspection() ->
         assert reopened_snapshot["selected_run_summary"]["evidence_summary"]["final_status_logged"] is True
         assert reopened_snapshot["selected_run_summary"]["summary_source"] == "persisted_queue_summary"
         assert reopened_snapshot["selected_run_summary"]["evidence_summary"] == persisted_canceled_job["queue_summary"]["evidence_summary"]
+        assert reopened_snapshot["selected_run_focus_reason"] == "Esta é a terminal mais crítica porque define a recuperação antes de outra rodada."
         assert reopened_snapshot["selected_run_detail"]["status"] == "canceled"
         assert reopened_snapshot["selected_run_detail"]["queue_summary"] == persisted_canceled_job["queue_summary"]
         assert reopened_snapshot["selected_run_detail"]["queue_summary"]["refresh_path"] == "canonical_persist_run_job"
@@ -677,6 +679,39 @@ def test_phase3_queue_acceptance_reopens_persisted_run_state_for_inspection() ->
         assert "run-queue-root" in layout_repr
         assert queue_root_store.data == queue_root_str
         assert canceled_job["run_id"] in layout_repr
+    finally:
+        cleanup_scenario_copy(queue_root)
+        cleanup_scenario_copy(scenario_dir)
+
+
+@pytest.mark.fast
+def test_phase3_queue_acceptance_snapshot_prefers_usable_terminal_over_queued_placeholder() -> None:
+    scenario_dir = prepare_maquete_v2_acceptance_scenario(
+        "maquete_v2_phase3_focus_priority_source",
+        scenario_overrides={"hydraulic_engine": {"fallback": "python_emulated_julia"}},
+    )
+    queue_root = prepare_isolated_tmp_dir("phase3_queue_focus_priority_root")
+    try:
+        with diagnostic_runtime_test_mode():
+            completed_candidate = create_run_job(
+                scenario_dir,
+                queue_root=queue_root,
+                allow_diagnostic_python_emulation=True,
+            )
+            completed_job = run_next_queued_job(queue_root=queue_root)
+            queued_job = create_run_job(
+                scenario_dir,
+                queue_root=queue_root,
+                allow_diagnostic_python_emulation=True,
+            )
+
+        snapshot = build_run_jobs_snapshot(queue_root)
+
+        assert completed_job is not None
+        assert completed_job["status"] == "completed"
+        assert queued_job["status"] == "queued"
+        assert snapshot["selected_run_id"] == completed_candidate["run_id"]
+        assert snapshot["selected_run_focus_reason"] == "Esta é a terminal mais útil porque já carrega resultado reaproveitável para a próxima decisão."
     finally:
         cleanup_scenario_copy(queue_root)
         cleanup_scenario_copy(scenario_dir)

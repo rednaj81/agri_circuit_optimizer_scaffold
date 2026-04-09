@@ -1,0 +1,36 @@
+{
+  "snapshot_source_commit": "2ac0fe3df855f006ec7521b8bea398a9edb7d34e",
+  "runs": {
+    "focus_priority": [
+      "preferred run id",
+      "active run",
+      "usable terminal run",
+      "blocked terminal run",
+      "completed without usable result",
+      "next queued run",
+      "latest run"
+    ],
+    "progress_signals": [
+      "Espera sem avanço",
+      "Andamento real em preparação",
+      "Andamento real em execução",
+      "Andamento real na consolidação",
+      "Término sem resultado útil",
+      "Resultado utilizável",
+      "Execução interrompida"
+    ],
+    "detail_signals": [
+      "Progresso desta run",
+      "Sinal de progresso",
+      "O que falta",
+      "Recuperação desta run"
+    ],
+    "decision_gate_requires_usable_result": true,
+    "technical_logs_primary_surface": false
+  },
+  "screenshot_attempt": {
+    "target_path": "output/playwright/runs-fullhd-wave10.png",
+    "status": "failed_in_sandbox",
+    "reason": "No stable browser capture session was available in this sandbox during wave 10; structured snapshot retained as honest evidence."
+  }
+}

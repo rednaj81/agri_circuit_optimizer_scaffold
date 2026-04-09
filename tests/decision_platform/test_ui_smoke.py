@@ -1265,6 +1265,7 @@ def test_runs_workspace_panel_prioritizes_queue_focus_and_primary_transition() -
     assert "Próxima ação recomendada" in panel_text
     assert "Gate do cenário e limites desta leitura" in panel_text
     assert "Próxima run pronta: run-003." in panel_text
+    assert "Resultado utilizável" in panel_text
     assert "Já existe um resultado utilizável" in panel_text
     assert "Run em foco para recuperação: run-002." in panel_text
     assert _find_component_by_id(panel, "runs-workspace-open-studio-link") is not None
@@ -1298,6 +1299,7 @@ def test_runs_workspace_panel_distinguishes_failure_recovery_from_decision_ready
 
     assert "Resultado bloqueado" in failed_text
     assert "Falha ou recuperação" in failed_text
+    assert "Execução interrompida" in failed_text
     assert "Revisar falha" in failed_text
     assert "ainda não existe resultado utilizável para Decisão" in failed_text
     assert getattr(_find_component_by_id(failed_panel, "runs-workspace-open-decision-button"), "disabled", None) is True
@@ -1327,6 +1329,7 @@ def test_runs_workspace_panel_uses_refresh_cta_for_intermediate_execution_states
     panel_text = _collect_text_content(panel)
 
     assert "Aguardar run em foco" in panel_text
+    assert "Andamento real em execução" in panel_text
     assert _find_component_by_id(panel, "runs-workspace-refresh-button") is not None
 
 
@@ -1410,10 +1413,12 @@ def test_run_job_detail_panel_covers_preparing_and_exporting_states() -> None:
     assert "preparando artefatos" in preparing_text.lower()
     assert "Em preparação" in preparing_text
     assert "1/5 etapas em andamento" in preparing_text
+    assert "Andamento real em preparação" in preparing_text
     assert "Run em foco" in preparing_text
     assert "finalizando artefatos" in exporting_text.lower()
     assert "Consolidando saída" in exporting_text
     assert "4/5 etapas em andamento" in exporting_text
+    assert "Andamento real na consolidação" in exporting_text
     assert "Timeline operacional" in exporting_text
     assert "Agora" in exporting_text
 

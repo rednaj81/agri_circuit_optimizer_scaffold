@@ -4560,50 +4560,82 @@ def _run_progress_snapshot(detail: dict[str, Any] | None) -> dict[str, str]:
     if status == "queued":
         return {
             "progress_label": "0/5 etapas concluídas",
-            "progress_text": "A run está aguardando vez na fila local.",
+            "progress_text": "A run está aguardando vez na fila local, ainda sem avanço material de execução.",
             "focus_reason": "Segue em foco porque ainda define a próxima saída útil da fila.",
+            "signal": "Espera sem avanço",
         }
     if status == "preparing":
         return {
             "progress_label": "1/5 etapas em andamento",
             "progress_text": "A run já saiu da fila e prepara artefatos antes do cálculo principal.",
             "focus_reason": "Segue em foco porque está avançando, mas ainda sem resultado utilizável.",
+            "signal": "Andamento real em preparação",
         }
     if status == "running":
         return {
             "progress_label": "2/5 etapas em andamento",
             "progress_text": "O cálculo principal está rodando agora.",
             "focus_reason": "Segue em foco porque ainda move a fila e a próxima decisão operacional.",
+            "signal": "Andamento real em execução",
         }
     if status == "exporting":
         return {
             "progress_label": "4/5 etapas em andamento",
             "progress_text": "A run já calculou e está consolidando a saída final.",
             "focus_reason": "Segue em foco porque falta apenas consolidar artefatos e resultado utilizável.",
+            "signal": "Andamento real na consolidação",
         }
     if status == "completed" and result_available:
         return {
             "progress_label": "5/5 etapas concluídas",
             "progress_text": "A run terminou com saída reaproveitável para decisão assistida.",
             "focus_reason": "Segue em foco porque já pode abrir Decisão sem recorrer à trilha técnica.",
+            "signal": "Resultado utilizável",
         }
     if status == "completed":
         return {
             "progress_label": "5/5 etapas concluídas",
             "progress_text": "A run terminou, mas ainda sem saída forte para Decisão.",
             "focus_reason": "Segue em foco porque ajuda a decidir se vale revisar o cenário ou reexecutar.",
+            "signal": "Término sem resultado útil",
         }
     if status in {"failed", "canceled"}:
         return {
             "progress_label": "Execução interrompida",
             "progress_text": "A run terminou sem saída utilizável e pede recuperação antes de repetir a rodada.",
             "focus_reason": "Segue em foco porque define o próximo reenfileiramento ou a revisão do cenário.",
+            "signal": "Execução interrompida",
         }
     return {
         "progress_label": "Sem progresso legível",
         "progress_text": "Ainda não há progresso suficiente para resumir esta run em linguagem de produto.",
         "focus_reason": "O foco ainda depende de atualização da leitura desta fila.",
+        "signal": "Sem leitura confiável",
     }
+
+
+def _run_summary_has_usable_result(run: dict[str, Any]) -> bool:
+    evidence = dict(run.get("evidence_summary") or {})
+    return str(run.get("status") or "").strip() == "completed" and bool(
+        evidence.get("has_selected_candidate_json") or evidence.get("has_summary_json")
+    )
+
+
+def _run_summary_focus_reason(run: dict[str, Any] | None) -> str:
+    if not run:
+        return "Ainda não existe run suficientemente forte para virar foco operacional."
+    status = str(run.get("status") or "").strip()
+    if status in {"preparing", "running", "exporting"}:
+        return "Esta é a run ativa do momento e continua movendo a fila local."
+    if _run_summary_has_usable_result(run):
+        return "Esta é a terminal mais útil porque já carrega resultado reaproveitável para a próxima decisão."
+    if status in {"failed", "canceled"}:
+        return "Esta é a terminal mais crítica porque define a recuperação antes de outra rodada."
+    if status == "queued":
+        return "Esta é a próxima rodada pendente quando nenhuma execução ativa ou terminal útil domina a leitura."
+    if status == "completed":
+        return "Esta terminal segue em foco porque terminou sem saída suficiente para decisão e ainda orienta a próxima ação."
+    return "Esta run permanece em foco por falta de alternativa mais útil para a leitura operacional."
 
 
 def _preferred_run_focus_id(summary: dict[str, Any], preferred_run_id: str | None = None) -> str | None:
@@ -4615,6 +4647,24 @@ def _preferred_run_focus_id(summary: dict[str, Any], preferred_run_id: str | Non
     for run_id in active_run_ids:
         if run_id in run_ids:
             return run_id
+    usable_terminal_runs = [
+        run for run in reversed(runs)
+        if _run_summary_has_usable_result(run)
+    ]
+    if usable_terminal_runs:
+        return str(usable_terminal_runs[0].get("run_id") or "").strip() or None
+    blocked_terminal_runs = [
+        run for run in reversed(runs)
+        if str(run.get("status") or "").strip() in {"failed", "canceled"}
+    ]
+    if blocked_terminal_runs:
+        return str(blocked_terminal_runs[0].get("run_id") or "").strip() or None
+    completed_without_result_runs = [
+        run for run in reversed(runs)
+        if str(run.get("status") or "").strip() == "completed"
+    ]
+    if completed_without_result_runs:
+        return str(completed_without_result_runs[0].get("run_id") or "").strip() or None
     next_queued_run_id = str(summary.get("next_queued_run_id") or "").strip() if isinstance(summary, dict) else ""
     if next_queued_run_id and next_queued_run_id in run_ids:
         return next_queued_run_id
@@ -4786,7 +4836,53 @@ def render_runs_workspace_panel(
     execution_error = str((execution_summary or {}).get("error") or "").strip()
     selected_run_id = str(selected_run_detail.get("selected_run_id") or "").strip()
     selected_run_status = str(selected_run_detail.get("status") or "").strip()
-    progress_snapshot = _run_progress_snapshot(selected_run_detail)
+    selected_run_summary = next(
+        (
+            run for run in list((run_summary or {}).get("runs", []))
+            if str(run.get("run_id") or "").strip() == selected_run_id
+        ),
+        None,
+    ) if isinstance(run_summary, dict) else None
+    fallback_focus_run_id = selected_run_id or (
+        active_run_ids[0]
+        if active_run_ids
+        else (
+            str(next_queued_run_id or "").strip()
+            or str(latest_run_id or "").strip()
+        )
+    )
+    detail_for_progress = dict(selected_run_detail)
+    if not str(detail_for_progress.get("selected_run_id") or "").strip() and fallback_focus_run_id:
+        detail_for_progress["selected_run_id"] = fallback_focus_run_id
+    if selected_run_summary:
+        detail_for_progress.setdefault("status", selected_run_summary.get("status"))
+        artifacts = dict(detail_for_progress.get("artifacts") or {})
+        evidence = dict(selected_run_summary.get("evidence_summary") or {})
+        if evidence.get("has_summary_json"):
+            artifacts.setdefault("summary_json", "available")
+        if evidence.get("has_selected_candidate_json"):
+            artifacts.setdefault("selected_candidate_json", "available")
+        detail_for_progress["artifacts"] = artifacts
+    elif not str(detail_for_progress.get("status") or "").strip():
+        if active_run_ids:
+            detail_for_progress["status"] = "running"
+        elif state["preparing_count"]:
+            detail_for_progress["status"] = "preparing"
+        elif next_queued_run_id:
+            detail_for_progress["status"] = "queued"
+        elif execution_error:
+            detail_for_progress["status"] = "failed"
+        elif state["decision_enabled"]:
+            detail_for_progress["status"] = "completed"
+            detail_for_progress["artifacts"] = {"summary_json": "available", "selected_candidate_json": "available"}
+        elif latest_run_id:
+            detail_for_progress["status"] = "completed"
+    if state["decision_enabled"]:
+        artifacts = dict(detail_for_progress.get("artifacts") or {})
+        artifacts.setdefault("summary_json", "available")
+        detail_for_progress["artifacts"] = artifacts
+    progress_snapshot = _run_progress_snapshot(detail_for_progress)
+    focus_reason = _run_summary_focus_reason(selected_run_summary)
     if active_run_ids:
         queue_focus = f"Execução em foco: {active_run_ids[0]}."
     elif next_queued_run_id:
@@ -4856,7 +4952,7 @@ def render_runs_workspace_panel(
                     _guidance_card("Agora", state["headline"]),
                     _guidance_card("Fila", queue_focus),
                     _guidance_card("Run em foco", selected_run_id or latest_run_id or "Nenhuma run dominante agora."),
-                    _guidance_card("Andamento real", progress_snapshot["progress_text"]),
+                    _guidance_card("Andamento real", progress_snapshot["signal"]),
                     _guidance_card("Resultado útil", usable_result),
                     _guidance_card("Falha ou recuperação", state["recovery_headline"]),
                     _guidance_card("Próxima ação recomendada", state["next_action"]),
@@ -4870,7 +4966,7 @@ def render_runs_workspace_panel(
                     html.Div(state["next_action"], style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"}),
                     html.Div(state["decision_gate"], style={"lineHeight": "1.6", "marginTop": "10px"}),
                     html.Div(
-                        f"Run em foco para recuperação: {selected_run_id or latest_run_id or 'nenhuma ainda selecionada'}. {progress_snapshot['focus_reason']}",
+                        f"Run em foco para recuperação: {selected_run_id or latest_run_id or 'nenhuma ainda selecionada'}. {focus_reason}",
                         style={"lineHeight": "1.6", "marginTop": "10px", "color": "#496158"},
                     ),
                     html.Div(style={**UI_ACTION_ROW_STYLE, "marginTop": "12px"}, children=[local_recovery_cta]),
@@ -5090,6 +5186,7 @@ def render_run_job_detail_panel(detail: dict[str, Any]) -> Any:
                 children=[
                     _guidance_card("Progresso desta run", progress_snapshot["progress_label"]),
                     _guidance_card("Leitura operacional", next_action),
+                    _guidance_card("Sinal de progresso", progress_snapshot["signal"]),
                     _guidance_card("Pode agir agora", action_guidance),
                     _guidance_card("O que falta", progress_snapshot["progress_text"]),
                     _guidance_card("Recuperação desta run", recovery_text),
@@ -10797,6 +10894,7 @@ def build_run_jobs_snapshot(
         "options": options,
         "selected_run_id": selected_run_id,
         "selected_run_summary": selected_run_summary,
+        "selected_run_focus_reason": _run_summary_focus_reason(selected_run_summary),
         "selected_run_detail": build_run_job_detail_summary(selected_run_id, queue_root=queue_root),
     }
 
