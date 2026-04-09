@@ -5490,6 +5490,21 @@ def render_runs_workspace_panel(
             else "O cenário está pronto, mas ainda falta a primeira run para abrir leitura operacional útil."
         )
     )
+    queue_lane_copy = (
+        f"{queue_focus} Estado da fila: {state['queue_state']}."
+        if state["run_count"] or next_queued_run_id or active_run_ids
+        else "Nenhuma run entrou na fila ainda; a leitura operacional começa quando o cenário for enfileirado."
+    )
+    focused_execution_copy = (
+        f"{selected_run_id or fallback_focus_run_id} em {progress_snapshot['signal'].lower()}. {focus_reason}"
+        if selected_run_id or fallback_focus_run_id
+        else "Nenhuma run em foco ainda; escolha a próxima execução quando a fila existir."
+    )
+    recent_history_copy = (
+        f"Última run observada: {latest_run_id}. {usable_result}"
+        if latest_run_id
+        else usable_result
+    )
     return html.Div(
         children=[
             html.Div("Leitura operacional de Runs", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
@@ -5501,15 +5516,12 @@ def render_runs_workspace_panel(
                 ],
             ),
             html.Div(
-                style={**UI_TWO_COLUMN_STYLE, "marginBottom": "12px"},
+                id="runs-workspace-operational-lanes",
+                style={**UI_THREE_COLUMN_STYLE, "marginBottom": "12px"},
                 children=[
-                    _guidance_card("Agora", state["headline"]),
-                    _guidance_card("Fila", queue_focus),
-                    _guidance_card("Run em foco", selected_run_id or latest_run_id or "Nenhuma run dominante agora."),
-                    _guidance_card("Andamento real", progress_snapshot["signal"]),
-                    _guidance_card("Resultado utilizável", usable_result),
-                    _guidance_card("Falha ou recuperação", state["recovery_headline"]),
-                    _guidance_card("Próxima ação", state["next_action"]),
+                    _guidance_card("Fila atual", queue_lane_copy),
+                    _guidance_card("Execução em foco", focused_execution_copy),
+                    _guidance_card("Histórico recente", recent_history_copy),
                 ],
             ),
             html.Div(

@@ -1,0 +1,15 @@
+{
+  "wave": 11,
+  "phase_id": "phase_ux_refinement",
+  "opened_phase": "ux_phase_3",
+  "runs_first_fold": [
+    "Fila atual",
+    "Execução em foco",
+    "Histórico recente"
+  ],
+  "studio_baseline_preserved": true,
+  "validation": {
+    "command": "$env:PYTHONPATH='src;.'; .\\.venv\\Scripts\\python.exe -m pytest tests/decision_platform/test_ui_smoke.py -q -p no:cacheprovider --basetemp tests/_tmp/pytest-basetemp-ux-wave11-runs-rerun",
+    "result": "106 passed in 356.35s (0:05:56)"
+  }
+}
