@@ -4427,8 +4427,12 @@ def render_run_jobs_overview_panel(summary: dict[str, Any]) -> Any:
     latest_updated_at = summary.get("latest_updated_at") if isinstance(summary, dict) else None
     failed_count = int(status_counts.get("failed", 0) or 0)
     completed_count = int(status_counts.get("completed", 0) or 0)
+    preparing_count = int(status_counts.get("preparing", 0) or 0)
     queue_state = _humanize_run_status(summary.get("queue_state", "idle")) if isinstance(summary, dict) else "Sem leitura"
-    if active_run_ids:
+    if preparing_count and not active_run_ids:
+        queue_headline = "Preparação em andamento"
+        queue_guidance = "Há run saindo da fila e preparando artefatos. Aguarde essa etapa antes de cobrar resultado ou reenfileirar."
+    elif active_run_ids:
         queue_headline = "Execução em andamento"
         queue_guidance = f"Há run em andamento agora ({active_run_ids[0]}). Acompanhe essa execução antes de decidir se vale abrir outra rodada."
     elif next_queued_run_id:
@@ -4453,6 +4457,8 @@ def render_run_jobs_overview_panel(summary: dict[str, Any]) -> Any:
         history_label = "Ainda não existe histórico recente."
     if active_run_ids:
         operator_next_action = f"Aguarde {active_run_ids[0]} consolidar resultado antes de abrir outra rodada."
+    elif preparing_count:
+        operator_next_action = "Aguarde a preparação terminar; reexecute ou revise só depois que a run sair deste estado intermediário."
     elif next_queued_run_id:
         operator_next_action = f"Execute {next_queued_run_id} quando quiser transformar cenário pronto em resultado utilizável."
     elif failed_count and run_count:
@@ -4461,6 +4467,14 @@ def render_run_jobs_overview_panel(summary: dict[str, Any]) -> Any:
         operator_next_action = "Use a run mais recente para decidir se já vale abrir Decisão ou preparar nova rodada."
     else:
         operator_next_action = "Enfileire o cenário atual para abrir a primeira leitura operacional desta área."
+    if failed_count:
+        recovery_signal = "Há falha ou revisão pendente; o próximo passo é revisar a run mais recente antes de reenfileirar."
+    elif completed_count:
+        recovery_signal = "Já existe histórico concluído; confirme se o último resultado já serve para abrir Decisão."
+    elif run_count:
+        recovery_signal = "O histórico existe, mas ainda não liberou um desfecho claro para avançar com segurança."
+    else:
+        recovery_signal = "Ainda não há histórico suficiente para falar em recuperação ou reaproveitamento."
     return html.Div(
         children=[
             html.H3("Resumo da fila", style={"marginTop": 0}),
@@ -4476,9 +4490,10 @@ def render_run_jobs_overview_panel(summary: dict[str, Any]) -> Any:
                 id="run-jobs-operational-lanes",
                 style={**UI_TWO_COLUMN_STYLE, "marginBottom": "12px"},
                 children=[
-                    _guidance_card("Na fila", queued_label),
+                    _guidance_card("Na fila ou preparando", queued_label if not preparing_count else f"{preparing_count} run(s) preparando artefatos antes da execução principal."),
                     _guidance_card("Executando", active_label),
                     _guidance_card("Resultado recente", history_label),
+                    _guidance_card("Falha ou revisão", recovery_signal),
                     _guidance_card("Próxima ação recomendada", operator_next_action),
                 ],
             ),
@@ -4487,6 +4502,7 @@ def render_run_jobs_overview_panel(summary: dict[str, Any]) -> Any:
                 children=[
                     _metric_card("Runs", summary.get("run_count", 0), "Total observavel na fila local."),
                     _metric_card("Estado da fila", queue_state, "fila serial local"),
+                    _metric_card("Preparando", preparing_count),
                     _metric_card("Em execução", len(active_run_ids)),
                     _metric_card("Na fila", len(queued_run_ids)),
                     _metric_card("Concluídas", completed_count),
@@ -4547,6 +4563,7 @@ def _runs_primary_state(
     next_queued_run_id = run_summary.get("next_queued_run_id") if isinstance(run_summary, dict) else None
     queue_state = _humanize_run_status((run_summary or {}).get("queue_state", "idle")) if isinstance(run_summary, dict) else "Sem leitura"
     active_run_ids = list((run_summary or {}).get("active_run_ids", [])) if isinstance(run_summary, dict) else []
+    preparing_count = int((run_summary or {}).get("status_counts", {}).get("preparing", 0) or 0) if isinstance(run_summary, dict) else 0
     failed_count = int((run_summary or {}).get("status_counts", {}).get("failed", 0) or 0) if isinstance(run_summary, dict) else 0
     execution_summary = execution_summary or {}
     execution_error = str(execution_summary.get("error") or "").strip()
@@ -4559,6 +4576,24 @@ def _runs_primary_state(
         decision_gate = "A passagem para Decisão continua secundária até o Studio liberar o gate principal de readiness."
         decision_button_label = "Decisão ainda secundária"
         decision_enabled = False
+        recovery_headline = "A recuperação ainda não começa em Runs; o cenário precisa sair do bloqueio principal no Studio."
+        recovery_action = "Corrigir cenário antes de reenfileirar"
+        primary_cta_label = "Corrigir cenário no Studio"
+        primary_cta_target = "studio"
+        wait_state = "Corrigir cenário"
+    elif preparing_count:
+        readiness_note = "O cenário já passou pelo gate principal de prontidão do Studio."
+        flow_state = "Preparação em andamento"
+        headline = "Há run em preparação de artefatos antes da execução principal."
+        next_action = "Aguarde a preparação terminar antes de avaliar falha, reenfileirar ou esperar resultado útil."
+        decision_gate = "A Decisão continua secundária enquanto a run ainda prepara artefatos e não consolidou saída utilizável."
+        decision_button_label = "Aguardar preparação"
+        decision_enabled = False
+        recovery_headline = "Estado intermediário: ainda é cedo para corrigir ou reenfileirar."
+        recovery_action = "Aguardar preparação atual"
+        primary_cta_label = "Aguardar preparação"
+        primary_cta_target = "wait"
+        wait_state = "Aguardar preparação"
     elif active_run_ids:
         readiness_note = "O cenário já passou pelo gate principal de prontidão do Studio."
         flow_state = "Execução em andamento"
@@ -4567,6 +4602,11 @@ def _runs_primary_state(
         decision_gate = "A execução atual ainda não consolidou um resultado utilizável para a Decisão."
         decision_button_label = "Aguardar execução atual"
         decision_enabled = False
+        recovery_headline = "Estado intermediário: a leitura principal pede espera, não correção imediata."
+        recovery_action = "Aguardar execução atual"
+        primary_cta_label = "Aguardar run em foco"
+        primary_cta_target = "wait"
+        wait_state = "Aguardar execução"
     elif next_queued_run_id and not decision_available:
         readiness_note = "O cenário já passou pelo gate principal de prontidão do Studio."
         flow_state = "Fila pronta"
@@ -4575,6 +4615,11 @@ def _runs_primary_state(
         decision_gate = "Ainda falta um resultado utilizável; execute ou revise a próxima run antes de avançar."
         decision_button_label = "Gerar resultado utilizável"
         decision_enabled = False
+        recovery_headline = "A fila já está pronta; o próximo gesto é rodar ou revisar, não abrir Auditoria."
+        recovery_action = "Executar próxima run"
+        primary_cta_label = f"Executar {next_queued_run_id}"
+        primary_cta_target = "run"
+        wait_state = "Executar próxima run"
     elif execution_error:
         readiness_note = "O cenário já passou pelo gate principal de prontidão do Studio."
         flow_state = "Resultado bloqueado"
@@ -4583,6 +4628,11 @@ def _runs_primary_state(
         decision_gate = "A Decisão permanece bloqueada enquanto o resumo executivo carregar erro crítico."
         decision_button_label = "Decisão bloqueada nesta execução"
         decision_enabled = False
+        recovery_headline = "Há falha ou revisão pendente; o caminho seguro é revisar a execução antes de reenfileirar."
+        recovery_action = "Revisar falha e reenfileirar com correção"
+        primary_cta_label = "Revisar falha"
+        primary_cta_target = "review"
+        wait_state = "Revisar falha"
     elif decision_available:
         readiness_note = "O cenário já passou pelo gate principal de prontidão do Studio."
         flow_state = "Decisão disponível"
@@ -4591,6 +4641,11 @@ def _runs_primary_state(
         decision_gate = "Já existe um resultado utilizável; a passagem para Decisão está liberada."
         decision_button_label = "Ir para Decisão"
         decision_enabled = True
+        recovery_headline = "Não há recuperação pendente; a leitura principal já pode migrar para decisão assistida."
+        recovery_action = "Abrir Decisão"
+        primary_cta_label = "Abrir Decisão"
+        primary_cta_target = "decision"
+        wait_state = "Abrir Decisão"
     elif run_count:
         readiness_note = "O cenário já passou pelo gate principal de prontidão do Studio."
         flow_state = "Sem resultado utilizável"
@@ -4599,6 +4654,11 @@ def _runs_primary_state(
         decision_gate = "A Decisão segue secundária até existir winner legível sem bloqueio crítico."
         decision_button_label = "Gerar resultado utilizável"
         decision_enabled = False
+        recovery_headline = "Há histórico recente, mas ainda sem desfecho útil; a próxima ação é revisar e reenfileirar com intenção clara."
+        recovery_action = "Revisar histórico recente"
+        primary_cta_label = "Revisar run mais recente"
+        primary_cta_target = "review"
+        wait_state = "Revisar histórico"
     else:
         readiness_note = "O cenário já passou pelo gate principal de prontidão do Studio."
         flow_state = "Sem runs"
@@ -4607,12 +4667,18 @@ def _runs_primary_state(
         decision_gate = "A passagem para Decisão ainda depende da primeira execução utilizável."
         decision_button_label = "Enfileirar antes da Decisão"
         decision_enabled = False
+        recovery_headline = "Sem histórico e sem recuperação pendente; o primeiro passo ainda é criar a primeira run."
+        recovery_action = "Enfileirar primeira run"
+        primary_cta_label = "Enfileirar cenário"
+        primary_cta_target = "run"
+        wait_state = "Enfileirar primeira run"
     return {
         "studio_status": studio_status,
         "run_count": run_count,
         "next_queued_run_id": next_queued_run_id,
         "queue_state": queue_state,
         "active_run_ids": active_run_ids,
+        "preparing_count": preparing_count,
         "failed_count": failed_count,
         "readiness_note": readiness_note,
         "flow_state": flow_state,
@@ -4621,6 +4687,11 @@ def _runs_primary_state(
         "decision_gate": decision_gate,
         "decision_button_label": decision_button_label,
         "decision_enabled": decision_enabled,
+        "recovery_headline": recovery_headline,
+        "recovery_action": recovery_action,
+        "primary_cta_label": primary_cta_label,
+        "primary_cta_target": primary_cta_target,
+        "wait_state": wait_state,
     }
 
 
@@ -4651,6 +4722,12 @@ def render_runs_workspace_panel(
         usable_result = f"{latest_run_id} ainda não liberou contexto suficiente para decisão assistida."
     else:
         usable_result = "Ainda não existe resultado utilizável porque nenhuma run terminou esta trilha."
+    if state["primary_cta_target"] == "decision":
+        local_recovery_cta: Any = html.Button(state["primary_cta_label"], id="runs-workspace-primary-recovery-button", style=UI_BUTTON_STYLE, disabled=False)
+    elif state["primary_cta_target"] == "studio":
+        local_recovery_cta = _button_link(state["primary_cta_label"], "?tab=studio", "runs-workspace-primary-recovery-link")
+    else:
+        local_recovery_cta = html.Button(state["primary_cta_label"], id="runs-workspace-primary-recovery-button", style=UI_BUTTON_STYLE, disabled=True)
     if state["decision_enabled"]:
         decision_cta: Any = html.Button("Ir para Decisão", id="runs-workspace-open-decision-button", style=UI_BUTTON_STYLE, disabled=False)
     else:
@@ -4680,6 +4757,7 @@ def render_runs_workspace_panel(
                     _guidance_card("Agora", state["headline"]),
                     _guidance_card("Fila", queue_focus),
                     _guidance_card("Resultado útil", usable_result),
+                    _guidance_card("Falha ou recuperação", state["recovery_headline"]),
                     _guidance_card("Próxima ação recomendada", state["next_action"]),
                 ],
             ),
@@ -4690,6 +4768,7 @@ def render_runs_workspace_panel(
                     html.Div("Próxima ação recomendada", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
                     html.Div(state["next_action"], style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"}),
                     html.Div(state["decision_gate"], style={"lineHeight": "1.6", "marginTop": "10px"}),
+                    html.Div(style={**UI_ACTION_ROW_STYLE, "marginTop": "12px"}, children=[local_recovery_cta]),
                 ],
             ),
             html.Details(
@@ -4711,6 +4790,7 @@ def render_runs_workspace_panel(
                 children=[
                     _metric_card("Estado dominante", state["flow_state"]),
                     _metric_card("Runs locais", state["run_count"]),
+                    _metric_card("Preparando", state["preparing_count"]),
                     _metric_card("Na fila", queued_count),
                     _metric_card("Em execução", len(active_run_ids)),
                     _metric_card("Falhas recentes", state["failed_count"]),
@@ -4786,18 +4866,32 @@ def render_run_job_detail_panel(detail: dict[str, Any]) -> Any:
         gate_label = "Gate oficial não informado"
     if status == "queued":
         next_action = "Execute o próximo job quando o cenário estiver pronto, ou cancele a fila se a preparação ainda estiver incompleta."
+        recovery_label = "Na fila"
+        recovery_text = "Esta run ainda não falhou nem gerou resultado; o gesto seguro é executar ou cancelar antes do processamento."
     elif status == "preparing":
         next_action = "A run já saiu da fila e está preparando artefatos. Aguarde essa etapa antes de avaliar resultado."
+        recovery_label = "Em preparação"
+        recovery_text = "Estado intermediário: ainda é cedo para corrigir cenário ou reenfileirar."
     elif status == "running":
         next_action = "Acompanhe a execução em foco e evite abrir uma nova run até este job concluir."
+        recovery_label = "Executando"
+        recovery_text = "O próximo passo é aguardar consolidação; recuperação só faz sentido depois do desfecho desta run."
     elif status == "exporting":
         next_action = "A run já concluiu o cálculo principal e está finalizando artefatos. Aguarde a consolidação antes de abrir Decisão."
+        recovery_label = "Consolidando saída"
+        recovery_text = "A run já está no fechamento da rodada; espere a exportação terminar antes de agir."
     elif status == "completed":
         next_action = "Leia o resumo executivo e siga para Decisão se a run já gerou um candidato oficial confiável."
+        recovery_label = "Resultado útil"
+        recovery_text = "Esta run já pode migrar para decisão assistida ou servir de base para uma nova rodada mais consciente."
     elif status in {"failed", "canceled"}:
         next_action = "Revise o bundle e o status técnico antes de reexecutar esta run."
+        recovery_label = "Falha ou revisão pendente"
+        recovery_text = "A recuperação começa revendo esta run antes de repetir a fila com a mesma configuração."
     else:
         next_action = "Confirme o estado desta run antes de decidir entre executar, cancelar ou reprocessar."
+        recovery_label = "Estado indefinido"
+        recovery_text = "Confirme a situação desta run antes de escolher entre espera, recuperação ou reexecução."
     events = list(detail.get("events") or [])
     event_lines = []
     event_statuses = [str(event.get("status") or "").strip() for event in events if str(event.get("status") or "").strip()]
@@ -4889,10 +4983,12 @@ def render_run_job_detail_panel(detail: dict[str, Any]) -> Any:
                 children=[
                     _guidance_card("Leitura operacional", next_action),
                     _guidance_card("Pode agir agora", action_guidance),
+                    _guidance_card("Recuperação desta run", recovery_text),
                     _guidance_card("Cenário de origem", str(detail.get("source_bundle_root") or "-")),
                     _guidance_card("Execução específica", str(detail.get("selected_run_id") or "-")),
                     _guidance_card("Execução pedida", str(detail.get("requested_execution_mode") or detail.get("execution_mode") or "-")),
                     _guidance_card("Resultado agora", result_state),
+                    _guidance_card("Sinal desta run", recovery_label),
                 ],
             ),
             html.H4("Eventos relevantes", style={"marginBottom": "6px", "marginTop": "14px"}),

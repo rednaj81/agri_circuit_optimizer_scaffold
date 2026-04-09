@@ -1,0 +1,43 @@
+{
+  "snapshot_source_commit": "f109503870428ce82352ee35061ddc6f0a617c78",
+  "runs": {
+    "first_fold_signals": [
+      "Agora",
+      "Fila",
+      "Resultado útil",
+      "Falha ou recuperação",
+      "Próxima ação recomendada"
+    ],
+    "distinct_states": [
+      "preparação em andamento",
+      "execução em andamento",
+      "fila pronta",
+      "resultado bloqueado",
+      "decisão disponível",
+      "sem resultado utilizável"
+    ],
+    "local_recovery_cta": true,
+    "overview_lanes": [
+      "Na fila ou preparando",
+      "Executando",
+      "Resultado recente",
+      "Falha ou revisão",
+      "Próxima ação recomendada"
+    ],
+    "technical_logs_primary_surface": false
+  },
+  "run_detail": {
+    "signals": [
+      "Leitura operacional",
+      "Pode agir agora",
+      "Recuperação desta run",
+      "Resultado agora",
+      "Sinal desta run"
+    ]
+  },
+  "screenshot_attempt": {
+    "target_path": "output/playwright/runs-fullhd-wave7.png",
+    "status": "failed_in_sandbox",
+    "reason": "No stable browser capture session was available in this sandbox during wave 7; structured snapshot retained as honest evidence."
+  }
+}

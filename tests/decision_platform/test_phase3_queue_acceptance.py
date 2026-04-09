@@ -180,13 +180,16 @@ def test_phase3_queue_acceptance_runs_ui_surfaces_operational_queue_and_detail_l
     assert "Limitação agora" in workspace_text
     assert "O cenário já passou no gate principal" in workspace_text
     assert "Resultado útil" in workspace_text
-    assert "Na fila" in overview_text
+    assert "Falha ou recuperação" in workspace_text
+    assert "Na fila ou preparando" in overview_text
     assert "Executando" in overview_text
     assert "Resultado recente" in overview_text
+    assert "Falha ou revisão" in overview_text
     assert "Próxima ação recomendada" in overview_text
     assert "Eventos relevantes" in detail_text
     assert "Resultado e artefatos" in detail_text
     assert "Pode agir agora" in detail_text
+    assert "Recuperação desta run" in detail_text
     assert "Contexto técnico secundário desta run" in detail_text
 
 

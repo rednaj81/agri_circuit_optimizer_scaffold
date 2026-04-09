@@ -1253,12 +1253,40 @@ def test_runs_workspace_panel_prioritizes_queue_focus_and_primary_transition() -
     assert "Agora" in panel_text
     assert "Fila" in panel_text
     assert "Resultado útil" in panel_text
+    assert "Falha ou recuperação" in panel_text
     assert "Próxima ação recomendada" in panel_text
     assert "Gate do cenário e limites desta leitura" in panel_text
     assert "Próxima run pronta: run-003." in panel_text
     assert "Já existe um resultado utilizável" in panel_text
     assert _find_component_by_id(panel, "runs-workspace-open-studio-link") is not None
     assert getattr(_find_component_by_id(panel, "runs-workspace-open-decision-button"), "disabled", None) is False
+
+
+def test_runs_workspace_panel_distinguishes_failure_recovery_from_decision_ready() -> None:
+    failed_panel = render_runs_workspace_panel(
+        {
+            "status": "ready",
+            "readiness_headline": "Cenário pronto para seguir para Runs.",
+        },
+        {
+            "run_count": 2,
+            "next_queued_run_id": None,
+            "active_run_ids": [],
+            "queued_run_ids": [],
+            "latest_run_id": "run-009",
+            "status_counts": {"failed": 1, "completed": 0},
+        },
+        {
+            "error": "Falha ao consolidar bundle.",
+        },
+    )
+    failed_text = _collect_text_content(failed_panel)
+
+    assert "Resultado bloqueado" in failed_text
+    assert "Falha ou recuperação" in failed_text
+    assert "Revisar falha" in failed_text
+    assert "ainda não existe resultado utilizável para Decisão" in failed_text
+    assert getattr(_find_component_by_id(failed_panel, "runs-workspace-open-decision-button"), "disabled", None) is True
 
 
 def test_primary_runs_panels_hide_raw_backend_keys_in_main_surface() -> None:
@@ -1339,8 +1367,10 @@ def test_run_job_detail_panel_covers_preparing_and_exporting_states() -> None:
     exporting_text = _collect_text_content(exporting_panel)
 
     assert "preparando artefatos" in preparing_text.lower()
+    assert "Em preparação" in preparing_text
     assert "Run em foco" in preparing_text
     assert "finalizando artefatos" in exporting_text.lower()
+    assert "Consolidando saída" in exporting_text
     assert "Timeline operacional" in exporting_text
     assert "Agora" in exporting_text
 
@@ -1369,15 +1399,38 @@ def test_run_jobs_overview_panel_clarifies_queue_now_vs_recent_history() -> None
 
     assert "Execução em andamento" in panel_text
     assert "Fila agora" in panel_text
-    assert "Na fila" in panel_text
+    assert "Na fila ou preparando" in panel_text
     assert "Executando" in panel_text
     assert "Resultado recente" in panel_text
+    assert "Falha ou revisão" in panel_text
     assert "Próxima ação recomendada" in panel_text
     assert "Em execução: run-003" in panel_text
     assert "Próxima a rodar: run-004" in panel_text
     assert "Última run conhecida: run-003" in panel_text
     assert "Falhas" in panel_text
     assert _component_id_is_inside_details(panel, "run-jobs-overview-history-block") is True
+
+
+def test_run_jobs_overview_panel_surfaces_preparing_and_recovery_states() -> None:
+    panel = render_run_jobs_overview_panel(
+        {
+            "run_count": 3,
+            "queue_state": "preparing",
+            "worker_mode": "serial",
+            "next_queued_run_id": None,
+            "active_run_ids": [],
+            "queued_run_ids": [],
+            "terminal_run_ids": ["run-001"],
+            "latest_run_id": "run-002",
+            "status_counts": {"preparing": 1, "failed": 1, "completed": 1},
+        }
+    )
+    panel_text = _collect_text_content(panel)
+
+    assert "Preparação em andamento" in panel_text
+    assert "1 run(s) preparando artefatos" in panel_text
+    assert "Há falha ou revisão pendente" in panel_text
+    assert "Preparando" in panel_text
 
 
 def test_execution_summary_panel_only_opens_decision_with_usable_result() -> None:
