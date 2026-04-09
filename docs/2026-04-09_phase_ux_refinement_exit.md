@@ -57,3 +57,10 @@ Esta fase fechou a `decision_platform` com quatro superfícies principais mais l
   - manutenção corretiva;
   - evidência visual em ambiente mais estável;
   - refinamentos fora do escopo já congelado desta UX phase.
+
+## Stop auditável
+
+- A `phase_ux_refinement` permanece formalmente encerrada após a onda 10.
+- O limite de ondas definido pelo repositório foi atingido para este ciclo.
+- O Auditor recomendou parada em vez de abertura de nova onda funcional.
+- A presente etapa de fechamento não deve ser interpretada como reabertura de Studio, Runs, Decisão ou Audit; ela existe apenas para registrar o stop e preservar a baseline validada.
