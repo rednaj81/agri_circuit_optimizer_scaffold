@@ -574,7 +574,8 @@ def test_studio_canvas_guidance_panel_keeps_canvas_as_primary_entry() -> None:
     assert "Abrir bancada completa" in without_focus_text
     assert "Conexão em foco: Bomba -> Misturador." in with_edge_focus_text
     assert "inverta a direção direto no primeiro fold" in with_edge_focus_text.lower()
-    assert "Abrir bancada desta conexão" in with_edge_focus_text
+    assert "Trazer trecho" in with_edge_focus_text
+    assert "Inverter direção" in with_edge_focus_text
     assert "Abrir orientação deste foco" in with_edge_focus_text
     assert "Cenário pronto para seguir para Runs." in with_edge_focus_text
 
@@ -602,6 +603,9 @@ def test_studio_canvas_guidance_panel_surfaces_contextual_blocker_and_runs_gate(
     assert "Bloqueio local" in panel_text
     assert "Tanque de água" in panel_text
     assert "Ir para Runs quando o cenário estiver pronto" in panel_text
+    assert _find_component_by_id(panel, "studio-canvas-load-edge-button") is not None
+    assert _find_component_by_id(panel, "studio-canvas-reverse-edge-button") is not None
+    assert _find_component_by_id(panel, "studio-canvas-intent-mandatory-button") is not None
 
 
 def test_studio_workspace_panel_unifies_focus_connectivity_and_runs_gate() -> None:
@@ -1491,11 +1495,11 @@ def test_route_panel_callbacks_manage_composer_and_confirm_route_without_workben
     confirm_callback = _get_callback(app, input_id="studio-route-compose-confirm-button")
     cancel_callback = _get_callback(app, input_id="studio-route-cancel-draft-button")
 
-    composer_state, status = set_source_callback(1, "I", {})
+    composer_state, status = set_source_callback(1, 0, "I", {})
     assert composer_state["source_node_id"] == "I"
     assert status == "Origem da rota armada em I. Agora defina o destino explicitamente no composer."
 
-    composer_state, status = set_target_callback(1, "IR", composer_state)
+    composer_state, status = set_target_callback(1, 0, "IR", composer_state)
     assert composer_state["sink_node_id"] == "IR"
     assert status == "Destino da rota ajustado para IR. Revise o preview e confirme no canvas."
 
@@ -1590,6 +1594,7 @@ def test_focus_edge_reverse_callback_swaps_flow_without_workbench() -> None:
     callback = _get_callback(app, input_id="studio-focus-edge-reverse-button")
     updated_links, next_selected_link_id, status = callback(
         1,
+        0,
         bundle.candidate_links.to_dict("records"),
         "L013",
         bundle.nodes.to_dict("records"),
@@ -1684,6 +1689,7 @@ def test_decision_workspace_panel_makes_winner_runner_up_and_tie_legible() -> No
     assert "Comparação final assistida" in panel_text
     assert "Winner x runner-up" in panel_text
     assert "Sinal comparativo" in panel_text
+    assert "Risco comparativo" in panel_text
     assert "Escolha manual atual" in panel_text
     assert "cand-04" in panel_text
     assert "sem sobrescrever a referência oficial do produto" in panel_text.lower()

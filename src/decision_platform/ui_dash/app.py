@@ -3808,7 +3808,11 @@ def render_studio_canvas_guidance_panel(
             local_blocker = "Aviso local: feche esta revisão no canvas antes de avançar para Runs."
         else:
             local_blocker = "Nada neste foco impede Runs; use a conexão para confirmar fluxo, comprimento e famílias sugeridas."
-        primary_button_label = "Abrir bancada desta conexão"
+        local_action_buttons = [
+            html.Button("Trazer trecho", id="studio-canvas-load-edge-button", style=UI_BUTTON_STYLE),
+            html.Button("Inverter direção", id="studio-canvas-reverse-edge-button", style=UI_BUTTON_STYLE),
+            html.Button("Marcar obrigatória", id="studio-canvas-intent-mandatory-button", style=UI_BUTTON_STYLE),
+        ]
     elif selected_node_id and selected_node_label:
         current_focus = f"Entidade em foco: {selected_node_label}."
         canvas_action = "Use a entidade selecionada para reposicionar, revisar conectividade e validar o papel dela antes de abrir Runs."
@@ -3818,12 +3822,18 @@ def render_studio_canvas_guidance_panel(
             local_blocker = "Aviso local: confirme as conexões deste nó antes de enfileirar uma nova run."
         else:
             local_blocker = "Este nó já pode ser usado como ponto de conferência final antes de abrir Runs."
-        primary_button_label = "Abrir bancada desta entidade"
+        local_action_buttons = [
+            html.Button("Usar como origem", id="studio-canvas-arm-source-button", style=UI_BUTTON_STYLE),
+            html.Button("Usar como destino", id="studio-canvas-arm-target-button", style=UI_BUTTON_STYLE),
+            html.Button("Abrir bancada desta entidade", id="studio-canvas-open-workbench-button", style=UI_BUTTON_STYLE),
+        ]
     else:
         current_focus = "Nenhum foco ativo no canvas."
         canvas_action = "Clique em uma entidade ou conexão do grafo para abrir o contexto principal desta revisão."
         local_blocker = "Sem foco local: selecione um trecho do grafo para destravar conectividade, completude e readiness a partir do canvas."
-        primary_button_label = "Abrir bancada completa"
+        local_action_buttons = [
+            html.Button("Abrir bancada completa", id="studio-canvas-open-workbench-button", style=UI_BUTTON_STYLE),
+        ]
     runs_label = (
         "Ir para Runs"
         if str(summary.get("status") or "").strip().lower() == "ready"
@@ -3848,7 +3858,7 @@ def render_studio_canvas_guidance_panel(
             html.Div(
                 style={**UI_ACTION_ROW_STYLE, "marginTop": "12px"},
                 children=[
-                    html.Button(primary_button_label, id="studio-canvas-open-workbench-button", style=UI_BUTTON_STYLE),
+                    *local_action_buttons,
                     html.Button("Abrir orientação deste foco", id="studio-canvas-open-technical-guide-button", style=UI_BUTTON_STYLE),
                     _button_link(runs_label, "?tab=runs", "studio-canvas-open-runs-link", primary=str(summary.get("status") or "").strip().lower() == "ready"),
                 ],
@@ -5266,6 +5276,8 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
     official_profile_label = _decision_profile_presentation(official_profile_id)["label"]
     active_profile_label = _decision_profile_presentation(active_profile_id)["label"]
     score_margin_delta = summary.get("score_margin_delta")
+    critical_routes = list(summary.get("critical_routes", []) or [])
+    winner_penalties = list(summary.get("winner_penalties", []) or [])
     comparison_signal = (
         f"Margem de score: {score_margin_delta}"
         if score_margin_delta not in (None, "")
@@ -5276,6 +5288,22 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
         or summary.get("contrast_state")
         or decision_state["contrast_state"]
     )
+    if critical_routes:
+        top_route = critical_routes[0]
+        risk_value = f"Rota {top_route.get('route_id') or '-'}"
+        risk_note = _humanize_route_issue(top_route.get("reason"))
+    elif winner_penalties:
+        risk_value = "Penalidade ativa"
+        risk_note = _humanize_decision_copy(winner_penalties[0])
+    elif score_margin_delta not in (None, ""):
+        try:
+            risk_value = "Margem curta" if float(score_margin_delta) <= 0.5 else "Margem estável"
+        except (TypeError, ValueError):
+            risk_value = "Margem registrada"
+        risk_note = comparison_signal
+    else:
+        risk_value = "Sem alerta forte"
+        risk_note = "A comparação depende mais de preferência de perfil do que de um risco dominante."
     return html.Div(
         children=[
             html.Div("Leitura principal da decisão", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
@@ -5293,6 +5321,7 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
                     _compact_value_card("Winner atual", candidate_id or "Sem winner", summary.get("topology_family") or "Sem família líder legível", accent="#d7e5c1"),
                     _compact_value_card("Runner-up", runner_up_id or "Sem runner-up", summary.get("runner_up_topology_family") or "Sem contraste comparável"),
                     _compact_value_card("Technical tie", tie_label, "Winner vs runner-up" if decision_status == "technical_tie" else "Sem empate técnico aberto"),
+                    _compact_value_card("Risco comparativo", risk_value, risk_note),
                 ],
             ),
             html.Div(
@@ -7132,17 +7161,19 @@ def build_app(
         Output("studio-route-composer-state", "data", allow_duplicate=True),
         Output("studio-status-message", "data", allow_duplicate=True),
         Input("studio-route-start-from-node-button", "n_clicks"),
+        Input("studio-canvas-arm-source-button", "n_clicks"),
         State("node-studio-selected-id", "data"),
         State("studio-route-composer-state", "data"),
         prevent_initial_call=True,
     )
     def _set_route_composer_source(
         n_clicks: Any,
+        canvas_n_clicks: Any,
         selected_node_id: str | None,
         composer_state: dict[str, Any] | None,
     ) -> tuple[dict[str, Any], str]:
         state = _normalize_route_composer_state(composer_state)
-        if not n_clicks:
+        if max(int(n_clicks or 0), int(canvas_n_clicks or 0)) <= 0:
             return state, ""
         selected_id = str(selected_node_id or "").strip()
         if not selected_id:
@@ -7156,17 +7187,19 @@ def build_app(
         Output("studio-route-composer-state", "data", allow_duplicate=True),
         Output("studio-status-message", "data", allow_duplicate=True),
         Input("studio-route-complete-to-node-button", "n_clicks"),
+        Input("studio-canvas-arm-target-button", "n_clicks"),
         State("node-studio-selected-id", "data"),
         State("studio-route-composer-state", "data"),
         prevent_initial_call=True,
     )
     def _set_route_composer_target(
         n_clicks: Any,
+        canvas_n_clicks: Any,
         selected_node_id: str | None,
         composer_state: dict[str, Any] | None,
     ) -> tuple[dict[str, Any], str]:
         state = _normalize_route_composer_state(composer_state)
-        if not n_clicks:
+        if max(int(n_clicks or 0), int(canvas_n_clicks or 0)) <= 0:
             return state, ""
         selected_id = str(selected_node_id or "").strip()
         if not selected_id:
@@ -7178,6 +7211,7 @@ def build_app(
         Output("studio-route-composer-state", "data", allow_duplicate=True),
         Output("studio-status-message", "data", allow_duplicate=True),
         Input("studio-route-create-from-edge-button", "n_clicks"),
+        Input("studio-canvas-load-edge-button", "n_clicks"),
         State("edge-studio-selected-id", "data"),
         State("candidate-links-grid", "rowData"),
         State("studio-route-composer-state", "data"),
@@ -7185,12 +7219,13 @@ def build_app(
     )
     def _load_selected_edge_into_route_composer(
         n_clicks: Any,
+        canvas_n_clicks: Any,
         selected_link_id: str | None,
         candidate_links_rows: list[dict[str, Any]] | None,
         composer_state: dict[str, Any] | None,
     ) -> tuple[dict[str, Any], str]:
         state = _normalize_route_composer_state(composer_state)
-        if not n_clicks:
+        if max(int(n_clicks or 0), int(canvas_n_clicks or 0)) <= 0:
             return state, ""
         selected_id = _default_edge_studio_selection(candidate_links_rows or [], preferred_link_id=selected_link_id)
         edge_row = next(
@@ -7329,6 +7364,7 @@ def build_app(
         Input("studio-route-intent-mandatory-button", "n_clicks"),
         Input("studio-route-intent-desirable-button", "n_clicks"),
         Input("studio-route-intent-optional-button", "n_clicks"),
+        Input("studio-canvas-intent-mandatory-button", "n_clicks"),
         State("routes-grid", "rowData"),
         State("edge-studio-selected-id", "data"),
         State("candidate-links-grid", "rowData"),
@@ -7339,13 +7375,14 @@ def build_app(
         mandatory_n_clicks: Any,
         desirable_n_clicks: Any,
         optional_n_clicks: Any,
+        canvas_mandatory_n_clicks: Any,
         route_rows: list[dict[str, Any]] | None,
         selected_link_id: str | None,
         candidate_links_rows: list[dict[str, Any]] | None,
         selected_route_id: str | None,
     ) -> tuple[list[dict[str, Any]], str]:
         click_map = {
-            "mandatory": int(mandatory_n_clicks or 0),
+            "mandatory": max(int(mandatory_n_clicks or 0), int(canvas_mandatory_n_clicks or 0)),
             "desirable": int(desirable_n_clicks or 0),
             "optional": int(optional_n_clicks or 0),
         }
@@ -7510,6 +7547,7 @@ def build_app(
         Output("edge-studio-selected-id", "data", allow_duplicate=True),
         Output("studio-status-message", "data", allow_duplicate=True),
         Input("studio-focus-edge-reverse-button", "n_clicks"),
+        Input("studio-canvas-reverse-edge-button", "n_clicks"),
         State("candidate-links-grid", "rowData"),
         State("edge-studio-selected-id", "data"),
         State("nodes-grid", "rowData"),
@@ -7519,13 +7557,14 @@ def build_app(
     )
     def _reverse_focus_edge_direction(
         n_clicks: Any,
+        canvas_n_clicks: Any,
         candidate_links_rows: list[dict[str, Any]] | None,
         selected_link_id: str | None,
         nodes_rows: list[dict[str, Any]] | None,
         route_rows: list[dict[str, Any]] | None,
         edge_component_rules_rows: list[dict[str, Any]] | None,
     ) -> tuple[list[dict[str, Any]], str | None, str]:
-        if not n_clicks:
+        if max(int(n_clicks or 0), int(canvas_n_clicks or 0)) <= 0:
             return candidate_links_rows or [], selected_link_id, ""
         selected_id = _default_edge_studio_selection(candidate_links_rows or [], preferred_link_id=selected_link_id)
         try:

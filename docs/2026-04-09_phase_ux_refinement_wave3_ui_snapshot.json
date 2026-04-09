@@ -1,0 +1,34 @@
+{
+  "snapshot_source_commit": "8218f5109a029642db63ebafb695c78c94a4cff1",
+  "studio": {
+    "canvas_height": "820px",
+    "workspace_signals": [
+      "Seleção atual",
+      "Quem supre quem",
+      "Gesto principal",
+      "Readiness crítico",
+      "Ajustes locais do canvas"
+    ],
+    "edge_focus_actions": [
+      "studio-canvas-load-edge-button",
+      "studio-canvas-reverse-edge-button",
+      "studio-canvas-intent-mandatory-button"
+    ]
+  },
+  "decision": {
+    "signals": [
+      "Perfil em leitura",
+      "Winner atual",
+      "Runner-up",
+      "Technical tie",
+      "Risco comparativo",
+      "Winner x runner-up",
+      "Sinal comparativo"
+    ]
+  },
+  "screenshot_attempt": {
+    "target_path": "output/playwright/studio-fullhd-wave3.png",
+    "status": "failed_in_sandbox",
+    "reason": "Headless Chrome/Edge crashed while trying to create a bitmap screenshot in this environment."
+  }
+}
