@@ -1387,6 +1387,7 @@ def test_primary_surfaces_explain_empty_states_without_debug_language() -> None:
     assert "Selecione uma conexão no canvas" in _collect_text_content(edge_selection)
     assert "Nenhuma run registrada ainda." in _collect_text_content(runs_queue)
     assert "Ainda não existe uma run em foco" in _collect_text_content(run_detail)
+    assert "Estado atual" in _collect_text_content(run_detail)
     assert "Ainda não há resultado executivo suficiente" in _collect_text_content(execution)
     assert "ainda não existe decisão utilizável" in _collect_text_content(decision).lower()
     assert "Ainda não há candidato visível" in _collect_text_content(candidate)
@@ -1846,6 +1847,10 @@ def test_primary_decision_panels_hide_raw_metric_keys_in_main_surface() -> None:
     assert "decisão humana assistida" in contrast_text.lower()
     assert "Trade-offs por perfil" in contrast_text
     assert "Perfis diferentes estão puxando winners diferentes" in contrast_text
+    assert "`" not in decision_text
+    assert "`" not in contrast_text
+    assert "balanced" not in decision_text
+    assert "robust_quality" not in contrast_text
     assert "mandatory_route_failure" not in signal_text
     assert "rota obrigatória não conseguiu fechar" in signal_text
     assert "Rota crítica R001" in signal_text

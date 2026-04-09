@@ -1263,13 +1263,19 @@ def _build_readiness_action_queue(
 
 def _guided_empty_state(title: str, headline: str, next_action: str, *, tone: str = "needs_attention") -> Any:
     background, color = _status_tone(tone)
+    state_label = {
+        "ready": "Contexto disponível",
+        "blocked": "Bloqueio ativo",
+        "technical_tie": "Leitura humana necessária",
+    }.get(tone, "Aguardando contexto")
     return html.Div(
         children=[
             html.H3(title, style={"marginTop": 0}),
+            html.Div("Estado atual", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
             html.Div(
                 style={"display": "flex", "alignItems": "center", "gap": "10px", "margin": "8px 0 14px", "flexWrap": "wrap"},
                 children=[
-                    html.Span("Aguardando contexto", style={"padding": "6px 10px", "borderRadius": "999px", "background": background, "color": color, "fontWeight": 700}),
+                    html.Span(state_label, style={"padding": "6px 10px", "borderRadius": "999px", "background": background, "color": color, "fontWeight": 700}),
                     html.Span(headline, style={"fontWeight": 700, "lineHeight": "1.5"}),
                 ],
             ),
@@ -5085,6 +5091,13 @@ def _decision_profile_presentation(profile_id: str | None) -> dict[str, str]:
     return presentations.get(normalized, {"label": normalized or "Perfil atual", "summary": "Sem leitura de produto configurada para este perfil."})
 
 
+def _humanize_decision_copy(text: Any) -> str:
+    normalized = str(text or "").replace("`", "")
+    for profile_id in ("min_cost", "balanced", "robust_quality", "cleaning_focus"):
+        normalized = normalized.replace(profile_id, _decision_profile_presentation(profile_id)["label"])
+    return normalized
+
+
 def _decision_profile_state_label(view: dict[str, Any]) -> str:
     candidate_id = str(view.get("candidate_id") or "").strip()
     if not candidate_id:
@@ -5401,7 +5414,7 @@ def render_decision_summary_panel(summary: dict[str, Any]) -> Any:
         priority_signal = "A margem para o runner-up ainda é curta; trate esta escolha como contraste fraco."
     else:
         priority_signal = "O winner abriu contraste suficiente para orientar a decisão assistida."
-    winner_reason = str(summary.get("winner_reason_summary") or "Sem justificativa resumida.")
+    winner_reason = _humanize_decision_copy(summary.get("winner_reason_summary") or "Sem justificativa resumida.")
     if summary.get("feasible") is False:
         winner_reason = f"{winner_reason} Bloqueio atual: {_humanize_infeasibility_reason(summary.get('infeasibility_reason'))}."
     return html.Div(
@@ -5472,7 +5485,7 @@ def render_decision_contrast_panel(summary: dict[str, Any]) -> Any:
         if winner_cost not in (None, "") and runner_up_cost not in (None, "")
         else "-"
     )
-    difference_lines = [str(item.get("summary")) for item in summary.get("key_factors", []) if item.get("summary")]
+    difference_lines = [_humanize_decision_copy(item.get("summary")) for item in summary.get("key_factors", []) if item.get("summary")]
     if summary.get("runner_up_total_cost") not in (None, ""):
         difference_lines.insert(0, f"Custo oficial vs runner-up: {winner_cost} vs {summary.get('runner_up_total_cost')}.")
     contrast_summary = (
@@ -5486,7 +5499,7 @@ def render_decision_contrast_panel(summary: dict[str, Any]) -> Any:
         if len(preferred_candidates) > 1
         else "Os perfis convergem para o mesmo winner; o trade-off principal continua concentrado no runner-up e na margem de contraste."
     )
-    tie_dimensions = [str(item.get("summary")) for item in summary.get("key_factors", []) if item.get("summary")]
+    tie_dimensions = [_humanize_decision_copy(item.get("summary")) for item in summary.get("key_factors", []) if item.get("summary")]
     return html.Div(
         children=[
             html.H3("Runner-up e contraste", style={"marginTop": 0}),
