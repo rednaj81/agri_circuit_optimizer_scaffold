@@ -583,6 +583,10 @@ def test_studio_tab_surfaces_readiness_and_selection_context() -> None:
     assert _find_component_by_id(studio_tab, "studio-canvas-open-runs-link") is not None
     assert _find_component_by_id(studio_tab, "studio-workspace-panel") is not None
     assert _find_component_by_id(studio_tab, "studio-workspace-context-panel") is not None
+    assert _find_component_by_id(studio_tab, "studio-workspace-context-direct-actions") is not None
+    assert _find_component_by_id(studio_tab, "studio-workspace-require-measurement-button") is not None
+    assert _find_component_by_id(studio_tab, "studio-workspace-create-route-button") is not None
+    assert _find_component_by_id(studio_tab, "studio-workspace-reverse-edge-button") is not None
     assert _find_component_by_id(studio_tab, "studio-workspace-quick-edit-panel") is not None
     assert _find_component_by_id(studio_tab, "studio-workspace-local-actions-panel") is not None
     assert _find_component_by_id(studio_tab, "studio-context-detailed-panels") is not None
@@ -845,6 +849,53 @@ def test_studio_workspace_panel_unifies_focus_connectivity_and_runs_gate() -> No
     assert _find_component_by_id(panel, "studio-focus-delete-edge-button") is not None
     assert _find_component_by_id(panel, "studio-focus-open-workbench-button") is not None
     assert _find_component_by_id(panel, "studio-workspace-fine-tuning-panel") is not None
+
+
+def test_studio_workspace_panel_promotes_direct_measurement_fix_in_primary_context() -> None:
+    panel = render_studio_workspace_panel(
+        {
+            "status": "needs_attention",
+            "readiness_headline": "Ainda há bloqueios estruturais impedindo a passagem segura para Runs.",
+            "primary_action": "Corrigir regras estruturais e rotas inválidas antes de enfileirar uma nova run.",
+            "blocker_count": 1,
+            "warning_count": 0,
+            "mandatory_route_count": 1,
+            "blockers": ["Rotas com dosagem sem medicao direta: R002"],
+            "warnings": [],
+            "next_steps": ["Feche os bloqueios estruturais antes de enfileirar uma nova run."],
+        },
+        {
+            "selected_node_id": "W",
+            "business_label": "Tanque de água",
+        },
+        {
+            "selected_link_id": "route:R002",
+            "selected_edge": {"from_node": "W", "to_node": "M"},
+            "from_label": "Tanque de água",
+            "to_label": "Misturador",
+            "business_label": "Tanque de água para Misturador",
+        },
+        [
+            {"node_id": "W", "label": "Tanque de água", "node_type": "water_tank", "zone": "supply"},
+            {"node_id": "M", "label": "Misturador", "node_type": "mixer", "zone": "process"},
+        ],
+        [
+            {"link_id": "L001", "from_node": "W", "to_node": "M", "archetype": "bus_segment"},
+        ],
+        [
+            {"route_id": "R002", "source": "W", "sink": "M", "mandatory": True, "dose_min_l": 2.0, "measurement_required": False},
+        ],
+        "Trecho principal revisado.",
+    )
+    panel_text = _collect_text_content(panel)
+    measurement_button = _find_component_by_id(panel, "studio-workspace-require-measurement-button")
+    create_route_button = _find_component_by_id(panel, "studio-workspace-create-route-button")
+
+    assert "Exigir medição direta agora" in panel_text
+    assert measurement_button is not None
+    assert getattr(measurement_button, "disabled", None) is False
+    assert create_route_button is not None
+    assert getattr(create_route_button, "disabled", None) is True
 
 
 def test_studio_primary_canvas_hides_internal_and_hub_nodes() -> None:
@@ -1346,6 +1397,7 @@ def test_connectivity_route_callback_updates_selected_edge_route_directly() -> N
     updated_rows, status = callback(
         1,
         0,
+        0,
         route_rows,
         "L001",
         candidate_links_rows,
@@ -1362,6 +1414,36 @@ def test_connectivity_route_callback_updates_selected_edge_route_directly() -> N
     assert updated_rows[0]["dose_min_l"] == 2.5
     assert updated_rows[0]["q_min_delivered_lpm"] == 18.0
     assert updated_rows[0]["notes"] == "ajuste local"
+
+
+def test_workspace_context_measurement_button_updates_selected_edge_route_directly() -> None:
+    with diagnostic_runtime_test_mode():
+        app = build_app("data/decision_platform/maquete_v2")
+
+    callback = _get_callback(app, input_id="studio-workspace-require-measurement-button")
+    route_rows = [
+        {"route_id": "R001", "source": "W", "sink": "M", "mandatory": True, "measurement_required": 0, "dose_min_l": 2.0, "q_min_delivered_lpm": 12.0, "notes": ""},
+    ]
+    candidate_links_rows = [
+        {"link_id": "L001", "from_node": "W", "to_node": "M", "archetype": "bus_segment"},
+    ]
+
+    updated_rows, status = callback(
+        0,
+        0,
+        1,
+        route_rows,
+        "L001",
+        candidate_links_rows,
+        "mandatory",
+        [],
+        2.0,
+        12.0,
+        "",
+    )
+
+    assert status == "Rota R001 agora exige medição direta no trecho em foco."
+    assert updated_rows[0]["measurement_required"] == 1
 
 
 def test_studio_focus_panel_uses_canvas_selection_as_primary_context() -> None:
@@ -2082,6 +2164,7 @@ def test_focus_edge_reverse_callback_swaps_flow_without_workbench() -> None:
     callback = _get_callback(app, input_id="studio-focus-edge-reverse-button")
     updated_links, next_selected_link_id, status = callback(
         1,
+        0,
         0,
         bundle.candidate_links.to_dict("records"),
         "L013",

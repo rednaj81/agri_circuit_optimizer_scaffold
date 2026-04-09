@@ -1,26 +1,50 @@
-# Phase UX Refinement - Wave 8 Handoff
+# Phase UX Refinement Wave 8 Handoff
 
-## Escopo executado
+## Escopo entregue
 
-- Transformei a recuperação de Runs em ação operacional direta na própria workspace, reaproveitando os callbacks reais de enfileirar, executar próxima, atualizar leitura, reexecutar e abrir Decisão.
-- Mantive Studio e Decisão fora do centro desta wave; os ajustes ficaram na integração necessária para a nova operacionalidade de Runs.
-- Reforcei a distinção entre resultado bloqueado, sem resultado utilizável, decisão disponível e estados intermediários com CTAs executáveis e diferentes.
+- Promovi correções frequentes de readiness e conectividade para o painel dominante do Studio, sem reabrir arquitetura nem inflar a lateral.
+- Mantive a sidebar curta da wave 7 e preservei a estabilidade do canvas consolidada na wave 6.
 
-## O que ficou melhor para o operador comum
+## Implementação
 
-- A primeira dobra de Runs não só explica o que está acontecendo: ela agora oferece o próximo gesto operacional coerente com o estado real da fila e da run em foco.
-- Estados de espera passaram a ter atualização direta da leitura, estados de recuperação passaram a expor reexecução e estados úteis passaram a abrir Decisão sem desvio manual.
-- Fica mais curto sair de “entendi o estado” para “executei o próximo passo”.
+- `src/decision_platform/ui_dash/app.py`
+  - Adicionado `studio-workspace-context-direct-actions` no bloco contextual principal do Studio.
+  - Promovidas ações contextuais diretas para o primeiro fold:
+    - `studio-workspace-require-measurement-button`
+    - `studio-workspace-create-route-button`
+    - `studio-workspace-reverse-edge-button`
+  - Reaproveitados callbacks já existentes para:
+    - exigir medição direta no trecho em foco sem disclosure;
+    - carregar criação de rota a partir do trecho em foco;
+    - inverter trecho crítico a partir do painel dominante.
+  - Os botões permanecem sempre no layout para não quebrar validação do Dash, mas aparecem só quando o contexto do trecho pede a ação.
 
-## Evidência da onda
+- `tests/decision_platform/test_ui_smoke.py`
+  - Cobertura do novo painel de ações diretas.
+  - Cobertura do atalho de medição direta disparado pelo painel dominante.
+  - Ajuste das assinaturas de callback afetadas pela promoção dos novos inputs.
 
-- Snapshot estruturado: `docs/2026-04-09_phase_ux_refinement_wave8_ui_snapshot.json`
-- Documentação da onda: `docs/2026-04-09_phase_ux_refinement_wave8_handoff.md`
-- Validação executada:
-  - `python -m pytest tests/decision_platform/test_ui_smoke.py tests/decision_platform/test_phase3_queue_acceptance.py -m "not slow"`
+- `tests/decision_platform/test_studio_structure.py`
+  - Cobertura estrutural dos novos controles no layout principal.
 
-## Limitações honestas
+## Validação
 
-- Não houve screenshot bitmap utilizável nesta sessão; o snapshot estruturado registra a tentativa como indisponível no sandbox.
-- Ainda existe um script temporário não versionado em `output/capture_wave3_studio.ps1`, fora dos commits desta wave.
-- Não rodei a suíte lenta completa nesta sessão.
+Executado:
+
+```powershell
+$env:PYTHONPATH='src;.'; .\.venv\Scripts\python.exe -m pytest tests/decision_platform/test_ui_smoke.py tests/decision_platform/test_studio_structure.py -q -p no:cacheprovider --basetemp tests/_tmp/pytest-basetemp-ux-wave8-full
+```
+
+Resultado:
+
+- `123 passed in 349.61s (0:05:49)`
+
+## Evidência
+
+- `output/playwright/wave8-studio-direct-actions.json`
+
+## Limitações
+
+- A wave resolve tarefas frequentes direto no painel dominante, mas não substitui o contexto detalhado para revisão ampla de readiness.
+- A evidência registrada nesta wave é estrutural e orientada a comportamento; não há screenshot literal do app.
+

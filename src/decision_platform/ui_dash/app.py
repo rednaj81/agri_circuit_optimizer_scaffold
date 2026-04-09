@@ -3462,6 +3462,20 @@ def render_studio_workspace_panel(
     connection_preview = connection_lines[0] if connection_lines else "Ainda não há trecho de suprimento legível na camada principal."
     selected_node_present = bool(str(node_summary.get("selected_node_id") or "").strip())
     selected_edge_present = bool(edge_summary.get("selected_edge"))
+    focused_route_row = _selected_route_row_from_edge_focus(
+        route_rows,
+        selected_link_id=str(edge_summary.get("selected_link_id") or "").strip(),
+        candidate_links_rows=candidate_links_rows,
+    )
+    focused_route_id = str((focused_route_row or {}).get("route_id") or "").strip()
+    focused_route_has_dose = float((focused_route_row or {}).get("dose_min_l") or 0.0) > 0
+    focused_route_requires_measurement = _coerce_truthy((focused_route_row or {}).get("measurement_required"))
+    can_require_measurement_directly = bool(focused_route_id and focused_route_has_dose and not focused_route_requires_measurement)
+    can_create_route_from_focus = bool(selected_edge_present and not focused_route_id)
+    selected_edge_row = dict(edge_summary.get("selected_edge") or {})
+    selected_edge_to_node = str(selected_edge_row.get("to_node") or "").strip()
+    selected_edge_from_node = str(selected_edge_row.get("from_node") or "").strip()
+    can_reverse_directly = bool(selected_edge_present and (selected_edge_to_node == "W" or selected_edge_from_node == "S"))
     supply_flow_summary = (
         str(business_flow.get("headline") or connection_preview)
         if selected_node_present or selected_edge_present
@@ -3515,6 +3529,26 @@ def render_studio_workspace_panel(
         if route_focus_row
         else str(composer_preview.get("headline") or "Abra a rota em foco apenas quando precisar concluir o composer ou ajustar particularidades.")
     )
+    context_direct_actions = [
+        html.Button(
+            "Exigir medição direta agora",
+            id="studio-workspace-require-measurement-button",
+            style={**UI_BUTTON_STYLE, **({} if can_require_measurement_directly else {"display": "none"})},
+            disabled=not can_require_measurement_directly,
+        ),
+        html.Button(
+            "Criar rota deste trecho",
+            id="studio-workspace-create-route-button",
+            style={**UI_BUTTON_STYLE, **({} if can_create_route_from_focus else {"display": "none"})},
+            disabled=not can_create_route_from_focus,
+        ),
+        html.Button(
+            "Inverter trecho crítico",
+            id="studio-workspace-reverse-edge-button",
+            style={**UI_BUTTON_STYLE, **({} if can_reverse_directly else {"display": "none"})},
+            disabled=not can_reverse_directly,
+        ),
+    ]
     runs_enabled = status == "ready"
     runs_button_label = "Ir para Runs" if runs_enabled else "Runs bloqueado neste estado"
     primary_actions: list[Any]
@@ -3555,6 +3589,15 @@ def render_studio_workspace_panel(
                             ),
                         ],
                     ),
+                    html.Div(
+                        id="studio-workspace-context-direct-actions",
+                        style={
+                            **UI_ACTION_ROW_STYLE,
+                            "marginTop": "10px",
+                            **({} if (can_require_measurement_directly or can_create_route_from_focus or can_reverse_directly) else {"display": "none"}),
+                        },
+                        children=context_direct_actions,
+                    )
                 ],
             ),
             html.Details(
@@ -8227,6 +8270,7 @@ def build_app(
         Input("studio-route-create-from-edge-button", "n_clicks"),
         Input("studio-canvas-load-edge-button", "n_clicks"),
         Input("studio-connectivity-route-create-button", "n_clicks"),
+        Input("studio-workspace-create-route-button", "n_clicks"),
         State("edge-studio-selected-id", "data"),
         State("candidate-links-grid", "rowData"),
         State("studio-route-composer-state", "data"),
@@ -8236,12 +8280,13 @@ def build_app(
         n_clicks: Any,
         canvas_n_clicks: Any,
         connectivity_n_clicks: Any,
+        workspace_n_clicks: Any,
         selected_link_id: str | None,
         candidate_links_rows: list[dict[str, Any]] | None,
         composer_state: dict[str, Any] | None,
     ) -> tuple[dict[str, Any], str]:
         state = _normalize_route_composer_state(composer_state)
-        if max(int(n_clicks or 0), int(canvas_n_clicks or 0), int(connectivity_n_clicks or 0)) <= 0:
+        if max(int(n_clicks or 0), int(canvas_n_clicks or 0), int(connectivity_n_clicks or 0), int(workspace_n_clicks or 0)) <= 0:
             return state, ""
         selected_id = _default_edge_studio_selection(candidate_links_rows or [], preferred_link_id=selected_link_id)
         edge_row = next(
@@ -8407,6 +8452,7 @@ def build_app(
         Output("studio-status-message", "data", allow_duplicate=True),
         Input("studio-connectivity-route-apply-button", "n_clicks"),
         Input("studio-connectivity-route-measurement-button", "n_clicks"),
+        Input("studio-workspace-require-measurement-button", "n_clicks"),
         State("routes-grid", "rowData"),
         State("edge-studio-selected-id", "data"),
         State("candidate-links-grid", "rowData"),
@@ -8420,6 +8466,7 @@ def build_app(
     def _apply_connectivity_route_edit(
         apply_n_clicks: Any,
         measurement_n_clicks: Any,
+        workspace_measurement_n_clicks: Any,
         route_rows: list[dict[str, Any]] | None,
         selected_link_id: str | None,
         candidate_links_rows: list[dict[str, Any]] | None,
@@ -8429,7 +8476,7 @@ def build_app(
         q_min_delivered_lpm: Any,
         notes: str | None,
     ) -> tuple[list[dict[str, Any]], str]:
-        if max(int(apply_n_clicks or 0), int(measurement_n_clicks or 0)) <= 0:
+        if max(int(apply_n_clicks or 0), int(measurement_n_clicks or 0), int(workspace_measurement_n_clicks or 0)) <= 0:
             return route_rows or [], ""
         form_values = _edge_route_focus_form_values(
             route_rows,
@@ -8440,7 +8487,8 @@ def build_app(
         if not selected_route_id:
             return route_rows or [], "Selecione uma conexão com rota operacional antes de editar este trecho."
         measurement_required_value = "measurement_required" in (measurement_required or [])
-        if int(measurement_n_clicks or 0) > int(apply_n_clicks or 0):
+        measurement_clicks = max(int(measurement_n_clicks or 0), int(workspace_measurement_n_clicks or 0))
+        if measurement_clicks > int(apply_n_clicks or 0):
             measurement_required_value = True
         try:
             updated_rows, route_id = apply_route_studio_edit(
@@ -8456,7 +8504,7 @@ def build_app(
             return route_rows or [], str(exc)
         status_message = (
             f"Rota {route_id} agora exige medição direta no trecho em foco."
-            if int(measurement_n_clicks or 0) > int(apply_n_clicks or 0)
+            if measurement_clicks > int(apply_n_clicks or 0)
             else f"Rota {route_id} atualizada direto no painel de conectividade."
         )
         return updated_rows, status_message
@@ -8651,6 +8699,7 @@ def build_app(
         Output("studio-status-message", "data", allow_duplicate=True),
         Input("studio-focus-edge-reverse-button", "n_clicks"),
         Input("studio-canvas-reverse-edge-button", "n_clicks"),
+        Input("studio-workspace-reverse-edge-button", "n_clicks"),
         State("candidate-links-grid", "rowData"),
         State("edge-studio-selected-id", "data"),
         State("nodes-grid", "rowData"),
@@ -8661,13 +8710,14 @@ def build_app(
     def _reverse_focus_edge_direction(
         n_clicks: Any,
         canvas_n_clicks: Any,
+        workspace_n_clicks: Any,
         candidate_links_rows: list[dict[str, Any]] | None,
         selected_link_id: str | None,
         nodes_rows: list[dict[str, Any]] | None,
         route_rows: list[dict[str, Any]] | None,
         edge_component_rules_rows: list[dict[str, Any]] | None,
     ) -> tuple[list[dict[str, Any]], str | None, str]:
-        if max(int(n_clicks or 0), int(canvas_n_clicks or 0)) <= 0:
+        if max(int(n_clicks or 0), int(canvas_n_clicks or 0), int(workspace_n_clicks or 0)) <= 0:
             return candidate_links_rows or [], selected_link_id, ""
         selected_id = _default_edge_studio_selection(candidate_links_rows or [], preferred_link_id=selected_link_id)
         try:
