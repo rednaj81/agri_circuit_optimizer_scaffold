@@ -823,10 +823,36 @@ def _compact_value_card(label: str, value: Any, note: str | None = None, *, acce
     )
 
 
+def _signal_card(label: str, value: Any, note: str | None = None, *, tone: str | None = None) -> Any:
+    background, color = _status_tone(tone)
+    return html.Div(
+        style={
+            **UI_COMPACT_VALUE_CARD_STYLE,
+            "background": background,
+            "color": color,
+            "border": "none",
+            "boxShadow": "none",
+        },
+        children=[
+            html.Div(label, style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "opacity": 0.82}),
+            html.Div(str(value or "-"), style={"fontSize": "20px", "fontWeight": 700, "lineHeight": "1.15"}),
+            html.Div(note or "", style={"fontSize": "13px", "lineHeight": "1.45", "opacity": 0.92}),
+        ],
+    )
+
+
 def _bullet_list(items: list[str], empty_label: str) -> Any:
     if not items:
         return html.Div(empty_label, style={"color": "#496158"})
     return html.Ul([html.Li(str(item)) for item in items], style={"margin": "8px 0 0 18px", "lineHeight": "1.6"})
+
+
+def _latest_run_with_status(summary: dict[str, Any] | None, statuses: set[str]) -> dict[str, Any] | None:
+    runs = list((summary or {}).get("runs", [])) if isinstance(summary, dict) else []
+    for run in reversed(runs):
+        if str(run.get("status") or "").strip() in statuses:
+            return run
+    return None
 
 
 def _label_value_list(items: list[tuple[str, Any]]) -> Any:
@@ -4983,6 +5009,8 @@ def render_run_jobs_overview_panel(summary: dict[str, Any]) -> Any:
     completed_count = int(status_counts.get("completed", 0) or 0)
     preparing_count = int(status_counts.get("preparing", 0) or 0)
     queue_state = _humanize_run_status(summary.get("queue_state", "idle")) if isinstance(summary, dict) else "Sem leitura"
+    latest_failed_run = _latest_run_with_status(summary, {"failed", "canceled"})
+    latest_completed_run = _latest_run_with_status(summary, {"completed"})
     if preparing_count and not active_run_ids:
         queue_headline = "Preparação em andamento"
         queue_guidance = "Há run saindo da fila e preparando artefatos. Aguarde essa etapa antes de cobrar resultado ou reenfileirar."
@@ -5001,26 +5029,6 @@ def render_run_jobs_overview_panel(summary: dict[str, Any]) -> Any:
     else:
         queue_headline = "Nenhuma execução registrada"
         queue_guidance = "Nenhuma run registrada ainda. Enfileire o cenário atual para iniciar a trilha operacional."
-    active_label = f"{active_run_ids[0]} em execução agora." if active_run_ids else "Nenhuma run executando agora."
-    queued_label = f"{next_queued_run_id} pronta para rodar." if next_queued_run_id else "Nenhuma run aguardando na fila."
-    if failed_count and latest_run_id:
-        history_label = f"{latest_run_id} encerrou a leitura recente com falha ou revisão pendente."
-    elif latest_run_id:
-        history_label = f"{latest_run_id} é a referência mais recente desta fila."
-    else:
-        history_label = "Ainda não existe histórico recente."
-    if active_run_ids:
-        operator_next_action = f"Aguarde {active_run_ids[0]} consolidar resultado antes de abrir outra rodada."
-    elif preparing_count:
-        operator_next_action = "Aguarde a preparação terminar; reexecute ou revise só depois que a run sair deste estado intermediário."
-    elif next_queued_run_id:
-        operator_next_action = f"Execute {next_queued_run_id} quando quiser transformar cenário pronto em resultado utilizável."
-    elif failed_count and run_count:
-        operator_next_action = "Revise a run mais recente, corrija o cenário se preciso e só então reenfileire."
-    elif run_count:
-        operator_next_action = "Use a run mais recente para decidir se já vale abrir Decisão ou preparar nova rodada."
-    else:
-        operator_next_action = "Enfileire o cenário atual para abrir a primeira leitura operacional desta área."
     if failed_count:
         recovery_signal = "Há falha ou revisão pendente; o próximo passo é revisar a run mais recente antes de reenfileirar."
     elif completed_count:
@@ -5031,37 +5039,59 @@ def render_run_jobs_overview_panel(summary: dict[str, Any]) -> Any:
         recovery_signal = "Ainda não há histórico suficiente para falar em recuperação ou reaproveitamento."
     return html.Div(
         children=[
-            html.H3("Resumo da fila", style={"marginTop": 0}),
+            html.H3("Fila em um olhar", style={"marginTop": 0}),
             html.Div(queue_headline, style={"fontWeight": 700, "lineHeight": "1.5", "marginBottom": "10px"}),
             html.Div(
+                id="run-jobs-overview-signals",
                 style={**UI_TWO_COLUMN_STYLE, "marginBottom": "12px"},
                 children=[
-                    _guidance_card("Objetivo desta área", "Entender o que já rodou, o que ainda está na fila e qual run merece sua atenção agora."),
-                    _guidance_card("Próxima ação", queue_guidance),
-                ],
-            ),
-            html.Div(
-                id="run-jobs-operational-lanes",
-                style={**UI_TWO_COLUMN_STYLE, "marginBottom": "12px"},
-                children=[
-                    _guidance_card("Na fila ou preparando", queued_label if not preparing_count else f"{preparing_count} run(s) preparando artefatos antes da execução principal."),
-                    _guidance_card("Executando", active_label),
-                    _guidance_card("Resultado recente", history_label),
-                    _guidance_card("Falha ou revisão", recovery_signal),
-                    _guidance_card("Próxima ação", operator_next_action),
+                    _signal_card(
+                        "Fila agora",
+                        next_queued_run_id or ("Preparando" if preparing_count and not active_run_ids else "Vazia"),
+                        (
+                            f"{len(queued_run_ids)} aguardando"
+                            if next_queued_run_id
+                            else ("Sem próxima run pronta" if not preparing_count else f"{preparing_count} preparando")
+                        ),
+                        tone="queued" if next_queued_run_id or preparing_count else "idle",
+                    ),
+                    _signal_card(
+                        "Rodando agora",
+                        active_run_ids[0] if active_run_ids else ("Preparando" if preparing_count else "Nada"),
+                        "Run em foco da fila serial" if active_run_ids else ("Aguardando saída da preparação" if preparing_count else "Sem execução ativa"),
+                        tone="running" if active_run_ids or preparing_count else "idle",
+                    ),
+                    _signal_card(
+                        "Falhou",
+                        str(latest_failed_run.get("run_id") or failed_count or "Nada") if latest_failed_run else ("Nada" if failed_count == 0 else failed_count),
+                        (
+                            f"{failed_count} no histórico recente"
+                            if failed_count
+                            else "Sem falhas recentes"
+                        ),
+                        tone="failed" if failed_count else "ready",
+                    ),
+                    _signal_card(
+                        "Pode fazer agora",
+                        (
+                            "Aguardar"
+                            if active_run_ids or preparing_count
+                            else ("Executar próxima" if next_queued_run_id else ("Revisar falha" if failed_count else ("Ler resultado" if latest_completed_run else "Enfileirar cenário")))
+                        ),
+                        queue_guidance,
+                        tone="needs_attention" if not latest_completed_run else "ready",
+                    ),
                 ],
             ),
             html.Div(
                 style=UI_THREE_COLUMN_STYLE,
                 children=[
-                    _metric_card("Runs", summary.get("run_count", 0), "Total observavel na fila local."),
-                    _metric_card("Estado da fila", queue_state, "fila serial local"),
-                    _metric_card("Preparando", preparing_count),
-                    _metric_card("Em execução", len(active_run_ids)),
+                    _metric_card("Runs locais", summary.get("run_count", 0), "Histórico observável na fila serial."),
                     _metric_card("Na fila", len(queued_run_ids)),
-                    _metric_card("Concluídas", completed_count),
+                    _metric_card("Em execução", len(active_run_ids)),
                     _metric_card("Falhas", failed_count),
-                    _metric_card("Próxima run", summary.get("next_queued_run_id") or "-", "Entrada seguinte da fila"),
+                    _metric_card("Concluídas", completed_count),
+                    _metric_card("Estado da fila", queue_state, "Leitura agregada"),
                 ],
             ),
             html.Details(
@@ -5437,6 +5467,7 @@ def render_runs_workspace_panel(
         detail_for_progress["artifacts"] = artifacts
     progress_snapshot = _run_progress_snapshot(detail_for_progress)
     focus_reason = _run_summary_focus_reason(selected_run_summary)
+    latest_failed_run = _latest_run_with_status(run_summary, {"failed", "canceled"})
     if active_run_ids:
         queue_focus = f"Execução em foco: {active_run_ids[0]}."
     elif next_queued_run_id:
@@ -5495,15 +5526,24 @@ def render_runs_workspace_panel(
         if state["run_count"] or next_queued_run_id or active_run_ids
         else "Nenhuma run entrou na fila ainda; a leitura operacional começa quando o cenário for enfileirado."
     )
-    focused_execution_copy = (
-        f"{selected_run_id or fallback_focus_run_id} em {progress_snapshot['signal'].lower()}. {focus_reason}"
-        if selected_run_id or fallback_focus_run_id
-        else "Nenhuma run em foco ainda; escolha a próxima execução quando a fila existir."
+    focused_execution_copy = selected_run_id or fallback_focus_run_id or "Nenhuma"
+    failure_signal_value = (
+        str(latest_failed_run.get("run_id") or state["failed_count"] or "Nada")
+        if latest_failed_run
+        else ("Nada" if state["failed_count"] == 0 else state["failed_count"])
     )
-    recent_history_copy = (
-        f"Última run observada: {latest_run_id}. {usable_result}"
-        if latest_run_id
-        else usable_result
+    action_signal_value = (
+        "Corrigir Studio"
+        if state["primary_cta_target"] == "studio"
+        else (
+            "Executar próxima"
+            if state["primary_cta_target"] == "run"
+            else (
+                "Reexecutar"
+                if state["primary_cta_target"] == "rerun"
+                else ("Abrir Decisão" if state["primary_cta_target"] == "decision" else ("Enfileirar" if state["primary_cta_target"] == "enqueue" else "Atualizar"))
+            )
+        )
     )
     return html.Div(
         children=[
@@ -5517,11 +5557,55 @@ def render_runs_workspace_panel(
             ),
             html.Div(
                 id="runs-workspace-operational-lanes",
+                style={**UI_TWO_COLUMN_STYLE, "marginBottom": "12px"},
+                children=[
+                    _signal_card(
+                        "O que está na fila",
+                        next_queued_run_id or ("Preparando" if state["preparing_count"] and not active_run_ids else "Vazia"),
+                        queue_lane_copy,
+                        tone="queued" if next_queued_run_id or state["preparing_count"] else "idle",
+                    ),
+                    _signal_card(
+                        "O que está rodando",
+                        active_run_ids[0] if active_run_ids else ("Preparando" if state["preparing_count"] else focused_execution_copy),
+                        (
+                            f"{progress_snapshot['signal']}. {focus_reason}"
+                            if focused_execution_copy != "Nenhuma"
+                            else "Nenhuma execução em foco agora."
+                        ),
+                        tone="running" if active_run_ids or state["preparing_count"] else "idle",
+                    ),
+                    _signal_card(
+                        "O que falhou",
+                        failure_signal_value,
+                        recovery_headline if (recovery_headline := state["recovery_headline"]) else "Sem falhas recentes.",
+                        tone="failed" if state["failed_count"] else "ready",
+                    ),
+                    _signal_card(
+                        "O que pode fazer agora",
+                        action_signal_value,
+                        state["next_action"],
+                        tone="needs_attention" if not state["decision_enabled"] else "ready",
+                    ),
+                ],
+            ),
+            html.Div(
+                id="runs-workspace-scenario-run-result-panel",
                 style={**UI_THREE_COLUMN_STYLE, "marginBottom": "12px"},
                 children=[
-                    _guidance_card("Fila atual", queue_lane_copy),
-                    _guidance_card("Execução em foco", focused_execution_copy),
-                    _guidance_card("Histórico recente", recent_history_copy),
+                    _guidance_card(
+                        "Cenário",
+                        str(studio_summary.get("readiness_headline") or state["readiness_note"]),
+                    ),
+                    _guidance_card(
+                        "Run/job",
+                        (
+                            f"{selected_run_id or latest_run_id or next_queued_run_id or '-'} | {_humanize_run_status(selected_run_status or detail_for_progress.get('status'))}"
+                            if selected_run_id or latest_run_id or next_queued_run_id
+                            else "Nenhuma run selecionada ainda."
+                        ),
+                    ),
+                    _guidance_card("Resultado", usable_result),
                 ],
             ),
             html.Div(
@@ -5531,10 +5615,6 @@ def render_runs_workspace_panel(
                     html.Div("Próxima ação", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
                     html.Div(state["next_action"], style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"}),
                     html.Div(state["decision_gate"], style={"lineHeight": "1.6", "marginTop": "10px"}),
-                    html.Div(
-                        f"Run em foco para recuperação: {selected_run_id or latest_run_id or 'nenhuma ainda selecionada'}. {focus_reason}",
-                        style={"lineHeight": "1.6", "marginTop": "10px", "color": "#496158"},
-                    ),
                     html.Div(style={**UI_ACTION_ROW_STYLE, "marginTop": "12px"}, children=[local_recovery_cta]),
                 ],
             ),
@@ -5557,12 +5637,10 @@ def render_runs_workspace_panel(
                 children=[
                     _metric_card("Estado dominante", state["flow_state"]),
                     _metric_card("Runs locais", state["run_count"]),
-                    _metric_card("Preparando", state["preparing_count"]),
                     _metric_card("Na fila", queued_count),
                     _metric_card("Em execução", len(active_run_ids)),
                     _metric_card("Falhas recentes", state["failed_count"]),
-                    _metric_card("Andamento da run em foco", progress_snapshot["progress_label"]),
-                    _metric_card("Próxima run", next_queued_run_id or "-"),
+                    _metric_card("Resultado pronto", "Sim" if state["decision_enabled"] else "Não", state["decision_gate"]),
                 ],
             ),
             html.Div(
@@ -5751,16 +5829,17 @@ def render_run_job_detail_panel(detail: dict[str, Any]) -> Any:
                 style={**UI_TWO_COLUMN_STYLE, "marginTop": "12px"},
                 children=[
                     _guidance_card("Progresso desta run", progress_snapshot["progress_label"]),
-                    _guidance_card("Leitura operacional", next_action),
                     _guidance_card("Sinal de progresso", progress_snapshot["signal"]),
                     _guidance_card("Pode agir agora", action_guidance),
                     _guidance_card("O que falta", progress_snapshot["progress_text"]),
                     _guidance_card("Recuperação desta run", recovery_text),
-                    _guidance_card("Cenário de origem", str(detail.get("source_bundle_root") or "-")),
-                    _guidance_card("Execução específica", str(detail.get("selected_run_id") or "-")),
-                    _guidance_card("Execução pedida", str(detail.get("requested_execution_mode") or detail.get("execution_mode") or "-")),
+                    _guidance_card("Cenário", str(detail.get("source_bundle_root") or "-")),
+                    _guidance_card(
+                        "Run/job",
+                        f"{detail.get('selected_run_id') or '-'} | {str(detail.get('requested_execution_mode') or detail.get('execution_mode') or '-')}",
+                    ),
                     _guidance_card("Resultado agora", result_state),
-                    _guidance_card("Sinal desta run", recovery_label),
+                    _guidance_card("Estado desta run", recovery_label),
                 ],
             ),
             html.H4("Eventos relevantes", style={"marginBottom": "6px", "marginTop": "14px"}),

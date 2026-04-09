@@ -1,42 +1,47 @@
 {
-  "snapshot_source_commit": "d572ed3541cf8a1e897247ba21e179e128a28f13",
-  "studio": {
+  "snapshot_source": "runs_first_fold_compression",
+  "phase_id": "ux_phase_3",
+  "wave_index": 1,
+  "focus": "queue readability, run statuses, progress, scenario/run/result separation",
+  "runs": {
     "first_fold_signals": [
-      "Comece pelo canvas",
-      "Cadeia visível neste foco",
-      "Quem supre este foco",
-      "Quem este foco supre",
-      "Rota em preparo",
-      "Leitura do cenário",
-      "Trecho mais legível",
-      "Ajustes locais do canvas",
-      "Rotas que precisam de serviço"
+      "O que está na fila",
+      "O que está rodando",
+      "O que falhou",
+      "O que pode fazer agora",
+      "Cenário",
+      "Run/job",
+      "Resultado",
+      "Próxima ação"
     ],
-    "canvas_panel_excerpt": "Comece pelo canvasEntidade em foco: Tanque de água.Ação principal agoraUse a entidade selecionada para reposicionar, revisar conectividade e validar o papel dela antes de abrir Runs.Bloqueio ou liberação localBloqueio local: este nó ajuda a localizar a próxima correção estrutural no grafo principal.Gate para RunsAinda há bloqueios estruturais impedindo a passagem segura para Runs.Cadeia visível neste focoTanque de água supre Incorporador, Misturador e Saída externa.Quem supre este focoAinda não recebe suprimento visível.Quem este foco supreIncorporador, Misturador e Saída externaRota em preparoO composer local ainda não recebeu origem nem destino.Estado do composerComposer vazioVer trechos legíveis deste focoTanque de água para Misturador · Obrigatória · medição diretaTanque de água para Incorporador · Obrigatória · medição diretaTanque de água para Saída externa · Obrigatória · medição ",
-    "workspace_panel_excerpt": "Leitura do cenárioExige atençãoAinda há bloqueios estruturais impedindo a passagem segura para Runs.Seleção atualEntidade em foco: Tanque de água.Use este foco para fechar o principal bloqueio estrutural antes de liberar a passagem para Runs.Próximo gestoAjustar rota no focoCorrigir regras estruturais e rotas inválidas antes de enfileirar uma nova run.Quem supre este focoAinda não recebe suprimento visível.Tanque de água supre Incorporador, Misturador e Saída externa.Quem este foco supreIncorporador, Misturador e Saída externaTanque de água supre Misturador (rota obrigatória).Trecho mais legívelTanque de água supre Misturador (rota obrigatória).3 leitura(s) de suprimento já aparecem na camada principal.Readiness críticoA conexão L011 sai de Saída externa, mas Saída externa deve aparecer apenas como destino final.Ajustes locais do canvasUse estes controles rápidos para ajustes rotineiros ",
-    "canvas_controls": {
-      "context_menu_actions": [
-        "add-source-node",
-        "add-product-node",
-        "add-mixer-node",
-        "add-service-node",
-        "add-outlet-node",
-        "duplicate-node",
-        "start-route-from-node",
-        "remove-node"
-      ],
-      "min_zoom": 0.45,
-      "max_zoom": 1.6,
-      "wheel_sensitivity": 0.18
-    },
-    "route_first_behaviors": [
-      "node focus switches the primary CTA to destination completion when a route draft already has a source",
-      "supply-chain reading stays on the first fold instead of only inside disclosure blocks",
-      "route draft status and visible business flow now share the same canvas guidance surface"
-    ]
+    "overview_signals": [
+      "Fila agora",
+      "Rodando agora",
+      "Falhou",
+      "Pode fazer agora"
+    ],
+    "disclosures_kept_secondary": [
+      "Gate do cenário e limites desta leitura",
+      "Ver fila e histórico detalhados",
+      "Contexto técnico secundário desta run",
+      "Auditoria técnica de runs"
+    ],
+    "first_fold_excerpt": "Leitura operacional de Runs | O que está na fila | O que está rodando | O que falhou | O que pode fazer agora | Cenário | Run/job | Resultado | Próxima ação",
+    "detail_excerpt": "Run em foco | Timeline operacional | Progresso desta run | Pode agir agora | O que falta | Recuperação desta run | Resultado agora | Contexto técnico secundário desta run"
   },
   "validation": {
-    "command": "$env:PYTHONPATH='src;.'; .\\.venv\\Scripts\\python.exe -m pytest tests/decision_platform/test_ui_smoke.py -q -p no:cacheprovider --basetemp tests/_tmp/pytest-basetemp-ux-wave1-current",
-    "result": "96 passed in 544.22s (0:09:04)"
+    "commands": [
+      "$env:PYTHONPATH='.'; .\\.venv\\Scripts\\python.exe -m py_compile src\\decision_platform\\ui_dash\\app.py",
+      "$env:PYTHONPATH='.'; .\\.venv\\Scripts\\python.exe -m pytest tests\\decision_platform\\test_phase3_queue_acceptance.py -q",
+      "$env:PYTHONPATH='.'; .\\.venv\\Scripts\\python.exe -m pytest tests\\decision_platform\\test_phase3_runs_ui_smoke.py -q",
+      "$env:PYTHONPATH='.'; .\\.venv\\Scripts\\python.exe -m pytest tests\\decision_platform\\test_ui_smoke.py -k \"runs_tab_combines_queue_and_execution_summary or runs_workspace_panel_surfaces_queue_history_and_decision_gate or runs_workspace_panel_uses_refresh_cta_for_intermediate_execution_states or run_job_detail_panel_prioritizes_events_and_artifacts_over_logs or run_jobs_overview_panel_summarizes_current_queue_and_history or run_jobs_overview_panel_surfaces_preparing_and_recovery_states\" -q"
+    ],
+    "results": [
+      "py_compile passed",
+      "13 passed in test_phase3_queue_acceptance.py",
+      "1 passed in test_phase3_runs_ui_smoke.py",
+      "4 passed, 102 deselected in targeted test_ui_smoke.py validation"
+    ],
+    "known_timeout": "Full test_ui_smoke.py -q exceeded the local timeout budget and was not used as the closing gate for this wave."
   }
 }
