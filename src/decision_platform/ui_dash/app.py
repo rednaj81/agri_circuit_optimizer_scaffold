@@ -3816,6 +3816,8 @@ def render_studio_canvas_guidance_panel(
             html.Button("Marcar obrigatória", id="studio-canvas-intent-mandatory-button", style=UI_BUTTON_STYLE),
             html.Button("Abrir bancada desta conexão", id="studio-canvas-open-workbench-button", style=UI_BUTTON_STYLE),
         ]
+        secondary_actions_summary = "Mais ações: obrigatoriedade e bancada"
+        secondary_actions_hint = "Use estas ações depois de revisar o gesto principal deste trecho."
     elif selected_node_id and selected_node_label:
         current_focus = f"Entidade em foco: {selected_node_label}."
         canvas_action = "Use a entidade selecionada para reposicionar, revisar conectividade e validar o papel dela antes de abrir Runs."
@@ -3830,12 +3832,16 @@ def render_studio_canvas_guidance_panel(
             html.Button("Usar como destino", id="studio-canvas-arm-target-button", style=UI_BUTTON_STYLE),
             html.Button("Abrir bancada desta entidade", id="studio-canvas-open-workbench-button", style=UI_BUTTON_STYLE),
         ]
+        secondary_actions_summary = "Mais ações: destino e bancada"
+        secondary_actions_hint = "Abra estas ações quando o próximo passo não for iniciar a rota a partir deste ponto."
     else:
         current_focus = "Nenhum foco ativo no canvas."
         canvas_action = "Clique em uma entidade ou conexão do grafo para abrir o contexto principal desta revisão."
         local_blocker = "Sem foco local: selecione um trecho do grafo para destravar conectividade, completude e readiness a partir do canvas."
         primary_action_button = html.Button("Abrir bancada completa", id="studio-canvas-open-workbench-button", style=UI_BUTTON_STYLE)
         secondary_action_buttons = []
+        secondary_actions_summary = "Mais ações deste foco"
+        secondary_actions_hint = ""
     runs_label = (
         "Ir para Runs"
         if str(summary.get("status") or "").strip().lower() == "ready"
@@ -3868,7 +3874,8 @@ def render_studio_canvas_guidance_panel(
             html.Details(
                 style={**UI_MUTED_CARD_STYLE, "padding": "10px", "marginTop": "10px", "display": "block" if secondary_action_buttons else "none"},
                 children=[
-                    html.Summary("Mais ações deste foco"),
+                    html.Summary(secondary_actions_summary),
+                    html.Div(secondary_actions_hint, style={"marginTop": "10px", "lineHeight": "1.45", "fontWeight": 700}),
                     html.Div(style={**UI_ACTION_ROW_STYLE, "marginTop": "10px"}, children=secondary_action_buttons),
                 ],
             ),
@@ -5340,7 +5347,6 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
                     _compact_value_card("Margem", margin_value, margin_note),
                     _compact_value_card("Risco comparativo", risk_value, risk_note),
                     _compact_value_card("Technical tie", tie_label, "Winner vs runner-up" if decision_status == "technical_tie" else "Sem empate técnico aberto"),
-                    _compact_value_card("Perfil em leitura", active_profile_label, "Filtro ativo para esta comparação.", accent="rgba(16, 59, 53, 0.18)"),
                 ],
             ),
             html.Div(
@@ -5348,6 +5354,7 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
                 children=[
                     html.Div("O que esta decisão pede agora", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
                     html.Div(signal_text, style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"}),
+                    html.Div(f"Perfil em leitura: {active_profile_label}. Referência oficial: {official_profile_label} -> {official_product_candidate_id or '-'}.", style={"lineHeight": "1.5", "marginTop": "8px"}),
                     html.Div(decision_state["contrast_state"], style={"lineHeight": "1.6", "marginTop": "8px"}),
                 ],
             ),

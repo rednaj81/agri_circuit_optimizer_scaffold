@@ -575,7 +575,7 @@ def test_studio_canvas_guidance_panel_keeps_canvas_as_primary_entry() -> None:
     assert "Conexão em foco: Bomba -> Misturador." in with_edge_focus_text
     assert "inverta a direção direto no primeiro fold" in with_edge_focus_text.lower()
     assert "Trazer trecho" in with_edge_focus_text
-    assert "Mais ações deste foco" in with_edge_focus_text
+    assert "Mais ações: obrigatoriedade e bancada" in with_edge_focus_text
     assert "Abrir bancada desta conexão" in with_edge_focus_text
     assert "Abrir orientação deste foco" in with_edge_focus_text
     assert "Cenário pronto para seguir para Runs." in with_edge_focus_text

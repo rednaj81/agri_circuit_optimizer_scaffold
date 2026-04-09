@@ -1,0 +1,37 @@
+{
+  "snapshot_source_commit": "c15186c200e59fa78a6cd58b9745bc72194d4fd4",
+  "studio": {
+    "canvas_height": "820px",
+    "workspace_signals": [
+      "Seleção atual",
+      "Quem supre quem",
+      "Gesto principal",
+      "Readiness crítico",
+      "Ajustes locais do canvas"
+    ],
+    "edge_focus_primary_action": "studio-canvas-reverse-edge-button",
+    "edge_focus_secondary_summary": "Mais ações: obrigatoriedade e bancada"
+  },
+  "decision": {
+    "signals": [
+      "Winner atual",
+      "Runner-up",
+      "Margem",
+      "Risco comparativo",
+      "Technical tie",
+      "Perfil em leitura",
+      "Winner x runner-up",
+      "Sinal comparativo"
+    ],
+    "compact_profile_context_in_banner": true
+  },
+  "phase_exit_read": {
+    "ux_phase_2_exit_candidate": true,
+    "basis": "Studio permanece canvas-first com descoberta adequada de ações locais; Decisão ficou compacta sem crescer em densidade."
+  },
+  "screenshot_attempt": {
+    "target_path": "output/playwright/studio-fullhd-wave5.png",
+    "status": "failed_in_sandbox",
+    "reason": "Bitmap capture still unavailable in this sandbox; structured snapshot retained as honest exit evidence."
+  }
+}
