@@ -88,6 +88,7 @@ def test_dash_app_exposes_structural_studio_controls() -> None:
     assert "studio-focus-edge-reverse-button" in layout_repr
     assert "studio-focus-edge-flow-preview" in layout_repr
     assert "studio-context-detailed-panels" in layout_repr
+    assert "Paleta e criação rápida" in layout_repr
     assert "runs-workspace-panel" in layout_repr
     assert "runs-context-detailed-panels" in layout_repr
     assert "decision-workspace-panel" in layout_repr

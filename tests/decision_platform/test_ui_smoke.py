@@ -640,8 +640,9 @@ def test_studio_workspace_panel_unifies_focus_connectivity_and_runs_gate() -> No
 
     assert "Leitura do cenário" in panel_text
     assert "Seleção atual" in panel_text
-    assert "Conectividade em foco" in panel_text
-    assert "Readiness local" in panel_text
+    assert "Quem supre quem" in panel_text
+    assert "Gesto principal" in panel_text
+    assert "Readiness crítico" in panel_text
     assert "A conexão L900 termina em Tanque de água" in panel_text
     assert "Quem supre quem na camada principal" in panel_text
     assert "Bomba principal é suprido por Tanque de água e supre Misturador." in panel_text
@@ -652,6 +653,7 @@ def test_studio_workspace_panel_unifies_focus_connectivity_and_runs_gate() -> No
     assert "Impacto previsto" in panel_text
     assert "Corrigir no canvas" in panel_text
     assert "Runs bloqueado neste estado" in panel_text
+    assert "Readiness e saída do Studio" in panel_text
     assert getattr(_find_component_by_id(panel, "studio-workspace-open-runs-button"), "disabled", None) is True
     assert _find_component_by_id(panel, "studio-business-flow-panel") is not None
     assert _find_component_by_id(panel, "studio-focus-node-label") is not None
@@ -1680,6 +1682,8 @@ def test_decision_workspace_panel_makes_winner_runner_up_and_tie_legible() -> No
     assert "Technical tieExplícito" in panel_text
     assert "Technical tie explícito" in panel_text
     assert "Comparação final assistida" in panel_text
+    assert "Winner x runner-up" in panel_text
+    assert "Sinal comparativo" in panel_text
     assert "Escolha manual atual" in panel_text
     assert "cand-04" in panel_text
     assert "sem sobrescrever a referência oficial do produto" in panel_text.lower()

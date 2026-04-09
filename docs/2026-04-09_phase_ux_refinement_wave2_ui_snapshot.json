@@ -1,0 +1,27 @@
+{
+  "generated_from_commit": "a54dd5cc0ad1bf7aeaa0d252b6755845018412cd",
+  "studio": {
+    "shell_hero_padding": "14px 16px",
+    "journey_display": "none",
+    "canvas_height": "820px",
+    "command_center_under_disclosure": true,
+    "workspace_signals": [
+      "Quem supre quem",
+      "Gesto principal",
+      "Readiness e saída do Studio",
+      "Ajustes locais do canvas"
+    ]
+  },
+  "decision": {
+    "workspace_signals": [
+      "Perfil em leitura",
+      "Winner atual",
+      "Runner-up",
+      "Technical tie",
+      "Comparação final assistida",
+      "Winner x runner-up",
+      "Sinal comparativo"
+    ],
+    "final_comparison_text": "Referência oficial do produto-Perfil atualWinner x runner-up-- | Sem margem comparável registradaSinal comparativoContraste principalSem winner e runner-up legíveis nesta leitura.Escolha manual atual-Escolha manual ainda indefinida | -"
+  }
+}

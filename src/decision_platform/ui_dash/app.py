@@ -3377,6 +3377,11 @@ def render_studio_workspace_panel(
     connection_preview = connection_lines[0] if connection_lines else "Ainda não há trecho de suprimento legível na camada principal."
     selected_node_present = bool(str(node_summary.get("selected_node_id") or "").strip())
     selected_edge_present = bool(edge_summary.get("selected_edge"))
+    supply_flow_summary = (
+        str(business_flow.get("headline") or connection_preview)
+        if selected_node_present or selected_edge_present
+        else str(connection_preview)
+    )
     quick_edit_cards = _studio_workspace_quick_edit_cards(
         node_summary,
         edge_summary,
@@ -3417,12 +3422,18 @@ def render_studio_workspace_panel(
                 ],
             ),
             html.Div(
-                style={**UI_TWO_COLUMN_STYLE, "gridTemplateColumns": "repeat(2, minmax(0, 1fr))", "marginBottom": "12px"},
+                style={**UI_THREE_COLUMN_STYLE, "marginBottom": "12px"},
                 children=[
-                    _guidance_card("Seleção atual", focus_summary["headline"]),
-                    _guidance_card("Conectividade em foco", connection_preview),
-                    _guidance_card("Readiness local", top_issue),
-                    _guidance_card("Próxima ação", str(studio_summary.get("primary_action") or focus_summary["recommended_action"])),
+                    _compact_value_card("Seleção atual", focus_summary["headline"], focus_summary["recommended_action"], accent="rgba(16, 59, 53, 0.18)"),
+                    _compact_value_card("Quem supre quem", supply_flow_summary, business_flow.get("supplied_by_label") or "Sem suprimento visível"),
+                    _compact_value_card("Gesto principal", "Ajustar rota no foco", str(studio_summary.get("primary_action") or focus_summary["recommended_action"])),
+                ],
+            ),
+            html.Div(
+                style={**UI_COMPACT_BANNER_CARD_STYLE, "marginBottom": "12px", "display": "block" if blocker_count > 0 else "none"},
+                children=[
+                    html.Div("Readiness crítico", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+                    html.Div(top_issue, style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"}),
                 ],
             ),
             html.Div(
@@ -5254,6 +5265,17 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
     tie_label = "Explícito" if decision_status == "technical_tie" else "Não ativo"
     official_profile_label = _decision_profile_presentation(official_profile_id)["label"]
     active_profile_label = _decision_profile_presentation(active_profile_id)["label"]
+    score_margin_delta = summary.get("score_margin_delta")
+    comparison_signal = (
+        f"Margem de score: {score_margin_delta}"
+        if score_margin_delta not in (None, "")
+        else "Sem margem comparável registrada"
+    )
+    comparison_difference = (
+        summary.get("winner_reason_summary")
+        or summary.get("contrast_state")
+        or decision_state["contrast_state"]
+    )
     return html.Div(
         children=[
             html.Div("Leitura principal da decisão", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
@@ -5265,14 +5287,12 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
                 ],
             ),
             html.Div(
-                style={**UI_THREE_COLUMN_STYLE, "marginBottom": "12px"},
+                style={**UI_TWO_COLUMN_STYLE, "gridTemplateColumns": "repeat(auto-fit, minmax(210px, 1fr))", "marginBottom": "12px"},
                 children=[
                     _compact_value_card("Perfil em leitura", active_profile_label, "Filtro ativo para esta comparação.", accent="rgba(16, 59, 53, 0.18)"),
                     _compact_value_card("Winner atual", candidate_id or "Sem winner", summary.get("topology_family") or "Sem família líder legível", accent="#d7e5c1"),
                     _compact_value_card("Runner-up", runner_up_id or "Sem runner-up", summary.get("runner_up_topology_family") or "Sem contraste comparável"),
                     _compact_value_card("Technical tie", tie_label, "Winner vs runner-up" if decision_status == "technical_tie" else "Sem empate técnico aberto"),
-                    _compact_value_card("Referência oficial do produto", official_product_candidate_id or "-", official_profile_label),
-                    _compact_value_card("Escolha manual atual", selected_candidate_id or "-", selected_state_label),
                 ],
             ),
             html.Div(
@@ -5289,9 +5309,9 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
                 style={**UI_TWO_COLUMN_STYLE, "gridTemplateColumns": "repeat(auto-fit, minmax(220px, 1fr))", "marginBottom": "12px"},
                 children=[
                     _compact_value_card("Referência oficial do produto", official_product_candidate_id or "-", official_profile_label),
-                    _compact_value_card("Winner do perfil em leitura", candidate_id or "-", active_profile_label),
-                    _compact_value_card("Runner-up comparável", runner_up_id or "-", "Empate técnico" if decision_status == "technical_tie" else "Alternativa próxima"),
-                    _compact_value_card("Escolha manual atual", selected_candidate_id or "-", selected_topology_family),
+                    _compact_value_card("Winner x runner-up", candidate_id or "-", f"{runner_up_id or '-'} | {comparison_signal}"),
+                    _compact_value_card("Sinal comparativo", tie_label if decision_status == "technical_tie" else "Contraste principal", _humanize_decision_copy(comparison_difference)),
+                    _compact_value_card("Escolha manual atual", selected_candidate_id or "-", f"{selected_state_label} | {selected_topology_family}"),
                 ],
             ),
             html.H4("Perfis explícitos de seleção", style={"marginBottom": "6px"}),
@@ -5924,18 +5944,6 @@ def build_app(
                                         style=UI_STUDIO_SIDEBAR_STYLE,
                                         children=[
                                             html.Div(
-                                                id="studio-command-center-shell",
-                                                style=UI_CARD_STYLE,
-                                                children=render_studio_command_center_panel(
-                                                    initial_studio_readiness,
-                                                    _safe_json_loads(initial_node_studio_summary),
-                                                    _safe_json_loads(initial_edge_studio_summary),
-                                                    authoring_payload["nodes_rows"],
-                                                    authoring_payload["candidate_links_rows"],
-                                                    authoring_payload["route_rows"],
-                                                ),
-                                            ),
-                                            html.Div(
                                                 id="studio-workspace-panel",
                                                 children=render_studio_workspace_panel(
                                                     initial_studio_readiness,
@@ -5948,6 +5956,24 @@ def build_app(
                                                     initial_route_composer_state,
                                                 ),
                                                 style=UI_CARD_STYLE,
+                                            ),
+                                            html.Details(
+                                                style=UI_CARD_STYLE,
+                                                children=[
+                                                    html.Summary("Paleta e criação rápida"),
+                                                    html.Div(
+                                                        id="studio-command-center-shell",
+                                                        style={"marginTop": "12px"},
+                                                        children=render_studio_command_center_panel(
+                                                            initial_studio_readiness,
+                                                            _safe_json_loads(initial_node_studio_summary),
+                                                            _safe_json_loads(initial_edge_studio_summary),
+                                                            authoring_payload["nodes_rows"],
+                                                            authoring_payload["candidate_links_rows"],
+                                                            authoring_payload["route_rows"],
+                                                        ),
+                                                    ),
+                                                ],
                                             ),
                                         ],
                                     ),
