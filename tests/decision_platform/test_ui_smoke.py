@@ -33,6 +33,7 @@ from decision_platform.ui_dash.app import (
     render_candidate_summary_panel,
     render_decision_contrast_panel,
     render_decision_flow_panel,
+    render_decision_justification_panel,
     render_decision_signal_panel,
     render_decision_summary_panel,
     render_execution_summary_panel,
@@ -170,6 +171,20 @@ def test_dash_app_builds_layout_and_callbacks_even_when_fail_closed() -> None:
     assert app.layout is not None
     callback_count = len(getattr(app, "callbacks", [])) or len(getattr(app, "callback_map", {}))
     assert callback_count >= 4
+
+
+def test_dash_app_http_entrypoints_open_locally_without_server_error() -> None:
+    with diagnostic_runtime_test_mode():
+        app = build_app("data/decision_platform/maquete_v2")
+
+    client = app.server.test_client()
+    studio_response = client.get("/?tab=studio")
+    decision_response = client.get("/?tab=decision")
+
+    assert studio_response.status_code == 200
+    assert decision_response.status_code == 200
+    assert "Traceback" not in studio_response.get_data(as_text=True)
+    assert "Traceback" not in decision_response.get_data(as_text=True)
 
 
 @pytest.mark.skipif(not DASH_AVAILABLE, reason="Dash stack not installed in local validation environment.")
@@ -360,6 +375,31 @@ def test_product_space_banner_uses_consistent_product_language_for_each_space() 
     assert "Winner, runner-up e contraste com contexto" in decision_banner
     assert "Auditoria" in audit_banner
     assert "Trilha canônica e evidência técnica" in audit_banner
+
+
+def test_decision_justification_panel_avoids_repeating_winner_summary_header() -> None:
+    panel = render_decision_justification_panel(
+        {
+            "candidate_id": "cand-01",
+            "official_product_candidate_id": "cand-01",
+            "winner_reason_summary": "Lidera por menor custo mantendo leitura operacional suficiente.",
+            "decision_status": "winner_clear",
+            "technical_tie": False,
+            "feasible": True,
+            "critical_routes": [],
+            "winner_penalties": [],
+        },
+        {
+            "fallback_component_count": 0,
+            "rules_triggered": ["Regra de custo dominante"],
+        },
+    )
+    panel_text = _collect_text_content(panel)
+
+    assert "Justificativa da escolha" in panel_text
+    assert "Por que lidera" in panel_text
+    assert "Exportação" in panel_text
+    assert "Winner oficial" not in panel_text
 
 
 def test_product_space_banner_exposes_shell_switcher_for_all_primary_spaces() -> None:
@@ -827,10 +867,13 @@ def test_studio_canvas_uses_stable_zoom_bounds_for_full_hd() -> None:
     studio_tab = _find_tab_by_label(app.layout, "Studio")
     cytoscape = _find_component_by_id(studio_tab, "node-studio-cytoscape")
     assert cytoscape is not None
-    assert getattr(cytoscape, "minZoom", None) == 0.45
-    assert getattr(cytoscape, "maxZoom", None) == 1.6
-    assert getattr(cytoscape, "wheelSensitivity", None) == 0.18
+    assert getattr(cytoscape, "minZoom", None) == 0.58
+    assert getattr(cytoscape, "maxZoom", None) == 1.28
+    assert getattr(cytoscape, "wheelSensitivity", None) == 0.08
     assert getattr(cytoscape, "layout", {}).get("fit") is False
+    assert getattr(cytoscape, "autoRefreshLayout", None) is False
+    assert getattr(cytoscape, "boxSelectionEnabled", None) is False
+    assert getattr(cytoscape, "style", {}).get("height") == "760px"
 
 
 def test_studio_primary_editors_push_technical_fields_into_disclosure() -> None:
@@ -905,6 +948,11 @@ def test_decision_tab_contains_advanced_sections_without_extra_primary_tabs() ->
     assert _find_component_by_id(decision_tab, "decision-ranking-details") is not None
     assert _find_component_by_id(decision_tab, "decision-comparison-details") is not None
     assert _find_component_by_id(decision_tab, "decision-workspace-comparison-details") is not None
+    extended_summary = _find_component_by_id(decision_tab, "decision-summary-panel-extended")
+    assert extended_summary is not None
+    extended_summary_text = _collect_text_content(extended_summary)
+    assert "Justificativa da escolha" in extended_summary_text
+    assert "Winner oficial" not in extended_summary_text
 
 
 def test_app_layout_does_not_repeat_component_ids() -> None:
@@ -914,6 +962,50 @@ def test_app_layout_does_not_repeat_component_ids() -> None:
     component_ids = _collect_component_ids(app.layout)
     duplicates = sorted({component_id for component_id in component_ids if component_ids.count(component_id) > 1})
     assert duplicates == []
+
+
+def test_studio_first_fold_pushes_route_editor_and_destructive_actions_below_disclosure() -> None:
+    with diagnostic_runtime_test_mode():
+        app = build_app("data/decision_platform/maquete_v2")
+
+    studio_tab = _find_tab_by_label(app.layout, "Studio")
+    route_shell = _find_component_by_id(studio_tab, "studio-route-editor-shell")
+
+    assert route_shell is not None
+    assert getattr(route_shell, "open", None) is False
+    assert _component_id_is_inside_details(studio_tab, "studio-route-editor-panel") is True
+    assert _component_id_is_inside_details(studio_tab, "studio-focus-duplicate-node-button") is True
+    assert _component_id_is_inside_details(studio_tab, "studio-focus-delete-edge-button") is True
+
+
+def test_edge_focus_switch_keeps_primary_node_positions_stable() -> None:
+    with diagnostic_runtime_test_mode():
+        app = build_app("data/decision_platform/maquete_v2")
+
+    bundle = load_scenario_bundle("data/decision_platform/maquete_v2")
+    refresh_elements_callback = _get_callback(app, output_prefix="node-studio-elements-store.data")
+    sync_edge_callback = _get_callback(app, output_prefix="..edge-studio-selected-id.data")
+    nodes_rows = bundle.nodes.to_dict("records")
+    candidate_links_rows = bundle.candidate_links.to_dict("records")
+    route_rows = bundle.route_requirements.to_dict("records")
+
+    elements_before = refresh_elements_callback(nodes_rows, candidate_links_rows, route_rows, {})
+    next_selected = sync_edge_callback(candidate_links_rows, {"id": "route:R004", "route_id": "R004"}, "route:R001")[0]
+    elements_after = refresh_elements_callback(nodes_rows, candidate_links_rows, route_rows, {})
+
+    node_positions_before = {
+        element["data"]["id"]: dict(element.get("position") or {})
+        for element in elements_before
+        if "source" not in element.get("data", {})
+    }
+    node_positions_after = {
+        element["data"]["id"]: dict(element.get("position") or {})
+        for element in elements_after
+        if "source" not in element.get("data", {})
+    }
+
+    assert next_selected == "route:R004"
+    assert node_positions_before == node_positions_after
 
 
 def test_runs_tab_combines_queue_and_execution_summary() -> None:

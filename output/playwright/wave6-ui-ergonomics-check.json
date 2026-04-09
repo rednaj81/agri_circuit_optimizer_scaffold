@@ -1,0 +1,20 @@
+{
+  "captured_at": "2026-04-09",
+  "canvas": {
+    "minZoom": 0.58,
+    "maxZoom": 1.28,
+    "wheelSensitivity": 0.08,
+    "autoRefreshLayout": false,
+    "boxSelectionEnabled": false,
+    "height": "760px",
+    "layout_fit": false,
+    "layout_padding": 18
+  },
+  "studio_sidebar": {
+    "route_editor_shell_open": false,
+    "route_editor_shell_text": "Rota em foco e composer Trecho atual Tanque de água para Misturador · Obrigatória · medição direta Quando abrir este bloco Abra para trocar intenção, completar o composer ou ajustar particularidades da rota em foco. Rotas que precisam de serviço O foco atual toca 9 rota(s). Comece por Tanque de água para Misturador · Obrigatória e ajuste a intenção perto do canvas. Quem supre quem agora Tanque de água supre Misturador Próximo gesto Inicie a rota a partir de Tanque de água para continuar definindo o atendimento direto no canvas. Composer local Composer vazio Composer local da rota O composer local ainda não recebeu origem nem destino. A rota em preparo ficará opcional: continua legível no Studio sem travar a saída para Runs. Escolha a origem e o destino diretamente a partir do canvas. Origem Origem ainda não definida Destino Destino ainda não definido Intenção Opcional Readiness Medição direta não exigida Vazão mínima 10.0 L/min Dosagem mínima 0.0 L Intenção em preparo Próximo passo do composer Escolha a origem e o destino diretamente a partir do canvas. Usar esta entidade como origem Usar esta entidade como destino Trazer este trecho para o composer Confirmar rota no canvas Limpar composer Obrigatória Desejável Opcional Particularidades da rota em preparo Vazão mínima do preview (L/min) Dosagem mínima do preview (L) Observação do preview Medição direta do preview Obrigatória Desejável Opcional Readiness desta camada Remover bloqueios Gate para Runs Feche primeiro as rotas obrigatórias e confirme medição direta quando houver dosagem. Rota em foco Intenção Leitura rápida da rota O foco atual toca 9 rota(s). Comece por Tanque de água para Misturador · Obrigatória e ajuste a intenção perto do canvas. Aplicar rota no foco Particularidades da rota em foco Vazão mínima (L/min) Dosagem mínima (L) Observação visível da rota Medição direta Ver rotas ligadas a este foco Tanque de água para Misturador · Obrigatória · medição direta · Água para misturador (código r001) Misturador para Saída externa · Obrigatória · medição direta · Misturador para saída (código r009) Produto 1 para Misturador · Obrigatória · medição direta · Produto 1 para misturador (código r004) Produto 2 para Misturador · Obrigatória · medição direta · Produto 2 para misturador (código r005)"
+  },
+  "decision": {
+    "justification_panel_text": "Justificativa da escolha Por que lidera houve empate técnico com bus_with_pump_islands__g8m2_2 no perfil Equilibrado; a seleção oficial foi mantida pelo ordenamento determinístico do ranking exportado. A principal ressalva é usa 6 componentes de fallback e adiciona 300.000 de custo de fallback. O que ainda revisar Empate técnico ativo; mantenha winner e runner-up lado a lado antes de exportar. Exportação A referência oficial atual continua em bus_with_pump_islands__g18m1_1; use exportação apenas depois de confirmar o contraste final. Quando abrir Auditoria Abra só se o contraste final ainda depender de trilha técnica, bundle ou breakdown detalhado. Winner em leitura bus_with_pump_islands__g18m1_1 Referência oficial bus_with_pump_islands__g18m1_1 Regras disparadas 2 Fallbacks no breakdown 6 Regras e sinais usados nesta justificativa Q05 Q06 Rota crítica R001 : ok Rota crítica R003 : ok usa 6 componentes de fallback e adiciona 300.000 de custo de fallback aciona flags de qualidade desfavoráveis: Q06:fail"
+  }
+}

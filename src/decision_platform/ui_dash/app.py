@@ -3496,6 +3496,27 @@ def render_studio_workspace_panel(
         composer_state=composer_state,
         nodes_rows=nodes_rows,
     )
+    composer_state = _normalize_route_composer_state(composer_state)
+    composer_active = bool(str(composer_state.get("source_node_id") or "").strip() or str(composer_state.get("sink_node_id") or "").strip())
+    route_focus_row = _selected_route_row_from_edge_focus(
+        route_rows,
+        selected_link_id=str(edge_summary.get("selected_link_id") or "").strip() or None,
+        candidate_links_rows=candidate_links_rows,
+    )
+    route_focus_label = (
+        _studio_route_primary_label(
+            route_focus_row,
+            node_lookup={
+                str(row.get("node_id", "")).strip(): dict(row)
+                for row in _visible_studio_nodes(nodes_rows)
+                if str(row.get("node_id", "")).strip()
+            },
+            include_intent=True,
+            include_measurement=True,
+        )
+        if route_focus_row
+        else "Abra o editor local da rota quando precisar ajustar intenção ou particularidades."
+    )
     runs_enabled = status == "ready"
     runs_button_label = "Ir para Runs" if runs_enabled else "Runs bloqueado neste estado"
     primary_actions: list[Any]
@@ -3544,7 +3565,7 @@ def render_studio_workspace_panel(
                 children=[
                     html.Div("Ajustes locais do canvas", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
                     html.Div(
-                        "As ações mais comuns ficam aqui no primeiro fold; abra os ajustes finos só quando precisar de detalhes."
+                        "A primeira dobra fica só com os gestos de uso mais recorrentes; abra os detalhes apenas quando precisar de edição fina."
                         if selected_node_present or selected_edge_present
                         else "Selecione um nó ou uma conexão no canvas para destravar os ajustes rápidos locais.",
                         style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"},
@@ -3555,9 +3576,7 @@ def render_studio_workspace_panel(
                         children=[
                             html.Button("Mover à esquerda", id="studio-focus-move-left-button", style=UI_BUTTON_STYLE, disabled=not selected_node_present),
                             html.Button("Mover à direita", id="studio-focus-move-right-button", style=UI_BUTTON_STYLE, disabled=not selected_node_present),
-                            html.Button("Duplicar nó em foco", id="studio-focus-duplicate-node-button", style=UI_BUTTON_STYLE, disabled=not selected_node_present),
                             html.Button("Inverter conexão", id="studio-focus-edge-reverse-button", style=UI_BUTTON_STYLE, disabled=not selected_edge_present),
-                            html.Button("Excluir conexão em foco", id="studio-focus-delete-edge-button", style=UI_BUTTON_STYLE, disabled=not selected_edge_present),
                             html.Button("Abrir bancada completa", id="studio-focus-open-workbench-button", style=UI_BUTTON_STYLE),
                         ],
                     ),
@@ -3570,6 +3589,8 @@ def render_studio_workspace_panel(
                             html.Div(
                                 style={**UI_ACTION_ROW_STYLE, "marginTop": "10px"},
                                 children=[
+                                    html.Button("Duplicar nó em foco", id="studio-focus-duplicate-node-button", style=UI_BUTTON_STYLE, disabled=not selected_node_present),
+                                    html.Button("Excluir conexão em foco", id="studio-focus-delete-edge-button", style=UI_BUTTON_STYLE, disabled=not selected_edge_present),
                                     html.Button("Aplicar rótulo", id="studio-focus-node-apply-button", style=UI_BUTTON_STYLE, disabled=not selected_node_present),
                                     html.Button("Aplicar conexão", id="studio-focus-edge-apply-button", style=UI_BUTTON_STYLE, disabled=not selected_edge_present),
                                     html.Button("Mover acima", id="studio-focus-move-up-button", style=UI_BUTTON_STYLE, disabled=not selected_node_present),
@@ -3580,7 +3601,27 @@ def render_studio_workspace_panel(
                     ),
                 ],
             ),
-            route_editor_panel,
+            html.Details(
+                id="studio-route-editor-shell",
+                open=composer_active,
+                style={**UI_MUTED_CARD_STYLE, "padding": "12px", "marginBottom": "12px"},
+                children=[
+                    html.Summary("Rota em foco e composer"),
+                    html.Div(
+                        style={**UI_TWO_COLUMN_STYLE, "gridTemplateColumns": "repeat(auto-fit, minmax(220px, 1fr))", "marginTop": "10px"},
+                        children=[
+                            _guidance_card("Trecho atual", route_focus_label),
+                            _guidance_card(
+                                "Quando abrir este bloco",
+                                "Abra para trocar intenção, completar o composer ou ajustar particularidades da rota em foco."
+                                if selected_node_present or selected_edge_present or composer_active
+                                else "Abra quando o canvas já tiver um trecho ou entidade em foco.",
+                            ),
+                        ],
+                    ),
+                    html.Div(style={"marginTop": "12px"}, children=route_editor_panel),
+                ],
+            ),
             html.Div(style={**UI_ACTION_ROW_STYLE, "marginTop": "12px"}, children=[*primary_actions, _button_link("Abrir Auditoria", "?tab=audit", "studio-workspace-open-audit-link")]),
             html.Details(
                 id="studio-business-flow-panel",
@@ -6430,6 +6471,72 @@ def render_decision_signal_panel(summary: dict[str, Any]) -> Any:
     )
 
 
+def render_decision_justification_panel(summary: dict[str, Any], breakdown: dict[str, Any] | None = None) -> Any:
+    breakdown = breakdown or {}
+    candidate_id = str(summary.get("candidate_id") or "").strip()
+    if not summary or not candidate_id:
+        return _guided_empty_state(
+            "Justificativa da escolha",
+            "Ainda não existe winner utilizável para resumir o racional desta decisão.",
+            "Volte para Runs ou alivie os filtros antes de tentar fechar a justificativa final.",
+        )
+    decision_state = _decision_primary_state(summary)
+    official_candidate_id = str(summary.get("official_product_candidate_id") or candidate_id).strip()
+    breakdown_rules = [str(item) for item in breakdown.get("rules_triggered", []) if str(item).strip()]
+    winner_reason = _humanize_decision_copy(summary.get("winner_reason_summary") or "Sem justificativa resumida.")
+    if summary.get("technical_tie"):
+        review_signal = "Empate técnico ativo; mantenha winner e runner-up lado a lado antes de exportar."
+    elif summary.get("feasible") is False:
+        review_signal = f"O winner segue bloqueado por {_humanize_infeasibility_reason(summary.get('infeasibility_reason'))}."
+    elif breakdown_rules:
+        review_signal = "Há regras disparadas no breakdown; confirme se ainda mudam a leitura final do winner."
+    else:
+        review_signal = "O racional principal já cabe na leitura atual; aprofunde a trilha técnica só se a decisão humana ainda pedir reconciliação."
+    export_signal = (
+        f"A referência oficial atual continua em {official_candidate_id}; use exportação apenas depois de confirmar o contraste final."
+        if official_candidate_id
+        else decision_state["next_action"]
+    )
+    return html.Div(
+        children=[
+            html.H3("Justificativa da escolha", style={"marginTop": 0}),
+            html.Div(
+                style={**UI_TWO_COLUMN_STYLE, "marginBottom": "12px"},
+                children=[
+                    _guidance_card("Por que lidera", winner_reason),
+                    _guidance_card("O que ainda revisar", review_signal),
+                    _guidance_card("Exportação", export_signal),
+                    _guidance_card("Quando abrir Auditoria", "Abra só se o contraste final ainda depender de trilha técnica, bundle ou breakdown detalhado."),
+                ],
+            ),
+            html.Div(
+                style=UI_THREE_COLUMN_STYLE,
+                children=[
+                    _metric_card("Winner em leitura", candidate_id),
+                    _metric_card("Referência oficial", official_candidate_id or "-"),
+                    _metric_card("Regras disparadas", len(breakdown_rules)),
+                    _metric_card("Fallbacks no breakdown", breakdown.get("fallback_component_count") or 0),
+                ],
+            ),
+            html.Details(
+                style={**UI_MUTED_CARD_STYLE, "padding": "12px", "marginTop": "12px"},
+                children=[
+                    html.Summary("Regras e sinais usados nesta justificativa"),
+                    _bullet_list(
+                        breakdown_rules[:4]
+                        + [
+                            f"Rota crítica {str(item.get('route_id') or '-')} : {_humanize_route_issue(item.get('reason'))}"
+                            for item in list(summary.get("critical_routes", []) or [])[:2]
+                        ]
+                        + [_humanize_decision_copy(item) for item in list(summary.get("winner_penalties", []) or [])[:2]],
+                        "Sem regra ou sinal adicional para além do racional principal já exibido.",
+                    ),
+                ],
+            ),
+        ]
+    )
+
+
 def render_candidate_breakdown_panel(summary: dict[str, Any]) -> Any:
     if not summary:
         return _guided_empty_state(
@@ -6708,12 +6815,18 @@ def build_app(
                                             cyto.Cytoscape(
                                                 id="node-studio-cytoscape",
                                                 elements=initial_node_studio_elements,
-                                                layout={"name": "preset", "fit": False, "padding": 24},
-                                                style={"width": "100%", "height": "820px"},
+                                                layout={"name": "preset", "fit": False, "padding": 18},
+                                                style={"width": "100%", "height": "760px"},
                                                 contextMenu=STUDIO_CONTEXT_MENU,
-                                                minZoom=0.45,
-                                                maxZoom=1.6,
-                                                wheelSensitivity=0.18,
+                                                minZoom=0.58,
+                                                maxZoom=1.28,
+                                                wheelSensitivity=0.08,
+                                                boxSelectionEnabled=False,
+                                                autoRefreshLayout=False,
+                                                zoomingEnabled=True,
+                                                userZoomingEnabled=True,
+                                                panningEnabled=True,
+                                                userPanningEnabled=True,
                                                 stylesheet=_build_node_studio_stylesheet(
                                                     initial_node_studio_selected_id,
                                                     initial_edge_studio_selected_id,
@@ -7028,13 +7141,13 @@ def build_app(
                                 children=[
                                     html.Summary("Contexto completo da decisão"),
                                     html.Div(id="decision-flow-panel", children=render_decision_flow_panel(initial_official_summary), style={**UI_CARD_STYLE, "marginTop": "12px"}),
-                                    html.Div(
-                                        style={**UI_TWO_COLUMN_STYLE, "marginTop": "12px"},
-                                        children=[
-                                            html.Div(id="decision-summary-panel", children=render_decision_summary_panel(initial_official_summary), style=UI_CARD_STYLE),
-                                            html.Div(id="decision-contrast-panel", children=render_decision_contrast_panel(initial_official_summary), style=UI_MUTED_CARD_STYLE),
-                                        ],
-                                    ),
+                                            html.Div(
+                                                style={**UI_TWO_COLUMN_STYLE, "marginTop": "12px"},
+                                                children=[
+                                                    html.Div(id="decision-summary-panel", children=render_decision_summary_panel(initial_official_summary), style=UI_CARD_STYLE),
+                                                    html.Div(id="decision-contrast-panel", children=render_decision_contrast_panel(initial_official_summary), style=UI_MUTED_CARD_STYLE),
+                                                ],
+                                            ),
                                     html.Div(
                                         style={**UI_TWO_COLUMN_STYLE, "marginTop": "12px"},
                                         children=[
@@ -7162,7 +7275,7 @@ def build_app(
                                 style=UI_MUTED_CARD_STYLE,
                                 children=[
                                     html.Summary("Justificativa detalhada"),
-                                    html.Div(id="decision-summary-panel-extended", children=render_decision_summary_panel(initial_official_summary), style=UI_CARD_STYLE),
+                                    html.Div(id="decision-summary-panel-extended", children=render_decision_justification_panel(initial_official_summary, candidate_details.get("breakdown", {})), style=UI_CARD_STYLE),
                                     html.Div(id="candidate-breakdown-panel", children=render_candidate_breakdown_panel(candidate_details.get("breakdown", {})), style={**UI_MUTED_CARD_STYLE, "marginTop": "12px"}),
                                     html.Details(
                                         style={**UI_MUTED_CARD_STYLE, "marginTop": "12px"},
@@ -9769,7 +9882,7 @@ def build_app(
         return (
             render_decision_workspace_panel(official_payload, catalog_payload, _safe_json_loads(candidate_text)),
             render_decision_summary_panel(official_payload),
-            render_decision_summary_panel(official_payload),
+            render_decision_justification_panel(official_payload, _safe_json_loads(breakdown_text)),
             render_decision_contrast_panel(official_payload),
             render_decision_signal_panel(official_payload),
             render_decision_flow_panel(official_payload),

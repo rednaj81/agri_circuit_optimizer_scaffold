@@ -46,8 +46,6 @@ def test_dash_app_exposes_structural_studio_controls() -> None:
     assert "edge-studio-create-button" in layout_repr
     assert "edge-studio-delete-button" in layout_repr
     assert "studio-canvas-open-workbench-button" in layout_repr
-    assert "studio-canvas-arm-source-button" in layout_repr
-    assert "studio-canvas-arm-target-button" in layout_repr
     assert "studio-canvas-open-technical-guide-button" in layout_repr
     assert "studio-command-center-panel" in layout_repr
     assert "studio-add-source-node-button" in layout_repr
@@ -61,6 +59,7 @@ def test_dash_app_exposes_structural_studio_controls() -> None:
     assert "studio-workspace-panel" in layout_repr
     assert "studio-workspace-quick-edit-panel" in layout_repr
     assert "studio-workspace-local-actions-panel" in layout_repr
+    assert "studio-route-editor-shell" in layout_repr
     assert "studio-business-flow-panel" in layout_repr
     assert "studio-route-editor-panel" in layout_repr
     assert "studio-route-focus-dropdown" in layout_repr
@@ -97,6 +96,17 @@ def test_dash_app_exposes_structural_studio_controls() -> None:
     assert "decision-context-detailed-panels" in layout_repr
     assert "audit-workspace-panel" in layout_repr
     assert "audit-context-detailed-panels" in layout_repr
+
+
+@pytest.mark.fast
+def test_dash_app_http_entrypoints_resolve_primary_tabs_without_error() -> None:
+    with diagnostic_runtime_test_mode():
+        app = build_app("data/decision_platform/maquete_v2")
+
+    client = app.server.test_client()
+
+    assert client.get("/?tab=studio").status_code == 200
+    assert client.get("/?tab=decision").status_code == 200
 
 
 @pytest.mark.fast
