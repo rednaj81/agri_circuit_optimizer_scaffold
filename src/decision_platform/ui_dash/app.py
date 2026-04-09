@@ -1928,6 +1928,44 @@ def _edge_route_focus_form_values(
     }
 
 
+def _selected_route_row_from_edge_focus(
+    route_rows: list[dict[str, Any]] | None,
+    *,
+    selected_link_id: str | None,
+    candidate_links_rows: list[dict[str, Any]] | None,
+) -> dict[str, Any] | None:
+    form_values = _edge_route_focus_form_values(
+        route_rows,
+        selected_link_id=selected_link_id,
+        candidate_links_rows=candidate_links_rows,
+    )
+    selected_route_id = str(form_values.get("route_id") or "").strip()
+    if not selected_route_id:
+        return None
+    return next(
+        (
+            dict(route)
+            for route in (route_rows or [])
+            if str(route.get("route_id") or "").strip() == selected_route_id
+        ),
+        None,
+    )
+
+
+def _route_focus_business_reason(route: dict[str, Any] | None) -> str:
+    if not route:
+        return "Selecione um trecho de negócio para abrir a próxima revisão local do Studio."
+    if float(route.get("dose_min_l") or 0.0) > 0 and not _coerce_truthy(route.get("measurement_required")):
+        return "Este trecho abre uma correção prioritária porque ainda combina dosagem com ausência de medição direta."
+    if _coerce_truthy(route.get("mandatory")) and _coerce_truthy(route.get("measurement_required")):
+        return "Este trecho foi sugerido porque sustenta a readiness principal e já explicita a medição direta exigida."
+    if _coerce_truthy(route.get("mandatory")):
+        return "Este trecho foi sugerido porque sustenta a malha obrigatória do cenário."
+    if _route_intent_value(route) == "desirable":
+        return "Este trecho ajuda a orientar o atendimento desejável sem virar hard constraint."
+    return "Este trecho mantém a leitura principal do atendimento sem bloquear a saída para Runs."
+
+
 def apply_route_studio_edit(
     route_rows: list[dict[str, Any]],
     *,
@@ -3892,6 +3930,24 @@ def render_studio_canvas_guidance_panel(
     composer_preview = _build_route_composer_preview(composer_state, nodes_rows=nodes_rows)
     composer_data = composer_preview.get("state") or {}
     route_draft_source = str(composer_data.get("source_node_id") or "").strip()
+    selected_route = _selected_route_row_from_edge_focus(
+        route_rows,
+        selected_link_id=selected_edge_id,
+        candidate_links_rows=candidate_links_rows,
+    )
+    selected_route_label = (
+        _studio_route_primary_label(
+            selected_route,
+            node_lookup=node_lookup,
+            include_intent=True,
+            include_measurement=True,
+        )
+        if selected_route
+        else selected_edge_label
+    )
+    selected_route_reason = _route_focus_business_reason(selected_route)
+    primary_route_options = _route_choice_options(route_rows, nodes_rows=nodes_rows)
+    selected_route_id = str((selected_route or {}).get("route_id") or "").strip() or None
     focused_route_lines = [
         _studio_route_primary_label(
             route,
@@ -3904,7 +3960,7 @@ def render_studio_canvas_guidance_panel(
     selected_edge_from_label = _studio_node_business_label_from_lookup(str(selected_edge.get("from_node") or "").strip())
     selected_edge_to_label = _studio_node_business_label_from_lookup(str(selected_edge.get("to_node") or "").strip())
     if selected_edge_id and selected_edge_label:
-        current_focus = f"Conexão em foco: {selected_edge_label}."
+        current_focus = f"Trecho em foco: {selected_route_label or selected_edge_label}."
         if selected_edge_from_label or selected_edge_to_label:
             current_focus += f" Fluxo visível entre {selected_edge_from_label} e {selected_edge_to_label}."
         canvas_action = "Revise a conexão selecionada, ajuste comprimento ou famílias e inverta a direção direto no primeiro fold quando isso destravar o fluxo."
@@ -3979,11 +4035,46 @@ def render_studio_canvas_guidance_panel(
                     html.Div("Trecho fixado no Studio", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
                     html.Div(
                         (
-                            f"{selected_edge_label} permanece em foco para sustentar a edição local deste trecho e a leitura de quem supre quem."
+                            f"{selected_route_label or selected_edge_label} permanece em foco para sustentar a edição local deste trecho e a leitura de quem supre quem."
                             if selected_edge_present
                             else ""
                         ),
                         style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"},
+                    ),
+                    html.Div(
+                        selected_route_reason if selected_edge_present else "",
+                        style={"lineHeight": "1.45", "marginTop": "6px"},
+                    ),
+                    html.Div(
+                        style={**UI_TWO_COLUMN_STYLE, "gridTemplateColumns": "minmax(0, 1.2fr) minmax(0, 0.8fr)", "marginTop": "10px"},
+                        children=[
+                            _field_block(
+                                "Trocar trecho sugerido",
+                                dcc.Dropdown(
+                                    id="studio-primary-route-focus-dropdown",
+                                    options=primary_route_options,
+                                    value=selected_route_id,
+                                    placeholder="Escolha outro trecho do atendimento principal",
+                                    persistence=True,
+                                    persistence_type="session",
+                                ),
+                            ),
+                            _guidance_card(
+                                "Por que começar por aqui",
+                                selected_route_reason,
+                            ),
+                        ],
+                    ),
+                    html.Div(
+                        style={**UI_ACTION_ROW_STYLE, "marginTop": "10px"},
+                        children=[
+                            html.Button(
+                                "Trazer este trecho para foco",
+                                id="studio-primary-route-focus-apply-button",
+                                style=UI_BUTTON_STYLE,
+                                disabled=not bool(primary_route_options),
+                            ),
+                        ],
                     ),
                 ],
             ),
@@ -7848,6 +7939,100 @@ def build_app(
             form_values.get("dose_min_l"),
             str(form_values.get("notes") or ""),
             list(form_values.get("measurement_required") or []),
+        )
+
+    @app.callback(
+        Output("studio-primary-route-focus-dropdown", "options"),
+        Output("studio-primary-route-focus-dropdown", "value"),
+        Input("nodes-grid", "rowData"),
+        Input("routes-grid", "rowData"),
+        Input("edge-studio-selected-id", "data"),
+        Input("candidate-links-grid", "rowData"),
+        State("studio-primary-route-focus-dropdown", "value"),
+    )
+    def _sync_primary_route_focus_controls(
+        nodes_rows: list[dict[str, Any]] | None,
+        route_rows: list[dict[str, Any]] | None,
+        selected_link_id: str | None,
+        candidate_links_rows: list[dict[str, Any]] | None,
+        current_route_id: str | None,
+    ) -> tuple[list[dict[str, str]], str | None]:
+        options = _route_choice_options(route_rows, nodes_rows=nodes_rows)
+        selected_route = _selected_route_row_from_edge_focus(
+            route_rows,
+            selected_link_id=selected_link_id,
+            candidate_links_rows=candidate_links_rows,
+        )
+        selected_route_id = str((selected_route or {}).get("route_id") or "").strip()
+        option_values = {str(option.get("value") or "").strip() for option in options}
+        if selected_route_id and selected_route_id in option_values:
+            return options, selected_route_id
+        current_value = str(current_route_id or "").strip()
+        if current_value and current_value in option_values:
+            return options, current_value
+        return options, _default_route_focus_selection(route_rows, nodes_rows=nodes_rows)
+
+    @app.callback(
+        Output("edge-studio-selected-id", "data", allow_duplicate=True),
+        Output("node-studio-selected-id", "data", allow_duplicate=True),
+        Output("studio-status-message", "data", allow_duplicate=True),
+        Input("studio-primary-route-focus-apply-button", "n_clicks"),
+        State("studio-primary-route-focus-dropdown", "value"),
+        State("routes-grid", "rowData"),
+        State("nodes-grid", "rowData"),
+        State("edge-studio-selected-id", "data"),
+        State("node-studio-selected-id", "data"),
+        prevent_initial_call=True,
+    )
+    def _apply_primary_route_focus(
+        n_clicks: Any,
+        selected_route_id: str | None,
+        route_rows: list[dict[str, Any]] | None,
+        nodes_rows: list[dict[str, Any]] | None,
+        current_selected_link_id: str | None,
+        current_selected_node_id: str | None,
+    ) -> tuple[str | None, str | None, str]:
+        if not n_clicks:
+            return current_selected_link_id, current_selected_node_id, ""
+        normalized_route_id = str(selected_route_id or "").strip()
+        if not normalized_route_id:
+            return current_selected_link_id, current_selected_node_id, "Escolha um trecho do atendimento antes de trocar o foco principal."
+        selected_route = next(
+            (
+                dict(route)
+                for route in (route_rows or [])
+                if str(route.get("route_id") or "").strip() == normalized_route_id
+            ),
+            None,
+        )
+        if selected_route is None:
+            return current_selected_link_id, current_selected_node_id, "O trecho escolhido não está mais disponível no cenário atual."
+        node_lookup = {
+            str(row.get("node_id", "")).strip(): dict(row)
+            for row in _visible_studio_nodes(nodes_rows or [])
+            if str(row.get("node_id", "")).strip()
+        }
+        next_selected_edge_id = f"route:{normalized_route_id}"
+        source_node_id = str(selected_route.get("source") or "").strip()
+        next_selected_node_id = (
+            source_node_id
+            if source_node_id and source_node_id in node_lookup
+            else _default_primary_node_studio_selection(
+                nodes_rows or [],
+                [],
+                preferred_node_id=current_selected_node_id,
+            )
+        )
+        route_label = _studio_route_primary_label(
+            selected_route,
+            node_lookup=node_lookup,
+            include_intent=True,
+            include_measurement=True,
+        )
+        return (
+            next_selected_edge_id,
+            next_selected_node_id,
+            f"Foco principal trocado para {route_label}. Agora revise quem supre quem e as particularidades locais deste trecho.",
         )
 
     @app.callback(

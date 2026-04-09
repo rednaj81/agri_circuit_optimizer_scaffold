@@ -1,0 +1,37 @@
+{
+  "captured_at": "2026-04-09",
+  "source": "http_test_client_and_live_callback",
+  "studio_url": "/?tab=studio",
+  "index_status": 200,
+  "layout_status": 200,
+  "initial_selected_edge_store": "route:R001",
+  "initial_focus_banner": "Trecho fixado no Studio Tanque de água para Misturador · Obrigatória · medição direta permanece em foco para sustentar a edição local deste trecho e a leitura de quem supre quem. Este trecho foi sugerido porque sustenta a readiness principal e já explicita a medição direta exigida. Trocar trecho sugerido Por que começar por aqui Este trecho foi sugerido porque sustenta a readiness principal e já explicita a medição direta exigida. Trazer este trecho para foco",
+  "initial_primary_dropdown_value": "R001",
+  "initial_primary_dropdown_labels": [
+    "Tanque de água para Misturador · Obrigatória · Água para misturador",
+    "Misturador para Saída externa · Obrigatória · Misturador para saída",
+    "Produto 1 para Misturador · Obrigatória · Produto 1 para misturador",
+    "Produto 2 para Misturador · Obrigatória · Produto 2 para misturador",
+    "Produto 3 para Misturador · Obrigatória · Produto 3 para misturador",
+    "Produto 4 para Misturador · Obrigatória · Produto 4 para misturador"
+  ],
+  "switched_selected_edge_store": "route:R004",
+  "switched_selected_node_store": "P1",
+  "switched_focus_banner": "Trecho fixado no Studio Produto 1 para Misturador · Obrigatória · medição direta permanece em foco para sustentar a edição local deste trecho e a leitura de quem supre quem. Este trecho foi sugerido porque sustenta a readiness principal e já explicita a medição direta exigida. Trocar trecho sugerido Por que começar por aqui Este trecho foi sugerido porque sustenta a readiness principal e já explicita a medição direta exigida. Trazer este trecho para foco",
+  "switch_status_message": "Foco principal trocado para Produto 1 para Misturador · Obrigatória · medição direta. Agora revise quem supre quem e as particularidades locais deste trecho.",
+  "switched_primary_dropdown_value": "R004",
+  "switched_primary_dropdown_labels": [
+    "Tanque de água para Misturador · Obrigatória · Água para misturador",
+    "Misturador para Saída externa · Obrigatória · Misturador para saída",
+    "Produto 1 para Misturador · Obrigatória · Produto 1 para misturador",
+    "Produto 2 para Misturador · Obrigatória · Produto 2 para misturador",
+    "Produto 3 para Misturador · Obrigatória · Produto 3 para misturador",
+    "Produto 4 para Misturador · Obrigatória · Produto 4 para misturador"
+  ],
+  "business_language_checks": {
+    "initial_banner_has_route_id": false,
+    "initial_guidance_has_route_id": false,
+    "switch_status_has_route_id": false,
+    "switched_panel_has_route_id": false
+  }
+}

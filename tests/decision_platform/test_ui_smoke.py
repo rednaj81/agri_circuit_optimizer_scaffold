@@ -260,6 +260,8 @@ def test_studio_primary_surface_exposes_business_command_center() -> None:
     assert _find_component_by_id(app.layout, "studio-route-intent-desirable-button") is not None
     assert _find_component_by_id(app.layout, "studio-route-intent-optional-button") is not None
     assert _find_component_by_id(app.layout, "studio-canvas-selected-edge-banner") is not None
+    assert _find_component_by_id(app.layout, "studio-primary-route-focus-dropdown") is not None
+    assert _find_component_by_id(app.layout, "studio-primary-route-focus-apply-button") is not None
     assert getattr(_find_component_by_id(app.layout, "studio-context-detailed-panels"), "open", None) is True
     cytoscape = _find_component_by_id(app.layout, "node-studio-cytoscape")
     context_menu = getattr(cytoscape, "contextMenu", None)
@@ -278,6 +280,7 @@ def test_studio_primary_surface_exposes_business_command_center() -> None:
     assert "Tap" not in studio_text
     assert "Junção" not in studio_text
     route_text = _collect_text_content(_find_component_by_id(app.layout, "studio-route-editor-panel"))
+    canvas_text = _collect_text_content(_find_component_by_id(app.layout, "studio-canvas-guidance-panel"))
     assert "Trazer este trecho para o composer" in route_text
     assert "Usar esta entidade como origem" in route_text
     assert "Usar esta entidade como destino" in route_text
@@ -289,6 +292,10 @@ def test_studio_primary_surface_exposes_business_command_center() -> None:
     assert "W ->" not in route_text
     assert "Tap" not in route_text
     assert "Junção" not in route_text
+    assert "Trocar trecho sugerido" in canvas_text
+    assert "Por que começar por aqui" in canvas_text
+    assert "route:R001" not in canvas_text
+    assert "R001 ·" not in canvas_text
 
 
 def test_studio_initial_edge_focus_is_visible_and_not_null() -> None:
@@ -300,7 +307,9 @@ def test_studio_initial_edge_focus_is_visible_and_not_null() -> None:
 
     assert getattr(edge_store, "data", None)
     assert str(getattr(edge_store, "data", "")).startswith("route:")
-    assert "Trecho fixado no Studio" in _collect_text_content(banner)
+    banner_text = _collect_text_content(banner)
+    assert "Trecho fixado no Studio" in banner_text
+    assert "route:R001" not in banner_text
 
 
 def test_studio_primary_workspace_avoids_technical_internal_terms() -> None:
@@ -612,7 +621,10 @@ def test_studio_canvas_guidance_panel_keeps_canvas_as_primary_entry() -> None:
     assert "Gate para Runs" in without_focus_text
     assert "Cadeia visível neste foco" in without_focus_text
     assert "Abrir bancada completa" in without_focus_text
-    assert "Conexão em foco: Bomba -> Misturador." in with_edge_focus_text
+    assert "Trecho em foco: Bomba principal para Misturador" in with_edge_focus_text
+    assert "Trocar trecho sugerido" in with_edge_focus_text
+    assert "Por que começar por aqui" in with_edge_focus_text
+    assert "Trazer este trecho para foco" in with_edge_focus_text
     assert "inverta a direção direto no primeiro fold" in with_edge_focus_text.lower()
     assert "Trazer trecho" in with_edge_focus_text
     assert "Mais ações: obrigatoriedade e bancada" in with_edge_focus_text
@@ -623,6 +635,7 @@ def test_studio_canvas_guidance_panel_keeps_canvas_as_primary_entry() -> None:
     assert "Quem este foco supre" in with_edge_focus_text
     assert "Rota em preparo" in with_edge_focus_text
     assert "Ver trechos legíveis deste foco" in with_edge_focus_text
+    assert "route:R001" not in with_edge_focus_text
 
 
 def test_studio_canvas_guidance_panel_surfaces_contextual_blocker_and_runs_gate() -> None:
@@ -679,6 +692,45 @@ def test_studio_canvas_guidance_promotes_route_completion_when_draft_source_exis
     assert "Use Misturador como destino para concluir a rota em preparo direto no canvas." in panel_text
     assert "Tanque de água já está armado como origem; falta escolher o destino." in panel_text
     assert _find_component_by_id(panel, "studio-canvas-arm-target-button") is not None
+
+
+def test_primary_route_focus_callback_switches_focus_using_business_route_selection() -> None:
+    with diagnostic_runtime_test_mode():
+        app = build_app("data/decision_platform/maquete_v2")
+
+    apply_focus_callback = _get_callback(app, input_id="studio-primary-route-focus-apply-button")
+    sync_primary_focus_callback = _get_callback(app, output_prefix="..studio-primary-route-focus-dropdown.options")
+    bundle = load_scenario_bundle("data/decision_platform/maquete_v2")
+    nodes_rows = bundle.nodes.to_dict("records")
+    route_rows = bundle.route_requirements.to_dict("records")
+    candidate_links_rows = bundle.candidate_links.to_dict("records")
+
+    options, selected_route_id = sync_primary_focus_callback(
+        nodes_rows,
+        route_rows,
+        "route:R001",
+        candidate_links_rows,
+        None,
+    )
+
+    assert options
+    assert selected_route_id == "R001"
+    assert all("R00" not in str(option.get("label")) for option in options)
+
+    next_edge_id, next_node_id, status = apply_focus_callback(
+        1,
+        "R004",
+        route_rows,
+        nodes_rows,
+        "route:R001",
+        "W",
+    )
+
+    assert next_edge_id == "route:R004"
+    assert next_node_id == "P1"
+    assert "Foco principal trocado para" in status
+    assert "route:R004" not in status
+    assert "Produto 1 para Misturador" in status
 
 
 def test_studio_workspace_panel_unifies_focus_connectivity_and_runs_gate() -> None:
