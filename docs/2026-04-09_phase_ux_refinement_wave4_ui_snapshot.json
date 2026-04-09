@@ -1,0 +1,36 @@
+{
+  "snapshot_source_commit": "820374b7403e767056a9469eff3ecca595831890",
+  "studio": {
+    "canvas_height": "820px",
+    "workspace_signals": [
+      "Seleção atual",
+      "Quem supre quem",
+      "Gesto principal",
+      "Readiness crítico",
+      "Ajustes locais do canvas"
+    ],
+    "edge_focus_primary_action": "studio-canvas-reverse-edge-button",
+    "edge_focus_secondary_actions": [
+      "studio-canvas-intent-mandatory-button",
+      "studio-canvas-open-workbench-button"
+    ],
+    "edge_focus_has_more_actions_disclosure": true
+  },
+  "decision": {
+    "signals": [
+      "Winner atual",
+      "Runner-up",
+      "Margem",
+      "Risco comparativo",
+      "Technical tie",
+      "Perfil em leitura",
+      "Winner x runner-up",
+      "Sinal comparativo"
+    ]
+  },
+  "screenshot_attempt": {
+    "target_path": "output/playwright/studio-fullhd-wave4.png",
+    "status": "failed_in_sandbox",
+    "reason": "Bitmap capture remained unavailable in this sandbox; structured snapshot kept as auditable evidence."
+  }
+}

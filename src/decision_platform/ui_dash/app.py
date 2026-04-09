@@ -3808,10 +3808,13 @@ def render_studio_canvas_guidance_panel(
             local_blocker = "Aviso local: feche esta revisão no canvas antes de avançar para Runs."
         else:
             local_blocker = "Nada neste foco impede Runs; use a conexão para confirmar fluxo, comprimento e famílias sugeridas."
-        local_action_buttons = [
-            html.Button("Trazer trecho", id="studio-canvas-load-edge-button", style=UI_BUTTON_STYLE),
-            html.Button("Inverter direção", id="studio-canvas-reverse-edge-button", style=UI_BUTTON_STYLE),
+        if str(selected_edge.get("to_node") or "").strip() == "W" or str(selected_edge.get("from_node") or "").strip() == "S":
+            primary_action_button = html.Button("Inverter direção agora", id="studio-canvas-reverse-edge-button", style=UI_BUTTON_STYLE)
+        else:
+            primary_action_button = html.Button("Trazer trecho", id="studio-canvas-load-edge-button", style=UI_BUTTON_STYLE)
+        secondary_action_buttons = [
             html.Button("Marcar obrigatória", id="studio-canvas-intent-mandatory-button", style=UI_BUTTON_STYLE),
+            html.Button("Abrir bancada desta conexão", id="studio-canvas-open-workbench-button", style=UI_BUTTON_STYLE),
         ]
     elif selected_node_id and selected_node_label:
         current_focus = f"Entidade em foco: {selected_node_label}."
@@ -3822,8 +3825,8 @@ def render_studio_canvas_guidance_panel(
             local_blocker = "Aviso local: confirme as conexões deste nó antes de enfileirar uma nova run."
         else:
             local_blocker = "Este nó já pode ser usado como ponto de conferência final antes de abrir Runs."
-        local_action_buttons = [
-            html.Button("Usar como origem", id="studio-canvas-arm-source-button", style=UI_BUTTON_STYLE),
+        primary_action_button = html.Button("Usar como origem", id="studio-canvas-arm-source-button", style=UI_BUTTON_STYLE)
+        secondary_action_buttons = [
             html.Button("Usar como destino", id="studio-canvas-arm-target-button", style=UI_BUTTON_STYLE),
             html.Button("Abrir bancada desta entidade", id="studio-canvas-open-workbench-button", style=UI_BUTTON_STYLE),
         ]
@@ -3831,9 +3834,8 @@ def render_studio_canvas_guidance_panel(
         current_focus = "Nenhum foco ativo no canvas."
         canvas_action = "Clique em uma entidade ou conexão do grafo para abrir o contexto principal desta revisão."
         local_blocker = "Sem foco local: selecione um trecho do grafo para destravar conectividade, completude e readiness a partir do canvas."
-        local_action_buttons = [
-            html.Button("Abrir bancada completa", id="studio-canvas-open-workbench-button", style=UI_BUTTON_STYLE),
-        ]
+        primary_action_button = html.Button("Abrir bancada completa", id="studio-canvas-open-workbench-button", style=UI_BUTTON_STYLE)
+        secondary_action_buttons = []
     runs_label = (
         "Ir para Runs"
         if str(summary.get("status") or "").strip().lower() == "ready"
@@ -3858,9 +3860,16 @@ def render_studio_canvas_guidance_panel(
             html.Div(
                 style={**UI_ACTION_ROW_STYLE, "marginTop": "12px"},
                 children=[
-                    *local_action_buttons,
+                    primary_action_button,
                     html.Button("Abrir orientação deste foco", id="studio-canvas-open-technical-guide-button", style=UI_BUTTON_STYLE),
                     _button_link(runs_label, "?tab=runs", "studio-canvas-open-runs-link", primary=str(summary.get("status") or "").strip().lower() == "ready"),
+                ],
+            ),
+            html.Details(
+                style={**UI_MUTED_CARD_STYLE, "padding": "10px", "marginTop": "10px", "display": "block" if secondary_action_buttons else "none"},
+                children=[
+                    html.Summary("Mais ações deste foco"),
+                    html.Div(style={**UI_ACTION_ROW_STYLE, "marginTop": "10px"}, children=secondary_action_buttons),
                 ],
             ),
         ],
@@ -5304,6 +5313,15 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
     else:
         risk_value = "Sem alerta forte"
         risk_note = "A comparação depende mais de preferência de perfil do que de um risco dominante."
+    if score_margin_delta not in (None, ""):
+        try:
+            margin_value = "Curta" if float(score_margin_delta) <= 0.5 else "Estável"
+        except (TypeError, ValueError):
+            margin_value = "Registrada"
+        margin_note = comparison_signal
+    else:
+        margin_value = "Sem margem"
+        margin_note = "Ainda não há separação de score confiável para esta leitura."
     return html.Div(
         children=[
             html.Div("Leitura principal da decisão", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
@@ -5317,11 +5335,12 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
             html.Div(
                 style={**UI_TWO_COLUMN_STYLE, "gridTemplateColumns": "repeat(auto-fit, minmax(210px, 1fr))", "marginBottom": "12px"},
                 children=[
-                    _compact_value_card("Perfil em leitura", active_profile_label, "Filtro ativo para esta comparação.", accent="rgba(16, 59, 53, 0.18)"),
                     _compact_value_card("Winner atual", candidate_id or "Sem winner", summary.get("topology_family") or "Sem família líder legível", accent="#d7e5c1"),
                     _compact_value_card("Runner-up", runner_up_id or "Sem runner-up", summary.get("runner_up_topology_family") or "Sem contraste comparável"),
-                    _compact_value_card("Technical tie", tie_label, "Winner vs runner-up" if decision_status == "technical_tie" else "Sem empate técnico aberto"),
+                    _compact_value_card("Margem", margin_value, margin_note),
                     _compact_value_card("Risco comparativo", risk_value, risk_note),
+                    _compact_value_card("Technical tie", tie_label, "Winner vs runner-up" if decision_status == "technical_tie" else "Sem empate técnico aberto"),
+                    _compact_value_card("Perfil em leitura", active_profile_label, "Filtro ativo para esta comparação.", accent="rgba(16, 59, 53, 0.18)"),
                 ],
             ),
             html.Div(

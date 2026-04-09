@@ -575,7 +575,8 @@ def test_studio_canvas_guidance_panel_keeps_canvas_as_primary_entry() -> None:
     assert "Conexão em foco: Bomba -> Misturador." in with_edge_focus_text
     assert "inverta a direção direto no primeiro fold" in with_edge_focus_text.lower()
     assert "Trazer trecho" in with_edge_focus_text
-    assert "Inverter direção" in with_edge_focus_text
+    assert "Mais ações deste foco" in with_edge_focus_text
+    assert "Abrir bancada desta conexão" in with_edge_focus_text
     assert "Abrir orientação deste foco" in with_edge_focus_text
     assert "Cenário pronto para seguir para Runs." in with_edge_focus_text
 
@@ -603,7 +604,6 @@ def test_studio_canvas_guidance_panel_surfaces_contextual_blocker_and_runs_gate(
     assert "Bloqueio local" in panel_text
     assert "Tanque de água" in panel_text
     assert "Ir para Runs quando o cenário estiver pronto" in panel_text
-    assert _find_component_by_id(panel, "studio-canvas-load-edge-button") is not None
     assert _find_component_by_id(panel, "studio-canvas-reverse-edge-button") is not None
     assert _find_component_by_id(panel, "studio-canvas-intent-mandatory-button") is not None
 
@@ -1684,6 +1684,7 @@ def test_decision_workspace_panel_makes_winner_runner_up_and_tie_legible() -> No
     assert "Referência oficial do produto" in panel_text
     assert "Winner atual" in panel_text
     assert "Runner-up" in panel_text
+    assert "Margem" in panel_text
     assert "Technical tieExplícito" in panel_text
     assert "Technical tie explícito" in panel_text
     assert "Comparação final assistida" in panel_text
