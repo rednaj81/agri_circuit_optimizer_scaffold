@@ -1,32 +1,18 @@
-# Phase UX Refinement Handoff For Next Authorized Cycle
+# Next Cycle Handoff
 
-## Current Head
+## Recommended next phase
 
-- Branch: `codex/new-architecture-platform`
-- Head at stop: `db2bd4fe6c470b04740ce90d49d7f8943540ac12`
+Proceed to `ux_phase_4`.
 
-## What A Future Cycle Should Assume As Baseline
+## Why now
 
-- Studio, Runs, Decision, and Audit primary surfaces are already reorganized around product use, not raw technical disclosure.
-- The Studio first fold now shows supply-chain context and supports direct route-intent adjustment from the immediate workspace.
-- Runs and Decision transitions are stabilized and should not be reopened casually.
-- The Dash/Cytoscape stack and Julia-only official execution policy remain frozen constraints.
+- `ux_phase_3` already communicates queue readability, run states, progress, run detail, and scenario-versus-run separation at product level.
+- The remaining gap is not a Runs comprehension problem; it is evidence quality under the current browser-launch restrictions.
+- The next product-facing value is in `ux_phase_4`: winner, runner-up, and technical tie clarity in `Decisão`.
 
-## What Not To Reopen Without New Justification
+## Carry-forward note
 
-- Decision state architecture or export gating.
-- Runs queue/focus hierarchy.
-- Studio business-graph surface boundaries, including hidden internal hubs and derived nodes.
-- Any move back toward raw JSON, `html.Pre`, payload-first reading, or workbench-first routine editing.
-
-## If A New Cycle Is Explicitly Authorized
-
-- Start from a new Architect handoff with objective, acceptance criteria, and risk boundaries.
-- Treat the residual risks from `docs/2026-04-10_phase_ux_refinement_stop.md` as backlog candidates, not as automatic reopen items.
-- Reacquire visual evidence in a real browser if the environment permits; the strongest remaining gap is evidence quality, not missing functional UX waves.
-
-## Honest Note
-
-- This handoff is for continuity only. It is not authorization for wave 11 implementation and it does not supersede the `stop` recommendation for `phase_ux_refinement`.
-- Wave 12 reaffirmed the same stop state and did not reopen the cycle.
-- Wave 13 reaffirmed the same stop state and did not reopen the cycle.
+- Keep the current Studio local-fix strip hierarchy as the baseline.
+- Preserve the explicit business-flow reading in the Studio primary surface.
+- Preserve the compact operational reading in Runs.
+- Treat native browser capture as an environment blocker to document honestly, not as a reason to reopen phase-3 architecture or UX scope.

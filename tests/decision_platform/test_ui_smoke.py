@@ -898,17 +898,19 @@ def test_studio_workspace_panel_promotes_direct_measurement_fix_in_primary_conte
         "Trecho principal revisado.",
     )
     panel_text = _collect_text_content(panel)
+    local_fix_text = _collect_text_content(_find_component_by_id(panel, "studio-workspace-local-fix-strip"))
     measurement_button = _find_component_by_id(panel, "studio-workspace-require-measurement-button")
     create_route_button = _find_component_by_id(panel, "studio-workspace-create-route-button")
     desirable_button = _find_component_by_id(panel, "studio-workspace-intent-desirable-button")
 
     assert "Exigir medição direta" in panel_text
-    assert "Correção local mais curta" in panel_text
+    assert "Ação local prioritária" in panel_text
     assert "Sem workbench" in panel_text
-    assert "Exigir medição direta agora" in panel_text
+    assert "Corrigir medição agora" in panel_text
     assert "Tanque de água supre Misturador" in panel_text
     assert "Próxima ação" in panel_text
     assert "Disponível agora neste trecho com dosagem." in panel_text
+    assert "Corrigir no canvas" not in local_fix_text
     assert "Use estes botões para reclassificar a rota em foco sem abrir a bancada completa." in panel_text
     assert "Obrigatória" in panel_text
     assert "Desejável" in panel_text
@@ -1002,11 +1004,14 @@ def test_studio_workspace_panel_surfaces_local_reverse_fix_in_primary_strip() ->
         "Inverta a direção deste trecho antes de seguir para Runs.",
     )
     panel_text = _collect_text_content(panel)
+    local_fix_text = _collect_text_content(_find_component_by_id(panel, "studio-workspace-local-fix-strip"))
     local_reverse_button = _find_component_by_id(panel, "studio-workspace-apply-local-reverse-button")
     local_measurement_button = _find_component_by_id(panel, "studio-workspace-apply-local-fix-button")
 
+    assert "Ação local prioritária" in panel_text
     assert "Inverter trecho agora" in panel_text
     assert "Tanque de água passa a suprir Bomba principal" in panel_text
+    assert "Criar rota deste trecho agora" not in local_fix_text
     assert local_reverse_button is not None
     assert getattr(local_reverse_button, "disabled", None) is False
     assert local_measurement_button is not None

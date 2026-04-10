@@ -221,6 +221,33 @@ def test_phase3_queue_acceptance_wave4_browser_capture_artifact_exists() -> None
 
 
 @pytest.mark.fast
+def test_phase3_queue_acceptance_wave5_browser_capture_artifact_tracks_native_blockers() -> None:
+    snapshot_path = Path("docs/2026-04-10_phase_ux_refinement_wave5_ui_snapshot.json")
+    capture_path = Path("docs/2026-04-10_phase_ux_refinement_wave5_browser_capture.png")
+
+    payload = json.loads(snapshot_path.read_text(encoding="utf-8"))
+
+    assert capture_path.exists()
+    assert capture_path.stat().st_size > 0
+    assert payload["browser_capture"]["path"] == str(capture_path).replace("\\", "/")
+    assert payload["browser_capture"]["size_bytes"] == capture_path.stat().st_size
+    assert payload["browser_capture"]["capture_kind"] == "native_browser_blocked_report"
+    assert any(attempt["tool"] == "playwright_cli_screenshot" for attempt in payload["browser_capture"]["native_attempts"])
+    assert any(attempt["status"] == "blocked" for attempt in payload["browser_capture"]["native_attempts"])
+
+
+@pytest.mark.fast
+def test_phase3_queue_acceptance_wave5_docs_explain_exit_status_and_next_cycle() -> None:
+    exit_text = Path("docs/2026-04-10_phase_ux_refinement_phase3_exit.md").read_text(encoding="utf-8")
+    next_cycle_text = Path("docs/2026-04-10_phase_ux_refinement_handoff_next_cycle.md").read_text(encoding="utf-8")
+
+    assert "ux_phase_3" in exit_text
+    assert "native browser capture" in exit_text.lower()
+    assert "ux_phase_4" in next_cycle_text
+    assert "technical tie" in next_cycle_text.lower()
+
+
+@pytest.mark.fast
 def test_phase3_queue_acceptance_run_actions_follow_selected_run_state() -> None:
     with diagnostic_runtime_test_mode():
         app = build_app("data/decision_platform/maquete_v2")

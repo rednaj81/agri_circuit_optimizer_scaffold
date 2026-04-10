@@ -3838,19 +3838,20 @@ def render_studio_workspace_panel(
         if blocker_count > 0 or warning_count > 0
         else focus_summary["recommended_action"]
     )
-    next_available_action = (
-        "Exigir medição direta agora"
+    local_fix_priority_action = (
+        "Corrigir medição agora"
         if can_require_measurement_directly
         else (
-            "Criar rota deste trecho"
-            if can_create_route_from_focus
+            "Inverter trecho agora"
+            if can_reverse_directly
             else (
-                "Inverter trecho crítico"
-                if can_reverse_directly
+                "Criar rota deste trecho agora"
+                if can_create_route_from_focus
                 else ("Ir para Runs" if runs_enabled else "Corrigir no canvas")
             )
         )
     )
+    next_available_action = local_fix_priority_action
     next_unlock_condition = (
         "Nenhuma condição pendente neste foco."
         if can_require_measurement_directly or can_create_route_from_focus or can_reverse_directly or runs_enabled
@@ -3874,14 +3875,16 @@ def render_studio_workspace_panel(
         if next_unlock_condition == "Nenhuma condição pendente neste foco."
         else f"{next_available_action}. {next_unlock_condition}"
     )
+    local_fix_available = bool(can_require_measurement_directly or can_create_route_from_focus or can_reverse_directly)
+    local_fix_heading = "Ação local prioritária" if local_fix_available else "Correção local mais curta"
     local_fix_label = (
         "Correção local pronta"
-        if can_require_measurement_directly or can_create_route_from_focus or can_reverse_directly
+        if local_fix_available
         else "Correção local orientada"
     )
     local_fix_note = (
-        "Ajuste este bloqueio no próprio contexto do canvas antes de recorrer ao workbench avançado."
-        if can_require_measurement_directly or can_create_route_from_focus or can_reverse_directly
+        "Aplique a ação direta deste trecho antes de recorrer à bancada completa."
+        if local_fix_available
         else next_unlock_condition
     )
     context_direct_actions = [
@@ -3949,7 +3952,7 @@ def render_studio_workspace_panel(
                 id="studio-workspace-local-fix-strip",
                 style={**UI_COMPACT_BANNER_CARD_STYLE, "marginBottom": "12px"},
                 children=[
-                    html.Div("Correção local mais curta", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+                    html.Div(local_fix_heading, style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
                     html.Div(next_available_action, style={"fontWeight": 700, "lineHeight": "1.45", "marginTop": "6px"}),
                     html.Div(local_fix_note, style={"lineHeight": "1.45", "marginTop": "6px", "color": "#496158"}),
                     html.Div(
@@ -3959,8 +3962,8 @@ def render_studio_workspace_panel(
                     html.Div(
                         style={"display": "flex", "gap": "8px", "flexWrap": "wrap", "marginTop": "8px"},
                         children=[
-                            _toned_pill(local_fix_label, "ready" if can_require_measurement_directly or can_create_route_from_focus or can_reverse_directly else "needs_attention"),
-                            _toned_pill("Sem workbench" if can_require_measurement_directly or can_create_route_from_focus or can_reverse_directly else "Foco ainda insuficiente", "ready" if can_require_measurement_directly or can_create_route_from_focus or can_reverse_directly else "idle"),
+                            _toned_pill(local_fix_label, "ready" if local_fix_available else "needs_attention"),
+                            _toned_pill("Sem workbench" if local_fix_available else "Foco ainda insuficiente", "ready" if local_fix_available else "idle"),
                         ],
                     ),
                     html.Div(

@@ -1,0 +1,68 @@
+{
+  "created_at": "2026-04-10T15:09:51.6804653Z",
+  "phase_id": "phase_ux_refinement",
+  "wave_index": 5,
+  "repo_head": "a437d59e066b9642390867a55ac92f747fa5ea1e",
+  "capture_method": "native_attempts_blocked_report",
+  "capture_note": "Wave 5 attempted native browser capture through Edge, Playwright CLI and Windows screenshot helpers. All native routes were blocked in this environment, so the committed artifact is an auditable report built from the live served UI plus the concrete native-capture failures.",
+  "browser_capture": {
+    "path": "docs/2026-04-10_phase_ux_refinement_wave5_browser_capture.png",
+    "capture_kind": "native_browser_blocked_report",
+    "source_urls": {
+      "studio": {
+        "url": "http://127.0.0.1:8056/?tab=studio",
+        "status": 200,
+        "body_length": 4424,
+        "contains_dash": true,
+        "contains_root": true
+      },
+      "runs": {
+        "url": "http://127.0.0.1:8056/?tab=runs",
+        "status": 200,
+        "body_length": 4424,
+        "contains_dash": true,
+        "contains_root": true
+      }
+    },
+    "native_attempts": [
+      {
+        "tool": "edge_system_new_window",
+        "status": "blocked",
+        "error_excerpt": "ProcessSingleton lock file can not be created; Edge aborted before opening a usable browser window."
+      },
+      {
+        "tool": "playwright_cli_screenshot",
+        "status": "blocked",
+        "error_excerpt": "Playwright screenshot failed with spawn EPERM while launching chrome-headless-shell.exe."
+      },
+      {
+        "tool": "windows_active_window_screenshot",
+        "status": "blocked",
+        "error_excerpt": "take_screenshot.ps1 failed to get active-window bounds because no usable browser window handle was available."
+      },
+      {
+        "tool": "windows_full_desktop_screenshot",
+        "status": "blocked",
+        "error_excerpt": "take_screenshot.ps1 failed with CopyFromScreen invalid handle on this session."
+      }
+    ],
+    "size_bytes": 98908
+  },
+  "sections": [
+    {
+      "title": "Studio local fix",
+      "component_id": "studio-workspace-local-fix-strip",
+      "excerpt": "Ação local prioritáriaCorrigir medição agoraAplique a ação direta deste trecho antes de recorrer à bancada completa.Misturador e Tanque de água ainda não participa de um trecho visível de suprimento.Correção local prontaSem workbenchCorrigir medição agoraInverter trecho agoraAbrir bancada completa"
+    },
+    {
+      "title": "Studio live workspace",
+      "component_id": "studio-workspace-panel",
+      "excerpt": "Leitura do cenárioExige atençãoAinda há bloqueios estruturais impedindo a passagem segura para Runs.Correção local mais curtaCorrigir no canvasA conexão L011 sai de Saída externa, mas Saída externa deve aparecer apenas como destino final.Misturador e Tanque de água é suprido por Incorporador, Produto 1, Produto 2 e mais 2 e supre Incorporador e Saída externa.Correção local orientadaFoco ainda insuficienteCorrigir medição agoraInverter trecho agoraAbrir bancada completaContexto dominante do StudioConexão em foco: Tanque de água -> Misturador.Agora no StudioA conexão L011 sai de Saída externa, mas Saída externa deve aparecer apenas como destino final.Próxima açãoCorrigir no canvas. A conexão L011 sai de Saída externa, mas Saída externa deve aparecer apenas como destino final.Passagem para RunsContinue no Studio: A conexão L011 sai de Saída externa, mas Saída externa deve aparecer apenas co"
+    },
+    {
+      "title": "Runs live workspace",
+      "component_id": "runs-workspace-panel",
+      "excerpt": "Leitura operacional de RunsAguardando readiness do StudioAinda há bloqueios estruturais impedindo a passagem segura para Runs.FalhouPronto0 na filaResultado pendenteRun em focoNenhumaEsta é a terminal mais crítica porque define a recuperação antes de outra rodada.Falha operacional em focoCorrija a causa dominante antes de repetir a rodada.Modo: -Na filaDepoisEm preparaçãoDepoisEm execuçãoDepoisConsolidando saídaDepoisConcluídaDepoisFalhouEstado finalA run encontrou um bloqueio operacional e terminou sem saída utilizável.Fila agoraSem pendênciaNada novo aguardando além do que a run em foco já explica.Execução agora: NenhumaHistórico terminalSem terminal recente relevanteA leitura principal continua totalmente centrada na run em foco.A última run terminou bloqueada; ainda não existe resultado utilizável para Decisão.Próxima ação seguraRevisar falhaA Decisao continua bloqueada: esta run fal"
+    }
+  ]
+}

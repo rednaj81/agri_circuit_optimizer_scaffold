@@ -149,3 +149,17 @@ def test_phase3_runs_ui_wave4_snapshot_artifact_is_traceable() -> None:
     assert payload["browser_capture"]["path"] == "docs/2026-04-10_phase_ux_refinement_wave4_browser_capture.png"
     assert isinstance(payload.get("sections"), list)
     assert any(section.get("component_id") == "studio-workspace-local-fix-strip" for section in payload["sections"])
+
+
+@pytest.mark.fast
+def test_phase3_runs_ui_wave5_snapshot_records_priority_strip_and_native_capture_blockers() -> None:
+    snapshot_path = Path("docs/2026-04-10_phase_ux_refinement_wave5_ui_snapshot.json")
+    payload = json.loads(snapshot_path.read_text(encoding="utf-8"))
+
+    assert payload["phase_id"] == "phase_ux_refinement"
+    assert payload["wave_index"] == 5
+    assert payload["capture_method"] == "native_attempts_blocked_report"
+    assert payload["browser_capture"]["capture_kind"] == "native_browser_blocked_report"
+    assert len(payload["browser_capture"]["native_attempts"]) >= 3
+    studio_strip = next(section for section in payload["sections"] if section["component_id"] == "studio-workspace-local-fix-strip")
+    assert "Ação local prioritária" in studio_strip["excerpt"]
