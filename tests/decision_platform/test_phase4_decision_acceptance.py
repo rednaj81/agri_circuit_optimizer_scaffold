@@ -2,7 +2,12 @@ from __future__ import annotations
 
 import pytest
 
-from decision_platform.ui_dash.app import render_decision_workspace_panel
+from decision_platform.ui_dash.app import (
+    render_decision_contrast_panel,
+    render_decision_justification_panel,
+    render_decision_signal_panel,
+    render_decision_workspace_panel,
+)
 
 
 def _find_component_by_id(component: object, target_id: str) -> object | None:
@@ -111,3 +116,48 @@ def test_decision_workspace_first_fold_surfaces_primary_decision_states(summary:
     assert "Comparação assistida e contexto" in panel_text
     for fragment in expected_fragments:
         assert fragment in panel_text
+
+
+@pytest.mark.fast
+def test_infeasible_decision_state_stays_blocked_across_secondary_panels() -> None:
+    summary = {
+        "candidate_id": "cand-01",
+        "runner_up_candidate_id": "cand-02",
+        "official_product_candidate_id": "cand-01",
+        "decision_status": "winner_clear",
+        "technical_tie": False,
+        "feasible": False,
+        "infeasibility_reason": "mandatory_route_failure",
+        "winner_reason_summary": "Segue na frente por custo, mas sem fechar as rotas obrigatórias.",
+        "key_factors": [{"summary": "o runner-up mantém leitura operacional mais segura."}],
+    }
+    contrast_text = _collect_text(render_decision_contrast_panel(summary))
+    signal_text = _collect_text(render_decision_signal_panel(summary))
+    justification_text = _collect_text(render_decision_justification_panel(summary))
+
+    assert "winner atual permanece bloqueado" in contrast_text.lower()
+    assert "a escolha oficial ficou inviável" in signal_text.lower()
+    assert "exportação bloqueada enquanto o winner em leitura seguir inviável" in justification_text.lower()
+    assert "use exportação apenas depois de confirmar o contraste final" not in justification_text.lower()
+
+
+@pytest.mark.fast
+def test_technical_tie_state_keeps_assisted_language_across_secondary_panels() -> None:
+    summary = {
+        "candidate_id": "cand-01",
+        "runner_up_candidate_id": "cand-02",
+        "official_product_candidate_id": "cand-03",
+        "decision_status": "technical_tie",
+        "technical_tie": True,
+        "feasible": True,
+        "winner_reason_summary": "O perfil atual ainda não separou o winner com folga suficiente.",
+        "key_factors": [{"summary": "winner e runner-up seguem praticamente empatados nas dimensões principais."}],
+    }
+    contrast_text = _collect_text(render_decision_contrast_panel(summary))
+    signal_text = _collect_text(render_decision_signal_panel(summary))
+    justification_text = _collect_text(render_decision_justification_panel(summary))
+
+    assert "a escolha final pede leitura humana assistida" in contrast_text.lower()
+    assert "a leitura continua em modo assistido" in signal_text.lower()
+    assert "technical tie ativo; exporte apenas como decisão assistida" in justification_text.lower()
+    assert "a escolha oficial segue viável na leitura atual do ranking" not in signal_text.lower()

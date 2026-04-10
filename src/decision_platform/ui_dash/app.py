@@ -1201,6 +1201,64 @@ def _decision_primary_state(summary: dict[str, Any]) -> dict[str, str]:
     }
 
 
+def _decision_page_mode(summary: dict[str, Any]) -> dict[str, Any]:
+    candidate_id = str(summary.get("candidate_id") or "").strip()
+    decision_status = str(summary.get("decision_status") or ("technical_tie" if summary.get("technical_tie") else "winner_clear")).strip().lower()
+    feasible_is_false = summary.get("feasible") is False
+    if not candidate_id:
+        return {
+            "key": "no_usable_result",
+            "allows_export": False,
+            "export_blocked_label": "Exportação bloqueada até existir decisão utilizável",
+            "export_guidance": "Exportação bloqueada até existir winner e runner-up comparáveis.",
+            "comparison_guidance": "Sem comparação aberta; recupere uma execução comparável em Runs antes de tentar fechar a decisão.",
+            "signal_guidance": "Ainda não existe escolha utilizável para sustentar exportação ou oficialização.",
+        }
+    if feasible_is_false:
+        return {
+            "key": "winner_infeasible",
+            "allows_export": False,
+            "export_blocked_label": "Exportação bloqueada: winner atual inviável",
+            "export_guidance": "Exportação bloqueada enquanto o winner em leitura seguir inviável.",
+            "comparison_guidance": "O runner-up virou contraste operacional porque o winner atual permanece bloqueado.",
+            "signal_guidance": "A escolha oficial continua bloqueada; use o runner-up e a causa de inviabilidade antes de qualquer exportação.",
+        }
+    if decision_status == "technical_tie":
+        return {
+            "key": "technical_tie",
+            "allows_export": True,
+            "export_blocked_label": "",
+            "export_guidance": "Technical tie ativo; exporte apenas como decisão assistida depois de registrar a escolha humana final.",
+            "comparison_guidance": "Winner e runner-up seguem tecnicamente próximos; mantenha a comparação aberta até a decisão humana assistida fechar a escolha.",
+            "signal_guidance": "A leitura continua em modo assistido; não trate o winner atual como oficializado sem fechar o technical tie.",
+        }
+    return {
+        "key": "winner_clear",
+        "allows_export": True,
+        "export_blocked_label": "",
+        "export_guidance": "A referência oficial atual já pode seguir para exportação assistida depois da confirmação final do contraste.",
+        "comparison_guidance": "O runner-up segue como contraste comparável, mas abaixo da escolha oficial no ranking.",
+        "signal_guidance": "A escolha oficial segue viável e já tem contraste suficiente para sustentar a decisão assistida.",
+    }
+
+
+def _decision_export_cta(summary: dict[str, Any], selected_candidate_id: str) -> tuple[str, bool]:
+    decision_mode = _decision_page_mode(summary)
+    official_candidate_id = str(summary.get("official_product_candidate_id") or "").strip()
+    profile_candidate_id = str(summary.get("candidate_id") or "").strip()
+    if not decision_mode["allows_export"]:
+        return str(decision_mode["export_blocked_label"]), True
+    if not selected_candidate_id:
+        return "Exportar escolha manual quando houver contexto", True
+    if decision_mode["key"] == "technical_tie":
+        return f"Exportar decisão assistida atual ({selected_candidate_id})", False
+    if selected_candidate_id == official_candidate_id:
+        return f"Exportar referência oficial ({selected_candidate_id})", False
+    if selected_candidate_id == profile_candidate_id:
+        return f"Exportar winner do perfil atual ({selected_candidate_id})", False
+    return f"Exportar escolha manual atual ({selected_candidate_id})", False
+
+
 def _coerce_float_or_none(value: Any) -> float | None:
     if value in (None, ""):
         return None
@@ -6703,6 +6761,7 @@ def _render_decision_tradeoff_cards(profile_views: list[dict[str, Any]]) -> list
 
 def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: dict[str, Any], selected_summary: dict[str, Any] | None = None) -> Any:
     decision_state = _decision_primary_state(summary)
+    decision_mode = _decision_page_mode(summary)
     candidate_id = str(summary.get("candidate_id") or "").strip()
     runner_up_id = str(summary.get("runner_up_candidate_id") or "").strip()
     decision_status = str(summary.get("decision_status") or ("technical_tie" if summary.get("technical_tie") else "winner_clear"))
@@ -6723,7 +6782,9 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
         else "Escolha manual ainda indefinida"
     )
     export_guidance = (
-        f"O export atual seguirá {selected_candidate_id} sem sobrescrever a referência oficial do produto."
+        str(decision_mode["export_guidance"])
+        if decision_mode["key"] in {"no_usable_result", "winner_infeasible", "technical_tie"}
+        else f"O export atual seguirá {selected_candidate_id} sem sobrescrever a referência oficial do produto."
         if selected_candidate_id
         else "Escolha um candidato manualmente antes de exportar uma decisão assistida."
     )
@@ -7159,6 +7220,7 @@ def render_decision_contrast_panel(summary: dict[str, Any]) -> Any:
     candidate_id = str(summary.get("candidate_id") or "").strip()
     runner_up_id = str(summary.get("runner_up_candidate_id") or "").strip()
     profile_views = list(summary.get("profile_views") or [])
+    decision_mode = _decision_page_mode(summary)
     if not summary or not candidate_id:
         return _guided_empty_state(
             "Runner-up e contraste",
@@ -7183,7 +7245,9 @@ def render_decision_contrast_panel(summary: dict[str, Any]) -> Any:
     if summary.get("runner_up_total_cost") not in (None, ""):
         difference_lines.insert(0, f"Custo oficial vs runner-up: {winner_cost} vs {summary.get('runner_up_total_cost')}.")
     contrast_summary = (
-        "Winner e runner-up seguem tecnicamente empatados; a escolha final pede leitura humana assistida."
+        str(decision_mode["comparison_guidance"])
+        if decision_mode["key"] == "winner_infeasible"
+        else "Winner e runner-up seguem tecnicamente empatados; a escolha final pede leitura humana assistida."
         if decision_status == "technical_tie"
         else "O runner-up segue como melhor alternativa comparável, mas abaixo da escolha oficial no ranking."
     )
@@ -7247,12 +7311,17 @@ def render_decision_signal_panel(summary: dict[str, Any]) -> Any:
             "Ainda não há sinais consolidados para suportar a leitura de risco desta decisão.",
             "Abra uma execução válida ou um candidato em foco para revelar penalidades, rotas críticas e fallback.",
         )
+    decision_mode = _decision_page_mode(summary)
     signal_lines: list[str] = []
     infeasibility_reason = str(summary.get("infeasibility_reason") or "").strip()
-    if infeasibility_reason:
+    if decision_mode["key"] == "technical_tie":
+        signal_lines.append(str(decision_mode["signal_guidance"]))
+    elif infeasibility_reason:
         signal_lines.append(f"A escolha oficial ficou inviável porque {_humanize_infeasibility_reason(infeasibility_reason)}.")
+    elif decision_mode["key"] == "no_usable_result":
+        signal_lines.append(str(decision_mode["signal_guidance"]))
     else:
-        signal_lines.append("A escolha oficial segue viável na leitura atual do ranking.")
+        signal_lines.append(str(decision_mode["signal_guidance"]))
     for penalty in list(summary.get("winner_penalties", []))[:2]:
         signal_lines.append(f"Atenção: {penalty}.")
     for route in list(summary.get("critical_routes", []))[:2]:
@@ -7286,11 +7355,12 @@ def render_decision_justification_panel(summary: dict[str, Any], breakdown: dict
             "Volte para Runs ou alivie os filtros antes de tentar fechar a justificativa final.",
         )
     decision_state = _decision_primary_state(summary)
+    decision_mode = _decision_page_mode(summary)
     official_candidate_id = str(summary.get("official_product_candidate_id") or candidate_id).strip()
     breakdown_rules = [str(item) for item in breakdown.get("rules_triggered", []) if str(item).strip()]
     winner_reason = _humanize_decision_copy(summary.get("winner_reason_summary") or "Sem justificativa resumida.")
     if summary.get("technical_tie"):
-        review_signal = "Empate técnico ativo; mantenha winner e runner-up lado a lado antes de exportar."
+        review_signal = "Empate técnico ativo; mantenha winner e runner-up lado a lado antes de fechar a escolha assistida."
     elif summary.get("feasible") is False:
         review_signal = f"O winner segue bloqueado por {_humanize_infeasibility_reason(summary.get('infeasibility_reason'))}."
     elif breakdown_rules:
@@ -7298,7 +7368,9 @@ def render_decision_justification_panel(summary: dict[str, Any], breakdown: dict
     else:
         review_signal = "O racional principal já cabe na leitura atual; aprofunde a trilha técnica só se a decisão humana ainda pedir reconciliação."
     export_signal = (
-        f"A referência oficial atual continua em {official_candidate_id}; use exportação apenas depois de confirmar o contraste final."
+        str(decision_mode["export_guidance"])
+        if decision_mode["key"] in {"no_usable_result", "winner_infeasible", "technical_tie"}
+        else f"A referência oficial atual continua em {official_candidate_id}; use exportação apenas depois de confirmar o contraste final."
         if official_candidate_id
         else decision_state["next_action"]
     )
@@ -10716,15 +10788,7 @@ def build_app(
         selected_payload = _safe_json_loads(selected_text)
         official_payload = _safe_json_loads(official_text)
         selected_candidate_id = str(selected_payload.get("candidate_id") or "").strip()
-        official_candidate_id = str(official_payload.get("official_product_candidate_id") or "").strip()
-        profile_candidate_id = str(official_payload.get("candidate_id") or "").strip()
-        if not selected_candidate_id:
-            return "Exportar escolha manual quando houver contexto", True
-        if selected_candidate_id == official_candidate_id:
-            return f"Exportar referência oficial ({selected_candidate_id})", False
-        if selected_candidate_id == profile_candidate_id:
-            return f"Exportar winner do perfil atual ({selected_candidate_id})", False
-        return f"Exportar escolha manual atual ({selected_candidate_id})", False
+        return _decision_export_cta(official_payload, selected_candidate_id)
 
     _normalize_callback_map_for_testing(app)
     return app

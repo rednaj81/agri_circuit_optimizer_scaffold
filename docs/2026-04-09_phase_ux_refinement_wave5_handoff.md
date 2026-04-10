@@ -1,29 +1,46 @@
-# Phase UX Refinement Wave 5 Handoff
+# Phase UX Refinement Wave 5 - Decision State Coherence
 
-## Objetivo da onda
+## Objective
 
-Consolidar a entrada route-first do Studio em linguagem de produto, permitir troca direta do trecho em foco na superfície principal e reduzir o viés técnico do foco inicial.
+Correct the mismatch between blocked decision states and secondary Decision panels so the whole page follows the same semantic model already established in the first fold.
 
-## Implementação
+## Delivered
 
-- adicionado no primeiro fold do Studio um seletor primário de trecho com rótulos de negócio em `src/decision_platform/ui_dash/app.py`
-- o banner do trecho em foco passou a explicar por que aquele trecho foi sugerido, sem expor `route:R...` como linguagem principal
-- criada a callback `_apply_primary_route_focus` para trocar o foco principal direto do canvas, atualizando o trecho em foco e o nó de contexto sem abrir a bancada avançada
-- a sincronização do dropdown primário passa a seguir o trecho em foco atual e a preservar labels de negócio ao alternar entre rotas relevantes
+- Added shared Decision-state helpers in `src/decision_platform/ui_dash/app.py` to classify page mode (`winner_clear`, `technical_tie`, `winner_infeasible`, `no_usable_result`) and reuse that logic in export messaging and CTA state.
+- Aligned the secondary `Escolha final e export` guidance in the Decision workspace with the actual decision state, so blocked states no longer reuse positive export language.
+- Updated `render_decision_contrast_panel`, `render_decision_signal_panel`, and `render_decision_justification_panel` so `technical_tie` stays in assisted mode and `winner_infeasible` / no-result states stay explicitly blocked across support panels.
+- Updated the export CTA callback so `winner_infeasible` and no-result states disable export with honest labels, while `technical_tie` now exports as assisted choice instead of as a closed winner.
+- Expanded the phase-4 acceptance suite and smoke coverage to assert cross-panel coherence and export-CTA behavior in blocked and assisted states.
 
-## Validação
+## Validation
 
-- `PYTHONPATH='src;.' .\.venv\Scripts\python.exe -m pytest tests/decision_platform/test_ui_smoke.py -q -p no:cacheprovider --basetemp tests/_tmp/pytest-basetemp-ux-wave5-current`
-- resultado: `99 passed in 394.12s (0:06:34)`
+```powershell
+$env:PYTHONPATH='src;.'; .\.venv\Scripts\python.exe -m pytest tests/decision_platform/test_ui_smoke.py -q -p no:cacheprovider -k "decision_export_cta_tracks_manual_choice_without_overwriting_official_reference or decision_summary_panel_surfaces_infeasible_winner_without_console_language or primary_decision_panels_hide_raw_metric_keys_in_main_surface" --basetemp tests/_tmp/pytest-basetemp-ux-wave5-targeted-ui-rerun
+$env:PYTHONPATH='src;.'; .\.venv\Scripts\python.exe -m pytest tests/decision_platform/test_phase4_decision_acceptance.py -q -p no:cacheprovider --basetemp tests/_tmp/pytest-basetemp-ux-wave5-phase4-targeted-rerun
+$env:PYTHONPATH='src;.'; .\.venv\Scripts\python.exe -m pytest tests/decision_platform/test_ui_smoke.py -q -p no:cacheprovider --basetemp tests/_tmp/pytest-basetemp-ux-wave5-full-ui
+$env:PYTHONPATH='src;.'; .\.venv\Scripts\python.exe -m pytest tests/decision_platform/test_phase4_decision_acceptance.py -q -p no:cacheprovider --basetemp tests/_tmp/pytest-basetemp-ux-wave5-phase4-full
+```
 
-## Evidências
+Result:
 
-- captura estruturada com foco inicial e troca direta de trecho: `output/playwright/wave5-studio-focus-switch-capture.json`
-- relatório HTML browser-ready com leitura perceptiva da troca de foco: `output/playwright/wave5-studio-focus-switch-report.html`
-- payload live do layout do app em execução: `output/playwright/wave5-studio-focus-switch-layout.json`
+- `3 passed, 108 deselected in 0.52s`
+- `6 passed in 0.27s`
+- `111 passed in 330.09s (0:05:30)`
+- `6 passed in 0.04s`
 
-## Limitações
+## Evidence
 
-- a evidência desta onda continua estruturada e browser-ready, não screenshot PNG do app rodando em navegador automatizado
-- o store interno ainda usa `route:<id>` para operar callbacks, mas a superfície primária e o relatório perceptivo desta onda deixam esses identificadores fora da leitura principal
-- o worktree segue com alterações não relacionadas fora dos arquivos desta onda
+- Structured state-coherence snapshot: `docs/2026-04-09_phase_ux_refinement_wave5_ui_snapshot.json`
+- This wave did not retry browser capture because the previous browser path was already blocked at environment level and the present change was logic coherence across panels, not a new visual shell change. The handoff keeps evidence structured and explicit.
+
+## Scope Guardrails
+
+- No architecture reopening.
+- No changes to Dash/Cytoscape stack or Julia-only official execution policy.
+- No reopening of Studio or Runs scope beyond preserving the existing transition into Decision.
+- No changes to solver, ranking engine, hydraulic core, or `docs/05_data_contract.md`.
+- No reintroduction of raw JSON, logs, or payload traces as primary Decision UI.
+
+## Honest Handoff
+
+This wave is a coherence fix, not a wording sweep. The visible gain is that blocked and assisted decision states now control the whole Decision page instead of only the hero. `winner_infeasible` no longer leaks export-ready copy in support panels or CTA labels, `technical_tie` stays explicitly in assisted mode across justification, signals, contrast and export, and no-result states block export honestly. `winner_clear` stays positively exportable, which preserves separation between the real ready state and all blocked states.

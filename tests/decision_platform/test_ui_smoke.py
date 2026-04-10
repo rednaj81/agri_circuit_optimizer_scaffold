@@ -2763,10 +2763,43 @@ def test_decision_export_cta_tracks_manual_choice_without_overwriting_official_r
         json.dumps({"candidate_id": "cand-09"}, ensure_ascii=False),
         json.dumps({"candidate_id": "cand-01", "official_product_candidate_id": "cand-03"}, ensure_ascii=False),
     )
+    blocked_result = callback(
+        json.dumps({"candidate_id": "cand-01"}, ensure_ascii=False),
+        json.dumps(
+            {
+                "candidate_id": "cand-01",
+                "official_product_candidate_id": "cand-01",
+                "decision_status": "winner_clear",
+                "technical_tie": False,
+                "feasible": False,
+            },
+            ensure_ascii=False,
+        ),
+    )
+    tie_result = callback(
+        json.dumps({"candidate_id": "cand-03"}, ensure_ascii=False),
+        json.dumps(
+            {
+                "candidate_id": "cand-01",
+                "official_product_candidate_id": "cand-03",
+                "decision_status": "technical_tie",
+                "technical_tie": True,
+                "feasible": True,
+            },
+            ensure_ascii=False,
+        ),
+    )
+    no_result = callback(
+        json.dumps({"candidate_id": "cand-03"}, ensure_ascii=False),
+        json.dumps({}, ensure_ascii=False),
+    )
 
     assert official_result == ("Exportar referência oficial (cand-03)", False)
     assert profile_result == ("Exportar winner do perfil atual (cand-01)", False)
     assert manual_result == ("Exportar escolha manual atual (cand-09)", False)
+    assert blocked_result == ("Exportação bloqueada: winner atual inviável", True)
+    assert tie_result == ("Exportar decisão assistida atual (cand-03)", False)
+    assert no_result == ("Exportação bloqueada até existir decisão utilizável", True)
 
 
 def test_candidate_summary_panel_surfaces_primary_blocker_and_next_action() -> None:
