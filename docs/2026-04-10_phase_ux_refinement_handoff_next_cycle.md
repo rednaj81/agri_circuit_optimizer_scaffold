@@ -2,7 +2,7 @@
 
 ## Recommended next phase
 
-Proceed to `ux_phase_4`.
+Proceed to `ux_phase_4`, carrying `ux_phase_3=blocked_on_evidence` as an explicit environmental blocker.
 
 ## Why now
 
@@ -15,4 +15,4 @@ Proceed to `ux_phase_4`.
 - Keep the current Studio local-fix strip hierarchy as the baseline.
 - Preserve the explicit business-flow reading in the Studio primary surface.
 - Preserve the compact operational reading in Runs.
-- Treat native browser capture as an environment blocker to document honestly, not as a reason to reopen phase-3 architecture or UX scope.
+- Treat native browser capture as a `blocked_on_evidence` environment blocker to document honestly, not as a reason to reopen phase-3 architecture or UX scope.

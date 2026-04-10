@@ -163,3 +163,16 @@ def test_phase3_runs_ui_wave5_snapshot_records_priority_strip_and_native_capture
     assert len(payload["browser_capture"]["native_attempts"]) >= 3
     studio_strip = next(section for section in payload["sections"] if section["component_id"] == "studio-workspace-local-fix-strip")
     assert "Ação local prioritária" in studio_strip["excerpt"]
+
+
+@pytest.mark.fast
+def test_phase3_runs_ui_wave6_snapshot_aligns_strip_and_workspace_context() -> None:
+    snapshot_path = Path("docs/2026-04-10_phase_ux_refinement_wave6_ui_snapshot.json")
+    payload = json.loads(snapshot_path.read_text(encoding="utf-8"))
+
+    assert payload["wave_index"] == 6
+    assert payload["phase3_exit_status"] == "blocked_on_evidence"
+    studio_strip = next(section for section in payload["sections"] if section["component_id"] == "studio-workspace-local-fix-strip")
+    studio_workspace = next(section for section in payload["sections"] if section["component_id"] == "studio-workspace-panel")
+    assert "Ação local prioritária" in studio_strip["excerpt"]
+    assert "Ação local prioritária" in studio_workspace["excerpt"]

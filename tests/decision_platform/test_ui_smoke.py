@@ -1018,6 +1018,45 @@ def test_studio_workspace_panel_surfaces_local_reverse_fix_in_primary_strip() ->
     assert getattr(local_measurement_button, "disabled", None) is True
 
 
+def test_studio_workspace_panel_keeps_priority_heading_consistent_between_strip_and_workspace() -> None:
+    panel = render_studio_workspace_panel(
+        {
+            "status": "needs_attention",
+            "readiness_headline": "Ainda há bloqueios estruturais impedindo a passagem segura para Runs.",
+            "primary_action": "Corrigir regras estruturais e rotas inválidas antes de enfileirar uma nova run.",
+            "blocker_count": 1,
+            "warning_count": 0,
+            "mandatory_route_count": 1,
+            "blockers": ["Rotas com dosagem sem medicao direta: R002"],
+            "warnings": [],
+            "next_steps": ["Feche os bloqueios estruturais antes de enfileirar uma nova run."],
+        },
+        {"selected_node_id": "W", "business_label": "Tanque de água"},
+        {
+            "selected_link_id": "route:R002",
+            "selected_edge": {"from_node": "W", "to_node": "M"},
+            "from_label": "Tanque de água",
+            "to_label": "Misturador",
+            "business_label": "Tanque de água para Misturador",
+        },
+        [
+            {"node_id": "W", "label": "Tanque de água", "node_type": "water_tank", "zone": "supply"},
+            {"node_id": "M", "label": "Misturador", "node_type": "mixer", "zone": "process"},
+        ],
+        [{"link_id": "L001", "from_node": "W", "to_node": "M", "archetype": "bus_segment"}],
+        [{"route_id": "R002", "source": "W", "sink": "M", "mandatory": True, "dose_min_l": 2.0, "measurement_required": False}],
+        "Trecho principal revisado.",
+    )
+    panel_text = _collect_text_content(panel)
+    local_fix_text = _collect_text_content(_find_component_by_id(panel, "studio-workspace-local-fix-strip"))
+
+    assert "Ação local prioritária" in panel_text
+    assert "Ação local prioritária" in local_fix_text
+    assert "Corrigir medição agora" in local_fix_text
+    assert "Tanque de água" in local_fix_text
+    assert "Misturador" in local_fix_text
+
+
 def test_studio_primary_canvas_hides_internal_and_hub_nodes() -> None:
     with diagnostic_runtime_test_mode():
         app = build_app("data/decision_platform/maquete_v2")

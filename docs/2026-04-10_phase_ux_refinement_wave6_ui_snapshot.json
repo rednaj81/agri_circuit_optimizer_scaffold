@@ -1,0 +1,73 @@
+{
+  "created_at": "2026-04-10T15:31:47.5233235Z",
+  "phase_id": "phase_ux_refinement",
+  "wave_index": 6,
+  "repo_head": "5a4a660ae76f977e3fe0450286ab2a0422b240dd",
+  "phase3_exit_status": "blocked_on_evidence",
+  "capture_method": "environment_blocker_dossier",
+  "capture_note": "Wave 6 formalizes the evidence blocker for ux_phase_3. Native browser capture was retried through reproducible commands and remained blocked by this environment; the dossier ties those failures to the same repo head and UI hierarchy represented in the structured snapshot.",
+  "browser_capture": {
+    "path": "docs/2026-04-10_phase_ux_refinement_wave6_browser_capture.png",
+    "capture_kind": "environment_blocker_dossier",
+    "source_urls": {
+      "studio": {
+        "url": "http://127.0.0.1:8056/?tab=studio",
+        "status": 200,
+        "body_length": 4424,
+        "contains_dash": true,
+        "contains_root": true
+      },
+      "runs": {
+        "url": "http://127.0.0.1:8056/?tab=runs",
+        "status": 200,
+        "body_length": 4424,
+        "contains_dash": true,
+        "contains_root": true
+      }
+    },
+    "native_attempts": [
+      {
+        "tool": "edge_system_new_window",
+        "command": "& 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe' --new-window 'http://127.0.0.1:8056/?tab=studio'",
+        "status": "blocked",
+        "output_excerpt": "ProcessSingleton lock file can not be created; Edge aborted before opening a usable browser window."
+      },
+      {
+        "tool": "playwright_cli_screenshot",
+        "command": "$env:npm_config_cache='C:\\d\\dev\\agri_circuit_optimizer_scaffold\\.npm-cache-local'; npx playwright screenshot --device=\"Desktop Chrome\" http://127.0.0.1:8056/?tab=studio docs/wave6-test.png",
+        "status": "blocked",
+        "output_excerpt": "Playwright screenshot failed with spawn EPERM while launching chrome-headless-shell.exe."
+      },
+      {
+        "tool": "windows_active_window_screenshot",
+        "command": "powershell -ExecutionPolicy Bypass -File C:\\Users\\jande\\.codex\\skills\\screenshot\\scripts\\take_screenshot.ps1 -ActiveWindow",
+        "status": "blocked",
+        "output_excerpt": "take_screenshot.ps1 failed to get window bounds."
+      },
+      {
+        "tool": "windows_full_desktop_screenshot",
+        "command": "powershell -ExecutionPolicy Bypass -File C:\\Users\\jande\\.codex\\skills\\screenshot\\scripts\\take_screenshot.ps1 -Path docs/wave6-full-desktop.png",
+        "status": "blocked",
+        "output_excerpt": "take_screenshot.ps1 failed with CopyFromScreen invalid handle."
+      }
+    ],
+    "size_bytes": 112787
+  },
+  "sections": [
+    {
+      "title": "Studio local fix",
+      "component_id": "studio-workspace-local-fix-strip",
+      "excerpt": "Ação local prioritáriaCorrigir medição agoraAplique a ação direta deste trecho antes de recorrer à bancada completa.Misturador e Tanque de água ainda não participa de um trecho visível de suprimento.Correção local prontaSem workbenchCorrigir medição agoraInverter trecho agoraAbrir bancada completa"
+    },
+    {
+      "title": "Studio workspace",
+      "component_id": "studio-workspace-panel",
+      "excerpt": "Leitura do cenárioExige atençãoAinda há bloqueios estruturais impedindo a passagem segura para Runs.Ação local prioritáriaCorrigir medição agoraAplique a ação direta deste trecho antes de recorrer à bancada completa.Misturador e Tanque de água ainda não participa de um trecho visível de suprimento.Correção local prontaSem workbenchCorrigir medição agoraInverter trecho agoraAbrir bancada completaContexto dominante do StudioConexão em foco: Tanque de água -> Misturador.Agora no StudioHá rotas com dosagem sem medição direta compatível: Tanque de água para Misturador.Próxima açãoCorrigir medição agoraPassagem para RunsContinue no Studio: Há rotas com dosagem sem medição direta compatível: Tanque de água para Misturador.Ações contextuais deste focoExigir medição diretaCriar rota deste trechoInverter trechoMedição diretaDisponível agora neste trecho com dosagem.Criar rotaEste trecho já tem rot"
+    },
+    {
+      "title": "Runs workspace",
+      "component_id": "runs-workspace-panel",
+      "excerpt": "Leitura operacional de RunsExecução em andamentoHá uma run em andamento agora (run-002).Em execuçãoPronto1 na filaResultado pendenteRun em focorun-002Esta é a run ativa do momento e continua movendo a fila local.Execução principal em andamentoA prioridade é acompanhar esta run até o primeiro desfecho confiável.Modo: -Na filaFeitoEm preparaçãoFeitoEm execuçãoAgoraConsolidando saídaDepoisConcluídaDepoisO cálculo principal está rodando agora.Fila agorarun-0031 pendência(s) ainda aguardando vez.Execução agora: run-002Histórico terminalSem terminal recente relevanteA leitura principal continua totalmente centrada na run em foco.run-001 ainda não liberou contexto suficiente para Decisão.Próxima ação seguraAguardar execuçãoA Decisao continua secundaria enquanto a run em foco ainda nao consolidou saida utilizavel.Aguardar run em focoAguardar execução atualCenário x execuçãoCenárioCenário pronto "
+    }
+  ]
+}

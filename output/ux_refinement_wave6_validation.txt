@@ -1,14 +1,12 @@
-Wave 6 capture validation
+Wave 6 validation
 
-- .\.venv\Scripts\python.exe output\wave5_browser_capture.py
-- python inline launcher for direct Chrome headless with `--remote-debugging-port=9222`
+Commit base context:
+5a4a660ae76f977e3fe0450286ab2a0422b240dd
 
-Result:
+Command 1:
+.\.venv\Scripts\python.exe -m py_compile src\decision_platform\ui_dash\app.py
+Result: success
 
-- `output/playwright/studio-fullhd-wave6.png` was not produced
-- existing CDP capture path failed with `RuntimeError: Chrome CDP did not become ready`
-- direct Chrome startup failed with `CreateFile: Acesso negado. (0x5)` and `platform_channel.cc:108`
-
-Evidence:
-
-- output\playwright\wave6_capture_blocker.txt
+Command 2:
+.\.venv\Scripts\python.exe -m pytest tests\decision_platform\test_phase3_runs_ui_smoke.py tests\decision_platform\test_phase3_queue_acceptance.py tests\decision_platform\test_ui_smoke.py -q
+Result: 137 passed in 440.10s (0:07:20)

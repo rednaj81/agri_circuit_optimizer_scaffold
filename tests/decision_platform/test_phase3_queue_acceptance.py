@@ -248,6 +248,25 @@ def test_phase3_queue_acceptance_wave5_docs_explain_exit_status_and_next_cycle()
 
 
 @pytest.mark.fast
+def test_phase3_queue_acceptance_wave6_artifacts_and_exit_status_are_coherent() -> None:
+    snapshot_path = Path("docs/2026-04-10_phase_ux_refinement_wave6_ui_snapshot.json")
+    capture_path = Path("docs/2026-04-10_phase_ux_refinement_wave6_browser_capture.png")
+    exit_text = Path("docs/2026-04-10_phase_ux_refinement_phase3_exit.md").read_text(encoding="utf-8")
+    next_cycle_text = Path("docs/2026-04-10_phase_ux_refinement_handoff_next_cycle.md").read_text(encoding="utf-8")
+
+    payload = json.loads(snapshot_path.read_text(encoding="utf-8"))
+
+    assert capture_path.exists()
+    assert capture_path.stat().st_size > 0
+    assert payload["browser_capture"]["path"] == str(capture_path).replace("\\", "/")
+    assert payload["phase3_exit_status"] == "blocked_on_evidence"
+    assert payload["browser_capture"]["capture_kind"] == "environment_blocker_dossier"
+    assert any(attempt["status"] == "blocked" for attempt in payload["browser_capture"]["native_attempts"])
+    assert "blocked_on_evidence" in exit_text
+    assert "blocked_on_evidence" in next_cycle_text
+
+
+@pytest.mark.fast
 def test_phase3_queue_acceptance_run_actions_follow_selected_run_state() -> None:
     with diagnostic_runtime_test_mode():
         app = build_app("data/decision_platform/maquete_v2")
