@@ -28,3 +28,4 @@
 ## Honest Note
 
 - This handoff is for continuity only. It is not authorization for wave 11 implementation and it does not supersede the `stop` recommendation for `phase_ux_refinement`.
+- Wave 12 reaffirmed the same stop state and did not reopen the cycle.
