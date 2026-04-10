@@ -3,6 +3,7 @@
 ## Cycle state
 
 There is no active next wave in the current `phase_ux_refinement` cycle.
+Wave 11 does not continue product implementation and exists only to preserve this stop state.
 
 ## Closed baseline
 
@@ -14,4 +15,5 @@ There is no active next wave in the current `phase_ux_refinement` cycle.
 
 - Keep `ux_phase_3=blocked_on_evidence` explicit in any future reopening or successor cycle.
 - Do not reinterpret the current stop as resolution of the inherited evidence blocker.
+- Do not reinterpret wave 11 as a reopened `ux_phase_4` or `ux_phase_5`.
 - Reopen the UX cycle only with explicit supervisor instruction and a fresh phase objective.
