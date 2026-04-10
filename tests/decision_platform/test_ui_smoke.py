@@ -1775,7 +1775,8 @@ def test_studio_runs_decision_primary_journey_uses_consistent_transition_languag
     assert "resultado utilizável" in runs_text.lower()
     assert "resultado utilizável" not in decision_text.lower() or "decisão" in decision_text.lower()
     assert "Leitura humana" in decision_text
-    assert "Referência oficial do produto" in decision_text
+    assert "Recomendação automática" in decision_text
+    assert "Escolha final humana" in decision_text
 
 
 def test_runs_workspace_panel_distinguishes_failure_recovery_from_decision_ready() -> None:
@@ -2422,12 +2423,17 @@ def test_decision_workspace_panel_makes_winner_runner_up_and_tie_legible() -> No
     assert "Explícito" in panel_text
     assert "Technical tie explícito" in panel_text
     assert "Empate técnico assistido" in panel_text
-    assert "Escolha manual atual" in panel_text
+    assert "Winner sugerido agora" in panel_text
+    assert "Runner-up ainda comparável" in panel_text
+    assert "Escolha final humana" in panel_text
     assert "O que está empatado" in panel_text
     assert "empatados em custo global e leitura operacional principal" in panel_text
     assert "cand-04" in panel_text
     assert "confirme o critério humano antes de liberar a exportação assistida" in panel_text.lower()
     assert "registre o critério humano do empate" in panel_text.lower()
+    assert "Recomendação e escolha final" in panel_text
+    assert "Recomendação automática atual: cand-01" in panel_text
+    assert "Escolha final humana: cand-04" in panel_text
     assert "Comparação assistida e contexto" in panel_text
     assert _find_component_by_id(panel, "decision-workspace-primary-fold") is not None
     assert _find_component_by_id(panel, "decision-workspace-state-hero") is not None
@@ -2801,7 +2807,7 @@ def test_decision_export_cta_tracks_manual_choice_without_overwriting_official_r
     assert profile_result == ("Exportar winner do perfil atual (cand-01)", False)
     assert manual_result == ("Exportar escolha manual atual (cand-09)", False)
     assert blocked_result == ("Exportação bloqueada: winner atual inviável", True)
-    assert tie_result == ("Exportar decisão assistida atual (cand-03)", False)
+    assert tie_result == ("Exportar escolha humana assistida (cand-03)", False)
     assert no_result == ("Exportação bloqueada até existir decisão utilizável", True)
 
 

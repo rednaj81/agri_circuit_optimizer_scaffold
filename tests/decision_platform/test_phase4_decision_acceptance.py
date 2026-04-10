@@ -58,6 +58,8 @@ def _collect_text(component: object) -> str:
                 "Confirmar decisão assistida",
                 "Decisão liberada",
                 "Decisão pronta para confirmar",
+                "Recomendação automática",
+                "Escolha final humana",
             ],
         ),
         (
@@ -76,6 +78,9 @@ def _collect_text(component: object) -> str:
                 "Fechar escolha assistida",
                 "Empate técnico em revisão",
                 "Empate técnico assistido",
+                "Winner sugerido agora",
+                "Runner-up ainda comparável",
+                "Escolha final humana",
                 "O que está empatado",
             ],
         ),
@@ -163,8 +168,13 @@ def test_technical_tie_state_keeps_assisted_language_across_secondary_panels() -
     signal_text = _collect_text(render_decision_signal_panel(summary))
     justification_text = _collect_text(render_decision_justification_panel(summary))
 
+    assert "winner sugerido agora" in workspace_text.lower()
+    assert "runner-up ainda comparável" in workspace_text.lower()
+    assert "escolha final humana" in workspace_text.lower()
     assert "o que está empatado" in workspace_text.lower()
     assert "registre o critério humano do empate" in workspace_text.lower()
+    assert "registrar a escolha humana final" in workspace_text.lower()
+    assert "exporte apenas como decisão assistida" in workspace_text.lower()
     assert "comparação principal continua assistida" in contrast_text.lower()
     assert "o que está empatado" in contrast_text.lower()
     assert "a leitura continua em modo assistido" in signal_text.lower()

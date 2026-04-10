@@ -1251,7 +1251,7 @@ def _decision_export_cta(summary: dict[str, Any], selected_candidate_id: str) ->
     if not selected_candidate_id:
         return "Exportar escolha manual quando houver contexto", True
     if decision_mode["key"] == "technical_tie":
-        return f"Exportar decisão assistida atual ({selected_candidate_id})", False
+        return f"Exportar escolha humana assistida ({selected_candidate_id})", False
     if selected_candidate_id == official_candidate_id:
         return f"Exportar referência oficial ({selected_candidate_id})", False
     if selected_candidate_id == profile_candidate_id:
@@ -6953,16 +6953,24 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
     )
     decision_strip_cards = (
         [
+            _guidance_card("Winner sugerido agora", f"{candidate_id or '-'} | {winner_short_reason}"),
+            _guidance_card("Runner-up ainda comparável", f"{runner_up_id or '-'} | {runner_up_primary_note}"),
+            _guidance_card("Escolha final humana", f"{selected_candidate_id or '-'} | {manual_choice_signal}"),
             _guidance_card("O que está empatado", technical_tie_reason),
-            _guidance_card("O que a pessoa precisa decidir", human_review_signal),
-            _guidance_card("Escolha manual atual", f"{selected_candidate_id or '-'} | {selected_state_label}. {manual_choice_signal}"),
         ]
         if decision_status == "technical_tie"
         else [
-            _guidance_card("Referência oficial do produto", f"{official_product_candidate_id or '-'} | {official_profile_label}"),
-            _guidance_card("Escolha manual atual", f"{selected_candidate_id or '-'} | {selected_state_label}. {manual_choice_signal}"),
-            _guidance_card("Runner-up ainda importa porque", runner_up_signal if runner_up_id else "Ainda não há contraste suficiente para pressionar a decisão."),
-            _guidance_card("O que a revisão humana precisa observar", human_review_signal),
+            _guidance_card(
+                "Recomendação automática"
+                if candidate_id and summary.get("feasible") is not False
+                else "Recomendação automática bloqueada"
+                if candidate_id
+                else "Recomendação automática indisponível",
+                f"{candidate_id or '-'} | {winner_short_reason}" if candidate_id else "Ainda não existe winner utilizável para sustentar recomendação automática.",
+            ),
+            _guidance_card("Runner-up ainda comparável", f"{runner_up_id or '-'} | {runner_up_signal}" if runner_up_id else "Ainda não há runner-up comparável para pressionar a decisão."),
+            _guidance_card("Escolha final humana", f"{selected_candidate_id or '-'} | {manual_choice_signal}"),
+            _guidance_card("Exportação", export_guidance),
         ]
     )
     return html.Div(
@@ -7048,9 +7056,10 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
                         id="decision-final-choice-panel",
                         style={**UI_MUTED_CARD_STYLE, "padding": "12px", "marginBottom": "12px"},
                         children=[
-                            html.Div("Escolha final e export", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+                            html.Div("Recomendação e escolha final", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
                             html.Div(selected_state_label, style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"}),
-                            html.Div(f"Candidato em foco manual: {selected_candidate_id or '-'} | Família: {selected_topology_family}", style={"lineHeight": "1.6", "marginTop": "8px"}),
+                            html.Div(f"Recomendação automática atual: {candidate_id or '-'}", style={"lineHeight": "1.6", "marginTop": "8px"}),
+                            html.Div(f"Escolha final humana: {selected_candidate_id or '-'} | Família: {selected_topology_family}", style={"lineHeight": "1.6", "marginTop": "8px"}),
                             html.Div(export_guidance, style={"lineHeight": "1.6", "marginTop": "8px"}),
                         ],
                     ),

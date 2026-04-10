@@ -1,32 +1,42 @@
 {
-  "snapshot_source_commit": "5590a807f604ac8cce0e6f33ab99d25cd79ba657",
-  "runs": {
-    "primary_surface_signals": [
-      "Agora",
-      "Fila",
-      "Resultado útil",
-      "Falha ou recuperação",
-      "Próxima ação recomendada"
-    ],
-    "workspace_ctas": {
-      "enqueue": "runs-workspace-enqueue-button",
-      "run_next": "runs-workspace-run-next-button",
-      "refresh": "runs-workspace-refresh-button",
-      "rerun": "runs-workspace-rerun-button",
-      "decision": "runs-workspace-primary-open-decision-button"
+  "winner_clear": {
+    "export_cta": {
+      "label": "Exportar referência oficial (cand-01)",
+      "disabled": false
     },
-    "state_mapping": {
-      "studio_blocked": "review scenario in Studio",
-      "preparing_or_running": "refresh current reading",
-      "queue_ready": "run next queued job",
-      "blocked_or_no_usable_result": "rerun selected run",
-      "decision_available": "open Decision"
-    },
-    "technical_logs_primary_surface": false
+    "workspace_excerpt": "Leitura principal da decisãoWinner claroA execução atual já entrega um winner legível e um runner-up de referência para a decisão assistida.Estado decisório agoraWinner claroA execução atual já entrega um winner legível e um runner-up de referência para a decisão assistida.Winner e runner-up já aparecem com leitura utilizável; aprofunde Auditoria só se precisar reconciliar a trilha técnica.Passagem Runs -> DecisãoLeitura principal abertaRuns já liberou resultado utilizável; a primeira dobra de Decisão pode sustentar a escolha principal.Technical tieNão ativoSem empate técnico ativo nesta leitura.Leitura humana observaDecisão liberadaMargem curta ou risco relevante; revise o runner-up antes de oficializar. Perfil em leitura: Equilibrado | Perfil oficial: Equilibrado.Winner oficial agoracand-01Lidera por custo, fechamento das rotas e leitura operacional mais estável.Runner-up sob revisãocand-02Perde por margem curta, mas segue como quase vencedor.Próxima ação seguraConfirmar decisão assistidaConfirme a referência oficial e siga para exportação.Decisão pronta para confirmarRecomendação automáticacand-01 | Lidera por custo, fechamento das rotas e leitura operacional mais estável.Runner",
+    "contrast_excerpt": "Runner-up e contrasteRunner-upcand-02Margem de score0.4Score runner-up-Delta de custo-O runner-up segue como melhor alternativa comparável, mas abaixo da escolha oficial no ranking.Alternativa comparávelTechnical tie e trade-offsTechnical tie em leitura humanaSem technical tie ativo nesta leitura.Leitura do empateSem fator dominante de empate nesta leitura.Sem dimensão adicional relevante para technical tie.Trade-offs por perfilOs perfis convergem para o mesmo winner; o trade-off principal continua concentrado no runner-up e na margem de contraste.Diferenças relevantesSem diferença relevante registrada.",
+    "signal_excerpt": "Sinais para decisão humanaRotas críticas0Penalidades0Fallbacks0Leitura rápidaA escolha oficial segue viável e já tem contraste suficiente para sustentar a decisão assistida.",
+    "justification_excerpt": "Justificativa da escolhaPor que lideraLidera por custo, fechamento das rotas e leitura operacional mais estável.O que ainda revisarO racional principal já cabe na leitura atual; aprofunde a trilha técnica só se a decisão humana ainda pedir reconciliação.ExportaçãoA referência oficial atual continua em cand-01; use exportação apenas depois de confirmar o contraste final.Quando abrir AuditoriaAbra só se o contraste final ainda depender de trilha técnica, bundle ou breakdown detalhado.Winner em leituracand-01Referência oficialcand-01Regras disparadas0Fallbacks no breakdown0Regras e sinais usados nesta justificativaSem regra ou sinal adicional para além do racional principal já exibido."
   },
-  "screenshot_attempt": {
-    "target_path": "output/playwright/runs-fullhd-wave8.png",
-    "status": "failed_in_sandbox",
-    "reason": "No stable browser capture session was available in this sandbox during wave 8; structured snapshot retained as honest evidence."
+  "technical_tie": {
+    "export_cta": {
+      "label": "Exportar escolha humana assistida (cand-03)",
+      "disabled": false
+    },
+    "workspace_excerpt": "Leitura principal da decisãoEmpate técnicoWinner e runner-up seguem próximos o suficiente para exigir decisão humana assistida.Estado decisório agoraEmpate técnicoWinner e runner-up seguem próximos o suficiente para exigir decisão humana assistida.Technical tie explícito: mantenha winner e runner-up visíveis antes de qualquer oficialização.Passagem Runs -> DecisãoLeitura principal abertaRuns já entregou contraste suficiente para abrir a decisão, mas a oficialização continua dependendo de leitura humana assistida.Technical tieExplícitoA revisão humana continua aberta.Leitura humana observaEmpate técnico em revisãoEmpate técnico aberto; compare runner-up e winner antes da escolha manual. Perfil em leitura: Perfil atual | Perfil oficial: Perfil atual.Winner oficial agoracand-01O perfil atual ainda não separou o winner com folga suficiente.Runner-up sob revisãocand-02Quase vence; o empate técnico ainda está aberto.Próxima ação seguraFechar escolha assistidaMantenha winner e runner-up lado a lado, registre o critério humano do empate e só então libere a exportação assistida.Empate técnico assistidoWinner sugerido agoracand-01 | O perfil atual ainda não separou o winner com folga suficie",
+    "contrast_excerpt": "Runner-up e contrasteRunner-upcand-02Margem de score-Score runner-up-Delta de custo-Empate técnico ativo; a comparação principal continua assistida.Empate técnicoTechnical tie e trade-offsTechnical tie em leitura humanaNão há vencedor inequívoco neste perfil; a escolha final continua dependendo de decisão humana assistida.O que está empatadowinner e runner-up seguem praticamente empatados nas dimensões principais.Os scores e trade-offs principais continuam próximos o suficiente para justificar a comparação aberta.Trade-offs por perfilOs perfis convergem para o mesmo winner; o trade-off principal continua concentrado no runner-up e na margem de contraste.Diferenças relevantesSem diferença rel",
+    "signal_excerpt": "Sinais para decisão humanaRotas críticas0Penalidades0Fallbacks0Leitura rápidaA leitura continua em modo assistido; não trate o winner atual como oficializado sem fechar o technical tie.",
+    "justification_excerpt": "Justificativa da escolhaPor que lideraO perfil atual ainda não separou o winner com folga suficiente.O que ainda revisarEmpate técnico ativo; mantenha winner e runner-up lado a lado antes de fechar a escolha assistida.ExportaçãoTechnical tie ativo; exporte apenas como decisão assistida depois de registrar a escolha humana final.Quando abrir AuditoriaAbra só se o contraste final ainda depender de trilha técnica, bundle ou breakdown detalhado.Winner em leituracand-01Referência oficialcand-03Regras disparadas0Fallbacks no breakdown0Regras e sinais usados nesta justificativaSem regra ou sinal adicional para além do racional principal já exibido."
+  },
+  "winner_infeasible": {
+    "export_cta": {
+      "label": "Exportação bloqueada: winner atual inviável",
+      "disabled": true
+    },
+    "workspace_excerpt": "Leitura principal da decisãoWinner inviávelExiste um winner visível, mas ele ainda não pode ser oficializado na leitura principal.Estado decisório agoraWinner inviávelExiste um winner visível, mas ele ainda não pode ser oficializado na leitura principal.Winner ainda bloqueado por uma rota obrigatória não conseguiu fechar com a configuração atual.Passagem Runs -> DecisãoBloqueadaExiste ranking visível, mas a decisão principal segue bloqueada até corrigir a inviabilidade ou aceitar o retorno para Runs.Technical tieNão ativoSem empate técnico ativo nesta leitura.Leitura humana observaBloqueio operacionalWinner bloqueado por uma rota obrigatória não conseguiu fechar com a configuração atual; valide a alternativa utilizável. Perfil em leitura: Perfil atual | Perfil oficial: Perfil atual.Winner oficial agoracand-01Segue na frente por custo, mas sem fechar as rotas obrigatórias.Runner-up sob revisãocand-02Pressiona a decisão porque o winner está bloqueado.Próxima ação seguraRevisar bloqueio em RunsVolte para Runs e corrija o bloqueio antes de oficializar ou exportar.Decisão bloqueadaRecomendação automática bloqueadacand-01 | Segue na frente por custo, mas sem fechar as rotas obrigatórias.",
+    "contrast_excerpt": "Runner-up e contrasteRunner-upcand-02Margem de score-Score runner-up-Delta de custo-O runner-up virou contraste operacional porque o winner atual permanece bloqueado.Alternativa comparávelTechnical tie e trade-offsTechnical tie em leitura humanaSem technical tie ativo nesta leitura.Leitura do empateSem fator dominante de empate nesta leitura.Sem dimensão adicional relevante para technical tie.Trade-offs por perfilOs perfis convergem para o mesmo winner; o trade-off principal continua concentrado no runner-up e na margem de contraste.Diferenças relevantesSem diferença relevante registrada.",
+    "signal_excerpt": "Sinais para decisão humanaRotas críticas0Penalidades0Fallbacks0Leitura rápidaA escolha oficial ficou inviável porque uma rota obrigatória não conseguiu fechar com a configuração atual.",
+    "justification_excerpt": "Justificativa da escolhaPor que lideraSegue na frente por custo, mas sem fechar as rotas obrigatórias.O que ainda revisarO winner segue bloqueado por uma rota obrigatória não conseguiu fechar com a configuração atual.ExportaçãoExportação bloqueada enquanto o winner em leitura seguir inviável.Quando abrir AuditoriaAbra só se o contraste final ainda depender de trilha técnica, bundle ou breakdown detalhado.Winner em leituracand-01Referência oficialcand-01Regras disparadas0Fallbacks no breakdown0Regras e sinais usados nesta justificativaSem regra ou sinal adicional para além do racional principal já exibido."
+  },
+  "no_usable_result": {
+    "export_cta": {
+      "label": "Exportação bloqueada até existir decisão utilizável",
+      "disabled": true
+    },
+    "workspace_excerpt": "Leitura principal da decisãoSem decisão utilizávelAinda falta uma run utilizável para abrir winner, runner-up e contraste com segurança.Estado decisório agoraSem decisão utilizávelAinda falta uma run utilizável para abrir winner, runner-up e contraste com segurança.Ainda não existe winner legível; a prioridade continua sendo recuperar uma execução comparável em Runs.Passagem Runs -> DecisãoBloqueadaA Decisão permanece aberta apenas como leitura bloqueada; não existe resultado utilizável para oficializar.Technical tieNão ativoSem empate técnico ativo nesta leitura.Leitura humana observaSem contraste executivoSem winner e runner-up utilizáveis; volte para Runs antes de qualquer escolha manual. Perfil em leitura: Perfil atual | Perfil oficial: Perfil atual.Winner oficial indisponívelSem winnerAinda não existe saída utilizável para sustentar um winner oficial.Runner-up ainda indisponívelSem runner-upAinda não existe runner-up comparável para sustentar contraste suficiente nesta dobra.Próxima ação seguraRecuperar execução em RunsVolte para Runs, confirme uma execução concluída e retorne quando existir resultado comparável.Decisão bloqueadaRecomendação automática indisponívelAinda não ex",
+    "contrast_excerpt": "Runner-up e contrasteEstado atualAguardando contextoAinda não existe decisão utilizável para abrir a comparação principal.Próxima açãoRecupere uma execução comparável em Runs antes de fechar a leitura entre winner e runner-up.",
+    "signal_excerpt": "Sinais para decisão humanaEstado atualAguardando contextoAinda não há sinais consolidados para suportar a leitura de risco desta decisão.Próxima açãoAbra uma execução válida ou um candidato em foco para revelar penalidades, rotas críticas e fallback.",
+    "justification_excerpt": "Justificativa da escolhaEstado atualAguardando contextoAinda não existe winner utilizável para resumir o racional desta decisão.Próxima açãoVolte para Runs ou alivie os filtros antes de tentar fechar a justificativa final."
   }
 }
