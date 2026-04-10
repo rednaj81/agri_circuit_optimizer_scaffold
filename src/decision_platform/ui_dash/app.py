@@ -6894,6 +6894,15 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
     selected_summary = selected_summary or {}
     selected_candidate_id = str(selected_summary.get("candidate_id") or candidate_id).strip()
     selected_topology_family = str(selected_summary.get("topology_family") or summary.get("topology_family") or "-").strip()
+    manual_choice_diverges = bool(selected_candidate_id and official_product_candidate_id and selected_candidate_id != official_product_candidate_id)
+    manual_choice_targets_runner_up = bool(manual_choice_diverges and runner_up_id and selected_candidate_id == runner_up_id)
+    divergent_choice_signal = (
+        f"A escolha manual sustenta o runner-up {selected_candidate_id} no lugar da referência oficial {official_product_candidate_id}."
+        if manual_choice_targets_runner_up
+        else f"A escolha manual sustenta {selected_candidate_id} no lugar da referência oficial {official_product_candidate_id}."
+        if manual_choice_diverges
+        else ""
+    )
     selected_state_label = (
         "Escolha manual alinhada à referência oficial"
         if selected_candidate_id and selected_candidate_id == official_product_candidate_id
@@ -6906,6 +6915,8 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
     export_guidance = (
         str(decision_mode["export_guidance"])
         if decision_mode["key"] in {"no_usable_result", "winner_infeasible", "technical_tie"}
+        else f"A exportação só pode seguir com {selected_candidate_id} depois de registrar por que a escolha manual substitui a referência oficial {official_product_candidate_id}."
+        if manual_choice_diverges
         else f"O export atual seguirá {selected_candidate_id} sem sobrescrever a referência oficial do produto."
         if selected_candidate_id
         else "Escolha um candidato manualmente antes de exportar uma decisão assistida."
@@ -7023,12 +7034,16 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
         if not candidate_id
         else "Escolha manual congelada; não exporte enquanto o winner oficial permanecer bloqueado."
         if summary.get("feasible") is False
+        else f"{divergent_choice_signal} Registre a justificativa humana mínima antes da exportação assistida."
+        if decision_status == "technical_tie" and manual_choice_diverges
         else "Escolha manual registrada em contexto de technical tie; confirme o critério humano antes de liberar a exportação assistida."
         if decision_status == "technical_tie" and selected_candidate_id
+        else f"{divergent_choice_signal} Registre por que a escolha manual substitui a referência oficial antes de exportar."
+        if manual_choice_diverges
         else "Escolha manual alinhada com a referência oficial; prossiga para exportação quando a leitura humana confirmar."
         if selected_candidate_id and selected_candidate_id == official_product_candidate_id
         else "Escolha manual divergente; confirme o contraste antes de substituir a referência oficial."
-        if selected_candidate_id and official_product_candidate_id
+        if manual_choice_diverges
         else "Ainda sem escolha manual final; use winner e runner-up para fechar a decisão."
     )
     hero_tone = (
@@ -7072,10 +7087,14 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
         if not candidate_id
         else "Segurar exportação e revisar Runs"
         if summary.get("feasible") is False
+        else "Sustentar runner-up manualmente"
+        if decision_status == "technical_tie" and manual_choice_targets_runner_up
+        else "Sustentar escolha manual divergente"
+        if decision_status == "technical_tie" and manual_choice_diverges
         else "Manter comparação aberta"
         if decision_status == "technical_tie"
-        else "Confirmar antes de substituir o oficial"
-        if selected_candidate_id and official_product_candidate_id and selected_candidate_id != official_product_candidate_id
+        else "Confirmar escolha manual divergente"
+        if manual_choice_diverges
         else "Oficializar candidato"
     )
     final_action_signal = (
@@ -7083,10 +7102,12 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
         if not candidate_id
         else "O winner atual segue inviável; não transforme a leitura atual em candidato oficial antes de recuperar o cenário em Runs."
         if summary.get("feasible") is False
+        else f"{divergent_choice_signal} O empate técnico permanece assistido até a justificativa humana fechar a escolha."
+        if decision_status == "technical_tie" and manual_choice_diverges
         else f"{technical_tie_reason} Registre o critério humano do empate antes de oficializar."
         if decision_status == "technical_tie"
-        else "A escolha manual ainda diverge da referência oficial; confirme o contraste final antes de substituir o candidato oficial."
-        if selected_candidate_id and official_product_candidate_id and selected_candidate_id != official_product_candidate_id
+        else f"{divergent_choice_signal} Confirme o contraste final antes de substituir o candidato oficial."
+        if manual_choice_diverges
         else "Winner e runner-up já sustentam a confirmação final; a decisão humana pode oficializar depois da última checagem."
     )
     export_confidence_label = (
@@ -7094,10 +7115,12 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
         if not candidate_id
         else "Exportação bloqueada"
         if summary.get("feasible") is False
+        else "Exportação depende da justificativa humana"
+        if manual_choice_diverges
         else "Exportação condicionada"
         if decision_status == "technical_tie"
         else "Exportação sob revisão"
-        if selected_candidate_id and official_product_candidate_id and selected_candidate_id != official_product_candidate_id
+        if manual_choice_diverges
         else "Exportação pronta após confirmação"
     )
     export_confidence_signal = (
@@ -7110,6 +7133,8 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
         if not candidate_id
         else "Critério humano não destrava"
         if summary.get("feasible") is False
+        else "Justificativa humana da divergência"
+        if manual_choice_diverges
         else "Critério humano para destrate"
         if decision_status == "technical_tie"
         else "Critério humano para oficializar"
@@ -7119,6 +7144,8 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
         if not candidate_id
         else "Bloqueio operacional"
         if summary.get("feasible") is False
+        else f"{selected_candidate_id} no lugar de {official_product_candidate_id}"
+        if manual_choice_diverges
         else "Comparação aberta"
         if decision_status == "technical_tie"
         else "Oficialização recomendada"
@@ -7128,6 +7155,8 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
         if not candidate_id
         else f"{_humanize_infeasibility_reason(summary.get('infeasibility_reason'))}. {manual_choice_signal}"
         if summary.get("feasible") is False
+        else f"{divergent_choice_signal} {manual_choice_signal}"
+        if manual_choice_diverges
         else f"{technical_tie_reason} {manual_choice_signal}"
         if decision_status == "technical_tie"
         else f"{_humanize_decision_copy(comparison_difference)} {manual_choice_signal}"

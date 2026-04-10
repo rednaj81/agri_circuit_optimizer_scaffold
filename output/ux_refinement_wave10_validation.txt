@@ -1,24 +1,13 @@
-Wave 10 closure validation
-Date: 2026-04-08
-
-Purpose:
-- Final controlled closure of ux_phase_2 without repeating the same blocked headless screenshot attempt.
-
-Functional baseline carried forward:
-- Business graph only on the primary Studio surface
-- Route-first workflow on the canvas
-- Contextual route editing near the canvas
-- Business-language labels on primary route selection and readiness
-- Existing Studio guard-rails and smoke tests remain the functional reference
-
-Visual evidence status:
-- Browser-native screenshot remained blocked in wave 9
-- Assessment reference: output/playwright/studio-fullhd-wave9-assessment.json
-- Runtime blocker reference: output/playwright/wave9-edge-native.stderr.log
-
-Decision prepared for supervisor:
-- Accept ux_phase_2 with documented operational exception for rasterized evidence in this runtime
-  or
-- Keep the phase blocked strictly on environment evidence, not on Studio functional UX delivery
-
-No new screenshot attempt was executed in wave 10 because the environment and permissions did not change.
+wave: 10
+phase_id: phase_ux_refinement
+ux_phase_id: ux_phase_5
+repo_head: 0da7f1ef8d740d2b9d8c637c13656de3aaaf1839
+validations:
+  - command: .\\.venv\\Scripts\\python.exe -m py_compile src\\decision_platform\\ui_dash\\app.py
+    result: passed
+  - command: .\\.venv\\Scripts\\python.exe -m pytest tests\\decision_platform\\test_phase4_decision_acceptance.py tests\\decision_platform\\test_ui_smoke.py -q
+    result: passed
+    summary: 129 passed in 352.02s (0:05:52)
+inherited_constraint:
+  - ux_phase_3=blocked_on_evidence
+cycle_stop: true

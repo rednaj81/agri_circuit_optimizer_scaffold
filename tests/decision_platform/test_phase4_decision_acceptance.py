@@ -228,3 +228,46 @@ def test_technical_tie_state_keeps_assisted_language_across_secondary_panels() -
     assert "a leitura continua em modo assistido" in signal_text.lower()
     assert "technical tie ativo; exporte apenas como decisão assistida" in justification_text.lower()
     assert "a escolha oficial segue viável na leitura atual do ranking" not in signal_text.lower()
+
+
+@pytest.mark.fast
+def test_divergent_manual_choice_surfaces_export_impact_and_human_justification() -> None:
+    summary = {
+        "candidate_id": "cand-01",
+        "runner_up_candidate_id": "cand-02",
+        "official_product_candidate_id": "cand-01",
+        "decision_status": "technical_tie",
+        "technical_tie": True,
+        "feasible": True,
+        "winner_reason_summary": "Winner e runner-up seguem próximos demais para oficialização automática.",
+        "key_factors": [{"summary": "winner e runner-up seguem empatados nas dimensões operacionais principais."}],
+    }
+    workspace_text = _collect_text(
+        render_decision_workspace_panel(
+            summary,
+            {"visible_candidate_count": 3},
+            {"candidate_id": "cand-02", "topology_family": "hybrid_loop"},
+        )
+    )
+
+    assert "sustentar runner-up manualmente" in workspace_text.lower()
+    assert "exportação depende da justificativa humana" in workspace_text.lower()
+    assert "justificativa humana da divergência" in workspace_text.lower()
+    assert "cand-02 no lugar de cand-01" in workspace_text
+    assert "A escolha manual sustenta o runner-up cand-02 no lugar da referência oficial cand-01" in workspace_text
+
+
+@pytest.mark.fast
+def test_phase4_exit_and_cycle_stop_keep_inherited_blocker_explicit() -> None:
+    from pathlib import Path
+
+    phase4_exit = Path("docs/2026-04-10_phase_ux_refinement_phase4_exit.md").read_text(encoding="utf-8")
+    cycle_stop = Path("docs/2026-04-10_phase_ux_refinement_stop.md").read_text(encoding="utf-8")
+
+    assert "ux_phase_4" in phase4_exit
+    assert "closed for the current refinement cycle" in phase4_exit
+    assert "ux_phase_3=blocked_on_evidence" in phase4_exit
+    assert "phase_ux_refinement" in cycle_stop
+    assert "ux_phase_3=blocked_on_evidence" in cycle_stop
+    assert "Studio: frozen" in cycle_stop
+    assert "Runs: frozen" in cycle_stop

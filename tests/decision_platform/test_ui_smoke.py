@@ -2636,17 +2636,17 @@ def test_decision_workspace_panel_makes_winner_runner_up_and_tie_legible() -> No
     assert "Winner sugerido agora" in panel_text
     assert "Runner-up ainda comparável" in panel_text
     assert "Ação final recomendada" in panel_text
-    assert "Manter comparação aberta" in panel_text
+    assert "Sustentar escolha manual divergente" in panel_text
     assert "Confiança de exportação" in panel_text
-    assert "Exportação condicionada" in panel_text
+    assert "Exportação depende da justificativa humana" in panel_text
     assert "Aprofundar se precisar" in panel_text
-    assert "Critério humano para destrate" in panel_text
+    assert "Justificativa humana da divergência" in panel_text
     assert "Comparação em aberto" in panel_text
     assert "Risco dominante" in panel_text
     assert "empatados em custo global e leitura operacional principal" in panel_text
     assert "cand-04" in panel_text
-    assert "confirme o critério humano antes de liberar a exportação assistida" in panel_text.lower()
-    assert "registre o critério humano do empate" in panel_text.lower()
+    assert "registre a justificativa humana mínima antes da exportação assistida" in panel_text.lower()
+    assert "a escolha manual sustenta cand-04 no lugar da referência oficial cand-03" in panel_text.lower()
     assert "Escolha final e exportação" in panel_text
     assert "Escolha final humana: cand-04" in panel_text
     assert "Comparação assistida, perfis e escolha" in panel_text
@@ -2658,6 +2658,36 @@ def test_decision_workspace_panel_makes_winner_runner_up_and_tie_legible() -> No
     assert _find_component_by_id(panel, "decision-profile-views-panel") is not None
     assert _find_component_by_id(panel, "decision-final-comparison-panel") is not None
     assert _find_component_by_id(panel, "decision-final-choice-panel") is not None
+
+
+def test_decision_workspace_panel_exposes_divergent_manual_choice_in_primary_fold() -> None:
+    panel = render_decision_workspace_panel(
+        {
+            "candidate_id": "cand-01",
+            "runner_up_candidate_id": "cand-02",
+            "official_product_candidate_id": "cand-01",
+            "decision_status": "technical_tie",
+            "technical_tie": True,
+            "feasible": True,
+            "key_factors": [{"summary": "winner e runner-up seguem empatados nas dimensões operacionais principais."}],
+            "topology_family": "hybrid_free",
+        },
+        {
+            "visible_candidate_count": 4,
+            "top_visible_family": "hybrid_free",
+        },
+        {
+            "candidate_id": "cand-02",
+            "topology_family": "hybrid_loop",
+        },
+    )
+    panel_text = _collect_text_content(panel)
+
+    assert "Sustentar runner-up manualmente" in panel_text
+    assert "Exportação depende da justificativa humana" in panel_text
+    assert "Justificativa humana da divergência" in panel_text
+    assert "cand-02 no lugar de cand-01" in panel_text
+    assert "a escolha manual sustenta o runner-up cand-02 no lugar da referência oficial cand-01" in panel_text.lower()
 
 
 def test_phase4_open_doc_keeps_phase3_blocked_status_visible_during_transition() -> None:
