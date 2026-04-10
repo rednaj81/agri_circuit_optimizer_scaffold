@@ -5656,6 +5656,29 @@ def render_runs_workspace_panel(
     )
     focus_run_label = selected_run_id or fallback_focus_run_id or "Nenhuma"
     focus_status_label = _humanize_run_status(selected_run_status or detail_for_progress.get("status"))
+    focus_mode_label = str(detail_for_progress.get("requested_execution_mode") or detail_for_progress.get("execution_mode") or "-")
+    focus_lineage = (selected_run_summary or {}).get("lineage") or {}
+    focus_rerun_source = str(selected_run_detail.get("rerun_of_run_id") or focus_lineage.get("source_run_id") or "").strip()
+    focus_is_rerun = bool(focus_rerun_source or focus_lineage.get("is_rerun"))
+    focus_result_ready = _run_has_usable_result(selected_run_summary or detail_for_progress) or state["decision_enabled"]
+    focus_state_tone = (
+        "ready"
+        if focus_result_ready
+        else (
+            "running"
+            if str(detail_for_progress.get("status") or "").strip() in {"running", "preparing", "exporting"}
+            else (
+                "failed"
+                if str(detail_for_progress.get("status") or "").strip() in {"failed", "canceled"}
+                else ("queued" if str(detail_for_progress.get("status") or "").strip() == "queued" else "idle")
+            )
+        )
+    )
+    focus_result_copy = (
+        "Resultado pronto para leitura posterior e passagem honesta para Decisão."
+        if focus_result_ready
+        else "Ainda sem resultado utilizável; a prioridade continua sendo conduzir ou recuperar esta run."
+    )
     return html.Div(
         children=[
             html.Div("Leitura operacional de Runs", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
@@ -5668,30 +5691,65 @@ def render_runs_workspace_panel(
             ),
             html.Div(
                 id="runs-workspace-mission-grid",
-                style={**UI_TWO_COLUMN_STYLE, "marginBottom": "12px", "alignItems": "start"},
+                style={"display": "grid", "gridTemplateColumns": "minmax(0, 1.45fr) minmax(320px, 0.95fr)", "gap": "16px", "marginBottom": "12px", "alignItems": "start"},
                 children=[
                     html.Div(
-                        id="runs-workspace-history-panel",
+                        id="runs-workspace-focus-panel",
                         style={**UI_CARD_STYLE, "padding": "14px"},
                         children=[
-                            html.Div("Histórico recente", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+                            html.Div("Run em foco", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
                             html.Div(
-                                (
-                                    f"Último desfecho: {latest_recent_run.get('run_id')}"
-                                    if latest_recent_run
-                                    else "Ainda não existe histórico recente encerrado."
-                                ),
-                                style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"},
+                                style={"display": "flex", "justifyContent": "space-between", "alignItems": "start", "gap": "12px", "marginTop": "6px", "flexWrap": "wrap"},
+                                children=[
+                                    html.Div(
+                                        children=[
+                                            html.Div(focus_run_label, style={"fontSize": "28px", "fontWeight": 700, "lineHeight": "1.1"}),
+                                            html.Div(focus_reason, style={"lineHeight": "1.55", "marginTop": "8px", "color": "#496158"}),
+                                        ]
+                                    ),
+                                    html.Div(
+                                        style={"display": "flex", "gap": "8px", "flexWrap": "wrap"},
+                                        children=[
+                                            _toned_pill(focus_status_label, focus_state_tone),
+                                            _toned_pill(focus_mode_label, "idle"),
+                                            _toned_pill(f"re-run de {focus_rerun_source}", "needs_attention") if focus_is_rerun else None,
+                                        ],
+                                    ),
+                                ],
                             ),
                             html.Div(
-                                usable_result if latest_recent_run else "Enfileire a primeira run para abrir histórico operacional reaproveitável.",
-                                style={"lineHeight": "1.55", "marginTop": "8px", "color": "#496158"},
+                                style={**UI_TWO_COLUMN_STYLE, "marginTop": "12px"},
+                                children=[
+                                    _signal_card("Progresso", progress_snapshot["progress_label"], progress_snapshot["progress_text"], tone=focus_state_tone),
+                                    _signal_card("Resultado", "Pronto" if focus_result_ready else "Pendente", focus_result_copy, tone="ready" if focus_result_ready else "needs_attention"),
+                                    _signal_card("Recuperação", state["recovery_headline"], state["next_action"], tone="failed" if state["primary_cta_target"] == "rerun" or state["failed_count"] else ("ready" if focus_result_ready else "needs_attention")),
+                                    _signal_card("Ação agora", action_signal_value, state["next_action"], tone="ready" if focus_result_ready else "needs_attention"),
+                                ],
                             ),
                             html.Div(
-                                id="runs-workspace-history-list",
-                                style={"display": "grid", "gap": "10px", "marginTop": "12px"},
-                                children=[_run_history_entry(run, latest=index == 0) for index, run in enumerate(recent_runs)]
-                                or [html.Div("Ainda não há histórico recente para leitura.", style={"color": "#496158"})],
+                                id="runs-workspace-context-strip",
+                                style={**UI_MUTED_CARD_STYLE, "padding": "14px", "marginTop": "12px"},
+                                children=[
+                                    html.Div("Leituras separadas", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+                                    html.Div(
+                                        style={**UI_THREE_COLUMN_STYLE, "marginTop": "10px"},
+                                        children=[
+                                            _compact_value_card("Cenário", _humanize_readiness_status(state["studio_status"]), str(studio_summary.get("readiness_headline") or state["readiness_note"])),
+                                            _compact_value_card("Fila agora", next_queued_run_id or ("Preparando" if state["preparing_count"] else "Vazia"), queue_lane_copy),
+                                            _compact_value_card("Resultado", "Pronto" if focus_result_ready else "Pendente", usable_result),
+                                        ],
+                                    ),
+                                ],
+                            ),
+                            html.Div(
+                                id="runs-workspace-next-step-panel",
+                                style={**UI_MUTED_CARD_STYLE, "padding": "14px", "marginTop": "12px"},
+                                children=[
+                                    html.Div("Próxima ação", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+                                    html.Div(action_signal_value, style={"fontSize": "22px", "fontWeight": 700, "marginTop": "6px"}),
+                                    html.Div(state["decision_gate"], style={"lineHeight": "1.55", "marginTop": "8px"}),
+                                    html.Div(style={**UI_ACTION_ROW_STYLE, "marginTop": "12px"}, children=[local_recovery_cta, decision_cta]),
+                                ],
                             ),
                         ],
                     ),
@@ -5703,59 +5761,41 @@ def render_runs_workspace_panel(
                                 id="runs-workspace-live-strip",
                                 style={**UI_CARD_STYLE, "padding": "14px"},
                                 children=[
-                                    html.Div("Ao vivo", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+                                    html.Div("Fila agora", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+                                    html.Div(queue_focus, style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"}),
+                                    html.Div(queue_lane_copy, style={"lineHeight": "1.55", "marginTop": "8px", "color": "#496158"}),
                                     html.Div(
-                                        style={**UI_TWO_COLUMN_STYLE, "marginTop": "10px"},
+                                        style={"display": "flex", "gap": "8px", "flexWrap": "wrap", "marginTop": "10px"},
                                         children=[
-                                            _signal_card(
-                                                "Fila agora",
-                                                next_queued_run_id or ("Preparando" if state["preparing_count"] and not active_run_ids else "Vazia"),
-                                                queue_lane_copy,
-                                                tone="queued" if next_queued_run_id or state["preparing_count"] else "idle",
-                                            ),
-                                            _signal_card(
-                                                "Run em foco",
-                                                active_run_ids[0] if active_run_ids else ("Preparando" if state["preparing_count"] else focus_run_label),
-                                                (
-                                                    f"{focus_status_label}. {focus_reason}"
-                                                    if focus_run_label != "Nenhuma"
-                                                    else "Nenhuma execução em foco agora."
-                                                ),
-                                                tone="running" if active_run_ids or state["preparing_count"] else "idle",
-                                            ),
+                                            _toned_pill(state["queue_state"], "running" if active_run_ids or state["preparing_count"] else ("queued" if next_queued_run_id else "idle")),
+                                            _toned_pill(f"{queued_count} na fila", "queued" if queued_count else "idle"),
+                                            _toned_pill(f"{len(active_run_ids)} em execução", "running" if active_run_ids else "idle"),
                                         ],
                                     ),
                                 ],
                             ),
                             html.Div(
-                                id="runs-workspace-next-step-panel",
-                                style={**UI_MUTED_CARD_STYLE, "padding": "14px"},
+                                id="runs-workspace-history-panel",
+                                style={**UI_CARD_STYLE, "padding": "14px"},
                                 children=[
-                                    html.Div("Próxima ação", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
-                                    html.Div(action_signal_value, style={"fontSize": "22px", "fontWeight": 700, "marginTop": "6px"}),
-                                    html.Div(state["next_action"], style={"lineHeight": "1.55", "marginTop": "8px"}),
-                                    html.Div(style={**UI_ACTION_ROW_STYLE, "marginTop": "12px"}, children=[local_recovery_cta]),
+                                    html.Div("Histórico terminal", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
                                     html.Div(
-                                        style={"display": "flex", "gap": "8px", "flexWrap": "wrap", "marginTop": "12px"},
-                                        children=[
-                                            _toned_pill(focus_status_label, "running" if active_run_ids or state["preparing_count"] else ("failed" if state["failed_count"] else "idle")),
-                                            _toned_pill("resultado pronto" if state["decision_enabled"] else "sem resultado pronto", "ready" if state["decision_enabled"] else "needs_attention"),
-                                        ],
+                                        (
+                                            f"Último desfecho: {latest_recent_run.get('run_id')}"
+                                            if latest_recent_run
+                                            else "Ainda não existe histórico terminal."
+                                        ),
+                                        style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"},
                                     ),
-                                ],
-                            ),
-                            html.Div(
-                                id="runs-workspace-context-strip",
-                                style={**UI_MUTED_CARD_STYLE, "padding": "14px"},
-                                children=[
-                                    html.Div("Leituras separadas", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
                                     html.Div(
-                                        style={**UI_THREE_COLUMN_STYLE, "marginTop": "10px"},
-                                        children=[
-                                            _compact_value_card("Cenário", _humanize_readiness_status(state["studio_status"]), str(studio_summary.get("readiness_headline") or state["readiness_note"])),
-                                            _compact_value_card("Run/job", focus_run_label, focus_status_label),
-                                            _compact_value_card("Resultado", "Pronto" if state["decision_enabled"] else "Pendente", usable_result),
-                                        ],
+                                        usable_result if latest_recent_run else "Quando a primeira run terminar, este trilho passa a carregar o último desfecho reaproveitável.",
+                                        style={"lineHeight": "1.55", "marginTop": "8px", "color": "#496158"},
+                                    ),
+                                    html.Div(
+                                        id="runs-workspace-history-list",
+                                        style={"display": "grid", "gap": "10px", "marginTop": "12px"},
+                                        children=[_run_history_entry(run, latest=index == 0) for index, run in enumerate(recent_runs[:2])]
+                                        or [html.Div("Ainda não há histórico recente para leitura.", style={"color": "#496158"})],
                                     ),
                                 ],
                             ),
@@ -5778,21 +5818,9 @@ def render_runs_workspace_panel(
                 ],
             ),
             html.Div(
-                style=UI_THREE_COLUMN_STYLE,
-                children=[
-                    _metric_card("Fila", next_queued_run_id or ("Preparando" if state["preparing_count"] else "Vazia")),
-                    _metric_card("Run em foco", focus_run_label, focus_status_label),
-                    _metric_card("Histórico útil", latest_recent_run.get("run_id") if latest_recent_run else "-", _run_history_note(latest_recent_run) if latest_recent_run else "Sem encerramento recente"),
-                    _metric_card("Na fila", queued_count),
-                    _metric_card("Em execução", len(active_run_ids)),
-                    _metric_card("Falhas recentes", state["failed_count"], recovery_headline if (recovery_headline := state["recovery_headline"]) else ""),
-                ],
-            ),
-            html.Div(
                 style={**UI_ACTION_ROW_STYLE, "marginTop": "12px"},
                 children=[
                     _button_link("Voltar ao Studio", "?tab=studio", "runs-workspace-open-studio-link"),
-                    decision_cta,
                     _button_link("Abrir Auditoria", "?tab=audit", "runs-workspace-open-audit-link"),
                 ],
             ),

@@ -176,13 +176,11 @@ def test_phase3_queue_acceptance_runs_ui_surfaces_operational_queue_and_detail_l
     overview_text = _collect_text(overview)
     detail_text = _collect_text(detail)
 
-    assert "Histórico recente" in workspace_text
-    assert "Ao vivo" in workspace_text
-    assert "Fila agora" in workspace_text
     assert "Run em foco" in workspace_text
+    assert "Fila agora" in workspace_text
+    assert "Histórico terminal" in workspace_text
     assert "Leituras separadas" in workspace_text
     assert "Cenário" in workspace_text
-    assert "Run/job" in workspace_text
     assert "Resultado" in workspace_text
     assert "Em execução" in workspace_text
     assert "Fila agora" in overview_text

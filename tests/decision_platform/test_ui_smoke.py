@@ -1168,15 +1168,14 @@ def test_runs_workspace_panel_distinguishes_scenario_gate_from_execution_state()
     blocked_text = _collect_text_content(blocked_panel)
     ready_text = _collect_text_content(ready_panel)
 
-    assert "Histórico recente" in blocked_text
-    assert "Ao vivo" in blocked_text
-    assert "Fila agora" in blocked_text
     assert "Run em foco" in blocked_text
+    assert "Fila agora" in blocked_text
+    assert "Histórico terminal" in blocked_text
     assert "Leituras separadas" in blocked_text
     assert "Gate do cenário e limites desta leitura" in blocked_text
     assert "Limitação agora" in blocked_text
     assert "A limitação principal ainda está no cenário" in blocked_text
-    assert "Histórico útil" in blocked_text
+    assert "Resultado" in blocked_text
     assert "Gate do cenário e limites desta leitura" in ready_text
     assert "Limitação agora" in ready_text
     assert "O cenário já passou no gate principal" in ready_text
@@ -1684,16 +1683,15 @@ def test_runs_workspace_panel_prioritizes_queue_focus_and_primary_transition() -
     panel_text = _collect_text_content(panel)
 
     assert "Leitura operacional de Runs" in panel_text
-    assert "Histórico recente" in panel_text
-    assert "Ao vivo" in panel_text
-    assert "Fila agora" in panel_text
     assert "Run em foco" in panel_text
+    assert "Fila agora" in panel_text
+    assert "Histórico terminal" in panel_text
     assert "Leituras separadas" in panel_text
     assert "Próxima ação" in panel_text
     assert "Gate do cenário e limites desta leitura" in panel_text
     assert "run-003" in panel_text
     assert "resultado utilizável" in panel_text.lower()
-    assert "Run/job" in panel_text
+    assert "Resultado" in panel_text
     assert _find_component_by_id(panel, "runs-workspace-operational-lanes") is not None
     assert _find_component_by_id(panel, "runs-workspace-open-studio-link") is not None
     assert getattr(_find_component_by_id(panel, "runs-workspace-open-decision-button"), "disabled", None) is False
@@ -1800,7 +1798,7 @@ def test_runs_workspace_panel_distinguishes_failure_recovery_from_decision_ready
     failed_text = _collect_text_content(failed_panel)
 
     assert "Resultado bloqueado" in failed_text
-    assert "Histórico recente" in failed_text
+    assert "Histórico terminal" in failed_text
     assert "run-009" in failed_text
     assert "Revisar falha" in failed_text
     assert "ainda não existe resultado utilizável para Decisão" in failed_text
