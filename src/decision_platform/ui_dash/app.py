@@ -3953,10 +3953,30 @@ def render_studio_workspace_panel(
                     html.Div(next_available_action, style={"fontWeight": 700, "lineHeight": "1.45", "marginTop": "6px"}),
                     html.Div(local_fix_note, style={"lineHeight": "1.45", "marginTop": "6px", "color": "#496158"}),
                     html.Div(
+                        str(business_flow.get("headline") or supply_flow_summary),
+                        style={"lineHeight": "1.45", "marginTop": "6px", "color": "#496158"},
+                    ),
+                    html.Div(
                         style={"display": "flex", "gap": "8px", "flexWrap": "wrap", "marginTop": "8px"},
                         children=[
                             _toned_pill(local_fix_label, "ready" if can_require_measurement_directly or can_create_route_from_focus or can_reverse_directly else "needs_attention"),
                             _toned_pill("Sem workbench" if can_require_measurement_directly or can_create_route_from_focus or can_reverse_directly else "Foco ainda insuficiente", "ready" if can_require_measurement_directly or can_create_route_from_focus or can_reverse_directly else "idle"),
+                        ],
+                    ),
+                    html.Div(
+                        style={**UI_ACTION_ROW_STYLE, "marginTop": "10px"},
+                        children=[
+                            html.Button(
+                                "Corrigir medição agora",
+                                id="studio-workspace-apply-local-fix-button",
+                                style=UI_BUTTON_STYLE,
+                                disabled=not can_require_measurement_directly,
+                            ),
+                            html.Button(
+                                "Abrir bancada completa",
+                                id="studio-workspace-local-fix-open-workbench-button",
+                                style=UI_BUTTON_STYLE,
+                            ),
                         ],
                     ),
                 ],
@@ -9388,6 +9408,7 @@ def build_app(
         Input("studio-connectivity-route-apply-button", "n_clicks"),
         Input("studio-connectivity-route-measurement-button", "n_clicks"),
         Input("studio-workspace-require-measurement-button", "n_clicks"),
+        Input("studio-workspace-apply-local-fix-button", "n_clicks"),
         State("routes-grid", "rowData"),
         State("edge-studio-selected-id", "data"),
         State("candidate-links-grid", "rowData"),
@@ -9402,6 +9423,7 @@ def build_app(
         apply_n_clicks: Any,
         measurement_n_clicks: Any,
         workspace_measurement_n_clicks: Any,
+        local_fix_n_clicks: Any,
         route_rows: list[dict[str, Any]] | None,
         selected_link_id: str | None,
         candidate_links_rows: list[dict[str, Any]] | None,
@@ -9411,7 +9433,7 @@ def build_app(
         q_min_delivered_lpm: Any,
         notes: str | None,
     ) -> tuple[list[dict[str, Any]], str]:
-        if max(int(apply_n_clicks or 0), int(measurement_n_clicks or 0), int(workspace_measurement_n_clicks or 0)) <= 0:
+        if max(int(apply_n_clicks or 0), int(measurement_n_clicks or 0), int(workspace_measurement_n_clicks or 0), int(local_fix_n_clicks or 0)) <= 0:
             return route_rows or [], ""
         form_values = _edge_route_focus_form_values(
             route_rows,
@@ -9422,7 +9444,7 @@ def build_app(
         if not selected_route_id:
             return route_rows or [], "Selecione uma conexão com rota operacional antes de editar este trecho."
         measurement_required_value = "measurement_required" in (measurement_required or [])
-        measurement_clicks = max(int(measurement_n_clicks or 0), int(workspace_measurement_n_clicks or 0))
+        measurement_clicks = max(int(measurement_n_clicks or 0), int(workspace_measurement_n_clicks or 0), int(local_fix_n_clicks or 0))
         if measurement_clicks > int(apply_n_clicks or 0):
             measurement_required_value = True
         try:
@@ -9438,9 +9460,13 @@ def build_app(
         except ValueError as exc:
             return route_rows or [], str(exc)
         status_message = (
-            f"Rota {route_id} agora exige medição direta no trecho em foco."
-            if measurement_clicks > int(apply_n_clicks or 0)
-            else f"Rota {route_id} atualizada direto no painel de conectividade."
+            f"Correção local aplicada: rota {route_id} agora exige medição direta no trecho em foco."
+            if int(local_fix_n_clicks or 0) >= measurement_clicks and int(local_fix_n_clicks or 0) > int(apply_n_clicks or 0)
+            else (
+                f"Rota {route_id} agora exige medição direta no trecho em foco."
+                if measurement_clicks > int(apply_n_clicks or 0)
+                else f"Rota {route_id} atualizada direto no painel de conectividade."
+            )
         )
         return updated_rows, status_message
 
@@ -9911,6 +9937,7 @@ def build_app(
         Input("studio-canvas-open-workbench-button", "n_clicks"),
         Input("studio-readiness-open-workbench-button", "n_clicks"),
         Input("studio-workspace-open-workbench-button", "n_clicks"),
+        Input("studio-workspace-local-fix-open-workbench-button", "n_clicks"),
         Input("studio-command-open-workbench-button", "n_clicks"),
         Input("studio-focus-recommended-open-workbench-button", "n_clicks"),
         Input("studio-focus-open-workbench-button", "n_clicks"),
@@ -9920,6 +9947,7 @@ def build_app(
         canvas_n_clicks: Any,
         readiness_n_clicks: Any,
         workspace_n_clicks: Any,
+        workspace_local_fix_n_clicks: Any,
         command_center_n_clicks: Any = None,
         recommended_n_clicks: Any = None,
         n_clicks: Any = None,
@@ -9928,6 +9956,7 @@ def build_app(
             canvas_n_clicks
             or readiness_n_clicks
             or workspace_n_clicks
+            or workspace_local_fix_n_clicks
             or command_center_n_clicks
             or recommended_n_clicks
             or n_clicks

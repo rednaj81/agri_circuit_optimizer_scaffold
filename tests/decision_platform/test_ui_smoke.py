@@ -906,6 +906,7 @@ def test_studio_workspace_panel_promotes_direct_measurement_fix_in_primary_conte
     assert "Correção local mais curta" in panel_text
     assert "Sem workbench" in panel_text
     assert "Exigir medição direta agora" in panel_text
+    assert "Tanque de água supre Misturador" in panel_text
     assert "Próxima ação" in panel_text
     assert "Disponível agora neste trecho com dosagem." in panel_text
     assert "Use estes botões para reclassificar a rota em foco sem abrir a bancada completa." in panel_text
@@ -913,6 +914,7 @@ def test_studio_workspace_panel_promotes_direct_measurement_fix_in_primary_conte
     assert "Desejável" in panel_text
     assert "Opcional" in panel_text
     assert _find_component_by_id(panel, "studio-workspace-local-fix-strip") is not None
+    assert getattr(_find_component_by_id(panel, "studio-workspace-apply-local-fix-button"), "disabled", None) is False
     assert measurement_button is not None
     assert getattr(measurement_button, "disabled", None) is False
     assert create_route_button is not None
@@ -1472,6 +1474,7 @@ def test_connectivity_route_callback_updates_selected_edge_route_directly() -> N
         1,
         0,
         0,
+        0,
         route_rows,
         "L001",
         candidate_links_rows,
@@ -1506,6 +1509,7 @@ def test_workspace_context_measurement_button_updates_selected_edge_route_direct
         0,
         0,
         1,
+        0,
         route_rows,
         "L001",
         candidate_links_rows,
@@ -1517,6 +1521,37 @@ def test_workspace_context_measurement_button_updates_selected_edge_route_direct
     )
 
     assert status == "Rota R001 agora exige medição direta no trecho em foco."
+    assert updated_rows[0]["measurement_required"] == 1
+
+
+def test_workspace_local_fix_button_updates_selected_edge_route_directly() -> None:
+    with diagnostic_runtime_test_mode():
+        app = build_app("data/decision_platform/maquete_v2")
+
+    callback = _get_callback(app, input_id="studio-workspace-apply-local-fix-button")
+    route_rows = [
+        {"route_id": "R001", "source": "W", "sink": "M", "mandatory": True, "measurement_required": 0, "dose_min_l": 2.0, "q_min_delivered_lpm": 12.0, "notes": ""},
+    ]
+    candidate_links_rows = [
+        {"link_id": "L001", "from_node": "W", "to_node": "M", "archetype": "bus_segment"},
+    ]
+
+    updated_rows, status = callback(
+        0,
+        0,
+        0,
+        1,
+        route_rows,
+        "L001",
+        candidate_links_rows,
+        "mandatory",
+        [],
+        2.0,
+        12.0,
+        "",
+    )
+
+    assert status == "Correção local aplicada: rota R001 agora exige medição direta no trecho em foco."
     assert updated_rows[0]["measurement_required"] == 1
 
 
