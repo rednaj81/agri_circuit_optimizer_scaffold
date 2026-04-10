@@ -1142,7 +1142,7 @@ def test_runs_tab_combines_queue_and_execution_summary() -> None:
     assert _find_component_by_id(runs_tab, "runs-flow-open-decision-button") is not None
     assert _find_component_by_id(runs_tab, "runs-workspace-open-studio-link") is not None
     assert _find_component_by_id(runs_tab, "runs-workspace-open-decision-button") is not None
-    assert _find_component_by_id(runs_tab, "runs-workspace-operational-lanes") is not None
+    assert _find_component_by_id(runs_tab, "runs-workspace-live-strip") is not None
     assert _find_component_by_id(runs_tab, "runs-workspace-next-step-panel") is not None
     assert _find_component_by_id(runs_tab, "execution-summary-panel") is not None
     assert _find_component_by_id(runs_tab, "run-jobs-status-banner") is not None
@@ -1260,12 +1260,11 @@ def test_studio_readiness_panel_surfaces_runs_transition_with_real_readiness() -
     panel_text = _collect_text_content(panel)
 
     assert "Passagem para Runs" in panel_text
-    assert "Objetivo desta área" in panel_text
+    assert "Estado dominante" in panel_text
     assert "Próxima ação" in panel_text
-    assert "Fluxo principal" in panel_text
     assert "Fila local de correção" in panel_text
-    assert "Agora no Studio" in panel_text
-    assert "Destino seguinte" in panel_text
+    assert "Bloqueio principal" in panel_text
+    assert "Bloqueios, avisos e próximos passos" in panel_text
     assert "ainda não tem fluxo suficiente" in panel_text.lower()
     assert "Conectar o grafo principal" in panel_text
     assert "Exige atenção" in panel_text
@@ -1309,7 +1308,7 @@ def test_studio_readiness_panel_humanizes_primary_blockers_and_warnings() -> Non
     assert "Bloqueado no Studio" in panel_text
     assert "Corrigir no canvas" in panel_text
     assert "Abrir Runs com bloqueios" in panel_text
-    assert "Impacto operacional" in panel_text
+    assert "Bloqueio principal" in panel_text
     assert "Trazer para o canvas" in panel_text
 
 
@@ -1748,7 +1747,7 @@ def test_runs_workspace_panel_prioritizes_queue_focus_and_primary_transition() -
     assert "saída reaproveitável para Decisão" in panel_text
     assert "Resultado" in panel_text
     assert _find_component_by_id(panel, "runs-workspace-progress-rail") is not None
-    assert _find_component_by_id(panel, "runs-workspace-operational-lanes") is not None
+    assert _find_component_by_id(panel, "runs-workspace-live-strip") is not None
     assert _find_component_by_id(panel, "runs-workspace-open-studio-link") is not None
     assert getattr(_find_component_by_id(panel, "runs-workspace-open-decision-button"), "disabled", None) is False
     assert _find_component_by_id(panel, "runs-workspace-primary-open-decision-button") is not None
@@ -1829,7 +1828,7 @@ def test_studio_runs_decision_primary_journey_uses_consistent_transition_languag
     assert "Leitura humana" in decision_text
     assert "confirmação final" in decision_text.lower()
     assert "Confirmar decisão final" in decision_text
-    assert "Recomendação automática" in decision_text
+    assert "Winner oficial agora" in decision_text
     assert "Escolha final humana" in decision_text
 
 
@@ -2067,7 +2066,6 @@ def test_run_jobs_overview_panel_clarifies_queue_now_vs_recent_history() -> None
     assert "Em execução: run-003" in panel_text
     assert "Próxima a rodar: run-004" in panel_text
     assert "Última run conhecida: run-003" in panel_text
-    assert "Falhas" in panel_text
     assert _component_id_is_inside_details(panel, "run-jobs-overview-history-block") is True
 
 
@@ -2088,7 +2086,6 @@ def test_run_jobs_overview_panel_surfaces_preparing_and_recovery_states() -> Non
     panel_text = _collect_text_content(panel)
 
     assert "Preparação em andamento" in panel_text
-    assert "1 preparando" in panel_text
     assert "Falhou" in panel_text
     assert "Preparando" in panel_text
 
@@ -2476,19 +2473,17 @@ def test_decision_workspace_panel_makes_winner_runner_up_and_tie_legible() -> No
     assert "Technical tie" in panel_text
     assert "Explícito" in panel_text
     assert "Technical tie explícito" in panel_text
-    assert "Empate técnico assistido" in panel_text
-    assert "Winner sugerido agora" in panel_text
-    assert "Runner-up ainda comparável" in panel_text
+    assert "Escolha humana e exportação" in panel_text
     assert "Escolha final humana" in panel_text
-    assert "O que está empatado" in panel_text
+    assert "Risco dominante" in panel_text
+    assert "Comparação aberta" in panel_text
     assert "empatados em custo global e leitura operacional principal" in panel_text
     assert "cand-04" in panel_text
     assert "confirme o critério humano antes de liberar a exportação assistida" in panel_text.lower()
     assert "registre o critério humano do empate" in panel_text.lower()
-    assert "Recomendação e escolha final" in panel_text
-    assert "Recomendação automática atual: cand-01" in panel_text
+    assert "Escolha final e exportação" in panel_text
     assert "Escolha final humana: cand-04" in panel_text
-    assert "Comparação assistida e contexto" in panel_text
+    assert "Comparação assistida, perfis e escolha" in panel_text
     assert _find_component_by_id(panel, "decision-workspace-primary-fold") is not None
     assert _find_component_by_id(panel, "decision-workspace-state-hero") is not None
     assert _find_component_by_id(panel, "decision-workspace-state-rail") is not None

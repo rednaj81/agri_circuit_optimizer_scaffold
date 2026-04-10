@@ -1,13 +1,10 @@
-Wave 1 targeted validation
+wave: 1
+phase: phase_ux_refinement
+date: 2026-04-10
 
-- python -m py_compile src\decision_platform\ui_dash\app.py
-- python -m pytest -q tests/decision_platform/test_studio_structure.py::test_dash_app_exposes_structural_studio_controls tests/decision_platform/test_studio_structure.py::test_route_focus_edit_updates_intent_and_measurement_flags tests/decision_platform/test_studio_structure.py::test_primary_studio_projection_marks_desirable_routes_in_canvas_classes tests/decision_platform/test_ui_smoke.py::test_studio_primary_surface_exposes_business_command_center
+validated_commands:
+- .\.venv\Scripts\python.exe -m py_compile src\decision_platform\ui_dash\app.py
+- .\.venv\Scripts\python.exe -m pytest tests\decision_platform\test_phase3_runs_ui_smoke.py tests\decision_platform\test_phase3_queue_acceptance.py tests\decision_platform\test_ui_smoke.py -q
 
-Result:
-
-- 4 passed in 0.53s
-
-Notes:
-
-- Full execution of the two whole test files timed out in this environment after reaching the end of collected cases.
-- No new Playwright capture was generated in this wave.
+result:
+- 126 passed in 475.71s

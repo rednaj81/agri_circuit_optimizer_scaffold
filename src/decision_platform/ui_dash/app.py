@@ -159,13 +159,13 @@ UI_PERSISTENT_BANNER_COMPACT_STYLE = {
 }
 UI_STUDIO_MAIN_GRID_STYLE = {
     "display": "grid",
-    "gridTemplateColumns": "minmax(0, 2.45fr) minmax(300px, 352px)",
-    "gap": "18px",
+    "gridTemplateColumns": "minmax(0, 2.7fr) minmax(280px, 320px)",
+    "gap": "14px",
     "alignItems": "start",
 }
 UI_STUDIO_SIDEBAR_STYLE = {
     "display": "grid",
-    "gap": "14px",
+    "gap": "10px",
     "alignContent": "start",
 }
 UI_STUDIO_CANVAS_CARD_STYLE = {
@@ -2935,13 +2935,12 @@ def render_studio_readiness_panel(
             html.Div("Readiness do cenário", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
             html.Div(style={"display": "flex", "alignItems": "center", "gap": "10px", "margin": "8px 0 14px", "flexWrap": "wrap"}, children=[html.Span(_humanize_readiness_status(status), style={"padding": "6px 10px", "borderRadius": "999px", "background": background, "color": color, "fontWeight": 700}), html.Span(str(summary.get("readiness_headline") or ("Pronto para rodar" if status == "ready" else "Ainda exige atencao estrutural")), style={"fontWeight": 700, "lineHeight": "1.5"})]),
             html.Div(
-                style={**UI_THREE_COLUMN_STYLE, "marginBottom": "12px"},
+                style={**UI_TWO_COLUMN_STYLE, "gridTemplateColumns": "repeat(auto-fit, minmax(220px, 1fr))", "marginBottom": "12px"},
                 children=[
-                    _guidance_card("Estado dominante", readiness_state_label),
-                    _guidance_card("Objetivo desta área", "Confirmar se o cenário já pode sair do Studio sem depender da trilha técnica."),
-                    _guidance_card("Próxima ação", str(summary.get("primary_action") or "Revise a camada principal antes de abrir Runs.")),
-                    _guidance_card("Bloqueio principal", primary_blocker),
-                    _guidance_card("Impacto operacional", str(primary_action_item.get("impact") or "Sem impacto dominante adicional neste momento.")),
+                    _compact_value_card("Estado dominante", readiness_state_label, str(summary.get("readiness_stage") or "Revisar readiness")),
+                    _compact_value_card("Passagem para Runs", runs_button_label, next_step),
+                    _compact_value_card("Bloqueio principal", primary_blocker, str(primary_action_item.get("impact") or "Sem impacto dominante adicional neste momento.")),
+                    _signal_card("Próxima ação", str(summary.get("primary_action") or "Revise a camada principal antes de abrir Runs.")),
                 ],
             ),
             html.Div(
@@ -2952,87 +2951,74 @@ def render_studio_readiness_panel(
                     _button_link("Abrir Auditoria", "?tab=audit", "studio-readiness-open-audit-link"),
                 ],
             ),
-            html.H4("Fluxo principal", style={"marginBottom": "6px"}),
             html.Div(
                 style={**UI_THREE_COLUMN_STYLE, "marginBottom": "12px"},
                 children=[
-                    _guidance_card("Agora no Studio", str(summary.get("readiness_stage") or "Revisar readiness")),
-                    _guidance_card("Sinal de passagem", str(summary.get("readiness_headline") or "Sem headline de readiness.")),
-                    _guidance_card("Destino seguinte", next_step),
-                ],
-            ),
-            html.Div(
-                style=UI_THREE_COLUMN_STYLE,
-                children=[
                     _metric_card("Entidades visíveis", summary.get("business_node_count", 0)),
                     _metric_card("Fluxos projetados", summary.get("business_edge_count", 0), "Leitura primária do circuito de negócio."),
-                    _metric_card("Internos ocultos", summary.get("hidden_internal_node_count", 0), "Hubs e nós técnicos fora do canvas principal."),
                     _metric_card("Rotas obrigatorias", summary.get("mandatory_route_count", 0)),
                     _metric_card("Bloqueios", summary.get("blocker_count", 0), "Impedem seguir direto para Runs."),
                     _metric_card("Avisos", warning_count, "Podem pedir revisão antes do enfileiramento."),
+                    _metric_card("Internos ocultos", summary.get("hidden_internal_node_count", 0), "Hubs e nós técnicos fora do canvas principal."),
                 ],
             ),
-            html.H4("Fila local de correção", style={"marginBottom": "6px", "marginTop": "14px"}),
-            html.Div(
+            html.Details(
                 id="studio-readiness-action-queue",
-                style={**UI_TWO_COLUMN_STYLE, "marginBottom": "12px"},
+                style={**UI_MUTED_CARD_STYLE, "padding": "12px", "marginBottom": "12px"},
                 children=[
+                    html.Summary("Fila local de correção"),
                     html.Div(
-                        id=f"studio-readiness-action-card-{index}",
-                        style={
-                            **UI_MUTED_CARD_STYLE,
-                            "padding": "14px",
-                            "border": (
-                                "1px solid rgba(140, 56, 25, 0.22)"
-                                if (action_queue[index]["level"] if index < len(action_queue) else "") == "blocker"
-                                else "1px solid rgba(16, 59, 53, 0.12)"
-                            ),
-                        },
-                        children=(
-                            [
-                                html.Div(
-                                    f"{'Bloqueio' if action_queue[index]['level'] == 'blocker' else 'Aviso'} {index + 1}",
-                                    style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"},
+                        style={**UI_TWO_COLUMN_STYLE, "gridTemplateColumns": "repeat(auto-fit, minmax(220px, 1fr))", "marginTop": "12px"},
+                        children=[
+                            html.Div(
+                                id=f"studio-readiness-action-card-{index}",
+                                style={
+                                    **UI_COMPACT_BANNER_CARD_STYLE,
+                                    "border": (
+                                        "1px solid rgba(140, 56, 25, 0.22)"
+                                        if (action_queue[index]["level"] if index < len(action_queue) else "") == "blocker"
+                                        else "1px solid rgba(16, 59, 53, 0.12)"
+                                    ),
+                                },
+                                children=(
+                                    [
+                                        html.Div(
+                                            f"{'Bloqueio' if action_queue[index]['level'] == 'blocker' else 'Aviso'} {index + 1}",
+                                            style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"},
+                                        ),
+                                        html.Div(action_queue[index]["title"], style={"fontWeight": 700, "lineHeight": "1.45", "marginTop": "6px"}),
+                                        html.Div(action_queue[index]["next_action"], style={"lineHeight": "1.45", "marginTop": "6px", "color": "#496158"}),
+                                        html.Button("Trazer para o canvas", id=f"studio-readiness-action-{index}-button", style=UI_BUTTON_STYLE),
+                                    ]
+                                    if index < len(action_queue)
+                                    else [
+                                        html.Div(
+                                            f"Espaço {index + 1}",
+                                            style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"},
+                                        ),
+                                        html.Div("Sem item dominante nesta posição.", style={"fontWeight": 700, "lineHeight": "1.45", "marginTop": "6px"}),
+                                        html.Div("Quando novos bloqueios ou avisos surgirem, eles aparecerão aqui com foco direto no canvas.", style={"lineHeight": "1.45", "marginTop": "6px", "color": "#496158"}),
+                                        html.Button("Trazer para o canvas", id=f"studio-readiness-action-{index}-button", style=UI_BUTTON_STYLE, disabled=True),
+                                    ]
                                 ),
-                                html.Div(action_queue[index]["title"], style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"}),
-                                html.Div(action_queue[index]["flow_label"], style={"lineHeight": "1.5", "marginTop": "6px"}),
-                                _guidance_card("Impacto em Runs", action_queue[index]["impact"]),
-                                _guidance_card("Próximo gesto no canvas", action_queue[index]["next_action"]),
-                                html.Button("Trazer para o canvas", id=f"studio-readiness-action-{index}-button", style=UI_BUTTON_STYLE),
-                            ]
-                            if index < len(action_queue)
-                            else [
-                                html.Div(
-                                    f"Espaço {index + 1}",
-                                    style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"},
-                                ),
-                                html.Div("Sem item dominante nesta posição.", style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"}),
-                                html.Div(
-                                    "Quando novos bloqueios ou avisos surgirem, eles aparecerão aqui com foco direto no canvas.",
-                                    style={"lineHeight": "1.5", "marginTop": "6px"},
-                                ),
-                                html.Button("Trazer para o canvas", id=f"studio-readiness-action-{index}-button", style=UI_BUTTON_STYLE, disabled=True),
-                            ]
-                        ),
-                    )
-                    for index in range(READINESS_ACTION_SLOT_COUNT)
+                            )
+                            for index in range(READINESS_ACTION_SLOT_COUNT)
+                        ],
+                    ),
                 ],
             ),
-            html.H4("Passagem para Runs", style={"marginBottom": "6px"}),
-            html.Div(
+            html.Details(
                 style={**UI_MUTED_CARD_STYLE, "padding": "12px"},
                 children=[
-                    html.Div(str(summary.get("readiness_stage") or "Preparar a passagem"), style={"fontWeight": 700, "lineHeight": "1.5"}),
-                    html.Div("Quando a camada principal estiver clara, siga para Runs para enfileirar ou revisar a fila. Se ainda houver bloqueios, termine a revisão no Studio antes de abrir uma nova rodada.", style={"lineHeight": "1.6", "marginTop": "6px"}),
-                    html.Div(runs_button_label, style={"lineHeight": "1.6", "marginTop": "10px", "fontWeight": 700}),
+                    html.Summary("Bloqueios, avisos e próximos passos"),
+                    html.H4("Bloqueios", style={"marginBottom": "6px", "marginTop": "12px"}),
+                    _bullet_list([_humanize_readiness_issue(item, route_rows=route_rows, nodes_rows=nodes_rows) for item in list(summary.get("blockers", []))], "Nenhum bloqueio estrutural detectado."),
+                    html.H4("Avisos", style={"marginBottom": "6px", "marginTop": "14px"}),
+                    _bullet_list([_humanize_readiness_issue(item, route_rows=route_rows, nodes_rows=nodes_rows) for item in list(summary.get("warnings", []))], "Sem aviso relevante neste momento."),
+                    html.H4("Proximos passos", style={"marginBottom": "6px", "marginTop": "14px"}),
+                    _bullet_list(list(summary.get("next_steps", [])), "Sem proximo passo registrado."),
                 ],
             ),
-            html.H4("Bloqueios", style={"marginBottom": "6px"}),
-            _bullet_list([_humanize_readiness_issue(item, route_rows=route_rows, nodes_rows=nodes_rows) for item in list(summary.get("blockers", []))], "Nenhum bloqueio estrutural detectado."),
-            html.H4("Avisos", style={"marginBottom": "6px", "marginTop": "14px"}),
-            _bullet_list([_humanize_readiness_issue(item, route_rows=route_rows, nodes_rows=nodes_rows) for item in list(summary.get("warnings", []))], "Sem aviso relevante neste momento."),
-            html.H4("Proximos passos", style={"marginBottom": "6px", "marginTop": "14px"}),
-            _bullet_list(list(summary.get("next_steps", [])), "Sem proximo passo registrado."),
         ],
     )
 
@@ -5374,99 +5360,45 @@ def render_run_jobs_overview_panel(summary: dict[str, Any]) -> Any:
         )
     return html.Div(
         children=[
-            html.H3("Painel operacional detalhado", style={"marginTop": 0}),
-            html.Div(queue_headline, style={"fontWeight": 700, "lineHeight": "1.5", "marginBottom": "12px"}),
+            html.H3("Leitura compacta da fila", style={"marginTop": 0, "marginBottom": "6px"}),
+            html.Div(queue_headline, style={"fontWeight": 700, "lineHeight": "1.45", "marginBottom": "10px"}),
             html.Div(
-                style={**UI_TWO_COLUMN_STYLE, "marginBottom": "12px", "alignItems": "start"},
+                style={"display": "flex", "gap": "8px", "flexWrap": "wrap", "marginBottom": "10px"},
+                children=[
+                    _toned_pill(queue_state, "running" if active_run_ids or preparing_count else ("queued" if next_queued_run_id else "idle")),
+                    _toned_pill("worker serial", "idle"),
+                    _toned_pill(f"{len(queued_run_ids)} na fila", "queued" if queued_run_ids else "idle"),
+                    _toned_pill(f"{len(active_run_ids)} em execução", "running" if active_run_ids else "idle"),
+                ],
+            ),
+            html.Div(
+                style={**UI_TWO_COLUMN_STYLE, "gridTemplateColumns": "repeat(auto-fit, minmax(220px, 1fr))", "marginBottom": "12px"},
                 children=[
                     html.Div(
                         id="run-jobs-overview-signals",
-                        style={**UI_CARD_STYLE, "padding": "14px"},
+                        style=UI_COMPACT_BANNER_CARD_STYLE,
                         children=[
-                            html.Div("Fila agora", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
-                            html.Div(
-                                style={**UI_TWO_COLUMN_STYLE, "marginTop": "10px"},
-                                children=[
-                                    _signal_card(
-                                        "Próxima run",
-                                        next_queued_run_id or ("Preparando" if preparing_count and not active_run_ids else "Vazia"),
-                                        (
-                                            f"{len(queued_run_ids)} aguardando"
-                                            if next_queued_run_id
-                                            else ("Sem próxima run pronta" if not preparing_count else f"{preparing_count} preparando")
-                                        ),
-                                        tone="queued" if next_queued_run_id or preparing_count else "idle",
-                                    ),
-                                    _signal_card(
-                                        "Execução agora",
-                                        active_run_ids[0] if active_run_ids else ("Preparando" if preparing_count else "Nada"),
-                                        "Run em foco da fila serial" if active_run_ids else ("Aguardando saída da preparação" if preparing_count else "Sem execução ativa"),
-                                        tone="running" if active_run_ids or preparing_count else "idle",
-                                    ),
-                                ],
-                            ),
-                            html.Div(
-                                style={"display": "flex", "gap": "8px", "flexWrap": "wrap", "marginTop": "10px"},
-                                children=[
-                                    _toned_pill(queue_state, "running" if active_run_ids or preparing_count else ("queued" if next_queued_run_id else "idle")),
-                                    _toned_pill("worker serial", "idle"),
-                                ],
-                            ),
-                            html.Div(queue_guidance, style={"lineHeight": "1.55", "marginTop": "10px", "color": "#496158"}),
+                            html.Div("Fila agora", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+                            html.Div(next_queued_run_id or ("Preparando" if preparing_count and not active_run_ids else "Vazia"), style={"fontWeight": 700, "lineHeight": "1.4", "marginTop": "6px"}),
+                            html.Div(queue_guidance, style={"lineHeight": "1.45", "marginTop": "6px", "color": "#496158"}),
                         ],
+                    ),
+                    _signal_card(
+                        "Execução agora",
+                        active_run_ids[0] if active_run_ids else ("Preparando" if preparing_count else "Nada"),
+                        "Run em foco da fila serial" if active_run_ids else ("Aguardando saída da preparação" if preparing_count else "Sem execução ativa"),
+                        tone="running" if active_run_ids or preparing_count else "idle",
                     ),
                     html.Div(
                         id="run-jobs-overview-history-panel",
-                        style={**UI_CARD_STYLE, "padding": "14px"},
+                        style=UI_COMPACT_BANNER_CARD_STYLE,
                         children=[
-                            html.Div("Histórico recente", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
-                            html.Div(
-                                (
-                                    f"Último encerramento: {latest_recent_run.get('run_id')}"
-                                    if latest_recent_run
-                                    else "Ainda não existe encerramento recente."
-                                ),
-                                style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"},
-                            ),
-                            html.Div(
-                                recovery_signal,
-                                style={"lineHeight": "1.55", "marginTop": "8px", "color": "#496158"},
-                            ),
-                            html.Div(
-                                id="run-jobs-overview-history-list",
-                                style={"display": "grid", "gap": "10px", "marginTop": "12px"},
-                                children=[_run_history_entry(run, latest=index == 0) for index, run in enumerate(recent_runs)]
-                                or [html.Div("Ainda não há histórico recente para leitura.", style={"color": "#496158"})],
-                            ),
+                            html.Div("Histórico recente", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+                            html.Div((f"Último encerramento: {latest_recent_run.get('run_id')}" if latest_recent_run else "Ainda não existe encerramento recente."), style={"fontWeight": 700, "lineHeight": "1.4", "marginTop": "6px"}),
+                            html.Div(recovery_signal, style={"lineHeight": "1.45", "marginTop": "6px", "color": "#496158"}),
                         ],
                     ),
-                ],
-            ),
-            html.Div(
-                id="run-jobs-overview-status-language",
-                style={**UI_CARD_STYLE, "padding": "14px", "marginTop": "12px"},
-                children=[
-                    html.Div("Estados da operação", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
-                    html.Div(
-                        "Cada status abaixo traduz o que a fila serial esta fazendo e qual gesto dominante ainda faz sentido.",
-                        style={"lineHeight": "1.55", "marginTop": "8px", "color": "#496158"},
-                    ),
-                    html.Div(
-                        style={**UI_THREE_COLUMN_STYLE, "marginTop": "12px"},
-                        children=status_guide_cards or [_guidance_card("Sem status ativos", "Nenhuma run registrada ainda.")],
-                    ),
-                ],
-            ),
-            html.Div(
-                style=UI_THREE_COLUMN_STYLE,
-                children=[
-                    _metric_card("Runs locais", summary.get("run_count", 0), "Histórico observável na fila serial."),
-                    _metric_card("Na fila", len(queued_run_ids)),
-                    _metric_card("Em execução", len(active_run_ids)),
-                    _metric_card("Falhas", failed_count),
-                    _metric_card("Concluídas", completed_count),
-                    _metric_card("Canceladas", canceled_count, "Rodadas interrompidas antes do desfecho."),
-                    _metric_card(
+                    _signal_card(
                         "Pode fazer agora",
                         (
                             "Aguardar"
@@ -5474,12 +5406,37 @@ def render_run_jobs_overview_panel(summary: dict[str, Any]) -> Any:
                             else ("Executar próxima" if next_queued_run_id else ("Revisar falha" if latest_failed_run else ("Ler resultado" if latest_completed_run else "Enfileirar cenário")))
                         ),
                         "Próximo gesto dominante",
+                        tone="ready" if latest_completed_run and not active_run_ids and not next_queued_run_id else ("needs_attention" if failed_count else "queued"),
+                    ),
+                ],
+            ),
+            html.Div(
+                style={**UI_THREE_COLUMN_STYLE, "marginBottom": "12px"},
+                children=[
+                    _metric_card("Runs locais", summary.get("run_count", 0), "Histórico observável na fila serial."),
+                    _metric_card("Falhou", failed_count, "Rodadas que ainda pedem recuperação."),
+                    _metric_card("Concluídas", completed_count),
+                    _metric_card("Canceladas", canceled_count, "Rodadas interrompidas antes do desfecho."),
+                ],
+            ),
+            html.Details(
+                id="run-jobs-overview-status-language",
+                style={**UI_MUTED_CARD_STYLE, "padding": "12px", "marginTop": "12px"},
+                children=[
+                    html.Summary("Estados da operação"),
+                    html.Div(
+                        "Cada status abaixo traduz o que a fila serial esta fazendo e qual gesto dominante ainda faz sentido.",
+                        style={"lineHeight": "1.55", "marginTop": "10px", "color": "#496158"},
+                    ),
+                    html.Div(
+                        style={**UI_THREE_COLUMN_STYLE, "marginTop": "12px"},
+                        children=status_guide_cards or [_guidance_card("Sem status ativos", "Nenhuma run registrada ainda.")],
                     ),
                 ],
             ),
             html.Details(
                 id="run-jobs-overview-history-details",
-                style={**UI_MUTED_CARD_STYLE, "marginTop": "14px"},
+                style={**UI_MUTED_CARD_STYLE, "marginTop": "12px"},
                 children=[
                     html.Summary("Ver fila e histórico detalhados"),
                     html.Div(
@@ -5506,6 +5463,12 @@ def render_run_jobs_overview_panel(summary: dict[str, Any]) -> Any:
                             _bullet_list(
                                 [f"{_humanize_run_status(status)}: {count}" for status, count in status_counts.items()],
                                 "Ainda não há histórico suficiente para distribuir a fila por status.",
+                            ),
+                            html.Div(
+                                id="run-jobs-overview-history-list",
+                                style={"display": "grid", "gap": "10px", "marginTop": "12px"},
+                                children=[_run_history_entry(run, latest=index == 0) for index, run in enumerate(recent_runs)]
+                                or [html.Div("Ainda não há histórico recente para leitura.", style={"color": "#496158"})],
                             ),
                             html.H4("Contexto operacional", style={"marginBottom": "6px", "marginTop": "14px"}),
                             _bullet_list(
@@ -6097,110 +6060,87 @@ def render_runs_workspace_panel(
                 ],
             ),
             html.Div(
+                style={"display": "flex", "gap": "8px", "flexWrap": "wrap", "marginBottom": "10px"},
+                children=[
+                    _toned_pill(focus_status_label, focus_state_tone),
+                    _toned_pill(state["queue_state"], "running" if active_run_ids or state["preparing_count"] else ("queued" if next_queued_run_id else "idle")),
+                    _toned_pill(f"{queued_count} na fila", "queued" if queued_count else "idle"),
+                    _toned_pill("Resultado pronto" if focus_result_ready else "Resultado pendente", "ready" if focus_result_ready else "needs_attention"),
+                    _toned_pill(f"re-run de {focus_rerun_source}", "needs_attention") if focus_is_rerun else None,
+                ],
+            ),
+            html.Div(
                 id="runs-workspace-mission-grid",
-                style={"display": "grid", "gridTemplateColumns": "minmax(0, 1.45fr) minmax(320px, 0.95fr)", "gap": "16px", "marginBottom": "12px", "alignItems": "start"},
+                style={**UI_TWO_COLUMN_STYLE, "gridTemplateColumns": "repeat(auto-fit, minmax(220px, 1fr))", "marginBottom": "12px", "alignItems": "stretch"},
                 children=[
                     html.Div(
                         id="runs-workspace-focus-panel",
-                        style={**UI_CARD_STYLE, "padding": "14px"},
+                        style=UI_COMPACT_BANNER_CARD_STYLE,
                         children=[
                             html.Div("Run em foco", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
-                            html.Div(
-                                style={"display": "flex", "justifyContent": "space-between", "alignItems": "start", "gap": "12px", "marginTop": "6px", "flexWrap": "wrap"},
-                                children=[
-                                    html.Div(
-                                        children=[
-                                            html.Div(focus_run_label, style={"fontSize": "28px", "fontWeight": 700, "lineHeight": "1.1"}),
-                                            html.Div(focus_reason, style={"lineHeight": "1.55", "marginTop": "8px", "color": "#496158"}),
-                                        ]
-                                    ),
-                                    html.Div(
-                                        style={"display": "flex", "gap": "8px", "flexWrap": "wrap"},
-                                        children=[
-                                            _toned_pill(focus_status_label, focus_state_tone),
-                                            _toned_pill(focus_mode_label, "idle"),
-                                            _toned_pill(f"re-run de {focus_rerun_source}", "needs_attention") if focus_is_rerun else None,
-                                        ],
-                                    ),
-                                ],
-                            ),
+                            html.Div(focus_run_label, style={"fontSize": "26px", "fontWeight": 700, "lineHeight": "1.1", "marginTop": "6px"}),
+                            html.Div(focus_reason, style={"lineHeight": "1.45", "marginTop": "6px", "color": "#496158"}),
                             html.Div(
                                 id="runs-workspace-focus-headline",
                                 style={
-                                    "marginTop": "12px",
-                                    "padding": "12px 14px",
+                                    "marginTop": "10px",
+                                    "padding": "10px 12px",
                                     "borderRadius": "16px",
                                     "background": focus_banner_background,
                                     "color": focus_banner_color,
                                 },
                                 children=[
                                     html.Div(focus_state_headline, style={"fontWeight": 700, "lineHeight": "1.4"}),
-                                    html.Div(focus_state_copy, style={"lineHeight": "1.5", "marginTop": "6px"}),
+                                    html.Div(focus_state_copy, style={"lineHeight": "1.45", "marginTop": "4px"}),
                                 ],
                             ),
+                            html.Div(f"Modo: {focus_mode_label}", style={"lineHeight": "1.45", "marginTop": "8px", "color": "#496158"}),
                             _run_progress_stage_bar(
                                 detail_for_progress.get("status"),
                                 result_ready=focus_result_ready,
                                 component_id="runs-workspace-progress-rail",
                             ),
-                            html.Div(
-                                style={**UI_TWO_COLUMN_STYLE, "marginTop": "12px"},
-                                children=[
-                                    _signal_card("Agora", progress_snapshot["signal"], progress_snapshot["progress_text"], tone=focus_state_tone),
-                                    _signal_card("Recuperação", focus_recovery_label, focus_recovery_copy, tone="failed" if focus_cta_target == "rerun" or state["failed_count"] else ("ready" if focus_result_ready else "needs_attention")),
-                                ],
-                            ),
-                            html.Div(
-                                id="runs-workspace-next-step-panel",
-                                style={**UI_MUTED_CARD_STYLE, "padding": "14px", "marginTop": "12px", "background": _status_tone(primary_action_tone)[0], "color": _status_tone(primary_action_tone)[1]},
-                                children=[
-                                    html.Div("Próxima ação segura", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "opacity": 0.82}),
-                                    html.Div(action_signal_value, style={"fontSize": "22px", "fontWeight": 700, "marginTop": "6px"}),
-                                    html.Div(decision_gate_copy, style={"lineHeight": "1.55", "marginTop": "8px"}),
-                                    html.Div(
-                                        style={"display": "flex", "gap": "8px", "flexWrap": "wrap", "marginTop": "10px"},
-                                        children=[
-                                            _toned_pill("Voltar ao Studio" if state["studio_status"] != "ready" else "Ficar em Runs", "failed" if state["studio_status"] != "ready" else "needs_attention"),
-                                            _toned_pill(focus_status_label, focus_state_tone),
-                                            _toned_pill("Resultado pronto" if focus_result_ready else "Resultado pendente", "ready" if focus_result_ready else "needs_attention"),
-                                        ],
-                                    ),
-                                    html.Div(scenario_vs_run_limit, style={"lineHeight": "1.55", "marginTop": "10px", "opacity": 0.92}),
-                                    html.Div(style={**UI_ACTION_ROW_STYLE, "marginTop": "12px"}, children=[local_recovery_cta, decision_cta]),
-                                ],
-                            ),
+                            html.Div(progress_snapshot["progress_text"], style={"lineHeight": "1.45", "marginTop": "8px", "color": "#496158"}),
                         ],
                     ),
                     html.Div(
-                        id="runs-workspace-operational-lanes",
-                        style={"display": "grid", "gap": "12px"},
+                        id="runs-workspace-live-strip",
+                        style=UI_COMPACT_BANNER_CARD_STYLE,
                         children=[
-                            html.Div(
-                                id="runs-workspace-live-strip",
-                                style={**UI_CARD_STYLE, "padding": "14px"},
-                                children=[
-                                    html.Div("Fila agora", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
-                                    html.Div(queue_support_value, style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"}),
-                                    html.Div(queue_support_note, style={"lineHeight": "1.55", "marginTop": "8px", "color": "#496158"}),
-                                    html.Div(
-                                        style={"display": "flex", "gap": "8px", "flexWrap": "wrap", "marginTop": "10px"},
-                                        children=[
-                                            _toned_pill(state["queue_state"], "running" if active_run_ids or state["preparing_count"] else ("queued" if next_queued_run_id else "idle")),
-                                            _toned_pill(f"{queued_count} na fila", "queued" if queued_count else "idle"),
-                                            _toned_pill(f"{len(active_run_ids)} em execução", "running" if active_run_ids else "idle"),
-                                        ],
-                                    ),
-                                ],
-                            ),
-                            html.Div(
-                                id="runs-workspace-history-summary",
-                                style={**UI_CARD_STYLE, "padding": "14px"},
-                                children=[
-                                    html.Div("Histórico terminal", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
-                                    html.Div(history_summary_headline, style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"}),
-                                    html.Div(history_summary_copy, style={"lineHeight": "1.55", "marginTop": "8px", "color": "#496158"}),
-                                ],
-                            ),
+                            html.Div("Fila agora", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+                            html.Div(queue_support_value, style={"fontWeight": 700, "lineHeight": "1.45", "marginTop": "6px"}),
+                            html.Div(queue_support_note, style={"lineHeight": "1.45", "marginTop": "6px", "color": "#496158"}),
+                            html.Div(f"Execução agora: {active_run_ids[0] if active_run_ids else 'Nenhuma'}", style={"lineHeight": "1.45", "marginTop": "8px", "color": "#496158"}),
+                        ],
+                    ),
+                    html.Div(
+                        id="runs-workspace-history-summary",
+                        style=UI_COMPACT_BANNER_CARD_STYLE,
+                        children=[
+                            html.Div("Histórico terminal", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+                            html.Div(history_summary_headline, style={"fontWeight": 700, "lineHeight": "1.45", "marginTop": "6px"}),
+                            html.Div(history_summary_copy, style={"lineHeight": "1.45", "marginTop": "6px", "color": "#496158"}),
+                            html.Div(usable_result, style={"lineHeight": "1.45", "marginTop": "8px", "color": "#496158"}),
+                        ],
+                    ),
+                    html.Div(
+                        id="runs-workspace-next-step-panel",
+                        style={**UI_COMPACT_BANNER_CARD_STYLE, "background": _status_tone(primary_action_tone)[0], "color": _status_tone(primary_action_tone)[1]},
+                        children=[
+                            html.Div("Próxima ação segura", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "opacity": 0.82}),
+                            html.Div(action_signal_value, style={"fontSize": "22px", "fontWeight": 700, "marginTop": "6px"}),
+                            html.Div(decision_gate_copy, style={"lineHeight": "1.45", "marginTop": "6px"}),
+                            html.Div(style={**UI_ACTION_ROW_STYLE, "marginTop": "10px"}, children=[local_recovery_cta, decision_cta]),
+                        ],
+                    ),
+                    html.Div(
+                        style=UI_COMPACT_BANNER_CARD_STYLE,
+                        children=[
+                            html.Div("Cenário x execução", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+                            html.Div("Cenário", style={"fontWeight": 700, "lineHeight": "1.4", "marginTop": "6px"}),
+                            html.Div(str(studio_summary.get("readiness_headline") or state["readiness_note"]), style={"lineHeight": "1.45", "marginTop": "4px", "color": "#496158"}),
+                            html.Div("Resultado", style={"fontWeight": 700, "lineHeight": "1.4", "marginTop": "8px"}),
+                            html.Div(focus_result_copy, style={"lineHeight": "1.45", "marginTop": "4px", "color": "#496158"}),
                         ],
                     ),
                 ],
@@ -6210,6 +6150,13 @@ def render_runs_workspace_panel(
                 style={**UI_MUTED_CARD_STYLE, "padding": "12px", "marginBottom": "12px"},
                 children=[
                     html.Summary("Histórico terminal secundário"),
+                    html.Div(
+                        style={**UI_TWO_COLUMN_STYLE, "gridTemplateColumns": "repeat(auto-fit, minmax(220px, 1fr))", "marginTop": "12px"},
+                        children=[
+                            _signal_card("Agora", progress_snapshot["signal"], progress_snapshot["progress_text"], tone=focus_state_tone),
+                            _signal_card("Recuperação", focus_recovery_label, focus_recovery_copy, tone="failed" if focus_cta_target == "rerun" or state["failed_count"] else ("ready" if focus_result_ready else "needs_attention")),
+                        ],
+                    ),
                     html.Div(
                         id="runs-workspace-history-panel",
                         style={"display": "grid", "gap": "10px", "marginTop": "12px"},
@@ -6224,7 +6171,7 @@ def render_runs_workspace_panel(
                 children=[
                     html.Summary("Gate do cenário e limites desta leitura"),
                     html.Div(
-                        style={**UI_TWO_COLUMN_STYLE, "marginTop": "12px"},
+                        style={**UI_TWO_COLUMN_STYLE, "gridTemplateColumns": "repeat(auto-fit, minmax(220px, 1fr))", "marginTop": "12px"},
                         children=[
                             _guidance_card("Gate do cenário", str(studio_summary.get("readiness_headline") or state["readiness_note"])),
                             _guidance_card("Limitação agora", scenario_vs_run_limit),
@@ -7012,35 +6959,16 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
         if candidate_id
         else "Sem contraste executivo"
     )
-    decision_strip_title = (
-        "Empate técnico assistido"
-        if decision_status == "technical_tie"
-        else "Decisão bloqueada"
-        if not candidate_id or summary.get("feasible") is False
-        else "Decisão pronta para confirmar"
-    )
-    decision_strip_cards = (
-        [
-            _guidance_card("Winner sugerido agora", f"{candidate_id or '-'} | {winner_short_reason}"),
-            _guidance_card("Runner-up ainda comparável", f"{runner_up_id or '-'} | {runner_up_primary_note}"),
-            _guidance_card("Escolha final humana", f"{selected_candidate_id or '-'} | {manual_choice_signal}"),
-            _guidance_card("O que está empatado", technical_tie_reason),
-        ]
-        if decision_status == "technical_tie"
-        else [
-            _guidance_card(
-                "Recomendação automática"
-                if candidate_id and summary.get("feasible") is not False
-                else "Recomendação automática bloqueada"
-                if candidate_id
-                else "Recomendação automática indisponível",
-                f"{candidate_id or '-'} | {winner_short_reason}" if candidate_id else "Ainda não existe winner utilizável para sustentar recomendação automática.",
-            ),
-            _guidance_card("Runner-up ainda comparável", f"{runner_up_id or '-'} | {runner_up_signal}" if runner_up_id else "Ainda não há runner-up comparável para pressionar a decisão."),
-            _guidance_card("Escolha final humana", f"{selected_candidate_id or '-'} | {manual_choice_signal}"),
-            _guidance_card("Exportação", export_guidance),
-        ]
-    )
+    decision_strip_title = "Escolha humana e exportação"
+    decision_strip_cards = [
+        _guidance_card("Escolha final humana", f"{selected_candidate_id or '-'} | {manual_choice_signal}"),
+        _guidance_card("Exportação", export_guidance),
+        _guidance_card("Risco dominante", f"{risk_value} | {risk_note}"),
+        _guidance_card(
+            "Comparação aberta",
+            technical_tie_reason if decision_status == "technical_tie" else _humanize_decision_copy(comparison_difference),
+        ),
+    ]
     return html.Div(
         children=[
             html.Div("Leitura principal da decisão", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
@@ -7107,7 +7035,7 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
                 id="decision-workspace-comparison-details",
                 style={**UI_MUTED_CARD_STYLE, "padding": "12px"},
                 children=[
-                    html.Summary("Comparação assistida e contexto"),
+                    html.Summary("Comparação assistida, perfis e escolha"),
                     html.Div(
                         id="decision-final-comparison-panel",
                         style={**UI_TWO_COLUMN_STYLE, "gridTemplateColumns": "repeat(auto-fit, minmax(220px, 1fr))", "marginTop": "12px", "marginBottom": "12px"},
@@ -7124,9 +7052,8 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
                         id="decision-final-choice-panel",
                         style={**UI_MUTED_CARD_STYLE, "padding": "12px", "marginBottom": "12px"},
                         children=[
-                            html.Div("Recomendação e escolha final", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+                            html.Div("Escolha final e exportação", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
                             html.Div(selected_state_label, style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"}),
-                            html.Div(f"Recomendação automática atual: {candidate_id or '-'}", style={"lineHeight": "1.6", "marginTop": "8px"}),
                             html.Div(f"Escolha final humana: {selected_candidate_id or '-'} | Família: {selected_topology_family}", style={"lineHeight": "1.6", "marginTop": "8px"}),
                             html.Div(export_guidance, style={"lineHeight": "1.6", "marginTop": "8px"}),
                         ],
