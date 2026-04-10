@@ -6728,26 +6728,36 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
         else "Escolha um candidato manualmente antes de exportar uma decisão assistida."
     )
     visible_candidate_count = int(catalog_summary.get("visible_candidate_count", 0) or 0) if isinstance(catalog_summary, dict) else 0
+    primary_action_label = "Voltar para Runs"
+    transition_signal = "Sem contexto suficiente para oficializar a decisão."
     if not candidate_id:
         state_background, state_color = _status_tone("needs_attention")
         signal_text = "Ainda não existe winner legível; a prioridade continua sendo recuperar uma execução comparável em Runs."
         runs_label = "Voltar para Runs"
         audit_primary = False
+        primary_action_label = "Recuperar execução em Runs"
+        transition_signal = "A Decisão permanece aberta apenas como leitura bloqueada; não existe resultado utilizável para oficializar."
     elif decision_status == "technical_tie":
         state_background, state_color = _status_tone("technical_tie")
         signal_text = "Technical tie explícito: mantenha winner e runner-up visíveis antes de qualquer oficialização."
         runs_label = "Revisar Runs"
         audit_primary = True
+        primary_action_label = "Fechar escolha assistida"
+        transition_signal = "Runs já entregou contraste suficiente para abrir a decisão, mas a oficialização continua dependendo de leitura humana assistida."
     elif summary.get("feasible") is False:
         state_background, state_color = _status_tone("blocked")
         signal_text = f"Winner ainda bloqueado por {_humanize_infeasibility_reason(summary.get('infeasibility_reason'))}."
         runs_label = "Revisar Runs"
         audit_primary = False
+        primary_action_label = "Revisar bloqueio em Runs"
+        transition_signal = "Existe ranking visível, mas a decisão principal segue bloqueada até corrigir a inviabilidade ou aceitar o retorno para Runs."
     else:
         state_background, state_color = _status_tone("ready")
         signal_text = "Winner e runner-up já aparecem com leitura utilizável; aprofunde Auditoria só se precisar reconciliar a trilha técnica."
         runs_label = "Voltar para Runs"
         audit_primary = True
+        primary_action_label = "Confirmar decisão assistida"
+        transition_signal = "Runs já liberou resultado utilizável; a primeira dobra de Decisão pode sustentar a escolha principal."
     tie_label = "Explícito" if decision_status == "technical_tie" else "Não ativo"
     official_profile_label = _decision_profile_presentation(official_profile_id)["label"]
     active_profile_label = _decision_profile_presentation(active_profile_id)["label"]
@@ -6791,7 +6801,9 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
         margin_value = "Sem margem"
         margin_note = "Ainda não há separação de score confiável para esta leitura."
     human_review_signal = (
-        "Empate técnico aberto; compare runner-up e winner antes da escolha manual."
+        "Sem winner e runner-up utilizáveis; volte para Runs antes de qualquer escolha manual."
+        if not candidate_id
+        else "Empate técnico aberto; compare runner-up e winner antes da escolha manual."
         if decision_status == "technical_tie"
         else f"Winner bloqueado por {_humanize_infeasibility_reason(summary.get('infeasibility_reason'))}; valide a alternativa utilizável."
         if summary.get("feasible") is False
@@ -6802,7 +6814,9 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
         else "Contraste suficiente; a leitura humana só confirma a escolha final."
     )
     winner_short_reason = _humanize_decision_copy(summary.get("winner_reason_summary") or "")
-    if not winner_short_reason:
+    if not candidate_id:
+        winner_short_reason = "Ainda não existe saída utilizável para sustentar um winner oficial."
+    elif not winner_short_reason:
         winner_short_reason = human_review_signal if decision_status != "winner_clear" else "Lidera com a melhor combinação de score e leitura operacional."
     runner_up_signal = (
         "Quase vence; o empate técnico ainda está aberto."
@@ -6816,18 +6830,48 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
         else "Segue como contraste principal, mas ainda abaixo do winner."
     )
     manual_choice_signal = (
-        "Escolha manual alinhada com a referência oficial; prossiga para exportação quando a leitura humana confirmar."
+        "Ainda sem escolha manual final; recupere winner e runner-up antes de definir exportação."
+        if not candidate_id
+        else "Escolha manual congelada; não exporte enquanto o winner oficial permanecer bloqueado."
+        if summary.get("feasible") is False
+        else "Escolha manual alinhada com a referência oficial; prossiga para exportação quando a leitura humana confirmar."
         if selected_candidate_id and selected_candidate_id == official_product_candidate_id
         else "Escolha manual divergente; confirme o contraste antes de substituir a referência oficial."
         if selected_candidate_id and official_product_candidate_id
         else "Ainda sem escolha manual final; use winner e runner-up para fechar a decisão."
     )
     next_action_signal = (
-        "Revise runner-up e escolha manual antes de exportar."
+        decision_state["next_action"]
+        if not candidate_id
+        else "Volte para Runs e corrija o bloqueio antes de oficializar ou exportar."
+        if summary.get("feasible") is False
+        else "Revise runner-up e escolha manual antes de exportar."
         if selected_candidate_id and selected_candidate_id != official_product_candidate_id
         else "Confirme a referência oficial e siga para exportação."
         if official_product_candidate_id
         else decision_state["next_action"]
+    )
+    hero_tone = (
+        "needs_attention"
+        if not candidate_id
+        else "technical_tie"
+        if decision_status == "technical_tie"
+        else "blocked"
+        if summary.get("feasible") is False
+        else "ready"
+    )
+    decision_gate_label = "Bloqueada" if not candidate_id or summary.get("feasible") is False else "Leitura principal aberta"
+    winner_primary_label = "Winner oficial agora" if candidate_id else "Winner oficial indisponível"
+    runner_up_primary_label = "Runner-up sob revisão" if runner_up_id else "Runner-up ainda indisponível"
+    runner_up_primary_note = runner_up_signal if runner_up_id else "Ainda não existe runner-up comparável para sustentar contraste suficiente nesta dobra."
+    review_priority_label = (
+        "Empate técnico em revisão"
+        if decision_status == "technical_tie"
+        else "Bloqueio operacional"
+        if summary.get("feasible") is False
+        else "Decisão liberada"
+        if candidate_id
+        else "Sem contraste executivo"
     )
     return html.Div(
         children=[
@@ -6840,27 +6884,58 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
                 ],
             ),
             html.Div(
-                style={**UI_TWO_COLUMN_STYLE, "gridTemplateColumns": "repeat(auto-fit, minmax(220px, 1fr))", "marginBottom": "12px"},
+                id="decision-workspace-primary-fold",
+                style={**UI_TWO_COLUMN_STYLE, "gridTemplateColumns": "minmax(0, 1.3fr) minmax(280px, 0.9fr)", "alignItems": "stretch", "marginBottom": "12px"},
                 children=[
-                    _compact_value_card("Winner", candidate_id or "Sem winner", winner_short_reason, accent="#d7e5c1"),
-                    _compact_value_card("Runner-up", runner_up_id or "Sem runner-up", runner_up_signal if runner_up_id else "Sem runner-up para pressionar a decisão"),
-                    _compact_value_card("Margem", tie_label if decision_status == "technical_tie" else margin_value, _humanize_decision_copy(comparison_difference)),
-                    _compact_value_card("Technical tie", tie_label, "Technical tie explícito" if decision_status == "technical_tie" else "Sem empate técnico aberto"),
-                    _compact_value_card("Leitura humana", risk_value, f"{human_review_signal} Perfil em leitura: {active_profile_label or '-'} | Perfil ativo e referência oficial: {official_profile_label}."),
+                    html.Div(
+                        id="decision-workspace-state-hero",
+                        style={
+                            **UI_MUTED_CARD_STYLE,
+                            "padding": "16px",
+                            "background": state_background,
+                            "color": state_color,
+                            "border": "none",
+                            "boxShadow": "none",
+                        },
+                        children=[
+                            html.Div("Estado decisório agora", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "opacity": 0.82}),
+                            html.Div(decision_state["state_label"], id="decision-workspace-state-label", style={"fontSize": "30px", "fontWeight": 800, "lineHeight": "1.05", "marginTop": "8px"}),
+                            html.Div(decision_state["headline"], id="decision-workspace-focus-headline", style={"fontSize": "16px", "fontWeight": 700, "lineHeight": "1.5", "marginTop": "10px"}),
+                            html.Div(signal_text, style={"lineHeight": "1.7", "marginTop": "10px", "opacity": 0.95}),
+                            html.Div(
+                                id="decision-workspace-state-rail",
+                                style={**UI_THREE_COLUMN_STYLE, "marginTop": "14px"},
+                                children=[
+                                    _signal_card("Passagem Runs -> Decisão", decision_gate_label, transition_signal, tone=hero_tone),
+                                    _signal_card("Technical tie", tie_label, "A revisão humana continua aberta." if decision_status == "technical_tie" else "Sem empate técnico ativo nesta leitura.", tone=hero_tone),
+                                    _signal_card("Leitura humana observa", review_priority_label, f"{human_review_signal} Perfil em leitura: {active_profile_label or '-'} | Perfil oficial: {official_profile_label}.", tone=hero_tone),
+                                ],
+                            ),
+                        ],
+                    ),
+                    html.Div(
+                        id="decision-workspace-action-stack",
+                        style={"display": "grid", "gap": "12px"},
+                        children=[
+                            _compact_value_card(winner_primary_label, candidate_id or "Sem winner", winner_short_reason, accent="#d7e5c1"),
+                            _compact_value_card(runner_up_primary_label, runner_up_id or "Sem runner-up", runner_up_primary_note, accent="#f0d99f" if decision_status == "technical_tie" else None),
+                            _signal_card("Próxima ação segura", primary_action_label, next_action_signal, tone=hero_tone),
+                        ],
+                    ),
                 ],
             ),
             html.Div(
                 id="decision-decision-strip",
                 style={**UI_MUTED_CARD_STYLE, "padding": "12px", "marginBottom": "12px"},
                 children=[
-                    html.Div("Faixa decisória", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+                    html.Div("Faixa decisória operacional", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
                     html.Div(
                         style={**UI_TWO_COLUMN_STYLE, "gridTemplateColumns": "repeat(auto-fit, minmax(220px, 1fr))", "marginTop": "8px"},
                         children=[
                             _guidance_card("Referência oficial do produto", f"{official_product_candidate_id or '-'} | {official_profile_label}"),
                             _guidance_card("Escolha manual atual", f"{selected_candidate_id or '-'} | {selected_state_label}. {manual_choice_signal}"),
                             _guidance_card("Runner-up ainda importa porque", runner_up_signal if runner_up_id else "Ainda não há contraste suficiente para pressionar a decisão."),
-                            _guidance_card("Próxima ação", next_action_signal),
+                            _guidance_card("O que a revisão humana precisa observar", human_review_signal),
                         ],
                     ),
                 ],
@@ -6876,6 +6951,7 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
                         children=[
                             _compact_value_card("Winner x runner-up", candidate_id or "-", f"{runner_up_id or '-'} | {comparison_signal}"),
                             _compact_value_card("Sinal comparativo", tie_label if decision_status == "technical_tie" else "Contraste principal", _humanize_decision_copy(comparison_difference)),
+                            _compact_value_card("Margem", tie_label if decision_status == "technical_tie" else margin_value, margin_note),
                             _compact_value_card("Escolha manual atual", selected_candidate_id or "-", f"{selected_state_label} | {selected_topology_family}"),
                         ],
                     ),

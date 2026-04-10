@@ -1,36 +1,56 @@
 {
-  "snapshot_source_commit": "820374b7403e767056a9469eff3ecca595831890",
-  "studio": {
-    "canvas_height": "820px",
-    "workspace_signals": [
-      "Seleção atual",
-      "Quem supre quem",
-      "Gesto principal",
-      "Readiness crítico",
-      "Ajustes locais do canvas"
-    ],
-    "edge_focus_primary_action": "studio-canvas-reverse-edge-button",
-    "edge_focus_secondary_actions": [
-      "studio-canvas-intent-mandatory-button",
-      "studio-canvas-open-workbench-button"
-    ],
-    "edge_focus_has_more_actions_disclosure": true
+  "wave": "2026-04-09_phase_ux_refinement_wave4",
+  "validation": {
+    "targeted_ui": "3 passed, 108 deselected in 0.60s",
+    "phase4_targeted": "4 passed in 0.26s",
+    "full_ui": "111 passed in 328.26s (0:05:28)",
+    "phase4_full": "4 passed in 0.04s"
   },
-  "decision": {
-    "signals": [
-      "Winner atual",
-      "Runner-up",
-      "Margem",
-      "Risco comparativo",
-      "Technical tie",
-      "Perfil em leitura",
-      "Winner x runner-up",
-      "Sinal comparativo"
-    ]
+  "visual_evidence": {
+    "type": "structured_ui_snapshot",
+    "browser_capture_attempt": "dash_server_background_launch_failed",
+    "browser_capture_error": "Background launch of the local Dash server exited before opening port 8056 and produced no stdout/stderr evidence; connection attempts returned connection refused."
   },
-  "screenshot_attempt": {
-    "target_path": "output/playwright/studio-fullhd-wave4.png",
-    "status": "failed_in_sandbox",
-    "reason": "Bitmap capture remained unavailable in this sandbox; structured snapshot kept as auditable evidence."
+  "decision_surface": {
+    "winner_clear": {
+      "text": "Leitura principal da decisãoWinner claroA execução atual já entrega um winner legível e um runner-up de referência para a decisão assistida.Estado decisório agoraWinner claroA execução atual já entrega um winner legível e um runner-up de referência para a decisão assistida.Winner e runner-up já aparecem com leitura utilizável; aprofunde Auditoria só se precisar reconciliar a trilha técnica.Passagem Runs -> DecisãoLeitura principal abertaRuns já liberou resultado utilizável; a primeira dobra de Decisão pode sustentar a escolha principal.Technical tieNão ativoSem empate técnico ativo nesta leitura.Leitura humana observaDecisão liberadaContraste suficiente; a leitura humana só confirma a escolha final. Perfil em leitura: Equilibrado | Perfil oficial: Equilibrado.Winner oficial agoracand-01Lidera com melhor equilíbrio entre custo e robustez.Runner-up sob revisãocand-02Segue como contraste principal, mas ainda abaixo do winner.Próxima ação seguraConfirmar decisão assistidaConfirme a referência oficial e siga para exportação.Faixa decisória operacionalReferência oficial do produtocand-01 | EquilibradoEscolha manual atualcand-01 | Escolha manual alinhada à referência oficial. Escolha manual alinhada com a referência oficial; prossiga para exportação quando a leitura humana confirmar.Runner-up ainda importa porqueSegue como contraste principal, mas ainda abaixo do winner.O que a revisão humana precisa observarContraste suficiente; a leitura humana só confirma a escolha final.Comparação assistida e contextoWinner x runner-upcand-01cand-02 | Sem margem comparável registradaSinal comparativoContraste principalLidera com melhor equilíbrio entre custo e robustez.MargemSem margemAinda não há separação de score confiável para esta leitura.Escolha manual atualcand-01Escolha manual alinhada à referência oficial | hybrid_freePerfis explícitos de seleçãoEscolha final e exportEscolha manual alinhada à referência oficialCandidato em foco manual: cand-01 | Família: hybrid_freeO export atual seguirá cand-01 sem sobrescrever a referência oficial do produto.Estado dominanteWinner claroCandidatos visíveis3Família líderhybrid_freeVoltar para RunsAbrir Auditoria",
+      "markers": [
+        "decision-workspace-primary-fold",
+        "decision-workspace-state-hero",
+        "decision-workspace-state-rail",
+        "decision-decision-strip",
+        "decision-workspace-comparison-details"
+      ]
+    },
+    "technical_tie": {
+      "text": "Leitura principal da decisãoEmpate técnicoWinner e runner-up seguem próximos o suficiente para exigir decisão humana assistida.Estado decisório agoraEmpate técnicoWinner e runner-up seguem próximos o suficiente para exigir decisão humana assistida.Technical tie explícito: mantenha winner e runner-up visíveis antes de qualquer oficialização.Passagem Runs -> DecisãoLeitura principal abertaRuns já entregou contraste suficiente para abrir a decisão, mas a oficialização continua dependendo de leitura humana assistida.Technical tieExplícitoA revisão humana continua aberta.Leitura humana observaEmpate técnico em revisãoEmpate técnico aberto; compare runner-up e winner antes da escolha manual. Perfil em leitura: Menor custo | Perfil oficial: Equilibrado.Winner oficial agoracand-01Empate técnico aberto; compare runner-up e winner antes da escolha manual.Runner-up sob revisãocand-02Quase vence; o empate técnico ainda está aberto.Próxima ação seguraFechar escolha assistidaRevise runner-up e escolha manual antes de exportar.Faixa decisória operacionalReferência oficial do produtocand-03 | EquilibradoEscolha manual atualcand-04 | Escolha manual alternativa. Escolha manual divergente; confirme o contraste antes de substituir a referência oficial.Runner-up ainda importa porqueQuase vence; o empate técnico ainda está aberto.O que a revisão humana precisa observarEmpate técnico aberto; compare runner-up e winner antes da escolha manual.Comparação assistida e contextoWinner x runner-upcand-01cand-02 | Sem margem comparável registradaSinal comparativoExplícitoEmpate técnico ativo; mantenha o runner-up visível antes de oficializar.MargemExplícitoAinda não há separação de score confiável para esta leitura.Escolha manual atualcand-04Escolha manual alternativa | branch_loopPerfis explícitos de seleçãoEscolha final e exportEscolha manual alternativaCandidato em foco manual: cand-04 | Família: branch_loopO export atual seguirá cand-04 sem sobrescrever a referência oficial do produto.Estado dominanteEmpate técnicoCandidatos visíveis4Família líderhybrid_freeRevisar RunsAbrir Auditoria",
+      "markers": [
+        "decision-workspace-primary-fold",
+        "decision-workspace-state-hero",
+        "decision-workspace-state-rail",
+        "decision-decision-strip",
+        "decision-workspace-comparison-details"
+      ]
+    },
+    "no_usable_result": {
+      "text": "Leitura principal da decisãoSem decisão utilizávelAinda falta uma run utilizável para abrir winner, runner-up e contraste com segurança.Estado decisório agoraSem decisão utilizávelAinda falta uma run utilizável para abrir winner, runner-up e contraste com segurança.Ainda não existe winner legível; a prioridade continua sendo recuperar uma execução comparável em Runs.Passagem Runs -> DecisãoBloqueadaA Decisão permanece aberta apenas como leitura bloqueada; não existe resultado utilizável para oficializar.Technical tieNão ativoSem empate técnico ativo nesta leitura.Leitura humana observaSem contraste executivoSem winner e runner-up utilizáveis; volte para Runs antes de qualquer escolha manual. Perfil em leitura: Perfil atual | Perfil oficial: Perfil atual.Winner oficial indisponívelSem winnerAinda não existe saída utilizável para sustentar um winner oficial.Runner-up ainda indisponívelSem runner-upAinda não existe runner-up comparável para sustentar contraste suficiente nesta dobra.Próxima ação seguraRecuperar execução em RunsVolte para Runs, confirme uma execução concluída e retorne quando existir resultado comparável.Faixa decisória operacionalReferência oficial do produto- | Perfil atualEscolha manual atual- | Escolha manual ainda indefinida. Ainda sem escolha manual final; recupere winner e runner-up antes de definir exportação.Runner-up ainda importa porqueAinda não há contraste suficiente para pressionar a decisão.O que a revisão humana precisa observarSem winner e runner-up utilizáveis; volte para Runs antes de qualquer escolha manual.Comparação assistida e contextoWinner x runner-up-- | Sem margem comparável registradaSinal comparativoContraste principalSem winner e runner-up legíveis nesta leitura.MargemSem margemAinda não há separação de score confiável para esta leitura.Escolha manual atual-Escolha manual ainda indefinida | -Perfis explícitos de seleçãoEscolha final e exportEscolha manual ainda indefinidaCandidato em foco manual: - | Família: -Escolha um candidato manualmente antes de exportar uma decisão assistida.Estado dominanteSem decisão utilizávelCandidatos visíveis0Família líder-Voltar para RunsAbrir Auditoria",
+      "markers": [
+        "decision-workspace-primary-fold",
+        "decision-workspace-state-hero",
+        "decision-workspace-state-rail",
+        "decision-decision-strip",
+        "decision-workspace-comparison-details"
+      ]
+    },
+    "winner_infeasible": {
+      "text": "Leitura principal da decisãoWinner inviávelExiste um winner visível, mas ele ainda não pode ser oficializado na leitura principal.Estado decisório agoraWinner inviávelExiste um winner visível, mas ele ainda não pode ser oficializado na leitura principal.Winner ainda bloqueado por uma rota obrigatória não conseguiu fechar com a configuração atual.Passagem Runs -> DecisãoBloqueadaExiste ranking visível, mas a decisão principal segue bloqueada até corrigir a inviabilidade ou aceitar o retorno para Runs.Technical tieNão ativoSem empate técnico ativo nesta leitura.Leitura humana observaBloqueio operacionalWinner bloqueado por uma rota obrigatória não conseguiu fechar com a configuração atual; valide a alternativa utilizável. Perfil em leitura: Equilibrado | Perfil oficial: Equilibrado.Winner oficial agoracand-01Segue na frente por custo, mas sem fechar as rotas obrigatórias.Runner-up sob revisãocand-02Pressiona a decisão porque o winner está bloqueado.Próxima ação seguraRevisar bloqueio em RunsVolte para Runs e corrija o bloqueio antes de oficializar ou exportar.Faixa decisória operacionalReferência oficial do produtocand-01 | EquilibradoEscolha manual atualcand-01 | Escolha manual alinhada à referência oficial. Escolha manual congelada; não exporte enquanto o winner oficial permanecer bloqueado.Runner-up ainda importa porquePressiona a decisão porque o winner está bloqueado.O que a revisão humana precisa observarWinner bloqueado por uma rota obrigatória não conseguiu fechar com a configuração atual; valide a alternativa utilizável.Comparação assistida e contextoWinner x runner-upcand-01cand-02 | Sem margem comparável registradaSinal comparativoContraste principalSegue na frente por custo, mas sem fechar as rotas obrigatórias.MargemSem margemAinda não há separação de score confiável para esta leitura.Escolha manual atualcand-01Escolha manual alinhada à referência oficial | hybrid_freePerfis explícitos de seleçãoEscolha final e exportEscolha manual alinhada à referência oficialCandidato em foco manual: cand-01 | Família: hybrid_freeO export atual seguirá cand-01 sem sobrescrever a referência oficial do produto.Estado dominanteWinner inviávelCandidatos visíveis2Família líderhybrid_freeRevisar RunsAbrir Auditoria",
+      "markers": [
+        "decision-workspace-primary-fold",
+        "decision-workspace-state-hero",
+        "decision-workspace-state-rail",
+        "decision-decision-strip",
+        "decision-workspace-comparison-details"
+      ]
+    }
   }
 }

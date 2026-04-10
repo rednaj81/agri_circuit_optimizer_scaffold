@@ -2412,28 +2412,68 @@ def test_decision_workspace_panel_makes_winner_runner_up_and_tie_legible() -> No
     panel_text = _collect_text_content(panel)
 
     assert "Leitura principal da decisão" in panel_text
-    assert "Perfil em leitura" in panel_text
-    assert "Referência oficial do produto" in panel_text
-    assert "Perfil ativo" in panel_text
-    assert "Winner" in panel_text
-    assert "Runner-up" in panel_text
-    assert "Margem" in panel_text
-    assert "Technical tieExplícito" in panel_text
+    assert "Estado decisório agora" in panel_text
+    assert "Passagem Runs -> Decisão" in panel_text
+    assert "Winner oficial agora" in panel_text
+    assert "Runner-up sob revisão" in panel_text
+    assert "Próxima ação segura" in panel_text
+    assert "Technical tie" in panel_text
+    assert "Explícito" in panel_text
     assert "Technical tie explícito" in panel_text
-    assert "Leitura humana" in panel_text
-    assert "Faixa decisória" in panel_text
+    assert "Faixa decisória operacional" in panel_text
+    assert "O que a revisão humana precisa observar" in panel_text
+    assert "Referência oficial do produto" in panel_text
     assert "Runner-up ainda importa porque" in panel_text
     assert "Escolha manual atual" in panel_text
-    assert "Próxima ação" in panel_text
     assert "cand-04" in panel_text
     assert "confirme o contraste antes de substituir a referência oficial" in panel_text.lower()
     assert "revise runner-up e escolha manual antes de exportar" in panel_text.lower()
     assert "Comparação assistida e contexto" in panel_text
+    assert _find_component_by_id(panel, "decision-workspace-primary-fold") is not None
+    assert _find_component_by_id(panel, "decision-workspace-state-hero") is not None
+    assert _find_component_by_id(panel, "decision-workspace-state-rail") is not None
     assert _find_component_by_id(panel, "decision-workspace-open-runs-link") is not None
     assert _find_component_by_id(panel, "decision-workspace-open-audit-link") is not None
     assert _find_component_by_id(panel, "decision-profile-views-panel") is not None
     assert _find_component_by_id(panel, "decision-final-comparison-panel") is not None
     assert _find_component_by_id(panel, "decision-final-choice-panel") is not None
+
+
+def test_decision_workspace_panel_blocks_primary_choice_without_usable_result() -> None:
+    panel = render_decision_workspace_panel({}, {"visible_candidate_count": 0}, {})
+    panel_text = _collect_text_content(panel)
+
+    assert "Sem decisão utilizável" in panel_text
+    assert "Winner oficial indisponível" in panel_text
+    assert "Runner-up ainda indisponível" in panel_text
+    assert "Recuperar execução em Runs" in panel_text
+    assert "A Decisão permanece aberta apenas como leitura bloqueada" in panel_text
+    assert "Voltar para Runs" in panel_text
+    assert "volte para runs antes de qualquer escolha manual" in panel_text.lower()
+
+
+def test_decision_workspace_panel_surfaces_infeasible_winner_as_blocked_state() -> None:
+    panel = render_decision_workspace_panel(
+        {
+            "candidate_id": "cand-01",
+            "runner_up_candidate_id": "cand-02",
+            "decision_status": "winner_clear",
+            "technical_tie": False,
+            "feasible": False,
+            "infeasibility_reason": "mandatory_route_failure",
+            "winner_reason_summary": "Segue na frente por custo, mas sem fechar as rotas obrigatórias.",
+        },
+        {"visible_candidate_count": 2},
+        {"candidate_id": "cand-01", "topology_family": "hybrid_free"},
+    )
+    panel_text = _collect_text_content(panel)
+
+    assert "Winner inviável" in panel_text
+    assert "Revisar bloqueio em Runs" in panel_text
+    assert "rota obrigatória não conseguiu fechar" in panel_text
+    assert "Existe ranking visível, mas a decisão principal segue bloqueada" in panel_text
+    assert "Runner-up sob revisão" in panel_text
+    assert "não exporte enquanto o winner oficial permanecer bloqueado" in panel_text.lower()
 
 
 def test_runs_flow_panel_enables_decision_only_with_usable_execution_result() -> None:
