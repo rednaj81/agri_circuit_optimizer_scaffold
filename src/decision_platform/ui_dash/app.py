@@ -1063,6 +1063,66 @@ def _run_status_operator_copy(status: Any) -> str:
     return lookup.get(normalized, "Sem orientacao operacional adicional para este estado.")
 
 
+def _run_progress_stage_bar(status: Any, *, result_ready: bool = False, component_id: str | None = None) -> Any:
+    normalized = str(status or "").strip().lower()
+    timeline_order = ["queued", "preparing", "running", "exporting", "completed"]
+    current_position = timeline_order.index(normalized) if normalized in timeline_order else None
+    stage_items = []
+    for index, step in enumerate(timeline_order):
+        if result_ready and step == "completed":
+            tone_name = "ready"
+            state_label = "Pronto"
+        elif step == normalized:
+            tone_name = _run_status_tone(normalized, result_ready=result_ready)
+            state_label = "Agora"
+        elif current_position is not None and index < current_position:
+            tone_name = "ready"
+            state_label = "Feito"
+        else:
+            tone_name = "idle"
+            state_label = "Depois"
+        background, color = _status_tone(tone_name)
+        stage_items.append(
+            html.Div(
+                style={
+                    "padding": "10px 12px",
+                    "borderRadius": "14px",
+                    "background": background,
+                    "color": color,
+                    "display": "grid",
+                    "gap": "4px",
+                },
+                children=[
+                    html.Div(_humanize_run_status(step), style={"fontSize": "11px", "fontWeight": 700, "lineHeight": "1.3"}),
+                    html.Div(state_label, style={"fontSize": "12px", "lineHeight": "1.3", "opacity": 0.92}),
+                ],
+            )
+        )
+    if normalized in {"failed", "canceled"}:
+        background, color = _status_tone("failed")
+        stage_items.append(
+            html.Div(
+                style={
+                    "padding": "10px 12px",
+                    "borderRadius": "14px",
+                    "background": background,
+                    "color": color,
+                    "display": "grid",
+                    "gap": "4px",
+                },
+                children=[
+                    html.Div(_humanize_run_status(normalized), style={"fontSize": "11px", "fontWeight": 700, "lineHeight": "1.3"}),
+                    html.Div("Estado final", style={"fontSize": "12px", "lineHeight": "1.3", "opacity": 0.92}),
+                ],
+            )
+        )
+    return html.Div(
+        id=component_id,
+        style={**UI_THREE_COLUMN_STYLE, "marginTop": "12px"},
+        children=stage_items,
+    )
+
+
 def _humanize_audit_status(status: Any) -> str:
     lookup = {
         "idle": "Pronto",
@@ -5952,12 +6012,16 @@ def render_runs_workspace_panel(
                                     html.Div(focus_state_copy, style={"lineHeight": "1.5", "marginTop": "6px"}),
                                 ],
                             ),
+                            _run_progress_stage_bar(
+                                detail_for_progress.get("status"),
+                                result_ready=focus_result_ready,
+                                component_id="runs-workspace-progress-rail",
+                            ),
                             html.Div(
                                 style={**UI_TWO_COLUMN_STYLE, "marginTop": "12px"},
                                 children=[
                                     _signal_card("Agora", progress_snapshot["signal"], progress_snapshot["progress_text"], tone=focus_state_tone),
                                     _signal_card("Recuperação", focus_recovery_label, focus_recovery_copy, tone="failed" if focus_cta_target == "rerun" or state["failed_count"] else ("ready" if focus_result_ready else "needs_attention")),
-                                    _signal_card("Resultado", "Pronto" if focus_result_ready else "Pendente", focus_result_copy, tone="ready" if focus_result_ready else "needs_attention"),
                                 ],
                             ),
                             html.Div(
@@ -5972,6 +6036,7 @@ def render_runs_workspace_panel(
                                         children=[
                                             _toned_pill("Voltar ao Studio" if state["studio_status"] != "ready" else "Ficar em Runs", "failed" if state["studio_status"] != "ready" else "needs_attention"),
                                             _toned_pill(focus_status_label, focus_state_tone),
+                                            _toned_pill("Resultado pronto" if focus_result_ready else "Resultado pendente", "ready" if focus_result_ready else "needs_attention"),
                                         ],
                                     ),
                                     html.Div(scenario_vs_run_limit, style={"lineHeight": "1.55", "marginTop": "10px", "opacity": 0.92}),

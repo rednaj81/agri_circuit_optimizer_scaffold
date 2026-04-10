@@ -1695,6 +1695,7 @@ def test_runs_workspace_panel_prioritizes_queue_focus_and_primary_transition() -
     assert "run-003" in panel_text
     assert "resultado utilizável" in panel_text.lower()
     assert "Resultado" in panel_text
+    assert _find_component_by_id(panel, "runs-workspace-progress-rail") is not None
     assert _find_component_by_id(panel, "runs-workspace-operational-lanes") is not None
     assert _find_component_by_id(panel, "runs-workspace-open-studio-link") is not None
     assert getattr(_find_component_by_id(panel, "runs-workspace-open-decision-button"), "disabled", None) is False
@@ -1854,8 +1855,10 @@ def test_runs_workspace_panel_contrasts_failed_and_canceled_focus_states() -> No
 
     assert "Falha operacional em foco" in failed_text
     assert "Reexecutar com correção" in failed_text
+    assert "Estado final" in failed_text
     assert "Cancelamento em foco" in canceled_text
     assert "Reexecutar se ainda fizer sentido" in canceled_text
+    assert "Estado final" in canceled_text
 
 
 def test_runs_workspace_panel_uses_refresh_cta_for_intermediate_execution_states() -> None:
@@ -1883,6 +1886,7 @@ def test_runs_workspace_panel_uses_refresh_cta_for_intermediate_execution_states
     assert "Aguardar run em foco" in panel_text
     assert "Run em foco" in panel_text
     assert "Em execução" in panel_text
+    assert _find_component_by_id(panel, "runs-workspace-progress-rail") is not None
     assert _find_component_by_id(panel, "runs-workspace-refresh-button") is not None
 
 

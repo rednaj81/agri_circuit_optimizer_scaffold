@@ -122,6 +122,7 @@ def test_runs_tab_reopens_persisted_operational_telemetry() -> None:
         detail_text = _collect_text(run_detail_panel)
         assert "Próxima ação segura" in workspace_text
         assert "Histórico terminal secundário" in workspace_text
+        assert _find_component_by_id(runs_workspace, "runs-workspace-progress-rail") is not None
         assert "Estados da operação" in overview_text
         assert "Reexecução" in overview_text
         assert "Origem desta rodada" in detail_text
