@@ -1171,7 +1171,7 @@ def test_runs_workspace_panel_distinguishes_scenario_gate_from_execution_state()
     assert "Run em foco" in blocked_text
     assert "Fila agora" in blocked_text
     assert "Histórico terminal" in blocked_text
-    assert "Leituras separadas" in blocked_text
+    assert "Separação operacional" in blocked_text
     assert "Gate do cenário e limites desta leitura" in blocked_text
     assert "Limitação agora" in blocked_text
     assert "A limitação principal ainda está no cenário" in blocked_text
@@ -1217,9 +1217,11 @@ def test_run_job_detail_panel_prioritizes_events_and_artifacts_over_logs() -> No
     assert "Progresso desta run" in panel_text
     assert "Pode agir agora" in panel_text
     assert "O que falta" in panel_text
+    assert "Origem desta rodada" in panel_text
     assert "Cenário" in panel_text
     assert "Run/job" in panel_text
     assert "Resultado agora" in panel_text
+    assert "Passagem Runs -> Decisão" in panel_text
     assert "Resumo executivo disponível." in panel_text
     assert "Candidato selecionado disponível." in panel_text
     assert "Logs" not in panel_text
@@ -1686,7 +1688,7 @@ def test_runs_workspace_panel_prioritizes_queue_focus_and_primary_transition() -
     assert "Run em foco" in panel_text
     assert "Fila agora" in panel_text
     assert "Histórico terminal" in panel_text
-    assert "Leituras separadas" in panel_text
+    assert "Separação operacional" in panel_text
     assert "Próxima ação" in panel_text
     assert "Gate do cenário e limites desta leitura" in panel_text
     assert "run-003" in panel_text
@@ -1950,6 +1952,7 @@ def test_run_jobs_overview_panel_clarifies_queue_now_vs_recent_history() -> None
     assert "Fila agora" in panel_text
     assert "Execução agora" in panel_text
     assert "Histórico recente" in panel_text
+    assert "Estados da operação" in panel_text
     assert "Falhou" in panel_text
     assert "Pode fazer agora" in panel_text
     assert "Em execução: run-003" in panel_text
@@ -1979,6 +1982,66 @@ def test_run_jobs_overview_panel_surfaces_preparing_and_recovery_states() -> Non
     assert "1 preparando" in panel_text
     assert "Falhou" in panel_text
     assert "Preparando" in panel_text
+
+
+def test_run_jobs_overview_panel_explains_status_language_for_terminal_and_rerun_states() -> None:
+    panel = render_run_jobs_overview_panel(
+        {
+            "run_count": 5,
+            "queue_state": "exporting",
+            "worker_mode": "serial",
+            "next_queued_run_id": None,
+            "active_run_ids": [],
+            "queued_run_ids": [],
+            "latest_run_id": "run-011",
+            "runs": [
+                {"run_id": "run-007", "status": "completed", "lineage": {"is_rerun": False}},
+                {"run_id": "run-008", "status": "canceled", "lineage": {"is_rerun": False}},
+                {"run_id": "run-009", "status": "queued", "lineage": {"is_rerun": True, "source_run_id": "run-007"}},
+                {"run_id": "run-010", "status": "preparing", "lineage": {"is_rerun": False}},
+                {"run_id": "run-011", "status": "exporting", "lineage": {"is_rerun": False}},
+            ],
+            "status_counts": {"queued": 1, "preparing": 1, "exporting": 1, "completed": 1, "canceled": 1},
+        }
+    )
+    panel_text = _collect_text_content(panel)
+
+    assert "Estados da operação" in panel_text
+    assert "Em preparação" in panel_text
+    assert "Consolidando saída" in panel_text
+    assert "Cancelada" in panel_text
+    assert "Reexecução" in panel_text
+
+
+def test_run_job_detail_panel_distinguishes_failed_canceled_and_rerun_guidance() -> None:
+    failed_panel = render_run_job_detail_panel(
+        {
+            "selected_run_id": "run-020",
+            "status": "failed",
+            "requested_execution_mode": "official",
+            "official_gate_valid": False,
+            "events": [{"status": "failed", "message": "Gate oficial recusou a execução."}],
+        }
+    )
+    canceled_panel = render_run_job_detail_panel(
+        {
+            "selected_run_id": "run-021",
+            "status": "canceled",
+            "requested_execution_mode": "diagnostic",
+            "official_gate_valid": False,
+            "rerun_of_run_id": "run-015",
+            "source_bundle_root": "data/decision_platform/maquete_v2",
+            "events": [{"status": "canceled", "message": "Operador interrompeu a rodada."}],
+        }
+    )
+    failed_text = _collect_text_content(failed_panel)
+    canceled_text = _collect_text_content(canceled_panel)
+
+    assert "Bloqueio operacional" in failed_text
+    assert "Passagem Runs -> Decisão" in failed_text
+    assert "Interrompida com intenção" in canceled_text
+    assert "Origem desta rodada" in canceled_text
+    assert "reexecução de run-015" in canceled_text.lower()
 
 
 def test_execution_summary_panel_only_opens_decision_with_usable_result() -> None:

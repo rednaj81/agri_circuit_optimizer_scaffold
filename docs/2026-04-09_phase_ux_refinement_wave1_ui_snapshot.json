@@ -1,47 +1,20 @@
 {
-  "snapshot_source": "runs_first_fold_compression",
-  "phase_id": "ux_phase_3",
-  "wave_index": 1,
-  "focus": "queue readability, run statuses, progress, scenario/run/result separation",
-  "runs": {
-    "first_fold_signals": [
-      "O que está na fila",
-      "O que está rodando",
-      "O que falhou",
-      "O que pode fazer agora",
-      "Cenário",
-      "Run/job",
-      "Resultado",
-      "Próxima ação"
-    ],
-    "overview_signals": [
-      "Fila agora",
-      "Rodando agora",
-      "Falhou",
-      "Pode fazer agora"
-    ],
-    "disclosures_kept_secondary": [
-      "Gate do cenário e limites desta leitura",
-      "Ver fila e histórico detalhados",
-      "Contexto técnico secundário desta run",
-      "Auditoria técnica de runs"
-    ],
-    "first_fold_excerpt": "Leitura operacional de Runs | O que está na fila | O que está rodando | O que falhou | O que pode fazer agora | Cenário | Run/job | Resultado | Próxima ação",
-    "detail_excerpt": "Run em foco | Timeline operacional | Progresso desta run | Pode agir agora | O que falta | Recuperação desta run | Resultado agora | Contexto técnico secundário desta run"
-  },
+  "wave": "2026-04-09_phase_ux_refinement_wave1",
   "validation": {
-    "commands": [
-      "$env:PYTHONPATH='.'; .\\.venv\\Scripts\\python.exe -m py_compile src\\decision_platform\\ui_dash\\app.py",
-      "$env:PYTHONPATH='.'; .\\.venv\\Scripts\\python.exe -m pytest tests\\decision_platform\\test_phase3_queue_acceptance.py -q",
-      "$env:PYTHONPATH='.'; .\\.venv\\Scripts\\python.exe -m pytest tests\\decision_platform\\test_phase3_runs_ui_smoke.py -q",
-      "$env:PYTHONPATH='.'; .\\.venv\\Scripts\\python.exe -m pytest tests\\decision_platform\\test_ui_smoke.py -k \"runs_tab_combines_queue_and_execution_summary or runs_workspace_panel_surfaces_queue_history_and_decision_gate or runs_workspace_panel_uses_refresh_cta_for_intermediate_execution_states or run_job_detail_panel_prioritizes_events_and_artifacts_over_logs or run_jobs_overview_panel_summarizes_current_queue_and_history or run_jobs_overview_panel_surfaces_preparing_and_recovery_states\" -q"
-    ],
-    "results": [
-      "py_compile passed",
-      "13 passed in test_phase3_queue_acceptance.py",
-      "1 passed in test_phase3_runs_ui_smoke.py",
-      "4 passed, 102 deselected in targeted test_ui_smoke.py validation"
-    ],
-    "known_timeout": "Full test_ui_smoke.py -q exceeded the local timeout budget and was not used as the closing gate for this wave."
+    "targeted_ui": "7 passed, 101 deselected in 0.58s",
+    "targeted_phase3": "2 passed, 12 deselected in 31.30s",
+    "quick_workspace": "3 passed, 105 deselected in 0.26s",
+    "full_ui": "108 passed in 332.71s (0:05:32)",
+    "full_phase3": "14 passed in 59.49s"
+  },
+  "visual_evidence": {
+    "type": "structured_ui_snapshot",
+    "note": "Snapshot captured from rendered Dash components after the wave 1 Runs UX updates."
+  },
+  "runs_surface": {
+    "workspace_text": "Leitura operacional de RunsDecisão disponívelA última execução já gerou contexto suficiente para entrar em Decisão.Run em focorun-011Esta é a próxima rodada pendente quando nenhuma execução ativa ou terminal útil domina a leitura.Na fila-re-run de run-008AgoraEspera sem avançoA run está aguardando vez na fila local, ainda sem avanço material de execução.RecuperaçãoFila ainda em abertoSem falha dominante agora; acompanhe esta run até ela liberar resultado ou exigir revisão.ResultadoPendenteAinda sem resultado utilizável; a prioridade continua sendo conduzir ou recuperar esta run.Separação operacionalCenário: Cenário pronto para seguir para Runs.Run em foco: run-011 | Na filaResultado: Já existe resultado utilizável para abrir Decisão sem depender de leitura técnica.Próxima açãoExecutar próximaA Decisao continua secundaria enquanto a run em foco ainda aguarda vez na fila.Executar reexecução run-011Ir para DecisãoFila agoraSem fila extraA run em foco já é a próxima da fila.Pronto1 na fila0 em execuçãoHistórico terminalÚltimo desfecho: run-010Resultados anteriores que ainda ajudam a ler reaproveitamento ou recuperação.run-010Resultado prontoresultado prontorun-009Canceladacancelada antes do desfechoGate do cenário e limites desta leituraGate do cenárioCenário pronto para seguir para Runs.Limitação agoraO cenário já passou no gate principal; o foco agora está na fila e na execução em si.Voltar ao StudioAbrir Auditoria",
+    "overview_text": "Painel operacional detalhadoPreparação em andamentoFila agoraPróxima runPreparando1 preparandoExecução agoraPreparandoAguardando saída da preparaçãoConsolidando saídaworker serialHá run saindo da fila e preparando artefatos. Aguarde essa etapa antes de cobrar resultado ou reenfileirar.Histórico recenteÚltimo encerramento: run-008Já existe histórico concluído; confirme se o último resultado já serve para abrir Decisão.run-008Canceladacancelada antes do desfechorun-007Concluídaconcluída sem resultado executivoEstados da operaçãoCada status abaixo traduz o que a fila serial esta fazendo e qual gesto dominante ainda faz sentido.Na fila1Aguardando vez na fila serial. O gesto seguro agora e rodar ou cancelar se o contexto mudou.Em preparação1Ja saiu da fila e prepara artefatos. Ainda nao e hora de rerun nem de Decisao.Em execução-O calculo principal esta aberto. A prioridade e acompanhar a run em foco.Consolidando saída1A rodada ja calculou e consolida a saida final. Aguarde antes de abrir Decisao.Concluída1Terminou a rodada. So vale abrir Decisao quando houver resultado executivo utilizavel.Falhou-Encontrou bloqueio operacional. Revise a causa antes de repetir a rodada.Cancelada1A execucao foi interrompida antes do desfecho. Confirme se a rodada ainda faz sentido.Reexecução1Reexecucao criada a partir de historico anterior. Preserve a origem visivel antes de rodar de novo.Runs locais5Histórico observável na fila serial.Na fila0Em execução0Falhas0Concluídas1Canceladas1Rodadas interrompidas antes do desfecho.Pode fazer agoraAguardarPróximo gesto dominanteVer fila e histórico detalhadosFila agoraHistórico recenteÚltima run conhecida: run-011Runs terminais registradas: 0Status por quantidadeNa fila: 1Em preparação: 1Consolidando saída: 1Concluída: 1Cancelada: 1Contexto operacionalWorker local: serial",
+    "detail_canceled_text": "Run em focorun-021Canceladadiagnosticreexecução de run-015Gate oficialJulia oficial bloqueadoDuração (s)-Modo da rodada-Timeline operacionalNa filaPendenteEm preparaçãoPendenteEm execuçãoPendenteConsolidando saídaPendenteConcluídaPendenteCanceladaEstado finalProgresso desta runExecução interrompidaCancelada com intençãoRecuperação desta runInterrompida com intençãoCancelamento não é falha: a rodada foi parada antes do desfecho e ainda pede decisão consciente.Pode agir agoraRevisar falha ou cancelamento antes de reenfileirar, para não repetir a mesma rodada sem correção.O que faltaA run foi cancelada antes do desfecho e ainda pede decisão consciente sobre reexecução.Origem desta rodadaReexecução da run-015.CenárioCenário atual carregado para esta rodada.Run/jobrun-021 | diagnosticResultado agoraAinda sem resultado utilizável nesta run.Estado desta runInterrompida com intençãoPassagem Runs -> DecisãoA passagem Runs -> Decisão continua bloqueada porque a run foi interrompida antes do desfecho.Eventos relevantesCancelada: Operador interrompeu a rodada.Resultado e artefatosEsta run ainda não expôs artefatos executivos suficientes.Próxima açãoConfirme se o cancelamento foi intencional antes de reenfileirar ou reexecutar esta run.Contexto técnico secundário desta runEngine utilizado: -Erro operacional: -Failure reason: -Bundle do cenário: data/decision_platform/maquete_v2Diretório de artefatos: artifacts/run-021Events path: events.jsonlLog path: run.log",
+    "detail_failed_text": "Run em focorun-020FalhouofficialGate oficialJulia oficial bloqueadoDuração (s)-Modo da rodada-Timeline operacionalNa filaPendenteEm preparaçãoPendenteEm execuçãoPendenteConsolidando saídaPendenteConcluídaPendenteFalhouEstado finalProgresso desta runExecução bloqueadaBloqueio operacionalRecuperação desta runBloqueio operacionalFalha não é cancelamento: a prioridade é entender a causa antes de repetir a rodada.Pode agir agoraRevisar falha ou cancelamento antes de reenfileirar, para não repetir a mesma rodada sem correção.O que faltaA run encontrou um bloqueio operacional e terminou sem saída utilizável.Origem desta rodadaRodada original do cenário atual.CenárioBundle do cenário não informado.Run/jobrun-020 | officialResultado agoraAinda sem resultado utilizável nesta run.Estado desta runBloqueio operacionalPassagem Runs -> DecisãoA passagem Runs -> Decisão continua bloqueada porque a run falhou antes do resultado executivo.Eventos relevantesFalhou: Gate oficial recusou a execução.Resultado e artefatosEsta run ainda não expôs artefatos executivos suficientes.Próxima açãoRevise o bloqueio operacional e só reexecute esta run depois de corrigir a causa dominante.Contexto técnico secundário desta runEngine utilizado: -Erro operacional: -Failure reason: -Bundle do cenário: -Diretório de artefatos: -Events path: -Log path: -"
   }
 }

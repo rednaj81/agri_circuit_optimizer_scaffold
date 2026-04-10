@@ -28,6 +28,20 @@ def _find_component_by_id(component: object, target_id: str) -> object | None:
     return None
 
 
+def _collect_text(component: object) -> str:
+    if component is None:
+        return ""
+    if isinstance(component, str):
+        return component
+    if isinstance(component, (int, float, bool)):
+        return str(component)
+    children = getattr(component, "children", None)
+    if children is None:
+        return ""
+    child_items = children if isinstance(children, (list, tuple)) else [children]
+    return "".join(_collect_text(child) for child in child_items)
+
+
 @pytest.mark.fast
 def test_runs_tab_reopens_persisted_operational_telemetry() -> None:
     scenario_dir = prepare_scenario_copy(
@@ -95,6 +109,22 @@ def test_runs_tab_reopens_persisted_operational_telemetry() -> None:
         assert detail_payload["inspection"]["artifacts_dir"] == rerun_result["artifacts_dir"]
         assert detail_payload["inspection"]["queue_summary_source"] == "persisted_queue_summary"
         assert detail_payload["inspection"]["source_bundle_reference_path"] == rerun_job["source_bundle_reference_path"]
+
+        runs_workspace = _find_component_by_id(app.layout, "runs-workspace-panel")
+        runs_overview = _find_component_by_id(app.layout, "run-jobs-overview-panel")
+        run_detail_panel = _find_component_by_id(app.layout, "run-job-detail-panel")
+        assert runs_workspace is not None
+        assert runs_overview is not None
+        assert run_detail_panel is not None
+
+        workspace_text = _collect_text(runs_workspace)
+        overview_text = _collect_text(runs_overview)
+        detail_text = _collect_text(run_detail_panel)
+        assert "Separação operacional" in workspace_text
+        assert "Estados da operação" in overview_text
+        assert "Reexecução" in overview_text
+        assert "Origem desta rodada" in detail_text
+        assert "Passagem Runs -> Decisão" in detail_text
     finally:
         cleanup_scenario_copy(queue_root)
         cleanup_scenario_copy(scenario_dir)

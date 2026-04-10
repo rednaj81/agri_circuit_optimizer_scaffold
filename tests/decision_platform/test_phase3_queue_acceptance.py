@@ -179,13 +179,14 @@ def test_phase3_queue_acceptance_runs_ui_surfaces_operational_queue_and_detail_l
     assert "Run em foco" in workspace_text
     assert "Fila agora" in workspace_text
     assert "Histórico terminal" in workspace_text
-    assert "Leituras separadas" in workspace_text
+    assert "Separação operacional" in workspace_text
     assert "Cenário" in workspace_text
     assert "Resultado" in workspace_text
     assert "Em execução" in workspace_text
     assert "Fila agora" in overview_text
     assert "Execução agora" in overview_text
     assert "Histórico recente" in overview_text
+    assert "Estados da operação" in overview_text
     assert "Falhou" in overview_text
     assert "Pode fazer agora" in overview_text
     assert "Eventos relevantes" in detail_text
@@ -194,7 +195,9 @@ def test_phase3_queue_acceptance_runs_ui_surfaces_operational_queue_and_detail_l
     assert "Pode agir agora" in detail_text
     assert "O que falta" in detail_text
     assert "Recuperação desta run" in detail_text
+    assert "Origem desta rodada" in detail_text
     assert "Run/job" in detail_text
+    assert "Passagem Runs -> Decisão" in detail_text
     assert "Contexto técnico secundário desta run" in detail_text
 
 

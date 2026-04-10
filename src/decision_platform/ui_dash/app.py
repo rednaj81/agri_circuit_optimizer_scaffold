@@ -906,6 +906,8 @@ def _run_history_note(run: dict[str, Any] | None) -> str:
         notes.append("aguardando vez na fila")
     elif status == "preparing":
         notes.append("preparando artefatos")
+    elif status == "exporting":
+        notes.append("consolidando saída final")
     return " | ".join(notes) or "sem leitura adicional"
 
 
@@ -913,7 +915,7 @@ def _run_history_entry(run: dict[str, Any], *, latest: bool = False) -> Any:
     status = str(run.get("status") or "unknown").strip().lower()
     result_ready = _run_has_usable_result(run)
     state_label = "Resultado pronto" if status == "completed" and result_ready else _humanize_run_status(status)
-    tone = "ready" if result_ready else ("running" if status in {"running", "preparing"} else ("queued" if status == "queued" else status))
+    tone = _run_status_tone(status, result_ready=result_ready)
     return html.Div(
         style={**UI_MUTED_CARD_STYLE, "padding": "12px", "border": "1px solid rgba(16, 59, 53, 0.08)" if latest else UI_MUTED_CARD_STYLE.get("border")},
         children=[
@@ -1018,14 +1020,47 @@ def _humanize_run_status(status: Any) -> str:
     lookup = {
         "idle": "Pronto",
         "queued": "Na fila",
+        "preparing": "Em preparação",
         "running": "Em execução",
+        "exporting": "Consolidando saída",
         "completed": "Concluída",
         "failed": "Falhou",
         "canceled": "Cancelada",
+        "rerun": "Reexecução",
         "unknown": "Sem contexto",
     }
     normalized = str(status or "").strip().lower()
     return lookup.get(normalized, normalized.replace("_", " ") or "-")
+
+
+def _run_status_tone(status: Any, *, result_ready: bool = False) -> str:
+    normalized = str(status or "").strip().lower()
+    if result_ready:
+        return "ready"
+    if normalized in {"queued"}:
+        return "queued"
+    if normalized in {"preparing", "running", "exporting"}:
+        return "running"
+    if normalized in {"failed", "canceled"}:
+        return "failed"
+    if normalized in {"rerun", "completed"}:
+        return "needs_attention"
+    return "idle"
+
+
+def _run_status_operator_copy(status: Any) -> str:
+    normalized = str(status or "").strip().lower()
+    lookup = {
+        "queued": "Aguardando vez na fila serial. O gesto seguro agora e rodar ou cancelar se o contexto mudou.",
+        "preparing": "Ja saiu da fila e prepara artefatos. Ainda nao e hora de rerun nem de Decisao.",
+        "running": "O calculo principal esta aberto. A prioridade e acompanhar a run em foco.",
+        "exporting": "A rodada ja calculou e consolida a saida final. Aguarde antes de abrir Decisao.",
+        "completed": "Terminou a rodada. So vale abrir Decisao quando houver resultado executivo utilizavel.",
+        "failed": "Encontrou bloqueio operacional. Revise a causa antes de repetir a rodada.",
+        "canceled": "A execucao foi interrompida antes do desfecho. Confirme se a rodada ainda faz sentido.",
+        "rerun": "Reexecucao criada a partir de historico anterior. Preserve a origem visivel antes de rodar de novo.",
+    }
+    return lookup.get(normalized, "Sem orientacao operacional adicional para este estado.")
 
 
 def _humanize_audit_status(status: Any) -> str:
@@ -5078,6 +5113,7 @@ def render_studio_selection_panel(summary: dict[str, Any], selection_type: str) 
 
 
 def render_run_jobs_overview_panel(summary: dict[str, Any]) -> Any:
+    runs = list(summary.get("runs", [])) if isinstance(summary, dict) else []
     status_counts = summary.get("status_counts", {}) if isinstance(summary, dict) else {}
     run_count = int(summary.get("run_count", 0) or 0) if isinstance(summary, dict) else 0
     next_queued_run_id = summary.get("next_queued_run_id") if isinstance(summary, dict) else None
@@ -5088,6 +5124,9 @@ def render_run_jobs_overview_panel(summary: dict[str, Any]) -> Any:
     failed_count = int(status_counts.get("failed", 0) or 0)
     completed_count = int(status_counts.get("completed", 0) or 0)
     preparing_count = int(status_counts.get("preparing", 0) or 0)
+    exporting_count = int(status_counts.get("exporting", 0) or 0)
+    canceled_count = int(status_counts.get("canceled", 0) or 0)
+    rerun_count = sum(1 for run in runs if (run.get("lineage") or {}).get("is_rerun"))
     queue_state = _humanize_run_status(summary.get("queue_state", "idle")) if isinstance(summary, dict) else "Sem leitura"
     latest_failed_run = _latest_run_with_status(summary, {"failed", "canceled"})
     latest_completed_run = _latest_run_with_status(summary, {"completed"})
@@ -5119,6 +5158,34 @@ def render_run_jobs_overview_panel(summary: dict[str, Any]) -> Any:
         recovery_signal = "O histórico existe, mas ainda não liberou um desfecho claro para avançar com segurança."
     else:
         recovery_signal = "Ainda não há histórico suficiente para falar em recuperação ou reaproveitamento."
+    status_guide_specs = [
+        ("queued", int(status_counts.get("queued", 0) or 0)),
+        ("preparing", preparing_count),
+        ("running", len(active_run_ids) or int(status_counts.get("running", 0) or 0)),
+        ("exporting", exporting_count),
+        ("completed", completed_count),
+        ("failed", failed_count),
+        ("canceled", canceled_count),
+    ]
+    status_guide_cards = [
+        _signal_card(
+            _humanize_run_status(status),
+            count,
+            _run_status_operator_copy(status),
+            tone=_run_status_tone(status, result_ready=status == "completed" and count > 0),
+        )
+        for status, count in status_guide_specs
+        if count or status in {"queued", "running", "completed", "failed"}
+    ]
+    if rerun_count:
+        status_guide_cards.append(
+            _signal_card(
+                _humanize_run_status("rerun"),
+                rerun_count,
+                _run_status_operator_copy("rerun"),
+                tone=_run_status_tone("rerun"),
+            )
+        )
     return html.Div(
         children=[
             html.H3("Painel operacional detalhado", style={"marginTop": 0}),
@@ -5190,6 +5257,21 @@ def render_run_jobs_overview_panel(summary: dict[str, Any]) -> Any:
                 ],
             ),
             html.Div(
+                id="run-jobs-overview-status-language",
+                style={**UI_CARD_STYLE, "padding": "14px", "marginTop": "12px"},
+                children=[
+                    html.Div("Estados da operação", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+                    html.Div(
+                        "Cada status abaixo traduz o que a fila serial esta fazendo e qual gesto dominante ainda faz sentido.",
+                        style={"lineHeight": "1.55", "marginTop": "8px", "color": "#496158"},
+                    ),
+                    html.Div(
+                        style={**UI_THREE_COLUMN_STYLE, "marginTop": "12px"},
+                        children=status_guide_cards or [_guidance_card("Sem status ativos", "Nenhuma run registrada ainda.")],
+                    ),
+                ],
+            ),
+            html.Div(
                 style=UI_THREE_COLUMN_STYLE,
                 children=[
                     _metric_card("Runs locais", summary.get("run_count", 0), "Histórico observável na fila serial."),
@@ -5197,11 +5279,12 @@ def render_run_jobs_overview_panel(summary: dict[str, Any]) -> Any:
                     _metric_card("Em execução", len(active_run_ids)),
                     _metric_card("Falhas", failed_count),
                     _metric_card("Concluídas", completed_count),
+                    _metric_card("Canceladas", canceled_count, "Rodadas interrompidas antes do desfecho."),
                     _metric_card(
                         "Pode fazer agora",
                         (
                             "Aguardar"
-                            if active_run_ids or preparing_count
+                            if active_run_ids or preparing_count or exporting_count
                             else ("Executar próxima" if next_queued_run_id else ("Revisar falha" if latest_failed_run else ("Ler resultado" if latest_completed_run else "Enfileirar cenário")))
                         ),
                         "Próximo gesto dominante",
@@ -5297,12 +5380,19 @@ def _run_progress_snapshot(detail: dict[str, Any] | None) -> dict[str, str]:
             "focus_reason": "Segue em foco porque ajuda a decidir se vale revisar o cenário ou reexecutar.",
             "signal": "Término sem resultado útil",
         }
-    if status in {"failed", "canceled"}:
+    if status == "failed":
+        return {
+            "progress_label": "Execução bloqueada",
+            "progress_text": "A run encontrou um bloqueio operacional e terminou sem saída utilizável.",
+            "focus_reason": "Segue em foco porque a recuperação depende de revisar a causa antes de reenfileirar.",
+            "signal": "Bloqueio operacional",
+        }
+    if status == "canceled":
         return {
             "progress_label": "Execução interrompida",
-            "progress_text": "A run terminou sem saída utilizável e pede recuperação antes de repetir a rodada.",
-            "focus_reason": "Segue em foco porque define o próximo reenfileiramento ou a revisão do cenário.",
-            "signal": "Execução interrompida",
+            "progress_text": "A run foi cancelada antes do desfecho e ainda pede decisão consciente sobre reexecução.",
+            "focus_reason": "Segue em foco porque o cancelamento ainda precisa ser confirmado ou revertido com intenção.",
+            "signal": "Cancelada com intenção",
         }
     return {
         "progress_label": "Sem progresso legível",
@@ -5583,14 +5673,6 @@ def render_runs_workspace_panel(
     focus_reason = _run_summary_focus_reason(selected_run_summary)
     recent_runs = _recent_runs_for_history(run_summary, limit=3)
     latest_recent_run = recent_runs[0] if recent_runs else None
-    if active_run_ids:
-        queue_focus = f"Execução em foco: {active_run_ids[0]}."
-    elif next_queued_run_id:
-        queue_focus = f"Próxima run pronta: {next_queued_run_id}."
-    elif latest_run_id:
-        queue_focus = f"Última run observada: {latest_run_id}."
-    else:
-        queue_focus = "Nenhuma run registrada ainda."
     if execution_error:
         usable_result = "A última run terminou bloqueada; ainda não existe resultado utilizável para Decisão."
     elif state["decision_enabled"]:
@@ -5599,6 +5681,9 @@ def render_runs_workspace_panel(
         usable_result = f"{latest_run_id} ainda não liberou contexto suficiente para decisão assistida."
     else:
         usable_result = "Ainda não existe resultado utilizável porque nenhuma run terminou esta trilha."
+    focus_cta_label = state["primary_cta_label"]
+    focus_cta_target = state["primary_cta_target"]
+    decision_gate_copy = state["decision_gate"]
     if state["primary_cta_target"] == "decision":
         local_recovery_cta: Any = html.Button(state["primary_cta_label"], id="runs-workspace-primary-open-decision-button", style=UI_BUTTON_STYLE, disabled=False)
     elif state["primary_cta_target"] == "studio":
@@ -5636,11 +5721,6 @@ def render_runs_workspace_panel(
             else "O cenário está pronto, mas ainda falta a primeira run para abrir leitura operacional útil."
         )
     )
-    queue_lane_copy = (
-        f"{queue_focus} Estado da fila: {state['queue_state']}."
-        if state["run_count"] or next_queued_run_id or active_run_ids
-        else "Nenhuma run entrou na fila ainda; a leitura operacional começa quando o cenário for enfileirado."
-    )
     action_signal_value = (
         "Corrigir Studio"
         if state["primary_cta_target"] == "studio"
@@ -5660,25 +5740,126 @@ def render_runs_workspace_panel(
     focus_lineage = (selected_run_summary or {}).get("lineage") or {}
     focus_rerun_source = str(selected_run_detail.get("rerun_of_run_id") or focus_lineage.get("source_run_id") or "").strip()
     focus_is_rerun = bool(focus_rerun_source or focus_lineage.get("is_rerun"))
-    focus_result_ready = _run_has_usable_result(selected_run_summary or detail_for_progress) or state["decision_enabled"]
-    focus_state_tone = (
-        "ready"
-        if focus_result_ready
-        else (
-            "running"
-            if str(detail_for_progress.get("status") or "").strip() in {"running", "preparing", "exporting"}
-            else (
-                "failed"
-                if str(detail_for_progress.get("status") or "").strip() in {"failed", "canceled"}
-                else ("queued" if str(detail_for_progress.get("status") or "").strip() == "queued" else "idle")
-            )
-        )
-    )
+    focus_result_ready = _run_has_usable_result(selected_run_summary or detail_for_progress)
+    focus_state_tone = _run_status_tone(detail_for_progress.get("status"), result_ready=focus_result_ready)
     focus_result_copy = (
         "Resultado pronto para leitura posterior e passagem honesta para Decisão."
         if focus_result_ready
         else "Ainda sem resultado utilizável; a prioridade continua sendo conduzir ou recuperar esta run."
     )
+    focus_status_key = str(detail_for_progress.get("status") or "").strip()
+    support_history_runs = [
+        run
+        for run in recent_runs
+        if str(run.get("run_id") or "").strip() and str(run.get("run_id") or "").strip() != focus_run_label
+    ][:2]
+    if next_queued_run_id and next_queued_run_id != focus_run_label:
+        queue_support_value = next_queued_run_id
+        queue_support_note = f"{queued_count} pendência(s) ainda aguardando vez."
+    elif next_queued_run_id:
+        queue_support_value = "Sem fila extra"
+        queue_support_note = "A run em foco já é a próxima da fila."
+    elif state["preparing_count"]:
+        queue_support_value = "Preparando"
+        queue_support_note = "Sem pendência terminal nova enquanto a preparação não termina."
+    else:
+        queue_support_value = "Sem pendência"
+        queue_support_note = "Nada novo aguardando além do que a run em foco já explica."
+    if focus_status_key in {"failed", "canceled"}:
+        focus_recovery_copy = (
+            "Revise a causa dominante desta falha antes de repetir a rodada."
+            if focus_status_key == "failed"
+            else "Confirme se o cancelamento foi deliberado antes de reenfileirar esta leitura."
+        )
+    elif focus_result_ready:
+        focus_recovery_copy = "Sem recuperação dominante: a leitura principal já pode migrar para resultado."
+    else:
+        focus_recovery_copy = "Sem falha dominante agora; acompanhe esta run até ela liberar resultado ou exigir revisão."
+    focus_recovery_label = state["recovery_headline"]
+    if focus_status_key == "failed":
+        focus_recovery_label = "Bloqueio pede correção"
+    elif focus_status_key == "canceled":
+        focus_recovery_label = "Cancelamento pede confirmação"
+    elif focus_status_key == "queued":
+        focus_recovery_label = "Fila ainda em aberto"
+    elif focus_status_key in {"preparing", "running", "exporting"}:
+        focus_recovery_label = "Execução ainda em aberto"
+    elif focus_result_ready:
+        focus_recovery_label = "Sem recuperação dominante"
+    elif focus_status_key == "completed":
+        focus_recovery_label = "Sem saída para Decisão"
+    if focus_result_ready:
+        focus_cta_label = "Abrir Decisão"
+        focus_cta_target = "decision"
+        action_signal_value = "Abrir Decisão"
+        decision_gate_copy = (
+            "Ja existe resultado utilizavel nesta leitura. A passagem Runs -> Decisao esta liberada."
+            if not focus_is_rerun
+            else "A reexecucao em foco ja consolidou resultado utilizavel. A passagem Runs -> Decisao esta liberada."
+        )
+    elif focus_status_key == "failed":
+        focus_cta_label = "Reexecutar com correção"
+        focus_cta_target = "rerun"
+        action_signal_value = "Revisar falha"
+        decision_gate_copy = (
+            "A Decisao ja esta liberada por outra rodada, mas esta run em foco segue bloqueada."
+            if state["decision_enabled"]
+            else "A Decisao continua bloqueada: esta run falhou antes de gerar contexto executivo utilizavel."
+        )
+    elif focus_status_key == "canceled":
+        focus_cta_label = "Reexecutar se ainda fizer sentido"
+        focus_cta_target = "rerun"
+        action_signal_value = "Decidir reexecução"
+        decision_gate_copy = (
+            "A Decisao ja esta liberada por outra rodada, mas esta run em foco foi interrompida antes do desfecho."
+            if state["decision_enabled"]
+            else "A Decisao continua bloqueada: esta run foi interrompida antes de consolidar resultado."
+        )
+    elif focus_status_key == "queued":
+        focus_cta_label = f"Executar {focus_run_label}" if focus_run_label != "Nenhuma" else state["primary_cta_label"]
+        if focus_is_rerun and focus_run_label != "Nenhuma":
+            focus_cta_label = f"Executar reexecução {focus_run_label}"
+        focus_cta_target = "run"
+        action_signal_value = "Executar próxima"
+        decision_gate_copy = "A Decisao continua secundaria enquanto a run em foco ainda aguarda vez na fila."
+    elif focus_status_key in {"preparing", "running", "exporting"}:
+        focus_cta_label = "Aguardar run em foco"
+        focus_cta_target = "refresh"
+        action_signal_value = "Aguardar execução"
+        decision_gate_copy = "A Decisao continua secundaria enquanto a run em foco ainda nao consolidou saida utilizavel."
+    elif focus_status_key == "completed":
+        focus_cta_label = "Reexecutar para gerar resultado"
+        focus_cta_target = "rerun"
+        action_signal_value = "Reexecutar"
+        decision_gate_copy = (
+            "Ja existe resultado utilizavel em outra rodada, mas esta run em foco terminou sem esse contexto."
+            if state["decision_enabled"]
+            else "A run terminou, mas ainda sem saida forte para Decisao. Revise ou reexecute com intencao clara."
+        )
+    if focus_cta_target == "decision":
+        local_recovery_cta = html.Button(focus_cta_label, id="runs-workspace-primary-open-decision-button", style=UI_BUTTON_STYLE, disabled=False)
+    elif focus_cta_target == "studio":
+        local_recovery_cta = _button_link(focus_cta_label, "?tab=studio", "runs-workspace-primary-recovery-link")
+    elif focus_cta_target == "enqueue":
+        local_recovery_cta = html.Button(focus_cta_label, id="runs-workspace-enqueue-button", style=UI_BUTTON_STYLE, disabled=False)
+    elif focus_cta_target == "run":
+        local_recovery_cta = html.Button(
+            focus_cta_label,
+            id="runs-workspace-run-next-button",
+            style=UI_BUTTON_STYLE,
+            disabled=not bool(next_queued_run_id),
+        )
+    elif focus_cta_target == "rerun":
+        local_recovery_cta = html.Button(
+            focus_cta_label,
+            id="runs-workspace-rerun-button",
+            style=UI_BUTTON_STYLE,
+            disabled=selected_run_status not in {"completed", "failed", "canceled"},
+        )
+    elif focus_cta_target == "refresh":
+        local_recovery_cta = html.Button(focus_cta_label, id="runs-workspace-refresh-button", style=UI_BUTTON_STYLE, disabled=False)
+    else:
+        local_recovery_cta = html.Button(focus_cta_label, id="runs-workspace-primary-recovery-button", style=UI_BUTTON_STYLE, disabled=True)
     return html.Div(
         children=[
             html.Div("Leitura operacional de Runs", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
@@ -5720,24 +5901,22 @@ def render_runs_workspace_panel(
                             html.Div(
                                 style={**UI_TWO_COLUMN_STYLE, "marginTop": "12px"},
                                 children=[
-                                    _signal_card("Progresso", progress_snapshot["progress_label"], progress_snapshot["progress_text"], tone=focus_state_tone),
+                                    _signal_card("Agora", progress_snapshot["signal"], progress_snapshot["progress_text"], tone=focus_state_tone),
+                                    _signal_card("Recuperação", focus_recovery_label, focus_recovery_copy, tone="failed" if focus_cta_target == "rerun" or state["failed_count"] else ("ready" if focus_result_ready else "needs_attention")),
                                     _signal_card("Resultado", "Pronto" if focus_result_ready else "Pendente", focus_result_copy, tone="ready" if focus_result_ready else "needs_attention"),
-                                    _signal_card("Recuperação", state["recovery_headline"], state["next_action"], tone="failed" if state["primary_cta_target"] == "rerun" or state["failed_count"] else ("ready" if focus_result_ready else "needs_attention")),
-                                    _signal_card("Ação agora", action_signal_value, state["next_action"], tone="ready" if focus_result_ready else "needs_attention"),
                                 ],
                             ),
                             html.Div(
                                 id="runs-workspace-context-strip",
                                 style={**UI_MUTED_CARD_STYLE, "padding": "14px", "marginTop": "12px"},
                                 children=[
-                                    html.Div("Leituras separadas", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
-                                    html.Div(
-                                        style={**UI_THREE_COLUMN_STYLE, "marginTop": "10px"},
-                                        children=[
-                                            _compact_value_card("Cenário", _humanize_readiness_status(state["studio_status"]), str(studio_summary.get("readiness_headline") or state["readiness_note"])),
-                                            _compact_value_card("Fila agora", next_queued_run_id or ("Preparando" if state["preparing_count"] else "Vazia"), queue_lane_copy),
-                                            _compact_value_card("Resultado", "Pronto" if focus_result_ready else "Pendente", usable_result),
-                                        ],
+                                    html.Div("Separação operacional", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+                                    _label_value_list(
+                                        [
+                                            ("Cenário", str(studio_summary.get("readiness_headline") or state["readiness_note"])),
+                                            ("Run em foco", f"{focus_run_label} | {focus_status_label}"),
+                                            ("Resultado", usable_result),
+                                        ]
                                     ),
                                 ],
                             ),
@@ -5747,7 +5926,7 @@ def render_runs_workspace_panel(
                                 children=[
                                     html.Div("Próxima ação", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
                                     html.Div(action_signal_value, style={"fontSize": "22px", "fontWeight": 700, "marginTop": "6px"}),
-                                    html.Div(state["decision_gate"], style={"lineHeight": "1.55", "marginTop": "8px"}),
+                                    html.Div(decision_gate_copy, style={"lineHeight": "1.55", "marginTop": "8px"}),
                                     html.Div(style={**UI_ACTION_ROW_STYLE, "marginTop": "12px"}, children=[local_recovery_cta, decision_cta]),
                                 ],
                             ),
@@ -5762,8 +5941,8 @@ def render_runs_workspace_panel(
                                 style={**UI_CARD_STYLE, "padding": "14px"},
                                 children=[
                                     html.Div("Fila agora", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
-                                    html.Div(queue_focus, style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"}),
-                                    html.Div(queue_lane_copy, style={"lineHeight": "1.55", "marginTop": "8px", "color": "#496158"}),
+                                    html.Div(queue_support_value, style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"}),
+                                    html.Div(queue_support_note, style={"lineHeight": "1.55", "marginTop": "8px", "color": "#496158"}),
                                     html.Div(
                                         style={"display": "flex", "gap": "8px", "flexWrap": "wrap", "marginTop": "10px"},
                                         children=[
@@ -5788,13 +5967,19 @@ def render_runs_workspace_panel(
                                         style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"},
                                     ),
                                     html.Div(
-                                        usable_result if latest_recent_run else "Quando a primeira run terminar, este trilho passa a carregar o último desfecho reaproveitável.",
+                                        (
+                                            "Resultados anteriores que ainda ajudam a ler reaproveitamento ou recuperação."
+                                            if support_history_runs
+                                            else "Sem terminal anterior relevante além da run em foco."
+                                        )
+                                        if latest_recent_run
+                                        else "Quando a primeira run terminar, este trilho passa a carregar o último desfecho reaproveitável.",
                                         style={"lineHeight": "1.55", "marginTop": "8px", "color": "#496158"},
                                     ),
                                     html.Div(
                                         id="runs-workspace-history-list",
                                         style={"display": "grid", "gap": "10px", "marginTop": "12px"},
-                                        children=[_run_history_entry(run, latest=index == 0) for index, run in enumerate(recent_runs[:2])]
+                                        children=[_run_history_entry(run, latest=index == 0) for index, run in enumerate(support_history_runs)]
                                         or [html.Div("Ainda não há histórico recente para leitura.", style={"color": "#496158"})],
                                     ),
                                 ],
@@ -5900,13 +6085,22 @@ def render_run_job_detail_panel(detail: dict[str, Any]) -> Any:
         recovery_label = "Consolidando saída"
         recovery_text = "A run já está no fechamento da rodada; espere a exportação terminar antes de agir."
     elif status == "completed":
-        next_action = "Leia o resumo executivo e siga para Decisão se a run já gerou um candidato oficial confiável."
-        recovery_label = "Resultado útil"
-        recovery_text = "Esta run já pode migrar para decisão assistida ou servir de base para uma nova rodada mais consciente."
-    elif status in {"failed", "canceled"}:
-        next_action = "Revise o bundle e o status técnico antes de reexecutar esta run."
-        recovery_label = "Falha ou revisão pendente"
-        recovery_text = "A recuperação começa revendo esta run antes de repetir a fila com a mesma configuração."
+        if (detail.get("artifacts") or {}).get("summary_json") or (detail.get("artifacts") or {}).get("selected_candidate_json"):
+            next_action = "Leia o resumo executivo e siga para Decisão se a run já gerou um candidato oficial confiável."
+            recovery_label = "Resultado útil"
+            recovery_text = "Esta run já pode migrar para decisão assistida ou servir de base para uma nova rodada mais consciente."
+        else:
+            next_action = "A rodada terminou, mas ainda sem saída forte para Decisão. Revise a execução antes de rerun."
+            recovery_label = "Concluída sem resultado"
+            recovery_text = "A run fechou a trilha, mas ainda não gerou contexto executivo suficiente para decisão assistida."
+    elif status == "failed":
+        next_action = "Revise o bloqueio operacional e só reexecute esta run depois de corrigir a causa dominante."
+        recovery_label = "Bloqueio operacional"
+        recovery_text = "Falha não é cancelamento: a prioridade é entender a causa antes de repetir a rodada."
+    elif status == "canceled":
+        next_action = "Confirme se o cancelamento foi intencional antes de reenfileirar ou reexecutar esta run."
+        recovery_label = "Interrompida com intenção"
+        recovery_text = "Cancelamento não é falha: a rodada foi parada antes do desfecho e ainda pede decisão consciente."
     else:
         next_action = "Confirme o estado desta run antes de decidir entre executar, cancelar ou reprocessar."
         recovery_label = "Estado indefinido"
@@ -5925,7 +6119,6 @@ def render_run_job_detail_panel(detail: dict[str, Any]) -> Any:
         "Resumo executivo disponível." if artifacts.get("summary_json") else "",
         "Candidato selecionado disponível." if artifacts.get("selected_candidate_json") else "",
         "Catálogo exportado disponível." if artifacts.get("catalog_csv") else "",
-        f"Diretório de artefatos: {artifacts.get('artifacts_dir')}" if artifacts.get("artifacts_dir") else "",
     ]
     artifact_lines = [line for line in artifact_lines if line]
     if not artifact_lines:
@@ -5943,6 +6136,24 @@ def render_run_job_detail_panel(detail: dict[str, Any]) -> Any:
         if artifacts.get("summary_json") or artifacts.get("selected_candidate_json")
         else "Ainda sem resultado utilizável nesta run."
     )
+    rerun_source_id = str(detail.get("rerun_of_run_id") or ((detail.get("source_bundle_reference") or {}).get("rerun_source") or {}).get("source_run_id") or "").strip()
+    is_rerun = bool(rerun_source_id)
+    scenario_state = "Cenário atual carregado para esta rodada." if detail.get("source_bundle_root") else "Bundle do cenário não informado."
+    run_origin = (
+        f"Reexecução da {rerun_source_id}."
+        if is_rerun
+        else "Rodada original do cenário atual."
+    )
+    if status in {"queued", "preparing", "running", "exporting"}:
+        decision_gate = "A passagem Runs -> Decisão ainda está bloqueada porque esta run não terminou."
+    elif artifacts.get("summary_json") or artifacts.get("selected_candidate_json"):
+        decision_gate = "A passagem Runs -> Decisão já está liberada por esta run."
+    elif status == "failed":
+        decision_gate = "A passagem Runs -> Decisão continua bloqueada porque a run falhou antes do resultado executivo."
+    elif status == "canceled":
+        decision_gate = "A passagem Runs -> Decisão continua bloqueada porque a run foi interrompida antes do desfecho."
+    else:
+        decision_gate = "A passagem Runs -> Decisão continua bloqueada até existir resultado executivo utilizável."
     progress_snapshot = _run_progress_snapshot(detail)
     timeline_order = ["queued", "preparing", "running", "exporting", "completed"]
     current_position = timeline_order.index(status) if status in timeline_order else None
@@ -5985,6 +6196,7 @@ def render_run_job_detail_panel(detail: dict[str, Any]) -> Any:
                 children=[
                     html.Span(_humanize_run_status(status), style=UI_PILL_STYLE),
                     html.Span(str(detail.get("requested_execution_mode") or detail.get("execution_mode") or "n/a"), style=UI_PILL_STYLE),
+                    _toned_pill(f"reexecução de {rerun_source_id}", "needs_attention") if is_rerun else None,
                 ],
             ),
             html.Div(
@@ -6001,17 +6213,19 @@ def render_run_job_detail_panel(detail: dict[str, Any]) -> Any:
                 id="run-job-detail-operational-summary",
                 style={**UI_TWO_COLUMN_STYLE, "marginTop": "12px"},
                 children=[
-                    _signal_card("Progresso desta run", progress_snapshot["progress_label"], progress_snapshot["signal"], tone="running" if status in {"running", "preparing", "exporting"} else ("ready" if status == "completed" else ("failed" if status in {"failed", "canceled"} else "queued"))),
-                    _signal_card("Recuperação desta run", recovery_label, recovery_text, tone="failed" if status in {"failed", "canceled"} else ("ready" if status == "completed" else "needs_attention")),
+                    _signal_card("Progresso desta run", progress_snapshot["progress_label"], progress_snapshot["signal"], tone=_run_status_tone(status, result_ready=bool(artifacts.get("summary_json") or artifacts.get("selected_candidate_json")))),
+                    _signal_card("Recuperação desta run", recovery_label, recovery_text, tone="failed" if status in {"failed", "canceled"} else ("ready" if artifacts.get("summary_json") or artifacts.get("selected_candidate_json") else "needs_attention")),
                     _guidance_card("Pode agir agora", action_guidance),
                     _guidance_card("O que falta", progress_snapshot["progress_text"]),
-                    _guidance_card("Cenário", str(detail.get("source_bundle_root") or "-")),
+                    _guidance_card("Origem desta rodada", run_origin),
+                    _guidance_card("Cenário", scenario_state),
                     _guidance_card(
                         "Run/job",
                         f"{detail.get('selected_run_id') or '-'} | {str(detail.get('requested_execution_mode') or detail.get('execution_mode') or '-')}",
                     ),
                     _guidance_card("Resultado agora", result_state),
                     _guidance_card("Estado desta run", recovery_label),
+                    _guidance_card("Passagem Runs -> Decisão", decision_gate),
                 ],
             ),
             html.H4("Eventos relevantes", style={"marginBottom": "6px", "marginTop": "14px"}),
@@ -6030,6 +6244,8 @@ def render_run_job_detail_panel(detail: dict[str, Any]) -> Any:
                             ("Engine utilizado", detail.get("engine_used")),
                             ("Erro operacional", detail.get("error")),
                             ("Failure reason", detail.get("failure_reason")),
+                            ("Bundle do cenário", detail.get("source_bundle_root")),
+                            ("Diretório de artefatos", artifacts.get("artifacts_dir")),
                             ("Events path", detail.get("events_path")),
                             ("Log path", detail.get("log_path")),
                         ]
