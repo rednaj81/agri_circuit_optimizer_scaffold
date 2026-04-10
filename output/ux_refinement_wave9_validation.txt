@@ -1,23 +1,12 @@
-Wave 9 validation
-Date: 2026-04-08
-
-Command executed:
-powershell -ExecutionPolicy Bypass -File scripts\Capture-UxRefinementStudio.ps1 -Port 8060 -OutputPath output\playwright\studio-fullhd-wave9.png
-
-Observed result:
-- Dash Studio became ready on http://127.0.0.1:8060/?tab=studio
-- Browser-native Edge headless screenshot path executed
-- No PNG was generated at output/playwright/studio-fullhd-wave9.png
-- Assessment file was generated at output/playwright/studio-fullhd-wave9-assessment.json
-
-Assessment summary:
-- edge_exit_code: -2147483645
-- output_exists: false
-- visually_useful: false
-
-Primary blocker evidence:
-- output/playwright/wave9-edge-native.stderr.log
-- output/playwright/studio-fullhd-wave9-assessment.json
-
-Conclusion:
-The browser-native capture path is now the single reproduced blocker for ux_phase_2 visual evidence in this runtime.
+wave: 9
+phase_id: phase_ux_refinement
+ux_phase_id: ux_phase_4
+repo_head: 8e4124f660ff1337344c052aa346b91c87ba46f9
+validations:
+  - command: .\\.venv\\Scripts\\python.exe -m py_compile src\\decision_platform\\ui_dash\\app.py
+    result: passed
+  - command: .\\.venv\\Scripts\\python.exe -m pytest tests\\decision_platform\\test_phase4_decision_acceptance.py tests\\decision_platform\\test_ui_smoke.py -q
+    result: passed
+    summary: 126 passed in 424.11s (0:07:04)
+inherited_constraint:
+  - ux_phase_3=blocked_on_evidence

@@ -57,11 +57,12 @@ def _collect_text(component: object) -> str:
                 "Winner claro",
                 "Winner oficial agora",
                 "Runner-up sob revisão",
-                "Confirmar decisão final",
-                "Decisão liberada",
+                "Oficializar candidato",
+                "Confiança de exportação",
+                "Exportação pronta após confirmação",
                 "Decisão pronta para confirmar",
-                "Próxima ação humana",
-                "Diferença principal agora",
+                "Ação final recomendada",
+                "Critério humano para oficializar",
                 "Aprofundar se precisar",
             ],
         ),
@@ -76,13 +77,14 @@ def _collect_text(component: object) -> str:
             },
             [
                 "Empate técnico",
-                "Fechar escolha assistida",
-                "Empate técnico em revisão",
+                "Manter comparação aberta",
+                "Confiança de exportação",
+                "Exportação condicionada",
                 "Empate técnico assistido",
                 "Winner sugerido agora",
                 "Runner-up ainda comparável",
-                "Próxima ação humana",
-                "Diferença principal em aberto",
+                "Ação final recomendada",
+                "Critério humano para destrate",
                 "Comparação em aberto",
             ],
         ),
@@ -95,7 +97,8 @@ def _collect_text(component: object) -> str:
                 "Recuperar execução em Runs",
                 "Passagem Runs -> Decisão",
                 "Decisão bloqueada",
-                "Diferença principal indisponível",
+                "Exportação indisponível",
+                "Critério humano ainda indisponível",
             ],
         ),
         (
@@ -111,10 +114,11 @@ def _collect_text(component: object) -> str:
                 "Winner inviável",
                 "Revisar bloqueio em Runs",
                 "rota obrigatória não conseguiu fechar",
-                "Bloqueio operacional",
                 "Runner-up sob revisão",
                 "Decisão bloqueada",
-                "Diferença principal bloqueada",
+                "Segurar exportação e revisar Runs",
+                "Exportação bloqueada",
+                "Critério humano não destrava",
             ],
         ),
     ],
@@ -155,6 +159,20 @@ def test_wave8_snapshot_keeps_inherited_evidence_blocker_visible() -> None:
     assert "ux_phase_3=blocked_on_evidence" in snapshot["inherited_constraints"]
     assert snapshot["scenarios"]["technical_tie"]["contains"]["primary_difference"] is True
     assert snapshot["scenarios"]["technical_tie"]["contains"]["next_human_action"] is True
+
+
+@pytest.mark.fast
+def test_wave9_snapshot_tracks_assisted_decision_and_export_confidence() -> None:
+    from pathlib import Path
+
+    snapshot = json.loads(Path("docs/2026-04-10_phase_ux_refinement_wave9_ui_snapshot.json").read_text(encoding="utf-8"))
+
+    assert snapshot["phase_id"] == "phase_ux_refinement"
+    assert snapshot["ux_phase_id"] == "ux_phase_4"
+    assert snapshot["wave_index"] == 9
+    assert "ux_phase_3=blocked_on_evidence" in snapshot["inherited_constraints"]
+    assert snapshot["scenarios"]["technical_tie"]["contains"]["assisted_action"] is True
+    assert snapshot["scenarios"]["technical_tie"]["contains"]["export_confidence"] is True
 
 
 @pytest.mark.fast
@@ -200,7 +218,8 @@ def test_technical_tie_state_keeps_assisted_language_across_secondary_panels() -
     assert "winner sugerido agora" in workspace_text.lower()
     assert "runner-up ainda comparável" in workspace_text.lower()
     assert "escolha final humana" in workspace_text.lower()
-    assert "diferença principal em aberto" in workspace_text.lower()
+    assert "critério humano para destrate" in workspace_text.lower()
+    assert "exportação condicionada" in workspace_text.lower()
     assert "registre o critério humano do empate" in workspace_text.lower()
     assert "registrar a escolha humana final" in workspace_text.lower()
     assert "exporte apenas como decisão assistida" in workspace_text.lower()

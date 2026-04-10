@@ -1,0 +1,54 @@
+{
+  "created_at": "2026-04-10T17:47:41.831171Z",
+  "phase_id": "phase_ux_refinement",
+  "ux_phase_id": "ux_phase_4",
+  "wave_index": 9,
+  "repo_head": "8e4124f660ff1337344c052aa346b91c87ba46f9",
+  "inherited_constraints": [
+    "ux_phase_3=blocked_on_evidence"
+  ],
+  "decision_first_fold_focus": [
+    "assisted_final_action",
+    "export_confidence_visibility",
+    "technical_tie_human_criteria",
+    "secondary_details_only_in_disclosure"
+  ],
+  "scenarios": {
+    "winner_clear": {
+      "contains": {
+        "assisted_action": true,
+        "export_confidence": true,
+        "human_criteria": true,
+        "secondary_disclosure": true
+      },
+      "text_excerpt": "Leitura principal da decisãoWinner claroA execução atual já entrega um winner legível e um runner-up de referência para a confirmação final.Estado decisório agoraWinner claroA execução atual já entrega um winner legível e um runner-up de referência para a confirmação final.Winner e runner-up já aparecem com leitura utilizável; aprofunde Auditoria só se precisar reconciliar a trilha técnica.Passagem Runs -> DecisãoDecisão pronta para confirmarRuns já liberou resultado utilizável; a primeira dobra de Decisão pode sustentar a escolha principal.Ação final recomendadaOficializar candidatoWinner e runner-up já sustentam a confirmação final; a decisão humana pode oficializar depois da última checagem. Próxima ação operacional: Confirmar decisão final.Confiança de exportaçãoExportação pronta após confirmaçãoO export atual seguirá cand-01 sem sobrescrever a referência oficial do produto. Escolha manual: Escolha manual alinhada à referência oficial. Perfil em leitura: Equilibrado | Perfil oficial: Equilibrado.Winner oficial agoracand-01Lidera por custo, fechamento das rotas e leitura operacional mais estável.Runner-up sob revisãocand-02Perde por margem curta, mas segue como quase vencedor.Critério humano para oficializarOficialização recomendadaLidera por custo, fechamento das rotas e leitura operacional mais estável. Escolha manual alinhada com a referência oficial; prossiga para exportação quando a leitura humana confirmar.Aprofundar se precisarComparação em abertocand-01 vs cand-02 | Perde por margem curta, mas segue como quase vencedor. Margem curta: Margem de score: 0.4Risco dom"
+    },
+    "technical_tie": {
+      "contains": {
+        "assisted_action": true,
+        "export_confidence": true,
+        "human_criteria": true,
+        "secondary_disclosure": true
+      },
+      "text_excerpt": "Leitura principal da decisãoEmpate técnicoWinner e runner-up seguem próximos o suficiente para exigir decisão humana assistida.Estado decisório agoraEmpate técnicoWinner e runner-up seguem próximos o suficiente para exigir decisão humana assistida.Technical tie explícito: mantenha winner e runner-up visíveis antes de qualquer oficialização.Passagem Runs -> DecisãoEmpate técnico assistidoRuns já entregou contraste suficiente para abrir a decisão, mas a oficialização continua dependendo de leitura humana assistida.Ação final recomendadaManter comparação abertaEmpatados em custo global e leitura operacional principal. Registre o critério humano do empate antes de oficializar. Próxima ação operacional: Fechar escolha assistida.Confiança de exportaçãoExportação condicionadaTechnical tie ativo; exporte apenas como decisão assistida depois de registrar a escolha humana final. Escolha manual: Escolha manual alinhada à referência oficial. Perfil em leitura: Equilibrado | Perfil oficial: Equilibrado.Winner sugerido agoracand-01Winner e runner-up seguem empatados nas dimensões operacionais principais.Runner-up ainda comparávelcand-02Quase vence; o empate técnico ainda está aberto.Critério humano para destrateComparação abertaEmpatados em custo global e leitura operacional principal. Escolha manual registrada em contexto de technical tie; confirme o critério humano antes de liberar a exportação assistida.Aprofundar se precisarComparação em abertocand-01 vs cand-02 | Empatados em custo global e leitura operacional principal.Risco dominanteMargem curta: Margem de score: 0.05Comparação as"
+    },
+    "blocked": {
+      "contains": {
+        "assisted_action": true,
+        "export_confidence": true,
+        "human_criteria": true,
+        "secondary_disclosure": true
+      },
+      "text_excerpt": "Leitura principal da decisãoSem decisão utilizávelAinda falta uma run utilizável para abrir winner, runner-up e contraste com segurança.Estado decisório agoraSem decisão utilizávelAinda falta uma run utilizável para abrir winner, runner-up e contraste com segurança.Ainda não existe winner legível; a prioridade continua sendo recuperar uma execução comparável em Runs.Passagem Runs -> DecisãoDecisão bloqueadaA Decisão permanece aberta apenas como leitura bloqueada; não existe resultado utilizável para oficializar.Ação final recomendadaVoltar para RunsVolte para Runs, confirme uma execução concluída e retorne quando existir resultado comparável; a decisão humana ainda não pode fechar esta leitura. Próxima ação operacional: Recuperar execução em Runs.Confiança de exportaçãoExportação indisponívelExportação bloqueada até existir winner e runner-up comparáveis. Escolha manual: Escolha manual ainda indefinida. Perfil em leitura: Perfil atual | Perfil oficial: Perfil atual.Winner oficial indisponívelSem winnerAinda não existe saída utilizável para sustentar um winner oficial.Runner-up ainda indisponívelSem runner-upAinda não existe runner-up comparável para sustentar contraste suficiente nesta dobra.Critério humano ainda indisponívelSem base comparávelRecupere uma execução comparável antes de pedir escolha humana final.Aprofundar se precisarComparação em aberto- vs - | Segue como contraste principal, mas ainda abaixo do winner. Sem alerta forte: A comparação depende mais de preferência de perfil do que de um risco dominante.Risco dominanteSem alerta forte: A comparação depende mais"
+    },
+    "winner_blocked": {
+      "contains": {
+        "assisted_action": true,
+        "export_confidence": true,
+        "human_criteria": true,
+        "secondary_disclosure": true
+      },
+      "text_excerpt": "Leitura principal da decisãoWinner inviávelExiste um winner visível, mas ele ainda não pode ser oficializado na leitura principal.Estado decisório agoraWinner inviávelExiste um winner visível, mas ele ainda não pode ser oficializado na leitura principal.Winner ainda bloqueado por uma rota obrigatória não conseguiu fechar com a configuração atual.Passagem Runs -> DecisãoDecisão bloqueadaExiste ranking visível, mas a decisão principal segue bloqueada até corrigir a inviabilidade ou aceitar o retorno para Runs.Ação final recomendadaSegurar exportação e revisar RunsO winner atual segue inviável; não transforme a leitura atual em candidato oficial antes de recuperar o cenário em Runs. Próxima ação operacional: Revisar bloqueio em Runs.Confiança de exportaçãoExportação bloqueadaExportação bloqueada enquanto o winner em leitura seguir inviável. Escolha manual: Escolha manual alinhada à referência oficial. Perfil em leitura: Perfil atual | Perfil oficial: Perfil atual.Winner oficial agoracand-01Lidera com a melhor combinação de score e leitura operacional.Runner-up sob revisãocand-02Pressiona a decisão porque o winner está bloqueado.Critério humano não destravaBloqueio operacionaluma rota obrigatória não conseguiu fechar com a configuração atual. Escolha manual congelada; não exporte enquanto o winner oficial permanecer bloqueado.Aprofundar se precisarComparação em abertocand-01 vs cand-02 | Pressiona a decisão porque o winner está bloqueado. Sem alerta forte: A comparação depende mais de preferência de perfil do que de um risco dominante.Risco dominanteSem alerta forte: A comparaç"
+    }
+  }
+}

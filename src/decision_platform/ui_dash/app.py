@@ -7031,19 +7031,6 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
         if selected_candidate_id and official_product_candidate_id
         else "Ainda sem escolha manual final; use winner e runner-up para fechar a decisão."
     )
-    next_action_signal = (
-        decision_state["next_action"]
-        if not candidate_id
-        else "Volte para Runs e corrija o bloqueio antes de oficializar ou exportar."
-        if summary.get("feasible") is False
-        else "Mantenha winner e runner-up lado a lado, registre o critério humano do empate e confirme o critério humano antes de liberar a exportação assistida."
-        if decision_status == "technical_tie"
-        else "Revise runner-up e escolha manual antes de exportar."
-        if selected_candidate_id and selected_candidate_id != official_product_candidate_id
-        else "Confirme a referência oficial e siga para exportação."
-        if official_product_candidate_id
-        else decision_state["next_action"]
-    )
     hero_tone = (
         "needs_attention"
         if not candidate_id
@@ -7075,37 +7062,75 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
         else "Runner-up ainda indisponível"
     )
     runner_up_primary_note = runner_up_signal if runner_up_id else "Ainda não existe runner-up comparável para sustentar contraste suficiente nesta dobra."
-    review_priority_label = (
-        "Empate técnico em revisão"
-        if decision_status == "technical_tie"
-        else "Bloqueio operacional"
-        if summary.get("feasible") is False
-        else "Decisão liberada"
-        if candidate_id
-        else "Sem contraste executivo"
-    )
-    primary_difference_label = (
-        "Diferença principal em aberto"
-        if decision_status == "technical_tie"
-        else "Diferença principal bloqueada"
-        if summary.get("feasible") is False
-        else "Diferença principal agora"
-        if candidate_id
-        else "Diferença principal indisponível"
-    )
-    primary_difference_signal = (
-        "Ainda não existe contraste suficiente entre winner e runner-up para sustentar a leitura principal desta decisão."
-        if not candidate_id
-        else f"{_humanize_decision_copy(summary.get('infeasibility_reason'))}. {runner_up_signal}"
-        if summary.get("feasible") is False
-        else technical_tie_reason
-        if decision_status == "technical_tie"
-        else _humanize_decision_copy(comparison_difference)
-    )
     comparison_open_signal = (
         technical_tie_reason
         if decision_status == "technical_tie"
         else f"{runner_up_signal} {risk_value}: {risk_note}"
+    )
+    final_action_label = (
+        "Voltar para Runs"
+        if not candidate_id
+        else "Segurar exportação e revisar Runs"
+        if summary.get("feasible") is False
+        else "Manter comparação aberta"
+        if decision_status == "technical_tie"
+        else "Confirmar antes de substituir o oficial"
+        if selected_candidate_id and official_product_candidate_id and selected_candidate_id != official_product_candidate_id
+        else "Oficializar candidato"
+    )
+    final_action_signal = (
+        "Volte para Runs, confirme uma execução concluída e retorne quando existir resultado comparável; a decisão humana ainda não pode fechar esta leitura."
+        if not candidate_id
+        else "O winner atual segue inviável; não transforme a leitura atual em candidato oficial antes de recuperar o cenário em Runs."
+        if summary.get("feasible") is False
+        else f"{technical_tie_reason} Registre o critério humano do empate antes de oficializar."
+        if decision_status == "technical_tie"
+        else "A escolha manual ainda diverge da referência oficial; confirme o contraste final antes de substituir o candidato oficial."
+        if selected_candidate_id and official_product_candidate_id and selected_candidate_id != official_product_candidate_id
+        else "Winner e runner-up já sustentam a confirmação final; a decisão humana pode oficializar depois da última checagem."
+    )
+    export_confidence_label = (
+        "Exportação indisponível"
+        if not candidate_id
+        else "Exportação bloqueada"
+        if summary.get("feasible") is False
+        else "Exportação condicionada"
+        if decision_status == "technical_tie"
+        else "Exportação sob revisão"
+        if selected_candidate_id and official_product_candidate_id and selected_candidate_id != official_product_candidate_id
+        else "Exportação pronta após confirmação"
+    )
+    export_confidence_signal = (
+        f"{export_guidance} Escolha manual: {selected_state_label}."
+        if selected_state_label
+        else export_guidance
+    )
+    human_criteria_label = (
+        "Critério humano ainda indisponível"
+        if not candidate_id
+        else "Critério humano não destrava"
+        if summary.get("feasible") is False
+        else "Critério humano para destrate"
+        if decision_status == "technical_tie"
+        else "Critério humano para oficializar"
+    )
+    human_criteria_value = (
+        "Sem base comparável"
+        if not candidate_id
+        else "Bloqueio operacional"
+        if summary.get("feasible") is False
+        else "Comparação aberta"
+        if decision_status == "technical_tie"
+        else "Oficialização recomendada"
+    )
+    human_criteria_signal = (
+        "Recupere uma execução comparável antes de pedir escolha humana final."
+        if not candidate_id
+        else f"{_humanize_infeasibility_reason(summary.get('infeasibility_reason'))}. {manual_choice_signal}"
+        if summary.get("feasible") is False
+        else f"{technical_tie_reason} {manual_choice_signal}"
+        if decision_status == "technical_tie"
+        else f"{_humanize_decision_copy(comparison_difference)} {manual_choice_signal}"
     )
     decision_strip_title = "Aprofundar se precisar"
     decision_strip_cards = [
@@ -7113,7 +7138,7 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
             "Comparação em aberto",
             f"{candidate_id or '-'} vs {runner_up_id or '-'} | {comparison_open_signal}",
         ),
-        _guidance_card("Exportação assistida", export_guidance),
+        _guidance_card("Risco dominante", f"{risk_value}: {risk_note}"),
     ]
     return html.Div(
         children=[
@@ -7149,8 +7174,8 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
                                 style={**UI_THREE_COLUMN_STYLE, "marginTop": "14px"},
                                 children=[
                                     _signal_card("Passagem Runs -> Decisão", decision_gate_label, transition_signal, tone=hero_tone),
-                                    _signal_card("Estado comparativo", review_priority_label, primary_difference_signal, tone=hero_tone),
-                                    _signal_card("Próxima ação humana", primary_action_label, f"{next_action_signal} Perfil em leitura: {active_profile_label or '-'} | Perfil oficial: {official_profile_label}.", tone=hero_tone),
+                                    _signal_card("Ação final recomendada", final_action_label, f"{final_action_signal} Próxima ação operacional: {primary_action_label}.", tone=hero_tone),
+                                    _signal_card("Confiança de exportação", export_confidence_label, f"{export_confidence_signal} Perfil em leitura: {active_profile_label or '-'} | Perfil oficial: {official_profile_label}.", tone=hero_tone),
                                 ],
                             ),
                         ],
@@ -7161,7 +7186,7 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
                         children=[
                             _compact_value_card(winner_primary_label, candidate_id or "Sem winner", winner_short_reason, accent="#d7e5c1"),
                             _compact_value_card(runner_up_primary_label, runner_up_id or "Sem runner-up", runner_up_primary_note, accent="#f0d99f" if decision_status == "technical_tie" else None),
-                            _compact_value_card(primary_difference_label, comparison_signal, primary_difference_signal, accent="#d7d3c8"),
+                            _compact_value_card(human_criteria_label, human_criteria_value, human_criteria_signal, accent="#d7d3c8"),
                         ],
                     ),
                 ],

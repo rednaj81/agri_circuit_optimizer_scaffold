@@ -1981,14 +1981,14 @@ def test_studio_runs_decision_primary_journey_uses_consistent_transition_languag
 
     assert "Próxima ação" in studio_text
     assert "Próxima ação" in runs_text
-    assert "Próxima ação" in decision_text
+    assert "Ação final" in decision_text
     assert "resultado utilizável" in studio_text.lower()
     assert "resultado utilizável" in runs_text.lower()
     assert "resultado utilizável" not in decision_text.lower() or "decisão" in decision_text.lower()
-    assert "Próxima ação humana" in decision_text
-    assert "Estado comparativo" in decision_text
+    assert "Ação final recomendada" in decision_text
+    assert "Confiança de exportação" in decision_text
     assert "confirmação final" in decision_text.lower()
-    assert "Confirmar decisão final" in decision_text
+    assert "Oficializar candidato" in decision_text
     assert "Winner oficial agora" in decision_text
     assert "Escolha final humana" in decision_text
 
@@ -2635,12 +2635,14 @@ def test_decision_workspace_panel_makes_winner_runner_up_and_tie_legible() -> No
     assert "Passagem Runs -> Decisão" in panel_text
     assert "Winner sugerido agora" in panel_text
     assert "Runner-up ainda comparável" in panel_text
-    assert "Diferença principal em aberto" in panel_text
-    assert "Empate técnico em revisão" in panel_text
+    assert "Ação final recomendada" in panel_text
+    assert "Manter comparação aberta" in panel_text
+    assert "Confiança de exportação" in panel_text
+    assert "Exportação condicionada" in panel_text
     assert "Aprofundar se precisar" in panel_text
-    assert "Próxima ação humana" in panel_text
+    assert "Critério humano para destrate" in panel_text
     assert "Comparação em aberto" in panel_text
-    assert "Exportação assistida" in panel_text
+    assert "Risco dominante" in panel_text
     assert "empatados em custo global e leitura operacional principal" in panel_text
     assert "cand-04" in panel_text
     assert "confirme o critério humano antes de liberar a exportação assistida" in panel_text.lower()
@@ -2676,6 +2678,8 @@ def test_decision_workspace_panel_blocks_primary_choice_without_usable_result() 
     assert "Recuperar execução em Runs" in panel_text
     assert "A Decisão permanece aberta apenas como leitura bloqueada" in panel_text
     assert "Voltar para Runs" in panel_text
+    assert "Exportação indisponível" in panel_text
+    assert "Critério humano ainda indisponível" in panel_text
     assert "volte para runs, confirme uma execução concluída e retorne quando existir resultado comparável" in panel_text.lower()
 
 
@@ -2700,6 +2704,8 @@ def test_decision_workspace_panel_surfaces_infeasible_winner_as_blocked_state() 
     assert "rota obrigatória não conseguiu fechar" in panel_text
     assert "Existe ranking visível, mas a decisão principal segue bloqueada" in panel_text
     assert "Runner-up sob revisão" in panel_text
+    assert "Segurar exportação e revisar Runs" in panel_text
+    assert "Critério humano não destrava" in panel_text
     assert "exportação bloqueada enquanto o winner em leitura seguir inviável" in panel_text.lower()
 
 
