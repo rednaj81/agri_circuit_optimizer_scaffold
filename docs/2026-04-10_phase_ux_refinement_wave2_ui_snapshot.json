@@ -1,0 +1,28 @@
+{
+  "created_at": "2026-04-10T13:45:00Z",
+  "phase_id": "phase_ux_refinement",
+  "wave_index": 2,
+  "repo_head": "2832f795b49b377abfae43bc053e12021bd42d7c",
+  "snapshot_type": "structured_ui_snapshot",
+  "studio_layout": {
+    "main_grid_template": "minmax(0, 2.7fr) minmax(280px, 320px)",
+    "gap": "14px",
+    "local_fix_strip_present": true,
+    "local_fix_excerpt": "Correção local mais curtaCorrigir no canvasA conexão L011 sai de Saída externa, mas Saída externa deve aparecer apenas como destino final.Correção local orientadaFoco ainda insuficiente",
+    "workspace_excerpt": "Leitura do cenárioExige atençãoAinda há bloqueios estruturais impedindo a passagem segura para Runs.Correção local mais curtaCorrigir no canvasA conexão L011 sai de Saída externa, mas Saída externa deve aparecer apenas como destino final.Correção local orientadaFoco ainda insuficienteContexto dominante do StudioConexão em foco: Tanque de água -> Misturador.A"
+  },
+  "runs_layout": {
+    "recovery_map_present": true,
+    "recovery_map_excerpt": "Se o problema for cenárioVoltar ao StudioA limitação principal ainda está no cenário; corrija o Studio antes de culpar a fila ou a execução.Se o problema for execuçãoReexecutar com correçãoRevise a causa dominante desta falha antes de repetir a rodada.Se o resultado já bastarDecisão ainda bloqueadaA Decisao continua bloqueada: esta run falhou antes de gerar ",
+    "workspace_excerpt": "Leitura operacional de RunsAguardando readiness do StudioAinda há bloqueios estruturais impedindo a passagem segura para Runs.FalhouPronto0 na filaResultado pendenteRun em focoNenhumaEsta é a terminal mais crítica porque define a recuperação antes de outra rodada.Falha operacional em focoCorrija a causa dominante antes de repetir a rodada.Modo: -Na filaDepoisEm preparaçãoDepoisEm execuçãoDepoisConsolidando saídaDepoi",
+    "overview_excerpt": "Leitura compacta da filaNenhuma execução registradaProntoworker serial0 na fila0 em execuçãoFila agoraVaziaNenhuma run registrada ainda. Enfileire o cenário atual para iniciar a trilha operacional.Execução agoraNadaSem execução ativaHistórico recenteAinda não existe encerramento recente.Ainda não há histórico suficiente para falar em recuperação ou reaprovei"
+  },
+  "decision_layout": {
+    "workspace_excerpt": "Leitura principal da decisãoSem decisão utilizávelAinda falta uma run utilizável para abrir winner, runner-up e contraste com segurança.Estado decisório agoraSem decisão utilizávelAinda falta uma run utilizável para abrir winner, runner-up e contraste com segurança.Ainda não existe winner legível; a prioridade continua sendo recuperar uma execução comparável"
+  },
+  "evidence_notes": [
+    "Studio mostra correção local curta antes do workbench avançado.",
+    "Runs expõe mapa explícito para cenário, execução e decisão na superfície primária.",
+    "Decision mantém a composição condensada sem reintroduzir painéis redundantes."
+  ]
+}

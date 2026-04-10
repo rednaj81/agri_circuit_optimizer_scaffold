@@ -903,12 +903,16 @@ def test_studio_workspace_panel_promotes_direct_measurement_fix_in_primary_conte
     desirable_button = _find_component_by_id(panel, "studio-workspace-intent-desirable-button")
 
     assert "Exigir medição direta" in panel_text
+    assert "Correção local mais curta" in panel_text
+    assert "Sem workbench" in panel_text
+    assert "Exigir medição direta agora" in panel_text
     assert "Próxima ação" in panel_text
     assert "Disponível agora neste trecho com dosagem." in panel_text
     assert "Use estes botões para reclassificar a rota em foco sem abrir a bancada completa." in panel_text
     assert "Obrigatória" in panel_text
     assert "Desejável" in panel_text
     assert "Opcional" in panel_text
+    assert _find_component_by_id(panel, "studio-workspace-local-fix-strip") is not None
     assert measurement_button is not None
     assert getattr(measurement_button, "disabled", None) is False
     assert create_route_button is not None
@@ -1740,6 +1744,9 @@ def test_runs_workspace_panel_prioritizes_queue_focus_and_primary_transition() -
     assert "Fila agora" in panel_text
     assert "Histórico terminal" in panel_text
     assert "Próxima ação segura" in panel_text
+    assert "Se o problema for cenário" in panel_text
+    assert "Se o problema for execução" in panel_text
+    assert "Se o resultado já bastar" in panel_text
     assert "Histórico terminal secundário" in panel_text
     assert "Gate do cenário e limites desta leitura" in panel_text
     assert "run-003" in panel_text
@@ -1861,6 +1868,10 @@ def test_runs_workspace_panel_distinguishes_failure_recovery_from_decision_ready
     assert "run-009" in failed_text
     assert "Revisar falha" in failed_text
     assert "Decisao continua bloqueada" in failed_text
+    assert "Se o problema for execução" in failed_text
+    assert "Reexecutar com correção" in failed_text
+    assert "Se o resultado já bastar" in failed_text
+    assert "Decisão ainda bloqueada" in failed_text
     assert getattr(_find_component_by_id(failed_panel, "runs-workspace-open-decision-button"), "disabled", None) is True
     assert getattr(_find_component_by_id(failed_panel, "runs-workspace-rerun-button"), "disabled", None) is False
 
@@ -1909,10 +1920,10 @@ def test_runs_workspace_panel_contrasts_failed_and_canceled_focus_states() -> No
 
     assert "Falha operacional em foco" in failed_text
     assert "Reexecutar com correção" in failed_text
-    assert "Estado final" in failed_text
+    assert "Se o problema for execução" in failed_text
     assert "Cancelamento em foco" in canceled_text
     assert "Reexecutar se ainda fizer sentido" in canceled_text
-    assert "Estado final" in canceled_text
+    assert "Se o problema for execução" in canceled_text
 
 
 def test_runs_workspace_panel_uses_refresh_cta_for_intermediate_execution_states() -> None:

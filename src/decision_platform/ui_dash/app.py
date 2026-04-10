@@ -1063,6 +1063,25 @@ def _run_status_operator_copy(status: Any) -> str:
     return lookup.get(normalized, "Sem orientacao operacional adicional para este estado.")
 
 
+def _run_status_primary_action(status: Any, *, result_ready: bool = False, is_rerun: bool = False) -> str:
+    normalized = str(status or "").strip().lower()
+    if result_ready and normalized == "completed":
+        return "Abrir Decisão"
+    if normalized == "queued":
+        return "Executar reexecução" if is_rerun else "Executar próxima"
+    if normalized in {"preparing", "running", "exporting"}:
+        return "Aguardar"
+    if normalized == "failed":
+        return "Reexecutar com correção"
+    if normalized == "canceled":
+        return "Reexecutar se ainda fizer sentido"
+    if normalized == "completed":
+        return "Reexecutar"
+    if normalized == "rerun":
+        return "Preservar origem e executar"
+    return "Atualizar leitura"
+
+
 def _run_progress_stage_bar(status: Any, *, result_ready: bool = False, component_id: str | None = None) -> Any:
     normalized = str(status or "").strip().lower()
     timeline_order = ["queued", "preparing", "running", "exporting", "completed"]
@@ -3855,6 +3874,16 @@ def render_studio_workspace_panel(
         if next_unlock_condition == "Nenhuma condição pendente neste foco."
         else f"{next_available_action}. {next_unlock_condition}"
     )
+    local_fix_label = (
+        "Correção local pronta"
+        if can_require_measurement_directly or can_create_route_from_focus or can_reverse_directly
+        else "Correção local orientada"
+    )
+    local_fix_note = (
+        "Ajuste este bloqueio no próprio contexto do canvas antes de recorrer ao workbench avançado."
+        if can_require_measurement_directly or can_create_route_from_focus or can_reverse_directly
+        else next_unlock_condition
+    )
     context_direct_actions = [
         html.Button(
             "Exigir medição direta",
@@ -3914,6 +3943,22 @@ def render_studio_workspace_panel(
                 children=[
                     html.Span(_humanize_readiness_status(status), style={"padding": "6px 10px", "borderRadius": "999px", "background": background, "color": color, "fontWeight": 700}),
                     html.Span(str(studio_summary.get("readiness_headline") or "Sem leitura principal do cenário."), style={"fontWeight": 700, "lineHeight": "1.5"}),
+                ],
+            ),
+            html.Div(
+                id="studio-workspace-local-fix-strip",
+                style={**UI_COMPACT_BANNER_CARD_STYLE, "marginBottom": "12px"},
+                children=[
+                    html.Div("Correção local mais curta", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+                    html.Div(next_available_action, style={"fontWeight": 700, "lineHeight": "1.45", "marginTop": "6px"}),
+                    html.Div(local_fix_note, style={"lineHeight": "1.45", "marginTop": "6px", "color": "#496158"}),
+                    html.Div(
+                        style={"display": "flex", "gap": "8px", "flexWrap": "wrap", "marginTop": "8px"},
+                        children=[
+                            _toned_pill(local_fix_label, "ready" if can_require_measurement_directly or can_create_route_from_focus or can_reverse_directly else "needs_attention"),
+                            _toned_pill("Sem workbench" if can_require_measurement_directly or can_create_route_from_focus or can_reverse_directly else "Foco ainda insuficiente", "ready" if can_require_measurement_directly or can_create_route_from_focus or can_reverse_directly else "idle"),
+                        ],
+                    ),
                 ],
             ),
             html.Div(
@@ -5343,7 +5388,7 @@ def render_run_jobs_overview_panel(summary: dict[str, Any]) -> Any:
         _signal_card(
             _humanize_run_status(status),
             count,
-            _run_status_operator_copy(status),
+            f"{_run_status_operator_copy(status)} Próxima ação: {_run_status_primary_action(status, result_ready=status == 'completed' and count > 0)}.",
             tone=_run_status_tone(status, result_ready=status == "completed" and count > 0),
         )
         for status, count in status_guide_specs
@@ -5354,7 +5399,7 @@ def render_run_jobs_overview_panel(summary: dict[str, Any]) -> Any:
             _signal_card(
                 _humanize_run_status("rerun"),
                 rerun_count,
-                _run_status_operator_copy("rerun"),
+                f"{_run_status_operator_copy('rerun')} Próxima ação: {_run_status_primary_action('rerun', is_rerun=True)}.",
                 tone=_run_status_tone("rerun"),
             )
         )
@@ -5914,7 +5959,16 @@ def render_runs_workspace_panel(
     else:
         queue_support_value = "Sem pendência"
         queue_support_note = "Nada novo aguardando além do que a run em foco já explica."
-    if focus_status_key == "failed":
+    if focus_is_rerun and focus_status_key == "queued":
+        focus_state_headline = "Reexecução aguardando vez"
+        focus_state_copy = "A fila já preservou a origem desta rodada; o próximo passo é executar a reexecução."
+    elif focus_is_rerun and focus_status_key in {"preparing", "running", "exporting"}:
+        focus_state_headline = "Reexecução em andamento"
+        focus_state_copy = "A leitura principal acompanha uma nova tentativa sem perder a origem da rodada anterior."
+    elif focus_is_rerun and focus_result_ready:
+        focus_state_headline = "Reexecução com resultado utilizável"
+        focus_state_copy = "A nova tentativa já devolveu contexto executivo reaproveitável para Decisão."
+    elif focus_status_key == "failed":
         focus_state_headline = "Falha operacional em foco"
         focus_state_copy = "Corrija a causa dominante antes de repetir a rodada."
     elif focus_status_key == "canceled":
@@ -6049,6 +6103,21 @@ def render_runs_workspace_panel(
         local_recovery_cta = html.Button(focus_cta_label, id="runs-workspace-refresh-button", style=UI_BUTTON_STYLE, disabled=False)
     else:
         local_recovery_cta = html.Button(focus_cta_label, id="runs-workspace-primary-recovery-button", style=UI_BUTTON_STYLE, disabled=True)
+    scenario_action_value = "Voltar ao Studio" if state["studio_status"] != "ready" else "Cenário já liberado"
+    scenario_action_note = scenario_vs_run_limit
+    execution_action_value = (
+        "Executar reexecução" if focus_is_rerun and focus_cta_target == "run"
+        else "Reexecutar com correção" if focus_cta_target == "rerun" and focus_status_key == "failed"
+        else "Reexecutar se ainda fizer sentido" if focus_cta_target == "rerun" and focus_status_key == "canceled"
+        else focus_cta_label
+    )
+    execution_action_note = (
+        focus_recovery_copy
+        if focus_cta_target != "decision"
+        else "A recuperação desta run já deixou de ser dominante; valide o resultado e siga."
+    )
+    decision_action_value = "Abrir Decisão" if focus_result_ready else "Decisão ainda bloqueada"
+    decision_action_note = decision_gate_copy
     return html.Div(
         children=[
             html.Div("Leitura operacional de Runs", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
@@ -6143,6 +6212,15 @@ def render_runs_workspace_panel(
                             html.Div(focus_result_copy, style={"lineHeight": "1.45", "marginTop": "4px", "color": "#496158"}),
                         ],
                     ),
+                ],
+            ),
+            html.Div(
+                id="runs-workspace-recovery-map",
+                style={**UI_TWO_COLUMN_STYLE, "gridTemplateColumns": "repeat(auto-fit, minmax(220px, 1fr))", "marginBottom": "12px"},
+                children=[
+                    _compact_value_card("Se o problema for cenário", scenario_action_value, scenario_action_note),
+                    _compact_value_card("Se o problema for execução", execution_action_value, execution_action_note),
+                    _compact_value_card("Se o resultado já bastar", decision_action_value, decision_action_note),
                 ],
             ),
             html.Details(

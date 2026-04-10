@@ -180,6 +180,9 @@ def test_phase3_queue_acceptance_runs_ui_surfaces_operational_queue_and_detail_l
     assert "Fila agora" in workspace_text
     assert "Histórico terminal" in workspace_text
     assert "Próxima ação segura" in workspace_text
+    assert "Se o problema for cenário" in workspace_text
+    assert "Se o problema for execução" in workspace_text
+    assert "Se o resultado já bastar" in workspace_text
     assert "Histórico terminal secundário" in workspace_text
     assert "Cenário" in workspace_text
     assert "Resultado" in workspace_text
@@ -190,6 +193,7 @@ def test_phase3_queue_acceptance_runs_ui_surfaces_operational_queue_and_detail_l
     assert "Estados da operação" in overview_text
     assert "Falhou" in overview_text
     assert "Pode fazer agora" in overview_text
+    assert "Próxima ação:" in overview_text
     assert "Eventos relevantes" in detail_text
     assert "Resultado e artefatos" in detail_text
     assert "Progresso desta run" in detail_text
