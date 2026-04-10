@@ -10,7 +10,7 @@
 
 - The UX refinement cycle already consumed the governed implementation waves and closed the last approved stabilization step in wave 10.
 - Opening a new implementation wave would violate the cycle governance and risk regressions across the Studio, Runs, and Decision baselines already accepted.
-- The correct action for waves 11 and 12 is to preserve the validated baseline and keep the cycle explicitly stopped.
+- The correct action for waves 11, 12, and 13 is to preserve the validated baseline and keep the cycle explicitly stopped.
 
 ## Final Baseline Preserved
 
@@ -37,6 +37,7 @@
 
 - No new product implementation was started in wave 11.
 - No new product implementation was started in wave 12.
+- No new product implementation was started in wave 13.
 - Code and product surfaces remain untouched in this stop wave.
 
 ## Wave 12 Reaffirmation
@@ -44,3 +45,9 @@
 - The stop recommendation remains in force after the Auditor follow-up.
 - The existing stop and next-cycle handoff documents remain the source of truth.
 - No reopening of Studio, Runs, Decision, Audit, or architecture was authorized in wave 12.
+
+## Wave 13 Reaffirmation
+
+- The stop recommendation remains in force after the Architect follow-up.
+- The existing stop and next-cycle handoff documents remain the source of truth.
+- No reopening of Studio, Runs, Decision, Audit, or architecture was authorized in wave 13.
