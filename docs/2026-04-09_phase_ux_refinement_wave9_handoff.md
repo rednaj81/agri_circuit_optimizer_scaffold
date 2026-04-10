@@ -1,46 +1,46 @@
-# Phase UX Refinement Wave 9 Handoff
+# Phase UX Refinement Wave 9 - Consistency And Semantic Polish
 
-## Escopo entregue
+## Objective
 
-- Transformei as ações contextuais do primeiro fold do Studio em affordances previsíveis: elas continuam curtas, mas deixam de sumir sem explicação.
-- Fechei a leitura da passagem Studio -> Runs no próprio painel dominante, sem reabrir a lateral nem voltar a multiplicar painéis.
+Open `ux_phase_5` by tightening terminology and confirmation language across the primary product surfaces without reopening the already stabilized Studio, Runs, and Decision flows.
 
-## Implementação
+## Delivered
 
-- `src/decision_platform/ui_dash/app.py`
-  - O painel `studio-workspace-context-panel` agora mostra:
-    - `Próxima ação disponível`
-    - `O que libera a seguinte`
-    - `Passagem para Runs`
-  - Mantive os botões contextuais do foco sempre visíveis no primeiro fold:
-    - `studio-workspace-require-measurement-button`
-    - `studio-workspace-create-route-button`
-    - `studio-workspace-reverse-edge-button`
-  - Cada ação passou a ter affordance contextual explícita no bloco `studio-workspace-context-affordances`, deixando claro quando está disponível, quando já foi satisfeita e quando depende de uma condição ainda não atendida.
-  - O gate para Runs ficou resumido no próprio contexto dominante, sem exigir disclosure adicional para entender se o operador deve seguir ou continuar corrigindo o Studio.
+- Normalized ready-state Decision language so `winner_clear` now reads as `confirmação final` instead of sounding like another assisted state.
+- Kept `technical_tie` explicitly assisted while leaving blocked states blocked, which preserves the semantic ladder between ready, assisted, and blocked decisions.
+- Softened Runs-to-Decision copy so completed runs now talk about opening `Decisão` and carrying usable decision context, instead of implying that every downstream decision remains assisted.
+- Aligned product-space banner objectives so `Runs` points to opening `Decisão`, while `Decisão` keeps the assisted wording only where human tie resolution is still needed.
+- Updated smoke and phase-4 acceptance coverage to lock the ready-versus-assisted terminology split.
 
-- `tests/decision_platform/test_ui_smoke.py`
-  - Cobertura dos novos estados de descoberta no primeiro fold.
-  - Cobertura do cenário sem conexão em foco, garantindo que os controles não desapareçam sem orientação.
-
-## Validação
-
-Executado:
+## Validation
 
 ```powershell
-$env:PYTHONPATH='src;.'; .\.venv\Scripts\python.exe -m pytest tests/decision_platform/test_ui_smoke.py tests/decision_platform/test_studio_structure.py -q -p no:cacheprovider --basetemp tests/_tmp/pytest-basetemp-ux-wave9-full
+$env:PYTHONPATH='src;.'; .\.venv\Scripts\python.exe -m pytest tests/decision_platform/test_ui_smoke.py -q -p no:cacheprovider -k "runs_workspace_panel_prioritizes_queue_focus_and_primary_transition or studio_runs_decision_primary_journey_uses_consistent_transition_language" --basetemp tests/_tmp/pytest-basetemp-ux-wave9-targeted-ui
+$env:PYTHONPATH='src;.'; .\.venv\Scripts\python.exe -m pytest tests/decision_platform/test_phase4_decision_acceptance.py -q -p no:cacheprovider --basetemp tests/_tmp/pytest-basetemp-ux-wave9-phase4-targeted
+$env:PYTHONPATH='src;.'; .\.venv\Scripts\python.exe -m pytest tests/decision_platform/test_ui_smoke.py -q -p no:cacheprovider --basetemp tests/_tmp/pytest-basetemp-ux-wave9-full-ui
+$env:PYTHONPATH='src;.'; .\.venv\Scripts\python.exe -m pytest tests/decision_platform/test_phase4_decision_acceptance.py -q -p no:cacheprovider --basetemp tests/_tmp/pytest-basetemp-ux-wave9-phase4-full
 ```
 
-Resultado:
+Result:
 
-- `124 passed in 368.92s (0:06:08)`
+- `2 passed, 109 deselected in 0.63s`
+- `6 passed in 0.06s`
+- `111 passed in 332.13s (0:05:32)`
+- `6 passed in 0.05s`
 
-## Evidência
+## Evidence
 
-- `output/playwright/wave9-studio-context-affordances.json`
+- Structured consistency snapshot: `docs/2026-04-09_phase_ux_refinement_wave9_ui_snapshot.json`
+- This wave did not spend time retrying browser capture. The change was semantic and cross-surface, so structured excerpts are the honest evidence baseline here.
 
-## Limitações
+## Scope Guardrails
 
-- A wave melhora previsibilidade e descoberta no primeiro fold, mas não muda o escopo funcional do Studio.
-- A evidência permanece estrutural; não houve screenshot literal do app nesta rodada.
+- No architecture reopening.
+- No changes to Dash/Cytoscape stack or Julia-only official execution policy.
+- No reopening of Studio, Runs, or Decision logic beyond consistency-level copy alignment.
+- No changes to solver, ranking core, hydraulic logic, or `docs/05_data_contract.md`.
+- No return of raw JSON, logs, payloads, or dense technical grids as primary surface.
 
+## Honest Handoff
+
+This wave adds coherence, not new flow. `Winner_clear` now sounds ready to confirm, `technical_tie` still sounds explicitly assisted, and Runs no longer suggests that every usable result must end in an assisted decision. `ux_phase_5` is now open on a clearer semantic baseline and can continue with polish/stabilization without reopening the closed journey architecture.

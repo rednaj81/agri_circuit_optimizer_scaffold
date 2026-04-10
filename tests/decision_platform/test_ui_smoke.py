@@ -1694,6 +1694,7 @@ def test_runs_workspace_panel_prioritizes_queue_focus_and_primary_transition() -
     assert "Gate do cenário e limites desta leitura" in panel_text
     assert "run-003" in panel_text
     assert "resultado utilizável" in panel_text.lower()
+    assert "saída reaproveitável para Decisão" in panel_text
     assert "Resultado" in panel_text
     assert _find_component_by_id(panel, "runs-workspace-progress-rail") is not None
     assert _find_component_by_id(panel, "runs-workspace-operational-lanes") is not None
@@ -1775,6 +1776,8 @@ def test_studio_runs_decision_primary_journey_uses_consistent_transition_languag
     assert "resultado utilizável" in runs_text.lower()
     assert "resultado utilizável" not in decision_text.lower() or "decisão" in decision_text.lower()
     assert "Leitura humana" in decision_text
+    assert "confirmação final" in decision_text.lower()
+    assert "Confirmar decisão final" in decision_text
     assert "Recomendação automática" in decision_text
     assert "Escolha final humana" in decision_text
 

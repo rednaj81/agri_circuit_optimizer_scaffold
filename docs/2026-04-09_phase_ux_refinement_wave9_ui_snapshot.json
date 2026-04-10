@@ -1,33 +1,10 @@
 {
-  "snapshot_source_commit": "d312c2d523ce7fb95b96b76fd1e9cc05f266a5fd",
-  "runs": {
-    "first_fold_signals": [
-      "Agora",
-      "Fila",
-      "Run em foco",
-      "Andamento real",
-      "Resultado útil",
-      "Falha ou recuperação",
-      "Próxima ação recomendada"
-    ],
-    "focus_priority": [
-      "preferred run id",
-      "active run",
-      "next queued run",
-      "latest run",
-      "latest terminal run"
-    ],
-    "detail_signals": [
-      "Progresso desta run",
-      "O que falta",
-      "Recuperação desta run",
-      "Resultado agora"
-    ],
-    "technical_logs_primary_surface": false
+  "banners": {
+    "runs": "Espaço ativoRunsFila local e execução em focoTrocar espaçoStudioRunsDecisãoAuditoriaO que esta área resolveDecidir se ainda falta corrigir o cenário, executar a próxima rodada ou já abrir Decisão.Estado do fluxo agoraStudio ainda bloqueia a fila: O cenário ainda não está pronto para sustentar uma nova run.Próximo destino sugeridoVoltar ao Studio: Feche os bloqueios do cenário antes de insistir em Runs.",
+    "decision": "Espaço ativoDecisãoWinner, runner-up e contraste com contextoTrocar espaçoStudioRunsDecisãoAuditoriaO que esta área resolveConfirmar se já existe escolha oficial legível ou se ainda falta contraste para uma escolha humana assistida.Estado do fluxo agoraDecisão ainda depende de Runs: Ainda falta uma run utilizável para abrir winner, runner-up e contraste com segurança.Próximo destino sugeridoVoltar para Runs: Sem execução utilizável, a próxima ação continua sendo recuperar contexto em Runs.",
+    "audit": "Espaço ativoAuditoriaTrilha canônica e evidência técnicaTrocar espaçoStudioRunsDecisãoAuditoriaO que esta área resolveAprofundar persistência, contrato e evidência técnica sem recolocar isso na primeira dobra das outras áreas.Estado do fluxo agoraAuditoria não substitui o Studio: O cenário ainda depende do canvas principal para fechar readiness.Próximo destino sugeridoVoltar ao Studio: Use Auditoria apenas como trilha de apoio; a próxima ação real continua no Studio."
   },
-  "screenshot_attempt": {
-    "target_path": "output/playwright/runs-fullhd-wave9.png",
-    "status": "failed_in_sandbox",
-    "reason": "No stable browser capture session was available in this sandbox during wave 9; structured snapshot retained as honest evidence."
-  }
+  "runs_ready_excerpt": "Leitura operacional de RunsDecisão disponívelA última execução já gerou contexto suficiente para entrar em Decisão.Run em focorun-002Esta terminal segue em foco porque terminou sem saída suficiente para decisão e ainda orienta a próxima ação.Concluída-Resultado utilizável em focoEsta run já liberou a passagem principal para Decisão.Na filaFeitoEm preparaçãoFeitoEm execuçãoFeitoConsolidando saídaFeitoConcluídaProntoAgoraResultado utilizávelA run terminou com saída reaproveitável para Decisão.RecuperaçãoSem recuperação dominanteSem recuperação dominante: a leitura principal já pode migrar para resultado.Próxima ação seguraAbrir DecisãoJa existe resultado utilizavel nesta leitura. A passagem Runs -> Decisao esta liberada.Ficar em RunsConcluídaResultado prontoO cenário já passou no gate principal; o foco agora está na fila e na execução em si.Abrir DecisãoIr para DecisãoFila agorarun-0031 pendência(s) ainda aguardando vez.Pronto1 na fila0 em execuçãoHistórico terminalSem terminal recente r",
+  "decision_ready_excerpt": "Leitura principal da decisãoWinner claroA execução atual já entrega um winner legível e um runner-up de referência para a confirmação final.Estado decisório agoraWinner claroA execução atual já entrega um winner legível e um runner-up de referência para a confirmação final.Winner e runner-up já aparecem com leitura utilizável; aprofunde Auditoria só se precisar reconciliar a trilha técnica.Passagem Runs -> DecisãoLeitura principal abertaRuns já liberou resultado utilizável; a primeira dobra de Decisão pode sustentar a escolha principal.Technical tieNão ativoSem empate técnico ativo nesta leitura.Leitura humana observaDecisão liberadaMargem curta ou risco relevante; revise o runner-up antes de oficializar. Perfil em leitura: Equilibrado | Perfil oficial: Equilibrado.Winner oficial agoracand-01Lidera por custo, fechamento das rotas e leitura operacional mais estável.Runner-up sob revisãocand-02Perde por margem curta, mas segue como quase vencedor.Próxima ação seguraConfirmar decisão finalConfirme a referência oficial e siga para exportação.Decisão pronta para confirmarRecomendação automáticacand-01 | Lidera por custo, fechamento das rotas e leitura operacional mais estável.Runner-up ",
+  "decision_assisted_excerpt": "Leitura principal da decisãoEmpate técnicoWinner e runner-up seguem próximos o suficiente para exigir decisão humana assistida.Estado decisório agoraEmpate técnicoWinner e runner-up seguem próximos o suficiente para exigir decisão humana assistida.Technical tie explícito: mantenha winner e runner-up visíveis antes de qualquer oficialização.Passagem Runs -> DecisãoLeitura principal abertaRuns já entregou contraste suficiente para abrir a decisão, mas a oficialização continua dependendo de leitura humana assistida.Technical tieExplícitoA revisão humana continua aberta.Leitura humana observaEmpate técnico em revisãoEmpate técnico aberto; compare runner-up e winner antes da escolha manual. Perfil em leitura: Perfil atual | Perfil oficial: Perfil atual.Winner oficial agoracand-01O perfil atual ainda não separou o winner com folga suficiente.Runner-up sob revisãocand-02Quase vence; o empate técnico ainda está aberto.Próxima ação seguraFechar escolha assistidaMantenha winner e runner-up lado a lado, registre o critério humano do empate e só então libere a exportação assistida.Empate técnico assistidoWinner sugerido agoracand-01 | O perfil atual ainda não separou o winner com folga suficie"
 }

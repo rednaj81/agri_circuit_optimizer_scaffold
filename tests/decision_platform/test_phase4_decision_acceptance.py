@@ -55,7 +55,7 @@ def _collect_text(component: object) -> str:
                 "Winner claro",
                 "Winner oficial agora",
                 "Runner-up sob revisão",
-                "Confirmar decisão assistida",
+                "Confirmar decisão final",
                 "Decisão liberada",
                 "Decisão pronta para confirmar",
                 "Recomendação automática",

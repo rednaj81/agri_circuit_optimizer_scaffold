@@ -328,7 +328,7 @@ def _product_space_content(space: str | None) -> dict[str, str]:
             "label": "Runs",
             "headline": "Fila local e execução em foco",
             "description": "Aqui a jornada sai do preparo do cenário e vira leitura operacional da fila, da run em foco e do último resultado.",
-            "objective": "Decidir se ainda falta corrigir o cenário, executar a próxima rodada ou já abrir a decisão assistida.",
+            "objective": "Decidir se ainda falta corrigir o cenário, executar a próxima rodada ou já abrir Decisão.",
             "next_action": "Revise a fila e a execução em foco antes de avançar para Decisão.",
         }
     if normalized == "decision":
@@ -336,7 +336,7 @@ def _product_space_content(space: str | None) -> dict[str, str]:
             "label": "Decisão",
             "headline": "Winner, runner-up e contraste com contexto",
             "description": "Aqui a jornada deixa de ser operacional e passa a ser comparativa, mantendo candidato oficial, runner-up e sinais de risco na mesma leitura.",
-            "objective": "Confirmar se já existe escolha oficial legível ou se ainda falta contraste para a decisão humana assistida.",
+            "objective": "Confirmar se já existe escolha oficial legível ou se ainda falta contraste para uma escolha humana assistida.",
             "next_action": "Valide winner, runner-up e sinais de risco antes de exportar ou abrir Auditoria.",
         }
     if normalized == "audit":
@@ -1189,7 +1189,7 @@ def _decision_primary_state(summary: dict[str, Any]) -> dict[str, str]:
         }
     return {
         "state_label": "Winner claro",
-        "headline": "A execução atual já entrega um winner legível e um runner-up de referência para a decisão assistida.",
+        "headline": "A execução atual já entrega um winner legível e um runner-up de referência para a confirmação final.",
         "next_action": "Confirme o runner-up e os sinais de risco antes de oficializar; abra Auditoria só se precisar aprofundar evidências técnicas.",
         "contrast_state": "Winner claro; use o runner-up como contraste de referência antes de exportar.",
         "winner_guidance": f"{candidate_id} lidera a leitura atual com contraste suficiente para sustentar a escolha principal.",
@@ -1236,9 +1236,9 @@ def _decision_page_mode(summary: dict[str, Any]) -> dict[str, Any]:
         "key": "winner_clear",
         "allows_export": True,
         "export_blocked_label": "",
-        "export_guidance": "A referência oficial atual já pode seguir para exportação assistida depois da confirmação final do contraste.",
+        "export_guidance": "A referência oficial atual já pode seguir para exportação depois da confirmação final do contraste.",
         "comparison_guidance": "O runner-up segue como contraste comparável, mas abaixo da escolha oficial no ranking.",
-        "signal_guidance": "A escolha oficial segue viável e já tem contraste suficiente para sustentar a decisão assistida.",
+        "signal_guidance": "A escolha oficial segue viável e já tem contraste suficiente para sustentar a confirmação final.",
     }
 
 
@@ -5487,7 +5487,7 @@ def _run_progress_snapshot(detail: dict[str, Any] | None) -> dict[str, str]:
     if status == "completed" and result_available:
         return {
             "progress_label": "5/5 etapas concluídas",
-            "progress_text": "A run terminou com saída reaproveitável para decisão assistida.",
+            "progress_text": "A run terminou com saída reaproveitável para Decisão.",
             "focus_reason": "Segue em foco porque já pode abrir Decisão sem recorrer à trilha técnica.",
             "signal": "Resultado utilizável",
         }
@@ -5673,7 +5673,7 @@ def _runs_primary_state(
         decision_gate = "Já existe um resultado utilizável; a passagem para Decisão está liberada."
         decision_button_label = "Ir para Decisão"
         decision_enabled = True
-        recovery_headline = "Não há recuperação pendente; a leitura principal já pode migrar para decisão assistida."
+        recovery_headline = "Não há recuperação pendente; a leitura principal já pode migrar para Decisão."
         recovery_action = "Abrir Decisão"
         primary_cta_label = "Abrir Decisão"
         primary_cta_target = "decision"
@@ -5796,7 +5796,7 @@ def render_runs_workspace_panel(
     elif state["decision_enabled"]:
         usable_result = "Já existe resultado utilizável para abrir Decisão sem depender de leitura técnica."
     elif latest_run_id:
-        usable_result = f"{latest_run_id} ainda não liberou contexto suficiente para decisão assistida."
+        usable_result = f"{latest_run_id} ainda não liberou contexto suficiente para Decisão."
     else:
         usable_result = "Ainda não existe resultado utilizável porque nenhuma run terminou esta trilha."
     focus_cta_label = state["primary_cta_label"]
@@ -6250,11 +6250,11 @@ def render_run_job_detail_panel(detail: dict[str, Any]) -> Any:
         if (detail.get("artifacts") or {}).get("summary_json") or (detail.get("artifacts") or {}).get("selected_candidate_json"):
             next_action = "Leia o resumo executivo e siga para Decisão se a run já gerou um candidato oficial confiável."
             recovery_label = "Resultado útil"
-            recovery_text = "Esta run já pode migrar para decisão assistida ou servir de base para uma nova rodada mais consciente."
+            recovery_text = "Esta run já pode migrar para Decisão ou servir de base para uma nova rodada mais consciente."
         else:
             next_action = "A rodada terminou, mas ainda sem saída forte para Decisão. Revise a execução antes de rerun."
             recovery_label = "Concluída sem resultado"
-            recovery_text = "A run fechou a trilha, mas ainda não gerou contexto executivo suficiente para decisão assistida."
+            recovery_text = "A run fechou a trilha, mas ainda não gerou contexto executivo suficiente para Decisão."
     elif status == "failed":
         next_action = "Revise o bloqueio operacional e só reexecute esta run depois de corrigir a causa dominante."
         recovery_label = "Bloqueio operacional"
@@ -6817,7 +6817,7 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
         signal_text = "Winner e runner-up já aparecem com leitura utilizável; aprofunde Auditoria só se precisar reconciliar a trilha técnica."
         runs_label = "Voltar para Runs"
         audit_primary = True
-        primary_action_label = "Confirmar decisão assistida"
+        primary_action_label = "Confirmar decisão final"
         transition_signal = "Runs já liberou resultado utilizável; a primeira dobra de Decisão pode sustentar a escolha principal."
     tie_label = "Explícito" if decision_status == "technical_tie" else "Não ativo"
     official_profile_label = _decision_profile_presentation(official_profile_id)["label"]
@@ -7110,7 +7110,7 @@ def render_decision_flow_panel(summary: dict[str, Any]) -> Any:
         signal_text = "Winner e runner-up estão separados por margem curta; confirme o contraste antes de oficializar."
     else:
         signal_title = "Contraste suficiente"
-        signal_text = "Winner e runner-up já aparecem com separação legível para a decisão assistida."
+        signal_text = "Winner e runner-up já aparecem com separação legível para a confirmação final."
     runs_cta_label = "Voltar para Runs"
     runs_primary = False
     audit_primary = True
