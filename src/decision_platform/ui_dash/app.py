@@ -3778,6 +3778,9 @@ def render_studio_workspace_panel(
         if route_focus_row
         else "Abra o editor local da rota quando precisar ajustar intenção ou particularidades."
     )
+    focused_route_intent = _route_intent_value(route_focus_row) if route_focus_row else "optional"
+    focused_route_intent_label = _route_intent_label(focused_route_intent) if route_focus_row else "Sem rota em foco"
+    can_adjust_route_intent_directly = bool(route_focus_row)
     dominant_readiness_signal = (
         top_issue
         if blocker_count > 0 or warning_count > 0
@@ -3886,6 +3889,26 @@ def render_studio_workspace_panel(
             disabled=not can_reverse_directly,
         ),
     ]
+    route_intent_actions = [
+        html.Button(
+            "Obrigatória",
+            id="studio-workspace-intent-mandatory-button",
+            style=UI_BUTTON_STYLE,
+            disabled=not can_adjust_route_intent_directly,
+        ),
+        html.Button(
+            "Desejável",
+            id="studio-workspace-intent-desirable-button",
+            style=UI_BUTTON_STYLE,
+            disabled=not can_adjust_route_intent_directly,
+        ),
+        html.Button(
+            "Opcional",
+            id="studio-workspace-intent-optional-button",
+            style=UI_BUTTON_STYLE,
+            disabled=not can_adjust_route_intent_directly,
+        ),
+    ]
     primary_actions: list[Any]
     if runs_enabled:
         primary_actions = [
@@ -3935,6 +3958,51 @@ def render_studio_workspace_panel(
                             _guidance_card("Medição direta", measurement_affordance),
                             _guidance_card("Criar rota", route_creation_affordance),
                             _guidance_card("Direção", reverse_affordance),
+                        ],
+                    ),
+                    html.Div("Intenção desta rota no foco", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d", "marginTop": "10px"}),
+                    html.Div(
+                        id="studio-workspace-intent-actions",
+                        style={**UI_ACTION_ROW_STYLE, "marginTop": "8px"},
+                        children=route_intent_actions,
+                    ),
+                        html.Div(
+                            style={**UI_THREE_COLUMN_STYLE, "marginTop": "10px"},
+                            children=[
+                                _compact_value_card("Intenção atual", focused_route_intent_label, dominant_route_copy),
+                                _guidance_card(
+                                    "Quando mudar daqui",
+                                    (
+                                        "Use estes botões para reclassificar a rota em foco sem abrir a bancada completa."
+                                        if can_adjust_route_intent_directly
+                                        else "Selecione um trecho com rota em foco para liberar o ajuste direto de intenção."
+                                    ),
+                                ),
+                                _compact_value_card("Trecho mais legível", connection_preview, supply_flow_summary),
+                            ],
+                        ),
+                ],
+            ),
+            html.Div(
+                id="studio-workspace-supply-rail",
+                style={**UI_MUTED_CARD_STYLE, "padding": "12px", "marginBottom": "12px"},
+                children=[
+                    html.Div("Quem supre quem neste foco", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+                    html.Div(str(business_flow.get("headline") or supply_flow_summary or "Sem cadeia principal visível neste foco."), style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"}),
+                    html.Div(
+                        style={**UI_THREE_COLUMN_STYLE, "marginTop": "10px"},
+                        children=[
+                            _compact_value_card("É suprido por", str(business_flow.get("supplied_by_label") or "Ainda não recebe suprimento visível."), supply_flow_summary),
+                            _compact_value_card("Supre", str(business_flow.get("supplies_label") or "Ainda não abastece outra entidade visível."), connection_preview),
+                            _compact_value_card(
+                                "Leitura mais direta",
+                                connection_preview,
+                                (
+                                    f"{len(connection_lines)} trecho(s) legíveis já aparecem na camada principal."
+                                    if connection_lines
+                                    else "Desenhe ou selecione uma conexão no canvas para abrir a cadeia principal."
+                                ),
+                            ),
                         ],
                     ),
                 ],
@@ -9378,6 +9446,9 @@ def build_app(
         Input("studio-route-intent-desirable-button", "n_clicks"),
         Input("studio-route-intent-optional-button", "n_clicks"),
         Input("studio-canvas-intent-mandatory-button", "n_clicks"),
+        Input("studio-workspace-intent-mandatory-button", "n_clicks"),
+        Input("studio-workspace-intent-desirable-button", "n_clicks"),
+        Input("studio-workspace-intent-optional-button", "n_clicks"),
         State("routes-grid", "rowData"),
         State("edge-studio-selected-id", "data"),
         State("candidate-links-grid", "rowData"),
@@ -9389,15 +9460,18 @@ def build_app(
         desirable_n_clicks: Any,
         optional_n_clicks: Any,
         canvas_mandatory_n_clicks: Any,
+        workspace_mandatory_n_clicks: Any,
+        workspace_desirable_n_clicks: Any,
+        workspace_optional_n_clicks: Any,
         route_rows: list[dict[str, Any]] | None,
         selected_link_id: str | None,
         candidate_links_rows: list[dict[str, Any]] | None,
         selected_route_id: str | None,
     ) -> tuple[list[dict[str, Any]], str]:
         click_map = {
-            "mandatory": max(int(mandatory_n_clicks or 0), int(canvas_mandatory_n_clicks or 0)),
-            "desirable": int(desirable_n_clicks or 0),
-            "optional": int(optional_n_clicks or 0),
+            "mandatory": max(int(mandatory_n_clicks or 0), int(canvas_mandatory_n_clicks or 0), int(workspace_mandatory_n_clicks or 0)),
+            "desirable": max(int(desirable_n_clicks or 0), int(workspace_desirable_n_clicks or 0)),
+            "optional": max(int(optional_n_clicks or 0), int(workspace_optional_n_clicks or 0)),
         }
         action = max(click_map, key=click_map.get)
         if click_map[action] <= 0:

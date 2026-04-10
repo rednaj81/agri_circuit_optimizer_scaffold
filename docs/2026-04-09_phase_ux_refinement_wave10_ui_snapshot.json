@@ -1,36 +1,5 @@
 {
-  "snapshot_source_commit": "2ac0fe3df855f006ec7521b8bea398a9edb7d34e",
-  "runs": {
-    "focus_priority": [
-      "preferred run id",
-      "active run",
-      "usable terminal run",
-      "blocked terminal run",
-      "completed without usable result",
-      "next queued run",
-      "latest run"
-    ],
-    "progress_signals": [
-      "Espera sem avanço",
-      "Andamento real em preparação",
-      "Andamento real em execução",
-      "Andamento real na consolidação",
-      "Término sem resultado útil",
-      "Resultado utilizável",
-      "Execução interrompida"
-    ],
-    "detail_signals": [
-      "Progresso desta run",
-      "Sinal de progresso",
-      "O que falta",
-      "Recuperação desta run"
-    ],
-    "decision_gate_requires_usable_result": true,
-    "technical_logs_primary_surface": false
-  },
-  "screenshot_attempt": {
-    "target_path": "output/playwright/runs-fullhd-wave10.png",
-    "status": "failed_in_sandbox",
-    "reason": "No stable browser capture session was available in this sandbox during wave 10; structured snapshot retained as honest evidence."
-  }
+  "focused_supply_route": "Leitura do cenárioExige atençãoAinda há bloqueios estruturais impedindo a passagem segura para Runs.Contexto dominante do StudioConexão em foco: Tanque de água -> Misturador.Agora no StudioHá rotas com dosagem sem medição direta compatível: Tanque de água para Misturador.Próxima açãoExigir medição direta agoraPassagem para RunsContinue no Studio: Há rotas com dosagem sem medição direta compatível: Tanque de água para Misturador.Ações contextuais deste focoExigir medição diretaCriar rota deste trechoInverter trechoMedição diretaDisponível agora neste trecho com dosagem.Criar rotaEste trecho já tem rota operacional vinculada.DireçãoEste foco já respeita a direção principal do Studio.Intenção desta rota no focoObrigatóriaDesejávelOpcionalIntenção atualObrigatóriaTanque de água para Misturador · ObrigatóriaQuando mudar daquiUse estes botões para reclassificar a rota em foco sem abrir a bancada completa.Trecho mais legívelTanque de água supre Misturador (rota obrigatória).Misturador e Tanque de água ainda não participa de um trecho visível de suprimento.Quem supre quem neste focoMisturador e Tanque de água ainda não participa de um trecho visível de suprimento.É suprido porAinda não recebe suprimento visível.Misturador e Tanque de água ainda não participa de um trecho visível de suprimento.SupreAinda não abastece outra entidade visível.Tanque de água supre Misturador (rota obrigatória).Leitura mais diretaTanque de água supre Misturador (rota obrigatória).1 trecho(s) legíveis já aparecem na camada principal.Cadeia visível deste focoQuem supre este focoAinda não recebe suprimento ",
+  "focused_business_node": "Leitura do cenárioExige atençãoAinda há bloqueios estruturais impedindo a passagem segura para Runs.Contexto dominante do StudioEntidade em foco: Bomba principal.Agora no StudioA conexão L900 termina em Tanque de água, mas Tanque de água deve apenas iniciar fluxo.Próxima açãoCorrigir no canvas. Remova o bloqueio dominante do Studio antes de seguir para Runs.Passagem para RunsContinue no Studio: A conexão L900 termina em Tanque de água, mas Tanque de água deve apenas iniciar fluxo.Ações contextuais deste focoExigir medição diretaCriar rota deste trechoInverter trechoMedição diretaSelecione uma conexão do canvas para revisar medição direta.Criar rotaSelecione uma conexão do canvas para criar uma rota a partir dela.DireçãoSelecione uma conexão do canvas para revisar a direção deste trecho.Intenção desta rota no focoObrigatóriaDesejávelOpcionalIntenção atualSem rota em focoO composer local ainda não recebeu origem nem destino.Quando mudar daquiSelecione um trecho com rota em foco para liberar o ajuste direto de intenção.Trecho mais legívelTanque de água supre Bomba principal.Bomba principal é suprido por Tanque de água e supre Misturador.Quem supre quem neste focoBomba principal é suprido por Tanque de água e supre Misturador.É suprido porTanque de águaBomba principal é suprido por Tanque de água e supre Misturador.SupreMisturadorTanque de água supre Bomba principal.Leitura mais diretaTanque de água supre Bomba principal.2 trecho(s) legíveis já aparecem na camada principal.Cadeia visível deste focoQuem supre este focoTanque de águaBomba principal é suprido por Tanque de água e ",
+  "workspace_route_intent_status": "Rota R001 marcada como desejável direto no contexto do canvas."
 }

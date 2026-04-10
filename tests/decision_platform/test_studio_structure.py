@@ -63,6 +63,11 @@ def test_dash_app_exposes_structural_studio_controls() -> None:
     assert "studio-workspace-require-measurement-button" in layout_repr
     assert "studio-workspace-create-route-button" in layout_repr
     assert "studio-workspace-reverse-edge-button" in layout_repr
+    assert "studio-workspace-intent-actions" in layout_repr
+    assert "studio-workspace-intent-mandatory-button" in layout_repr
+    assert "studio-workspace-intent-desirable-button" in layout_repr
+    assert "studio-workspace-intent-optional-button" in layout_repr
+    assert "studio-workspace-supply-rail" in layout_repr
     assert "studio-workspace-quick-edit-panel" in layout_repr
     assert "studio-workspace-local-actions-panel" in layout_repr
     assert "studio-route-editor-shell" in layout_repr

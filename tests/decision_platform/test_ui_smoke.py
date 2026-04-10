@@ -587,6 +587,11 @@ def test_studio_tab_surfaces_readiness_and_selection_context() -> None:
     assert _find_component_by_id(studio_tab, "studio-workspace-require-measurement-button") is not None
     assert _find_component_by_id(studio_tab, "studio-workspace-create-route-button") is not None
     assert _find_component_by_id(studio_tab, "studio-workspace-reverse-edge-button") is not None
+    assert _find_component_by_id(studio_tab, "studio-workspace-intent-actions") is not None
+    assert _find_component_by_id(studio_tab, "studio-workspace-intent-mandatory-button") is not None
+    assert _find_component_by_id(studio_tab, "studio-workspace-intent-desirable-button") is not None
+    assert _find_component_by_id(studio_tab, "studio-workspace-intent-optional-button") is not None
+    assert _find_component_by_id(studio_tab, "studio-workspace-supply-rail") is not None
     assert _find_component_by_id(studio_tab, "studio-workspace-quick-edit-panel") is not None
     assert _find_component_by_id(studio_tab, "studio-workspace-local-actions-panel") is not None
     assert _find_component_by_id(studio_tab, "studio-context-detailed-panels") is not None
@@ -821,7 +826,9 @@ def test_studio_workspace_panel_unifies_focus_connectivity_and_runs_gate() -> No
     assert "Próxima ação" in panel_text
     assert "Passagem para Runs" in panel_text
     assert "Ações contextuais deste foco" in panel_text
+    assert "Intenção desta rota no foco" in panel_text
     assert "Cadeia de suprimento e saída do Studio" in panel_text
+    assert "Quem supre quem neste foco" in panel_text
     assert "A conexão L900 termina em Tanque de água" in panel_text
     assert "Cadeia visível deste foco" in panel_text
     assert "Bomba principal" in panel_text
@@ -834,6 +841,7 @@ def test_studio_workspace_panel_unifies_focus_connectivity_and_runs_gate() -> No
     assert "Sinal de saída desta área" in panel_text
     assert getattr(_find_component_by_id(panel, "studio-workspace-open-runs-button"), "disabled", None) is True
     assert _find_component_by_id(panel, "studio-business-flow-panel") is not None
+    assert _find_component_by_id(panel, "studio-workspace-supply-rail") is not None
     assert _find_component_by_id(panel, "studio-workspace-supply-strip") is not None
     assert getattr(_find_component_by_id(panel, "studio-workspace-supply-strip"), "open", None) is False
     assert getattr(_find_component_by_id(panel, "studio-business-flow-panel"), "open", None) is False
@@ -892,14 +900,21 @@ def test_studio_workspace_panel_promotes_direct_measurement_fix_in_primary_conte
     panel_text = _collect_text_content(panel)
     measurement_button = _find_component_by_id(panel, "studio-workspace-require-measurement-button")
     create_route_button = _find_component_by_id(panel, "studio-workspace-create-route-button")
+    desirable_button = _find_component_by_id(panel, "studio-workspace-intent-desirable-button")
 
     assert "Exigir medição direta" in panel_text
     assert "Próxima ação" in panel_text
     assert "Disponível agora neste trecho com dosagem." in panel_text
+    assert "Use estes botões para reclassificar a rota em foco sem abrir a bancada completa." in panel_text
+    assert "Obrigatória" in panel_text
+    assert "Desejável" in panel_text
+    assert "Opcional" in panel_text
     assert measurement_button is not None
     assert getattr(measurement_button, "disabled", None) is False
     assert create_route_button is not None
     assert getattr(create_route_button, "disabled", None) is True
+    assert desirable_button is not None
+    assert getattr(desirable_button, "disabled", None) is False
 
 
 def test_studio_workspace_panel_keeps_context_actions_discoverable_when_not_applicable() -> None:
@@ -931,14 +946,19 @@ def test_studio_workspace_panel_keeps_context_actions_discoverable_when_not_appl
     panel_text = _collect_text_content(panel)
 
     assert "Ações contextuais deste foco" in panel_text
+    assert "Intenção desta rota no foco" in panel_text
     assert "Selecione uma conexão do canvas para revisar medição direta." in panel_text
     assert "Selecione uma conexão do canvas para criar uma rota a partir dela." in panel_text
     assert "Selecione uma conexão do canvas para revisar a direção deste trecho." in panel_text
+    assert "Selecione um trecho com rota em foco para liberar o ajuste direto de intenção." in panel_text
     assert "Passagem para Runs" in panel_text
     assert "Corrigir no canvas" in panel_text
     assert getattr(_find_component_by_id(panel, "studio-workspace-require-measurement-button"), "disabled", None) is True
     assert getattr(_find_component_by_id(panel, "studio-workspace-create-route-button"), "disabled", None) is True
     assert getattr(_find_component_by_id(panel, "studio-workspace-reverse-edge-button"), "disabled", None) is True
+    assert getattr(_find_component_by_id(panel, "studio-workspace-intent-mandatory-button"), "disabled", None) is True
+    assert getattr(_find_component_by_id(panel, "studio-workspace-intent-desirable-button"), "disabled", None) is True
+    assert getattr(_find_component_by_id(panel, "studio-workspace-intent-optional-button"), "disabled", None) is True
 
 
 def test_studio_primary_canvas_hides_internal_and_hub_nodes() -> None:
@@ -1495,6 +1515,37 @@ def test_workspace_context_measurement_button_updates_selected_edge_route_direct
 
     assert status == "Rota R001 agora exige medição direta no trecho em foco."
     assert updated_rows[0]["measurement_required"] == 1
+
+
+def test_workspace_context_route_intent_button_updates_selected_edge_route_directly() -> None:
+    with diagnostic_runtime_test_mode():
+        app = build_app("data/decision_platform/maquete_v2")
+
+    callback = _get_callback(app, input_id="studio-workspace-intent-desirable-button")
+    route_rows = [
+        {"route_id": "R001", "source": "W", "sink": "M", "mandatory": True, "measurement_required": 0, "dose_min_l": 0.0, "q_min_delivered_lpm": 12.0, "notes": ""},
+    ]
+    candidate_links_rows = [
+        {"link_id": "L001", "from_node": "W", "to_node": "M", "archetype": "bus_segment"},
+    ]
+
+    updated_rows, status = callback(
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        route_rows,
+        "L001",
+        candidate_links_rows,
+        None,
+    )
+
+    assert status == "Rota R001 marcada como desejável direto no contexto do canvas."
+    assert updated_rows[0]["route_group"] == "desirable"
+    assert bool(updated_rows[0]["mandatory"]) is False
 
 
 def test_studio_focus_panel_uses_canvas_selection_as_primary_context() -> None:
