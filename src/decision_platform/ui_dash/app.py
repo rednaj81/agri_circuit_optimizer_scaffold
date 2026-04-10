@@ -5175,7 +5175,7 @@ def render_run_jobs_overview_panel(summary: dict[str, Any]) -> Any:
             tone=_run_status_tone(status, result_ready=status == "completed" and count > 0),
         )
         for status, count in status_guide_specs
-        if count or status in {"queued", "running", "completed", "failed"}
+        if count
     ]
     if rerun_count:
         status_guide_cards.append(
@@ -5670,7 +5670,7 @@ def render_runs_workspace_panel(
         artifacts.setdefault("summary_json", "available")
         detail_for_progress["artifacts"] = artifacts
     progress_snapshot = _run_progress_snapshot(detail_for_progress)
-    focus_reason = _run_summary_focus_reason(selected_run_summary)
+    focus_reason = _run_summary_focus_reason(selected_run_summary or detail_for_progress)
     recent_runs = _recent_runs_for_history(run_summary, limit=3)
     latest_recent_run = recent_runs[0] if recent_runs else None
     if execution_error:
@@ -5765,6 +5765,46 @@ def render_runs_workspace_panel(
     else:
         queue_support_value = "Sem pendência"
         queue_support_note = "Nada novo aguardando além do que a run em foco já explica."
+    if focus_status_key == "failed":
+        focus_state_headline = "Falha operacional em foco"
+        focus_state_copy = "Corrija a causa dominante antes de repetir a rodada."
+    elif focus_status_key == "canceled":
+        focus_state_headline = "Cancelamento em foco"
+        focus_state_copy = "Confirme se a interrupção foi deliberada antes de reenfileirar."
+    elif focus_status_key == "queued":
+        focus_state_headline = "Próxima rodada aguardando vez"
+        focus_state_copy = "A fila já sabe qual é a próxima execução útil; ainda não há cálculo em andamento."
+    elif focus_status_key == "preparing":
+        focus_state_headline = "Preparação em andamento"
+        focus_state_copy = "A run já saiu da fila e prepara artefatos antes do cálculo principal."
+    elif focus_status_key == "running":
+        focus_state_headline = "Execução principal em andamento"
+        focus_state_copy = "A prioridade é acompanhar esta run até o primeiro desfecho confiável."
+    elif focus_status_key == "exporting":
+        focus_state_headline = "Saída final em consolidação"
+        focus_state_copy = "A rodada já calculou e só falta consolidar a saída executiva."
+    elif focus_result_ready:
+        focus_state_headline = "Resultado utilizável em foco"
+        focus_state_copy = "Esta run já liberou a passagem principal para Decisão."
+    else:
+        focus_state_headline = "Run em foco sem saída suficiente"
+        focus_state_copy = "A rodada terminou, mas ainda não entrega contexto executivo forte para Decisão."
+    history_summary_headline = (
+        f"Último terminal: {latest_recent_run.get('run_id')}"
+        if latest_recent_run
+        else "Sem terminal recente relevante"
+    )
+    history_summary_copy = (
+        "Use o histórico completo só quando a run em foco não bastar para decidir a próxima ação."
+        if latest_recent_run
+        else "A leitura principal continua totalmente centrada na run em foco."
+    )
+    focus_banner_background, focus_banner_color = _status_tone(focus_state_tone)
+    primary_action_tone = (
+        "ready"
+        if focus_cta_target == "decision"
+        else ("failed" if focus_cta_target == "rerun" else ("running" if focus_cta_target == "refresh" else ("queued" if focus_cta_target == "run" else "needs_attention")))
+    )
     if focus_status_key in {"failed", "canceled"}:
         focus_recovery_copy = (
             "Revise a causa dominante desta falha antes de repetir a rodada."
@@ -5899,6 +5939,20 @@ def render_runs_workspace_panel(
                                 ],
                             ),
                             html.Div(
+                                id="runs-workspace-focus-headline",
+                                style={
+                                    "marginTop": "12px",
+                                    "padding": "12px 14px",
+                                    "borderRadius": "16px",
+                                    "background": focus_banner_background,
+                                    "color": focus_banner_color,
+                                },
+                                children=[
+                                    html.Div(focus_state_headline, style={"fontWeight": 700, "lineHeight": "1.4"}),
+                                    html.Div(focus_state_copy, style={"lineHeight": "1.5", "marginTop": "6px"}),
+                                ],
+                            ),
+                            html.Div(
                                 style={**UI_TWO_COLUMN_STYLE, "marginTop": "12px"},
                                 children=[
                                     _signal_card("Agora", progress_snapshot["signal"], progress_snapshot["progress_text"], tone=focus_state_tone),
@@ -5907,26 +5961,20 @@ def render_runs_workspace_panel(
                                 ],
                             ),
                             html.Div(
-                                id="runs-workspace-context-strip",
-                                style={**UI_MUTED_CARD_STYLE, "padding": "14px", "marginTop": "12px"},
-                                children=[
-                                    html.Div("Separação operacional", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
-                                    _label_value_list(
-                                        [
-                                            ("Cenário", str(studio_summary.get("readiness_headline") or state["readiness_note"])),
-                                            ("Run em foco", f"{focus_run_label} | {focus_status_label}"),
-                                            ("Resultado", usable_result),
-                                        ]
-                                    ),
-                                ],
-                            ),
-                            html.Div(
                                 id="runs-workspace-next-step-panel",
-                                style={**UI_MUTED_CARD_STYLE, "padding": "14px", "marginTop": "12px"},
+                                style={**UI_MUTED_CARD_STYLE, "padding": "14px", "marginTop": "12px", "background": _status_tone(primary_action_tone)[0], "color": _status_tone(primary_action_tone)[1]},
                                 children=[
-                                    html.Div("Próxima ação", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+                                    html.Div("Próxima ação segura", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "opacity": 0.82}),
                                     html.Div(action_signal_value, style={"fontSize": "22px", "fontWeight": 700, "marginTop": "6px"}),
                                     html.Div(decision_gate_copy, style={"lineHeight": "1.55", "marginTop": "8px"}),
+                                    html.Div(
+                                        style={"display": "flex", "gap": "8px", "flexWrap": "wrap", "marginTop": "10px"},
+                                        children=[
+                                            _toned_pill("Voltar ao Studio" if state["studio_status"] != "ready" else "Ficar em Runs", "failed" if state["studio_status"] != "ready" else "needs_attention"),
+                                            _toned_pill(focus_status_label, focus_state_tone),
+                                        ],
+                                    ),
+                                    html.Div(scenario_vs_run_limit, style={"lineHeight": "1.55", "marginTop": "10px", "opacity": 0.92}),
                                     html.Div(style={**UI_ACTION_ROW_STYLE, "marginTop": "12px"}, children=[local_recovery_cta, decision_cta]),
                                 ],
                             ),
@@ -5954,37 +6002,28 @@ def render_runs_workspace_panel(
                                 ],
                             ),
                             html.Div(
-                                id="runs-workspace-history-panel",
+                                id="runs-workspace-history-summary",
                                 style={**UI_CARD_STYLE, "padding": "14px"},
                                 children=[
                                     html.Div("Histórico terminal", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
-                                    html.Div(
-                                        (
-                                            f"Último desfecho: {latest_recent_run.get('run_id')}"
-                                            if latest_recent_run
-                                            else "Ainda não existe histórico terminal."
-                                        ),
-                                        style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"},
-                                    ),
-                                    html.Div(
-                                        (
-                                            "Resultados anteriores que ainda ajudam a ler reaproveitamento ou recuperação."
-                                            if support_history_runs
-                                            else "Sem terminal anterior relevante além da run em foco."
-                                        )
-                                        if latest_recent_run
-                                        else "Quando a primeira run terminar, este trilho passa a carregar o último desfecho reaproveitável.",
-                                        style={"lineHeight": "1.55", "marginTop": "8px", "color": "#496158"},
-                                    ),
-                                    html.Div(
-                                        id="runs-workspace-history-list",
-                                        style={"display": "grid", "gap": "10px", "marginTop": "12px"},
-                                        children=[_run_history_entry(run, latest=index == 0) for index, run in enumerate(support_history_runs)]
-                                        or [html.Div("Ainda não há histórico recente para leitura.", style={"color": "#496158"})],
-                                    ),
+                                    html.Div(history_summary_headline, style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "6px"}),
+                                    html.Div(history_summary_copy, style={"lineHeight": "1.55", "marginTop": "8px", "color": "#496158"}),
                                 ],
                             ),
                         ],
+                    ),
+                ],
+            ),
+            html.Details(
+                id="runs-workspace-history-details",
+                style={**UI_MUTED_CARD_STYLE, "padding": "12px", "marginBottom": "12px"},
+                children=[
+                    html.Summary("Histórico terminal secundário"),
+                    html.Div(
+                        id="runs-workspace-history-panel",
+                        style={"display": "grid", "gap": "10px", "marginTop": "12px"},
+                        children=[_run_history_entry(run, latest=index == 0) for index, run in enumerate(support_history_runs)]
+                        or [html.Div("Ainda não há histórico recente para leitura.", style={"color": "#496158"})],
                     ),
                 ],
             ),

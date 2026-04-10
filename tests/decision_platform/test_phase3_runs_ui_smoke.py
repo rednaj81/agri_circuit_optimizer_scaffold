@@ -120,7 +120,8 @@ def test_runs_tab_reopens_persisted_operational_telemetry() -> None:
         workspace_text = _collect_text(runs_workspace)
         overview_text = _collect_text(runs_overview)
         detail_text = _collect_text(run_detail_panel)
-        assert "Separação operacional" in workspace_text
+        assert "Próxima ação segura" in workspace_text
+        assert "Histórico terminal secundário" in workspace_text
         assert "Estados da operação" in overview_text
         assert "Reexecução" in overview_text
         assert "Origem desta rodada" in detail_text

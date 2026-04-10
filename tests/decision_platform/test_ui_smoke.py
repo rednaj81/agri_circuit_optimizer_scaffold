@@ -1171,7 +1171,8 @@ def test_runs_workspace_panel_distinguishes_scenario_gate_from_execution_state()
     assert "Run em foco" in blocked_text
     assert "Fila agora" in blocked_text
     assert "Histórico terminal" in blocked_text
-    assert "Separação operacional" in blocked_text
+    assert "Próxima ação segura" in blocked_text
+    assert "Histórico terminal secundário" in blocked_text
     assert "Gate do cenário e limites desta leitura" in blocked_text
     assert "Limitação agora" in blocked_text
     assert "A limitação principal ainda está no cenário" in blocked_text
@@ -1688,8 +1689,8 @@ def test_runs_workspace_panel_prioritizes_queue_focus_and_primary_transition() -
     assert "Run em foco" in panel_text
     assert "Fila agora" in panel_text
     assert "Histórico terminal" in panel_text
-    assert "Separação operacional" in panel_text
-    assert "Próxima ação" in panel_text
+    assert "Próxima ação segura" in panel_text
+    assert "Histórico terminal secundário" in panel_text
     assert "Gate do cenário e limites desta leitura" in panel_text
     assert "run-003" in panel_text
     assert "resultado utilizável" in panel_text.lower()
@@ -1698,6 +1699,7 @@ def test_runs_workspace_panel_prioritizes_queue_focus_and_primary_transition() -
     assert _find_component_by_id(panel, "runs-workspace-open-studio-link") is not None
     assert getattr(_find_component_by_id(panel, "runs-workspace-open-decision-button"), "disabled", None) is False
     assert _find_component_by_id(panel, "runs-workspace-primary-open-decision-button") is not None
+    assert _component_id_is_inside_details(panel, "runs-workspace-history-panel") is True
 
 
 def test_studio_runs_decision_primary_journey_uses_consistent_transition_language() -> None:
@@ -1803,9 +1805,57 @@ def test_runs_workspace_panel_distinguishes_failure_recovery_from_decision_ready
     assert "Histórico terminal" in failed_text
     assert "run-009" in failed_text
     assert "Revisar falha" in failed_text
-    assert "ainda não existe resultado utilizável para Decisão" in failed_text
+    assert "Decisao continua bloqueada" in failed_text
     assert getattr(_find_component_by_id(failed_panel, "runs-workspace-open-decision-button"), "disabled", None) is True
     assert getattr(_find_component_by_id(failed_panel, "runs-workspace-rerun-button"), "disabled", None) is False
+
+
+def test_runs_workspace_panel_contrasts_failed_and_canceled_focus_states() -> None:
+    failed_panel = render_runs_workspace_panel(
+        {
+            "status": "ready",
+            "readiness_headline": "Cenário pronto para seguir para Runs.",
+        },
+        {
+            "run_count": 1,
+            "next_queued_run_id": None,
+            "active_run_ids": [],
+            "queued_run_ids": [],
+            "latest_run_id": "run-030",
+            "status_counts": {"failed": 1},
+        },
+        {},
+        {
+            "selected_run_id": "run-030",
+            "status": "failed",
+        },
+    )
+    canceled_panel = render_runs_workspace_panel(
+        {
+            "status": "ready",
+            "readiness_headline": "Cenário pronto para seguir para Runs.",
+        },
+        {
+            "run_count": 1,
+            "next_queued_run_id": None,
+            "active_run_ids": [],
+            "queued_run_ids": [],
+            "latest_run_id": "run-031",
+            "status_counts": {"canceled": 1},
+        },
+        {},
+        {
+            "selected_run_id": "run-031",
+            "status": "canceled",
+        },
+    )
+    failed_text = _collect_text_content(failed_panel)
+    canceled_text = _collect_text_content(canceled_panel)
+
+    assert "Falha operacional em foco" in failed_text
+    assert "Reexecutar com correção" in failed_text
+    assert "Cancelamento em foco" in canceled_text
+    assert "Reexecutar se ainda fizer sentido" in canceled_text
 
 
 def test_runs_workspace_panel_uses_refresh_cta_for_intermediate_execution_states() -> None:

@@ -179,7 +179,8 @@ def test_phase3_queue_acceptance_runs_ui_surfaces_operational_queue_and_detail_l
     assert "Run em foco" in workspace_text
     assert "Fila agora" in workspace_text
     assert "Histórico terminal" in workspace_text
-    assert "Separação operacional" in workspace_text
+    assert "Próxima ação segura" in workspace_text
+    assert "Histórico terminal secundário" in workspace_text
     assert "Cenário" in workspace_text
     assert "Resultado" in workspace_text
     assert "Em execução" in workspace_text
