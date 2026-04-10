@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
 
@@ -133,3 +134,18 @@ def test_runs_tab_reopens_persisted_operational_telemetry() -> None:
     finally:
         cleanup_scenario_copy(queue_root)
         cleanup_scenario_copy(scenario_dir)
+
+
+@pytest.mark.fast
+def test_phase3_runs_ui_wave4_snapshot_artifact_is_traceable() -> None:
+    snapshot_path = Path("docs/2026-04-10_phase_ux_refinement_wave4_ui_snapshot.json")
+    payload = json.loads(snapshot_path.read_text(encoding="utf-8"))
+
+    assert payload["phase_id"] == "phase_ux_refinement"
+    assert payload["wave_index"] == 4
+    assert len(str(payload["repo_head"])) == 40
+    assert payload["capture_method"] != "layout_render"
+    assert "browser_capture" in payload
+    assert payload["browser_capture"]["path"] == "docs/2026-04-10_phase_ux_refinement_wave4_browser_capture.png"
+    assert isinstance(payload.get("sections"), list)
+    assert any(section.get("component_id") == "studio-workspace-local-fix-strip" for section in payload["sections"])

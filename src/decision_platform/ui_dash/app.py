@@ -3973,6 +3973,12 @@ def render_studio_workspace_panel(
                                 disabled=not can_require_measurement_directly,
                             ),
                             html.Button(
+                                "Inverter trecho agora",
+                                id="studio-workspace-apply-local-reverse-button",
+                                style=UI_BUTTON_STYLE,
+                                disabled=not can_reverse_directly,
+                            ),
+                            html.Button(
                                 "Abrir bancada completa",
                                 id="studio-workspace-local-fix-open-workbench-button",
                                 style=UI_BUTTON_STYLE,
@@ -9667,6 +9673,7 @@ def build_app(
         Input("studio-focus-edge-reverse-button", "n_clicks"),
         Input("studio-canvas-reverse-edge-button", "n_clicks"),
         Input("studio-workspace-reverse-edge-button", "n_clicks"),
+        Input("studio-workspace-apply-local-reverse-button", "n_clicks"),
         State("candidate-links-grid", "rowData"),
         State("edge-studio-selected-id", "data"),
         State("nodes-grid", "rowData"),
@@ -9678,13 +9685,14 @@ def build_app(
         n_clicks: Any,
         canvas_n_clicks: Any,
         workspace_n_clicks: Any,
+        local_fix_n_clicks: Any,
         candidate_links_rows: list[dict[str, Any]] | None,
         selected_link_id: str | None,
         nodes_rows: list[dict[str, Any]] | None,
         route_rows: list[dict[str, Any]] | None,
         edge_component_rules_rows: list[dict[str, Any]] | None,
     ) -> tuple[list[dict[str, Any]], str | None, str]:
-        if max(int(n_clicks or 0), int(canvas_n_clicks or 0), int(workspace_n_clicks or 0)) <= 0:
+        if max(int(n_clicks or 0), int(canvas_n_clicks or 0), int(workspace_n_clicks or 0), int(local_fix_n_clicks or 0)) <= 0:
             return candidate_links_rows or [], selected_link_id, ""
         selected_id = _default_edge_studio_selection(candidate_links_rows or [], preferred_link_id=selected_link_id)
         try:
@@ -9694,7 +9702,11 @@ def build_app(
                 nodes_rows=nodes_rows or [],
                 route_rows=route_rows or [],
                 edge_component_rules_rows=edge_component_rules_rows or [],
-                message_prefix="Conexão invertida direto no foco do canvas.",
+                message_prefix=(
+                    "Correção local aplicada: conexão invertida no trecho em foco."
+                    if int(local_fix_n_clicks or 0) > max(int(n_clicks or 0), int(canvas_n_clicks or 0), int(workspace_n_clicks or 0))
+                    else "Conexão invertida direto no foco do canvas."
+                ),
             )
         except ValueError as exc:
             return candidate_links_rows or [], selected_link_id, str(exc)

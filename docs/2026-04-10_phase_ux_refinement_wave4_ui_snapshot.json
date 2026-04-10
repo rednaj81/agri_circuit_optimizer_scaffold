@@ -1,0 +1,53 @@
+{
+  "created_at": "2026-04-10T14:44:13.9375261Z",
+  "phase_id": "phase_ux_refinement",
+  "wave_index": 4,
+  "repo_head": "95cb1f9a710fa8170d874ab02cf1a2e29cdc265c",
+  "capture_method": "served_ui_report",
+  "capture_note": "Versioned evidence built from the live Dash UI served over HTTP plus structured excerpts from the current app layout. Native Edge screenshot capture was attempted separately and remained blocked by local access-denied sandbox errors.",
+  "browser_capture": {
+    "path": "docs/2026-04-10_phase_ux_refinement_wave4_browser_capture.png",
+    "capture_kind": "browser_equivalent_report",
+    "source_urls": {
+      "studio": {
+        "url": "http://127.0.0.1:8056/?tab=studio",
+        "status": 200,
+        "body_length": 4424,
+        "contains_dash": true,
+        "contains_root": true
+      },
+      "runs": {
+        "url": "http://127.0.0.1:8056/?tab=runs",
+        "status": 200,
+        "body_length": 4424,
+        "contains_dash": true,
+        "contains_root": true
+      }
+    },
+    "native_browser_attempt": "edge_headless_access_denied",
+    "native_browser_error_excerpt": "Crashpad and sandbox access denied prevented Edge headless from writing a screenshot artifact.",
+    "size_bytes": 93622
+  },
+  "sections": [
+    {
+      "title": "Studio local fix",
+      "component_id": "studio-workspace-local-fix-strip",
+      "excerpt": "Correção local mais curtaCorrigir no canvasA conexão L011 sai de Saída externa, mas Saída externa deve aparecer apenas como destino final.Misturador e Tanque de água é suprido por Incorporador, Produto 1, Produto 2 e mais 2 e supre Incorporador e Saída externa.Correção local orientadaFoco ainda insuficienteCorrigir medição agoraInverter trecho agoraAbrir bancada completa"
+    },
+    {
+      "title": "Studio workspace",
+      "component_id": "studio-workspace-panel",
+      "excerpt": "Leitura do cenárioExige atençãoAinda há bloqueios estruturais impedindo a passagem segura para Runs.Correção local mais curtaCorrigir no canvasA conexão L011 sai de Saída externa, mas Saída externa deve aparecer apenas como destino final.Misturador e Tanque de água é suprido por Incorporador, Produto 1, Produto 2 e mais 2 e supre Incorporador e Saída externa.Correção local orientadaFoco ainda insuficienteCorrigir medição agoraInverter trecho agoraAbrir bancada completaContexto dominante do StudioConexão em foco: Tanque de água -> Misturador.Agora no StudioA conexão L011 sai de Saída externa, mas Saída externa deve aparecer apenas como destino final.Próxima açãoCorrigir no canvas. A conexão L011 sai de Saída externa, mas Saída externa deve aparecer apenas como destino final.Passagem para RunsContinue no Studio: A conexão L011 sai de Saída externa, mas Saída externa deve aparecer apenas co"
+    },
+    {
+      "title": "Runs recovery map",
+      "component_id": "runs-workspace-recovery-map",
+      "excerpt": "Se o problema for cenárioVoltar ao StudioA limitação principal ainda está no cenário; corrija o Studio antes de culpar a fila ou a execução.Se o problema for execuçãoReexecutar com correçãoRevise a causa dominante desta falha antes de repetir a rodada.Se o resultado já bastarDecisão ainda bloqueadaA Decisao continua bloqueada: esta run falhou antes de gerar contexto executivo utilizavel."
+    },
+    {
+      "title": "Runs workspace",
+      "component_id": "runs-workspace-panel",
+      "excerpt": "Leitura operacional de RunsAguardando readiness do StudioAinda há bloqueios estruturais impedindo a passagem segura para Runs.FalhouPronto0 na filaResultado pendenteRun em focoNenhumaEsta é a terminal mais crítica porque define a recuperação antes de outra rodada.Falha operacional em focoCorrija a causa dominante antes de repetir a rodada.Modo: -Na filaDepoisEm preparaçãoDepoisEm execuçãoDepoisConsolidando saídaDepoisConcluídaDepoisFalhouEstado finalA run encontrou um bloqueio operacional e terminou sem saída utilizável.Fila agoraSem pendênciaNada novo aguardando além do que a run em foco já explica.Execução agora: NenhumaHistórico terminalSem terminal recente relevanteA leitura principal continua totalmente centrada na run em foco.A última run terminou bloqueada; ainda não existe resultado utilizável para Decisão.Próxima ação seguraRevisar falhaA Decisao continua bloqueada: esta run fal"
+    }
+  ]
+}

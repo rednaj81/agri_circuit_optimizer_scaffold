@@ -207,6 +207,20 @@ def test_phase3_queue_acceptance_runs_ui_surfaces_operational_queue_and_detail_l
 
 
 @pytest.mark.fast
+def test_phase3_queue_acceptance_wave4_browser_capture_artifact_exists() -> None:
+    snapshot_path = Path("docs/2026-04-10_phase_ux_refinement_wave4_ui_snapshot.json")
+    capture_path = Path("docs/2026-04-10_phase_ux_refinement_wave4_browser_capture.png")
+
+    payload = json.loads(snapshot_path.read_text(encoding="utf-8"))
+
+    assert capture_path.exists()
+    assert capture_path.stat().st_size > 0
+    assert payload["browser_capture"]["path"] == str(capture_path).replace("\\", "/")
+    assert payload["browser_capture"]["size_bytes"] == capture_path.stat().st_size
+    assert payload["browser_capture"]["capture_kind"] in {"native_browser", "browser_equivalent_report"}
+
+
+@pytest.mark.fast
 def test_phase3_queue_acceptance_run_actions_follow_selected_run_state() -> None:
     with diagnostic_runtime_test_mode():
         app = build_app("data/decision_platform/maquete_v2")

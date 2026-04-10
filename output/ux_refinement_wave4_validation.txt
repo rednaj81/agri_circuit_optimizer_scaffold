@@ -1,18 +1,9 @@
-Wave 4 targeted validation
+Wave 4 validation
 
-- python -m py_compile src\decision_platform\ui_dash\app.py
-- $env:PYTHONPATH='C:\d\dev\agri_circuit_optimizer_scaffold'; python -m pytest -q tests/decision_platform/test_studio_structure.py::test_dash_app_exposes_structural_studio_controls tests/decision_platform/test_studio_structure.py::test_create_route_between_business_nodes_adds_visible_route tests/decision_platform/test_studio_structure.py::test_apply_route_intent_from_edge_context_updates_matching_route tests/decision_platform/test_studio_structure.py::test_context_menu_action_starts_route_draft_from_selected_node tests/decision_platform/test_ui_smoke.py::test_studio_primary_surface_exposes_business_command_center tests/decision_platform/test_ui_smoke.py::test_studio_primary_workspace_avoids_technical_internal_terms tests/decision_platform/test_ui_smoke.py::test_studio_connectivity_panel_surfaces_routes_and_measurement_near_canvas tests/decision_platform/test_ui_smoke.py::test_studio_focus_panel_uses_canvas_selection_as_primary_context tests/decision_platform/test_ui_smoke.py::test_studio_readiness_panel_humanizes_primary_blockers_and_warnings tests/decision_platform/test_ui_smoke.py::test_studio_workspace_panel_unifies_focus_connectivity_and_runs_gate tests/decision_platform/test_ui_smoke.py::test_studio_connectivity_panel_previews_reverse_action_in_business_language
+Command 1:
+.\.venv\Scripts\python.exe -m py_compile src\decision_platform\ui_dash\app.py
+Result: success
 
-Result:
-
-- 11 passed in 1.07s
-
-Evidence:
-
-- output\ux_refinement_wave4_studio_snapshot.json
-
-Screenshot attempt:
-
-- `Start-Process` flow for browser capture was blocked by local policy
-- Chrome headless `--screenshot` attempt failed without producing `output/playwright/studio-fullhd-wave4.png`
-- Chrome stderr included `CreateFile: Acesso negado. (0x5)`
+Command 2:
+.\.venv\Scripts\python.exe -m pytest tests\decision_platform\test_phase3_runs_ui_smoke.py tests\decision_platform\test_phase3_queue_acceptance.py tests\decision_platform\test_ui_smoke.py -q
+Result: 131 passed in 412.04s (0:06:52)

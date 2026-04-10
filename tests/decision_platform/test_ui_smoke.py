@@ -967,6 +967,52 @@ def test_studio_workspace_panel_keeps_context_actions_discoverable_when_not_appl
     assert getattr(_find_component_by_id(panel, "studio-workspace-intent-optional-button"), "disabled", None) is True
 
 
+def test_studio_workspace_panel_surfaces_local_reverse_fix_in_primary_strip() -> None:
+    panel = render_studio_workspace_panel(
+        {
+            "status": "needs_attention",
+            "readiness_headline": "Ainda há bloqueios estruturais impedindo a passagem segura para Runs.",
+            "primary_action": "Corrija a direção deste trecho antes de abrir Runs.",
+            "blocker_count": 1,
+            "warning_count": 0,
+            "mandatory_route_count": 0,
+            "blockers": ["L900 entra em W"],
+            "warnings": [],
+            "next_steps": ["Inverta a conexão em foco antes de enfileirar uma nova run."],
+        },
+        {
+            "selected_node_id": "P1",
+            "business_label": "Bomba principal",
+        },
+        {
+            "selected_link_id": "L900",
+            "selected_edge": {"from_node": "P1", "to_node": "W", "archetype": "bus_segment"},
+            "from_label": "Bomba principal",
+            "to_label": "Tanque de água",
+            "business_label": "Bomba principal -> Tanque de água",
+        },
+        [
+            {"node_id": "W", "label": "Tanque de água", "node_type": "water_tank", "zone": "supply"},
+            {"node_id": "P1", "label": "Bomba principal", "node_type": "pump", "zone": "process"},
+        ],
+        [
+            {"link_id": "L900", "from_node": "P1", "to_node": "W", "archetype": "bus_segment", "length_m": 0.3, "family_hint": "loop"},
+        ],
+        [],
+        "Inverta a direção deste trecho antes de seguir para Runs.",
+    )
+    panel_text = _collect_text_content(panel)
+    local_reverse_button = _find_component_by_id(panel, "studio-workspace-apply-local-reverse-button")
+    local_measurement_button = _find_component_by_id(panel, "studio-workspace-apply-local-fix-button")
+
+    assert "Inverter trecho agora" in panel_text
+    assert "Tanque de água passa a suprir Bomba principal" in panel_text
+    assert local_reverse_button is not None
+    assert getattr(local_reverse_button, "disabled", None) is False
+    assert local_measurement_button is not None
+    assert getattr(local_measurement_button, "disabled", None) is True
+
+
 def test_studio_primary_canvas_hides_internal_and_hub_nodes() -> None:
     with diagnostic_runtime_test_mode():
         app = build_app("data/decision_platform/maquete_v2")
@@ -1553,6 +1599,34 @@ def test_workspace_local_fix_button_updates_selected_edge_route_directly() -> No
 
     assert status == "Correção local aplicada: rota R001 agora exige medição direta no trecho em foco."
     assert updated_rows[0]["measurement_required"] == 1
+
+
+def test_workspace_local_reverse_fix_button_updates_selected_edge_directly() -> None:
+    bundle = load_scenario_bundle("data/decision_platform/maquete_v2")
+    original_row = next(row for row in bundle.candidate_links.to_dict("records") if str(row["link_id"]) == "L013")
+    with diagnostic_runtime_test_mode():
+        app = build_app("data/decision_platform/maquete_v2")
+
+    callback = _get_callback(app, input_id="studio-workspace-apply-local-reverse-button")
+    updated_links, next_selected_link_id, status = callback(
+        0,
+        0,
+        0,
+        1,
+        bundle.candidate_links.to_dict("records"),
+        "L013",
+        bundle.nodes.to_dict("records"),
+        bundle.route_requirements.to_dict("records"),
+        bundle.edge_component_rules.to_dict("records"),
+    )
+
+    updated_row = next(row for row in updated_links if str(row["link_id"]) == "L013")
+    assert next_selected_link_id == "L013"
+    assert updated_row["from_node"] == original_row["to_node"]
+    assert updated_row["to_node"] == original_row["from_node"]
+    assert "Correção local aplicada: conexão invertida no trecho em foco." in status
+    assert "Agora" in status
+    assert "A inversão" in status or "Runs" in status
 
 
 def test_workspace_context_route_intent_button_updates_selected_edge_route_directly() -> None:
@@ -2425,6 +2499,7 @@ def test_focus_edge_reverse_callback_swaps_flow_without_workbench() -> None:
     callback = _get_callback(app, input_id="studio-focus-edge-reverse-button")
     updated_links, next_selected_link_id, status = callback(
         1,
+        0,
         0,
         0,
         bundle.candidate_links.to_dict("records"),
