@@ -6944,6 +6944,27 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
         if candidate_id
         else "Sem contraste executivo"
     )
+    decision_strip_title = (
+        "Empate técnico assistido"
+        if decision_status == "technical_tie"
+        else "Decisão bloqueada"
+        if not candidate_id or summary.get("feasible") is False
+        else "Decisão pronta para confirmar"
+    )
+    decision_strip_cards = (
+        [
+            _guidance_card("O que está empatado", technical_tie_reason),
+            _guidance_card("O que a pessoa precisa decidir", human_review_signal),
+            _guidance_card("Escolha manual atual", f"{selected_candidate_id or '-'} | {selected_state_label}. {manual_choice_signal}"),
+        ]
+        if decision_status == "technical_tie"
+        else [
+            _guidance_card("Referência oficial do produto", f"{official_product_candidate_id or '-'} | {official_profile_label}"),
+            _guidance_card("Escolha manual atual", f"{selected_candidate_id or '-'} | {selected_state_label}. {manual_choice_signal}"),
+            _guidance_card("Runner-up ainda importa porque", runner_up_signal if runner_up_id else "Ainda não há contraste suficiente para pressionar a decisão."),
+            _guidance_card("O que a revisão humana precisa observar", human_review_signal),
+        ]
+    )
     return html.Div(
         children=[
             html.Div("Leitura principal da decisão", style={"fontSize": "12px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
@@ -6999,18 +7020,10 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
                 id="decision-decision-strip",
                 style={**UI_MUTED_CARD_STYLE, "padding": "12px", "marginBottom": "12px"},
                 children=[
-                    html.Div("Faixa decisória operacional", style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
+                    html.Div(decision_strip_title, style={"fontSize": "11px", "textTransform": "uppercase", "letterSpacing": "0.12em", "color": "#5b756d"}),
                     html.Div(
                         style={**UI_TWO_COLUMN_STYLE, "gridTemplateColumns": "repeat(auto-fit, minmax(220px, 1fr))", "marginTop": "8px"},
-                        children=[
-                            _guidance_card("Referência oficial do produto", f"{official_product_candidate_id or '-'} | {official_profile_label}"),
-                            _guidance_card("Escolha manual atual", f"{selected_candidate_id or '-'} | {selected_state_label}. {manual_choice_signal}"),
-                            _guidance_card("Runner-up ainda importa porque", runner_up_signal if runner_up_id else "Ainda não há contraste suficiente para pressionar a decisão."),
-                            _guidance_card(
-                                "O que está empatado" if decision_status == "technical_tie" else "O que a revisão humana precisa observar",
-                                technical_tie_reason if decision_status == "technical_tie" else human_review_signal,
-                            ),
-                        ],
+                        children=decision_strip_cards,
                     ),
                 ],
             ),
@@ -7265,7 +7278,7 @@ def render_decision_contrast_panel(summary: dict[str, Any]) -> Any:
     contrast_summary = (
         str(decision_mode["comparison_guidance"])
         if decision_mode["key"] == "winner_infeasible"
-        else f"Winner e runner-up seguem tecnicamente empatados porque {tie_operational_reason}"
+        else "Empate técnico ativo; a comparação principal continua assistida."
         if decision_status == "technical_tie"
         else "O runner-up segue como melhor alternativa comparável, mas abaixo da escolha oficial no ranking."
     )
@@ -7314,7 +7327,7 @@ def render_decision_contrast_panel(summary: dict[str, Any]) -> Any:
                         style={"lineHeight": "1.6", "marginTop": "6px"},
                     ),
                     _bullet_list(
-                        tie_dimensions[:3],
+                        tie_dimensions[1:4] if decision_status == "technical_tie" else tie_dimensions[:3],
                         "Os scores e trade-offs principais continuam próximos o suficiente para justificar a comparação aberta."
                         if decision_status == "technical_tie"
                         else "Sem dimensão adicional relevante para technical tie.",
@@ -7323,7 +7336,10 @@ def render_decision_contrast_panel(summary: dict[str, Any]) -> Any:
                     html.Div(profile_tradeoff_summary, style={"lineHeight": "1.6", "marginBottom": "10px"}),
                     html.Div(id="decision-profile-tradeoff-panel", style={**UI_TWO_COLUMN_STYLE, "marginBottom": "12px"}, children=_render_decision_tradeoff_cards(profile_views)),
                     html.H4("Diferenças relevantes", style={"marginBottom": "6px"}),
-                    _bullet_list(difference_lines[:4], "Sem diferença relevante registrada."),
+                    _bullet_list(
+                        difference_lines[1:4] if decision_status == "technical_tie" else difference_lines[:4],
+                        "Sem diferença relevante registrada.",
+                    ),
                 ],
             ),
         ]

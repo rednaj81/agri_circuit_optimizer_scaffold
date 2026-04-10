@@ -57,6 +57,7 @@ def _collect_text(component: object) -> str:
                 "Runner-up sob revisão",
                 "Confirmar decisão assistida",
                 "Decisão liberada",
+                "Decisão pronta para confirmar",
             ],
         ),
         (
@@ -74,6 +75,7 @@ def _collect_text(component: object) -> str:
                 "Explícito",
                 "Fechar escolha assistida",
                 "Empate técnico em revisão",
+                "Empate técnico assistido",
                 "O que está empatado",
             ],
         ),
@@ -85,6 +87,7 @@ def _collect_text(component: object) -> str:
                 "Runner-up ainda indisponível",
                 "Recuperar execução em Runs",
                 "Passagem Runs -> Decisão",
+                "Decisão bloqueada",
             ],
         ),
         (
@@ -102,6 +105,7 @@ def _collect_text(component: object) -> str:
                 "rota obrigatória não conseguiu fechar",
                 "Bloqueio operacional",
                 "Runner-up sob revisão",
+                "Decisão bloqueada",
             ],
         ),
     ],
@@ -114,7 +118,6 @@ def test_decision_workspace_first_fold_surfaces_primary_decision_states(summary:
     assert _find_component_by_id(panel, "decision-workspace-state-hero") is not None
     assert _find_component_by_id(panel, "decision-workspace-state-rail") is not None
     assert "Leitura principal da decisão" in panel_text
-    assert "Faixa decisória operacional" in panel_text
     assert "Comparação assistida e contexto" in panel_text
     for fragment in expected_fragments:
         assert fragment in panel_text
@@ -162,7 +165,7 @@ def test_technical_tie_state_keeps_assisted_language_across_secondary_panels() -
 
     assert "o que está empatado" in workspace_text.lower()
     assert "registre o critério humano do empate" in workspace_text.lower()
-    assert "seguem tecnicamente empatados porque" in contrast_text.lower()
+    assert "comparação principal continua assistida" in contrast_text.lower()
     assert "o que está empatado" in contrast_text.lower()
     assert "a leitura continua em modo assistido" in signal_text.lower()
     assert "technical tie ativo; exporte apenas como decisão assistida" in justification_text.lower()

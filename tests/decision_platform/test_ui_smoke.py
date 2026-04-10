@@ -2421,9 +2421,7 @@ def test_decision_workspace_panel_makes_winner_runner_up_and_tie_legible() -> No
     assert "Technical tie" in panel_text
     assert "Explícito" in panel_text
     assert "Technical tie explícito" in panel_text
-    assert "Faixa decisória operacional" in panel_text
-    assert "Referência oficial do produto" in panel_text
-    assert "Runner-up ainda importa porque" in panel_text
+    assert "Empate técnico assistido" in panel_text
     assert "Escolha manual atual" in panel_text
     assert "O que está empatado" in panel_text
     assert "empatados em custo global e leitura operacional principal" in panel_text
@@ -2650,6 +2648,7 @@ def test_primary_decision_panels_hide_raw_metric_keys_in_main_surface() -> None:
     assert "decisão humana assistida" in contrast_text.lower()
     assert "Technical tie e trade-offs" in contrast_text
     assert "O que está empatado" in contrast_text
+    assert "comparação principal continua assistida" in contrast_text.lower()
     assert "vencedor e runner-up ficaram empatados" in contrast_text.lower()
     assert "Perfis diferentes estão puxando winners diferentes" in contrast_text
     assert "`" not in decision_text
