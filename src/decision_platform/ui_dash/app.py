@@ -7084,14 +7084,31 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
         if candidate_id
         else "Sem contraste executivo"
     )
+    primary_difference_label = (
+        "Diferença principal em aberto"
+        if decision_status == "technical_tie"
+        else "Diferença principal bloqueada"
+        if summary.get("feasible") is False
+        else "Diferença principal agora"
+        if candidate_id
+        else "Diferença principal indisponível"
+    )
+    primary_difference_signal = (
+        "Ainda não existe contraste suficiente entre winner e runner-up para sustentar a leitura principal desta decisão."
+        if not candidate_id
+        else f"{_humanize_decision_copy(summary.get('infeasibility_reason'))}. {runner_up_signal}"
+        if summary.get("feasible") is False
+        else technical_tie_reason
+        if decision_status == "technical_tie"
+        else _humanize_decision_copy(comparison_difference)
+    )
     comparison_open_signal = (
         technical_tie_reason
         if decision_status == "technical_tie"
         else f"{runner_up_signal} {risk_value}: {risk_note}"
     )
-    decision_strip_title = "Fluxo assistido desta decisão"
+    decision_strip_title = "Aprofundar se precisar"
     decision_strip_cards = [
-        _guidance_card("Próxima ação humana", next_action_signal),
         _guidance_card(
             "Comparação em aberto",
             f"{candidate_id or '-'} vs {runner_up_id or '-'} | {comparison_open_signal}",
@@ -7132,8 +7149,8 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
                                 style={**UI_THREE_COLUMN_STYLE, "marginTop": "14px"},
                                 children=[
                                     _signal_card("Passagem Runs -> Decisão", decision_gate_label, transition_signal, tone=hero_tone),
-                                    _signal_card("Technical tie", tie_label, "A revisão humana continua aberta." if decision_status == "technical_tie" else "Sem empate técnico ativo nesta leitura.", tone=hero_tone),
-                                    _signal_card("Leitura humana observa", review_priority_label, f"{human_review_signal} Perfil em leitura: {active_profile_label or '-'} | Perfil oficial: {official_profile_label}.", tone=hero_tone),
+                                    _signal_card("Estado comparativo", review_priority_label, primary_difference_signal, tone=hero_tone),
+                                    _signal_card("Próxima ação humana", primary_action_label, f"{next_action_signal} Perfil em leitura: {active_profile_label or '-'} | Perfil oficial: {official_profile_label}.", tone=hero_tone),
                                 ],
                             ),
                         ],
@@ -7144,7 +7161,7 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
                         children=[
                             _compact_value_card(winner_primary_label, candidate_id or "Sem winner", winner_short_reason, accent="#d7e5c1"),
                             _compact_value_card(runner_up_primary_label, runner_up_id or "Sem runner-up", runner_up_primary_note, accent="#f0d99f" if decision_status == "technical_tie" else None),
-                            _signal_card("Próxima ação segura", primary_action_label, next_action_signal, tone=hero_tone),
+                            _compact_value_card(primary_difference_label, comparison_signal, primary_difference_signal, accent="#d7d3c8"),
                         ],
                     ),
                 ],

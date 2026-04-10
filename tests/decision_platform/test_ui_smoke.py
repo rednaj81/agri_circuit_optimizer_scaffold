@@ -1985,7 +1985,8 @@ def test_studio_runs_decision_primary_journey_uses_consistent_transition_languag
     assert "resultado utilizável" in studio_text.lower()
     assert "resultado utilizável" in runs_text.lower()
     assert "resultado utilizável" not in decision_text.lower() or "decisão" in decision_text.lower()
-    assert "Leitura humana" in decision_text
+    assert "Próxima ação humana" in decision_text
+    assert "Estado comparativo" in decision_text
     assert "confirmação final" in decision_text.lower()
     assert "Confirmar decisão final" in decision_text
     assert "Winner oficial agora" in decision_text
@@ -2634,11 +2635,9 @@ def test_decision_workspace_panel_makes_winner_runner_up_and_tie_legible() -> No
     assert "Passagem Runs -> Decisão" in panel_text
     assert "Winner sugerido agora" in panel_text
     assert "Runner-up ainda comparável" in panel_text
-    assert "Próxima ação segura" in panel_text
-    assert "Technical tie" in panel_text
-    assert "Explícito" in panel_text
-    assert "Technical tie explícito" in panel_text
-    assert "Fluxo assistido desta decisão" in panel_text
+    assert "Diferença principal em aberto" in panel_text
+    assert "Empate técnico em revisão" in panel_text
+    assert "Aprofundar se precisar" in panel_text
     assert "Próxima ação humana" in panel_text
     assert "Comparação em aberto" in panel_text
     assert "Exportação assistida" in panel_text
@@ -2677,7 +2676,7 @@ def test_decision_workspace_panel_blocks_primary_choice_without_usable_result() 
     assert "Recuperar execução em Runs" in panel_text
     assert "A Decisão permanece aberta apenas como leitura bloqueada" in panel_text
     assert "Voltar para Runs" in panel_text
-    assert "volte para runs antes de qualquer escolha manual" in panel_text.lower()
+    assert "volte para runs, confirme uma execução concluída e retorne quando existir resultado comparável" in panel_text.lower()
 
 
 def test_decision_workspace_panel_surfaces_infeasible_winner_as_blocked_state() -> None:

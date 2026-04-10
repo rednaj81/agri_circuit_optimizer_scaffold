@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from decision_platform.ui_dash.app import (
@@ -59,7 +61,8 @@ def _collect_text(component: object) -> str:
                 "Decisão liberada",
                 "Decisão pronta para confirmar",
                 "Próxima ação humana",
-                "Fluxo assistido desta decisão",
+                "Diferença principal agora",
+                "Aprofundar se precisar",
             ],
         ),
         (
@@ -73,14 +76,13 @@ def _collect_text(component: object) -> str:
             },
             [
                 "Empate técnico",
-                "Technical tie",
-                "Explícito",
                 "Fechar escolha assistida",
                 "Empate técnico em revisão",
                 "Empate técnico assistido",
                 "Winner sugerido agora",
                 "Runner-up ainda comparável",
                 "Próxima ação humana",
+                "Diferença principal em aberto",
                 "Comparação em aberto",
             ],
         ),
@@ -93,6 +95,7 @@ def _collect_text(component: object) -> str:
                 "Recuperar execução em Runs",
                 "Passagem Runs -> Decisão",
                 "Decisão bloqueada",
+                "Diferença principal indisponível",
             ],
         ),
         (
@@ -111,6 +114,7 @@ def _collect_text(component: object) -> str:
                 "Bloqueio operacional",
                 "Runner-up sob revisão",
                 "Decisão bloqueada",
+                "Diferença principal bloqueada",
             ],
         ),
     ],
@@ -123,7 +127,7 @@ def test_decision_workspace_first_fold_surfaces_primary_decision_states(summary:
     assert _find_component_by_id(panel, "decision-workspace-state-hero") is not None
     assert _find_component_by_id(panel, "decision-workspace-state-rail") is not None
     assert "Leitura principal da decisão" in panel_text
-    assert "Fluxo assistido desta decisão" in panel_text
+    assert "Aprofundar se precisar" in panel_text
     for fragment in expected_fragments:
         assert fragment in panel_text
 
@@ -137,6 +141,20 @@ def test_phase4_open_doc_inherits_phase3_evidence_blocker_honestly() -> None:
     assert "ux_phase_4" in open_text
     assert "blocked_on_evidence" in open_text
     assert "ux_phase_3" in open_text
+
+
+@pytest.mark.fast
+def test_wave8_snapshot_keeps_inherited_evidence_blocker_visible() -> None:
+    from pathlib import Path
+
+    snapshot = json.loads(Path("docs/2026-04-10_phase_ux_refinement_wave8_ui_snapshot.json").read_text(encoding="utf-8"))
+
+    assert snapshot["phase_id"] == "phase_ux_refinement"
+    assert snapshot["ux_phase_id"] == "ux_phase_4"
+    assert snapshot["wave_index"] == 8
+    assert "ux_phase_3=blocked_on_evidence" in snapshot["inherited_constraints"]
+    assert snapshot["scenarios"]["technical_tie"]["contains"]["primary_difference"] is True
+    assert snapshot["scenarios"]["technical_tie"]["contains"]["next_human_action"] is True
 
 
 @pytest.mark.fast
@@ -182,6 +200,7 @@ def test_technical_tie_state_keeps_assisted_language_across_secondary_panels() -
     assert "winner sugerido agora" in workspace_text.lower()
     assert "runner-up ainda comparável" in workspace_text.lower()
     assert "escolha final humana" in workspace_text.lower()
+    assert "diferença principal em aberto" in workspace_text.lower()
     assert "registre o critério humano do empate" in workspace_text.lower()
     assert "registrar a escolha humana final" in workspace_text.lower()
     assert "exporte apenas como decisão assistida" in workspace_text.lower()
