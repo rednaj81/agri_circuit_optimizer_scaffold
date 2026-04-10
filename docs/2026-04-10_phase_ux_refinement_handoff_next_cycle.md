@@ -1,18 +1,18 @@
 # Next Cycle Handoff
 
-## Recommended next phase
+## Active next phase
 
-Proceed to `ux_phase_4`, carrying `ux_phase_3=blocked_on_evidence` as an explicit environmental blocker.
+`ux_phase_4` is now the active UX phase.
 
-## Why now
+## Carry-forward constraints
 
-- `ux_phase_3` already communicates queue readability, run states, progress, run detail, and scenario-versus-run separation at product level.
-- The remaining gap is not a Runs comprehension problem; it is evidence quality under the current browser-launch restrictions.
-- The next product-facing value is in `ux_phase_4`: winner, runner-up, and technical tie clarity in `Decisão`.
+- Keep `ux_phase_3=blocked_on_evidence` explicit.
+- Do not reopen the functional scope of Studio or Runs to compensate for that blocker.
+- Treat the blocker as inherited governance context while the product work moves into Decision.
 
-## Carry-forward note
+## Immediate focus
 
-- Keep the current Studio local-fix strip hierarchy as the baseline.
-- Preserve the explicit business-flow reading in the Studio primary surface.
-- Preserve the compact operational reading in Runs.
-- Treat native browser capture as a `blocked_on_evidence` environment blocker to document honestly, not as a reason to reopen phase-3 architecture or UX scope.
+- Winner visibility
+- Runner-up visibility
+- Technical tie support
+- Human assisted final choice

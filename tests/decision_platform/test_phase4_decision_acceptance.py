@@ -58,8 +58,8 @@ def _collect_text(component: object) -> str:
                 "Confirmar decisão final",
                 "Decisão liberada",
                 "Decisão pronta para confirmar",
-                "Recomendação automática",
-                "Escolha final humana",
+                "Próxima ação humana",
+                "Fluxo assistido desta decisão",
             ],
         ),
         (
@@ -80,8 +80,8 @@ def _collect_text(component: object) -> str:
                 "Empate técnico assistido",
                 "Winner sugerido agora",
                 "Runner-up ainda comparável",
-                "Escolha final humana",
-                "O que está empatado",
+                "Próxima ação humana",
+                "Comparação em aberto",
             ],
         ),
         (
@@ -123,9 +123,20 @@ def test_decision_workspace_first_fold_surfaces_primary_decision_states(summary:
     assert _find_component_by_id(panel, "decision-workspace-state-hero") is not None
     assert _find_component_by_id(panel, "decision-workspace-state-rail") is not None
     assert "Leitura principal da decisão" in panel_text
-    assert "Comparação assistida e contexto" in panel_text
+    assert "Fluxo assistido desta decisão" in panel_text
     for fragment in expected_fragments:
         assert fragment in panel_text
+
+
+@pytest.mark.fast
+def test_phase4_open_doc_inherits_phase3_evidence_blocker_honestly() -> None:
+    from pathlib import Path
+
+    open_text = Path("docs/2026-04-10_phase_ux_refinement_phase4_open.md").read_text(encoding="utf-8")
+
+    assert "ux_phase_4" in open_text
+    assert "blocked_on_evidence" in open_text
+    assert "ux_phase_3" in open_text
 
 
 @pytest.mark.fast
@@ -171,7 +182,6 @@ def test_technical_tie_state_keeps_assisted_language_across_secondary_panels() -
     assert "winner sugerido agora" in workspace_text.lower()
     assert "runner-up ainda comparável" in workspace_text.lower()
     assert "escolha final humana" in workspace_text.lower()
-    assert "o que está empatado" in workspace_text.lower()
     assert "registre o critério humano do empate" in workspace_text.lower()
     assert "registrar a escolha humana final" in workspace_text.lower()
     assert "exporte apenas como decisão assistida" in workspace_text.lower()

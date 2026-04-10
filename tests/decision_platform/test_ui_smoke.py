@@ -2632,16 +2632,16 @@ def test_decision_workspace_panel_makes_winner_runner_up_and_tie_legible() -> No
     assert "Leitura principal da decisão" in panel_text
     assert "Estado decisório agora" in panel_text
     assert "Passagem Runs -> Decisão" in panel_text
-    assert "Winner oficial agora" in panel_text
-    assert "Runner-up sob revisão" in panel_text
+    assert "Winner sugerido agora" in panel_text
+    assert "Runner-up ainda comparável" in panel_text
     assert "Próxima ação segura" in panel_text
     assert "Technical tie" in panel_text
     assert "Explícito" in panel_text
     assert "Technical tie explícito" in panel_text
-    assert "Escolha humana e exportação" in panel_text
-    assert "Escolha final humana" in panel_text
-    assert "Risco dominante" in panel_text
-    assert "Comparação aberta" in panel_text
+    assert "Fluxo assistido desta decisão" in panel_text
+    assert "Próxima ação humana" in panel_text
+    assert "Comparação em aberto" in panel_text
+    assert "Exportação assistida" in panel_text
     assert "empatados em custo global e leitura operacional principal" in panel_text
     assert "cand-04" in panel_text
     assert "confirme o critério humano antes de liberar a exportação assistida" in panel_text.lower()
@@ -2657,6 +2657,14 @@ def test_decision_workspace_panel_makes_winner_runner_up_and_tie_legible() -> No
     assert _find_component_by_id(panel, "decision-profile-views-panel") is not None
     assert _find_component_by_id(panel, "decision-final-comparison-panel") is not None
     assert _find_component_by_id(panel, "decision-final-choice-panel") is not None
+
+
+def test_phase4_open_doc_keeps_phase3_blocked_status_visible_during_transition() -> None:
+    open_text = Path("docs/2026-04-10_phase_ux_refinement_phase4_open.md").read_text(encoding="utf-8")
+
+    assert "ux_phase_4" in open_text
+    assert "blocked_on_evidence" in open_text
+    assert "ux_phase_3" in open_text
 
 
 def test_decision_workspace_panel_blocks_primary_choice_without_usable_result() -> None:
@@ -2693,7 +2701,7 @@ def test_decision_workspace_panel_surfaces_infeasible_winner_as_blocked_state() 
     assert "rota obrigatória não conseguiu fechar" in panel_text
     assert "Existe ranking visível, mas a decisão principal segue bloqueada" in panel_text
     assert "Runner-up sob revisão" in panel_text
-    assert "não exporte enquanto o winner oficial permanecer bloqueado" in panel_text.lower()
+    assert "exportação bloqueada enquanto o winner em leitura seguir inviável" in panel_text.lower()
 
 
 def test_runs_flow_panel_enables_decision_only_with_usable_execution_result() -> None:

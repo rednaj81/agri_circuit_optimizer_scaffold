@@ -7036,7 +7036,7 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
         if not candidate_id
         else "Volte para Runs e corrija o bloqueio antes de oficializar ou exportar."
         if summary.get("feasible") is False
-        else "Mantenha winner e runner-up lado a lado, registre o critério humano do empate e só então libere a exportação assistida."
+        else "Mantenha winner e runner-up lado a lado, registre o critério humano do empate e confirme o critério humano antes de liberar a exportação assistida."
         if decision_status == "technical_tie"
         else "Revise runner-up e escolha manual antes de exportar."
         if selected_candidate_id and selected_candidate_id != official_product_candidate_id
@@ -7053,9 +7053,27 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
         if summary.get("feasible") is False
         else "ready"
     )
-    decision_gate_label = "Bloqueada" if not candidate_id or summary.get("feasible") is False else "Leitura principal aberta"
-    winner_primary_label = "Winner oficial agora" if candidate_id else "Winner oficial indisponível"
-    runner_up_primary_label = "Runner-up sob revisão" if runner_up_id else "Runner-up ainda indisponível"
+    decision_gate_label = (
+        "Decisão bloqueada"
+        if not candidate_id or summary.get("feasible") is False
+        else "Empate técnico assistido"
+        if decision_status == "technical_tie"
+        else "Decisão pronta para confirmar"
+    )
+    winner_primary_label = (
+        "Winner sugerido agora"
+        if candidate_id and decision_status == "technical_tie"
+        else "Winner oficial agora"
+        if candidate_id
+        else "Winner oficial indisponível"
+    )
+    runner_up_primary_label = (
+        "Runner-up ainda comparável"
+        if runner_up_id and decision_status == "technical_tie"
+        else "Runner-up sob revisão"
+        if runner_up_id
+        else "Runner-up ainda indisponível"
+    )
     runner_up_primary_note = runner_up_signal if runner_up_id else "Ainda não existe runner-up comparável para sustentar contraste suficiente nesta dobra."
     review_priority_label = (
         "Empate técnico em revisão"
@@ -7066,15 +7084,19 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
         if candidate_id
         else "Sem contraste executivo"
     )
-    decision_strip_title = "Escolha humana e exportação"
+    comparison_open_signal = (
+        technical_tie_reason
+        if decision_status == "technical_tie"
+        else f"{runner_up_signal} {risk_value}: {risk_note}"
+    )
+    decision_strip_title = "Fluxo assistido desta decisão"
     decision_strip_cards = [
-        _guidance_card("Escolha final humana", f"{selected_candidate_id or '-'} | {manual_choice_signal}"),
-        _guidance_card("Exportação", export_guidance),
-        _guidance_card("Risco dominante", f"{risk_value} | {risk_note}"),
+        _guidance_card("Próxima ação humana", next_action_signal),
         _guidance_card(
-            "Comparação aberta",
-            technical_tie_reason if decision_status == "technical_tie" else _humanize_decision_copy(comparison_difference),
+            "Comparação em aberto",
+            f"{candidate_id or '-'} vs {runner_up_id or '-'} | {comparison_open_signal}",
         ),
+        _guidance_card("Exportação assistida", export_guidance),
     ]
     return html.Div(
         children=[
