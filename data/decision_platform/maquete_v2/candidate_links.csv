@@ -9,8 +9,8 @@ L007,I,J4,tank_tap,0.2,1,"bus,hybrid",0,tap_I,Tap I
 L008,IR,J4,service_tap,0.1,1,"bus,hybrid,loop",0,tap_IR,Tap IR
 L009,W,J1,supply_tap,0.3,1,"bus,hybrid",0,tap_W_lower,Água para barramento inferior
 L010,W,U1,supply_tap,0.15,1,"bus,loop,hybrid",0,tap_W_upper,Água para bypass superior
-L011,S,J4,outlet_tap,0.2,1,"bus,hybrid",0,tap_S_lower,Saída via barramento inferior
-L012,S,U3,outlet_tap,0.18,1,"bus,loop,hybrid",0,tap_S_upper,Saída via barramento superior
+L011,J4,S,outlet_tap,0.2,1,"bus,hybrid",0,tap_S_lower,Saída via barramento inferior
+L012,U3,S,outlet_tap,0.18,1,"bus,loop,hybrid",0,tap_S_upper,Saída via barramento superior
 L013,J1,J2,bus_segment,0.2,1,"bus,hybrid",0,bus_1,Barramento inferior 1
 L014,J2,J3,pump_island_segment,0.2,1,"bus,hybrid",0,bus_2,Barramento com ilha bomba
 L015,J3,J4,pump_island_segment,0.2,1,"bus,hybrid",0,bus_3,Barramento com ilha bomba

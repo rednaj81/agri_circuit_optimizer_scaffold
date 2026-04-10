@@ -232,7 +232,7 @@ def test_dash_app_surfaces_only_four_primary_product_spaces() -> None:
     assert _find_component_by_id(app.layout, "product-space-switcher-runs-link") is not None
     assert _find_component_by_id(app.layout, "product-space-switcher-decision-link") is not None
     assert _find_component_by_id(app.layout, "product-space-switcher-audit-link") is not None
-    assert getattr(_find_component_by_id(app.layout, "product-space-banner"), "style", {}).get("position") == "sticky"
+    assert getattr(_find_component_by_id(app.layout, "product-space-banner"), "style", {}).get("display") == "none"
     assert _find_component_by_id(app.layout, "hero-open-studio-link") is not None
     assert _find_component_by_id(app.layout, "hero-open-runs-link") is not None
     assert _find_component_by_id(app.layout, "hero-open-decision-link") is not None
@@ -323,7 +323,7 @@ def test_studio_initial_edge_focus_is_visible_and_not_null() -> None:
     assert getattr(edge_store, "data", None)
     assert str(getattr(edge_store, "data", "")).startswith("route:")
     banner_text = _collect_text_content(banner)
-    assert "Trecho fixado no Studio" in banner_text
+    assert "Trocar trecho em foco" in banner_text
     assert "route:R001" not in banner_text
 
 
@@ -501,10 +501,12 @@ def test_shell_chrome_compacts_studio_and_decision_first_fold() -> None:
 
     assert studio_styles[0]["padding"] == "14px 16px"
     assert studio_styles[1]["display"] == "none"
-    assert studio_styles[2]["padding"] == "12px 14px"
+    assert studio_styles[2]["display"] == "none"
     assert decision_styles[1]["display"] == "none"
+    assert decision_styles[2]["display"] == "none"
     assert runs_styles[0]["padding"] == "20px"
     assert runs_styles[1].get("display") != "none"
+    assert runs_styles[2]["display"] == "none"
 
 
 def test_product_space_banner_callback_tracks_active_primary_tab() -> None:
@@ -631,7 +633,8 @@ def test_studio_tab_surfaces_readiness_and_selection_context() -> None:
     assert _find_component_by_id(studio_tab, "studio-focus-open-workbench-button") is not None
     assert getattr(_find_component_by_id(studio_tab, "studio-context-detailed-panels"), "open", None) is False
     assert getattr(_find_component_by_id(studio_tab, "studio-workspace-supply-strip"), "open", None) is False
-    assert getattr(_find_component_by_id(studio_tab, "studio-business-flow-panel"), "open", None) is False
+    assert _find_component_by_id(studio_tab, "studio-business-flow-panel") is not None
+    assert getattr(_find_component_by_id(studio_tab, "studio-business-flow-panel"), "style", {}).get("display") == "none"
 
 
 def test_studio_canvas_guidance_panel_keeps_canvas_as_primary_entry() -> None:
@@ -667,12 +670,9 @@ def test_studio_canvas_guidance_panel_keeps_canvas_as_primary_entry() -> None:
     without_focus_text = _collect_text_content(panel_without_focus)
     with_edge_focus_text = _collect_text_content(panel_with_edge_focus)
 
-    assert "Comece pelo canvas" in without_focus_text
     assert "Nenhum foco ativo no canvas." in without_focus_text
-    assert "Bloqueio ou liberação local" in without_focus_text
     assert "Clique em uma entidade ou conexão do grafo" in without_focus_text
-    assert "Gate para Runs" in without_focus_text
-    assert "Cadeia visível neste foco" in without_focus_text
+    assert "Ainda há bloqueios estruturais impedindo a passagem segura para Runs." in without_focus_text
     assert "Abrir bancada completa" in without_focus_text
     assert "Trecho em foco: Bomba principal para Misturador" in with_edge_focus_text
     assert "Trocar trecho sugerido" in with_edge_focus_text
@@ -687,7 +687,7 @@ def test_studio_canvas_guidance_panel_keeps_canvas_as_primary_entry() -> None:
     assert "Quem supre este foco" in with_edge_focus_text
     assert "Quem este foco supre" in with_edge_focus_text
     assert "Rota em preparo" in with_edge_focus_text
-    assert "Ver trechos legíveis deste foco" in with_edge_focus_text
+    assert "Ver detalhes deste foco" in with_edge_focus_text
     assert "route:R001" not in with_edge_focus_text
 
 
@@ -820,17 +820,11 @@ def test_studio_workspace_panel_unifies_focus_connectivity_and_runs_gate() -> No
     )
     panel_text = _collect_text_content(panel)
 
-    assert "Leitura do cenário" in panel_text
-    assert "Contexto dominante do Studio" in panel_text
-    assert "Agora no Studio" in panel_text
-    assert "Próxima ação" in panel_text
-    assert "Passagem para Runs" in panel_text
-    assert "Ações contextuais deste foco" in panel_text
-    assert "Intenção desta rota no foco" in panel_text
-    assert "Cadeia de suprimento e saída do Studio" in panel_text
-    assert "Quem supre quem neste foco" in panel_text
-    assert "A conexão L900 termina em Tanque de água" in panel_text
-    assert "Cadeia visível deste foco" in panel_text
+    assert "Ação imediata" in panel_text
+    assert "Ações rápidas" in panel_text
+    assert "Intenção da rota" in panel_text
+    assert "Há uma conexão terminando em Tanque de água" in panel_text
+    assert "Ver detalhes deste foco" in panel_text
     assert "Bomba principal" in panel_text
     assert "Ajustes locais do canvas" in panel_text
     assert "Ajustes finos do foco" in panel_text
@@ -838,13 +832,12 @@ def test_studio_workspace_panel_unifies_focus_connectivity_and_runs_gate() -> No
     assert "Impacto previsto" in panel_text
     assert "Corrigir no canvas" in panel_text
     assert "Runs bloqueado neste estado" in panel_text
-    assert "Sinal de saída desta área" in panel_text
     assert getattr(_find_component_by_id(panel, "studio-workspace-open-runs-button"), "disabled", None) is True
     assert _find_component_by_id(panel, "studio-business-flow-panel") is not None
     assert _find_component_by_id(panel, "studio-workspace-supply-rail") is not None
     assert _find_component_by_id(panel, "studio-workspace-supply-strip") is not None
     assert getattr(_find_component_by_id(panel, "studio-workspace-supply-strip"), "open", None) is False
-    assert getattr(_find_component_by_id(panel, "studio-business-flow-panel"), "open", None) is False
+    assert getattr(_find_component_by_id(panel, "studio-business-flow-panel"), "style", {}).get("display") == "none"
     assert _find_component_by_id(panel, "studio-focus-node-label") is not None
     assert _find_component_by_id(panel, "studio-focus-node-apply-button") is not None
     assert _find_component_by_id(panel, "studio-focus-edge-length-m") is not None
@@ -904,14 +897,11 @@ def test_studio_workspace_panel_promotes_direct_measurement_fix_in_primary_conte
     desirable_button = _find_component_by_id(panel, "studio-workspace-intent-desirable-button")
 
     assert "Exigir medição direta" in panel_text
-    assert "Ação local prioritária" in panel_text
-    assert "Sem workbench" in panel_text
+    assert "Ação imediata" in panel_text
     assert "Corrigir medição agora" in panel_text
     assert "Tanque de água supre Misturador" in panel_text
-    assert "Próxima ação" in panel_text
-    assert "Disponível agora neste trecho com dosagem." in panel_text
+    assert "Ainda há bloqueios estruturais impedindo a passagem segura para Runs." in panel_text
     assert "Corrigir no canvas" not in local_fix_text
-    assert "Use estes botões para reclassificar a rota em foco sem abrir a bancada completa." in panel_text
     assert "Obrigatória" in panel_text
     assert "Desejável" in panel_text
     assert "Opcional" in panel_text
@@ -953,13 +943,9 @@ def test_studio_workspace_panel_keeps_context_actions_discoverable_when_not_appl
     )
     panel_text = _collect_text_content(panel)
 
-    assert "Ações contextuais deste foco" in panel_text
-    assert "Intenção desta rota no foco" in panel_text
-    assert "Selecione uma conexão do canvas para revisar medição direta." in panel_text
-    assert "Selecione uma conexão do canvas para criar uma rota a partir dela." in panel_text
-    assert "Selecione uma conexão do canvas para revisar a direção deste trecho." in panel_text
-    assert "Selecione um trecho com rota em foco para liberar o ajuste direto de intenção." in panel_text
-    assert "Passagem para Runs" in panel_text
+    assert "Ações rápidas" in panel_text
+    assert "Intenção da rota" in panel_text
+    assert "Remova o bloqueio dominante do Studio antes de seguir para Runs." in panel_text
     assert "Corrigir no canvas" in panel_text
     assert getattr(_find_component_by_id(panel, "studio-workspace-require-measurement-button"), "disabled", None) is True
     assert getattr(_find_component_by_id(panel, "studio-workspace-create-route-button"), "disabled", None) is True
@@ -1008,9 +994,8 @@ def test_studio_workspace_panel_surfaces_local_reverse_fix_in_primary_strip() ->
     local_reverse_button = _find_component_by_id(panel, "studio-workspace-apply-local-reverse-button")
     local_measurement_button = _find_component_by_id(panel, "studio-workspace-apply-local-fix-button")
 
-    assert "Ação local prioritária" in panel_text
+    assert "Ação imediata" in panel_text
     assert "Inverter trecho agora" in panel_text
-    assert "Tanque de água passa a suprir Bomba principal" in panel_text
     assert "Criar rota deste trecho agora" not in local_fix_text
     assert local_reverse_button is not None
     assert getattr(local_reverse_button, "disabled", None) is False
@@ -1050,11 +1035,10 @@ def test_studio_workspace_panel_keeps_priority_heading_consistent_between_strip_
     panel_text = _collect_text_content(panel)
     local_fix_text = _collect_text_content(_find_component_by_id(panel, "studio-workspace-local-fix-strip"))
 
-    assert "Ação local prioritária" in panel_text
-    assert "Ação local prioritária" in local_fix_text
+    assert "Ação imediata" in panel_text
+    assert "Ação imediata" in local_fix_text
     assert "Corrigir medição agora" in local_fix_text
-    assert "Tanque de água" in local_fix_text
-    assert "Misturador" in local_fix_text
+    assert "Aplique a ação direta deste trecho antes de recorrer à bancada completa." in local_fix_text
 
 
 def test_studio_primary_canvas_hides_internal_and_hub_nodes() -> None:
@@ -1398,7 +1382,7 @@ def test_studio_readiness_panel_humanizes_primary_blockers_and_warnings() -> Non
     )
     panel_text = _collect_text_content(panel)
 
-    assert "A conexão L900 termina em Tanque de água" in panel_text
+    assert "Há uma conexão terminando em Tanque de água" in panel_text
     assert "Há rotas com dosagem sem medição direta compatível: Tanque de água para Misturador." in panel_text
     assert "Ainda existem entidades sem conexão na leitura principal do grafo: Produto 3." in panel_text
     assert "Bloqueado no Studio" in panel_text
@@ -2508,7 +2492,7 @@ def test_readiness_action_callback_brings_blocker_into_canvas_focus() -> None:
 
     assert next_node_id == "P1"
     assert next_edge_id == "L900"
-    assert "A conexão L900 termina em Tanque de água" in status
+    assert "Há uma conexão terminando em Tanque de água" in status
     assert "inversão de direção" in status
 
 
