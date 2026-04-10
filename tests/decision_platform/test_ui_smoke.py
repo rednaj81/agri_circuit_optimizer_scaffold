@@ -2392,6 +2392,7 @@ def test_decision_workspace_panel_makes_winner_runner_up_and_tie_legible() -> No
             "active_profile_id": "min_cost",
             "official_profile_id": "balanced",
             "official_product_candidate_id": "cand-03",
+            "key_factors": [{"summary": "winner e runner-up seguem empatados em custo global e leitura operacional principal."}],
             "profile_views": [
                 {"profile_id": "min_cost", "candidate_id": "cand-01", "runner_up_candidate_id": "cand-02", "technical_tie": False, "feasible": True, "topology_family": "loop_ring", "score_margin_delta": 0.2},
                 {"profile_id": "balanced", "candidate_id": "cand-03", "runner_up_candidate_id": "cand-02", "technical_tie": True, "feasible": True, "topology_family": "hybrid_free", "score_margin_delta": 0.0},
@@ -2421,13 +2422,14 @@ def test_decision_workspace_panel_makes_winner_runner_up_and_tie_legible() -> No
     assert "Explícito" in panel_text
     assert "Technical tie explícito" in panel_text
     assert "Faixa decisória operacional" in panel_text
-    assert "O que a revisão humana precisa observar" in panel_text
     assert "Referência oficial do produto" in panel_text
     assert "Runner-up ainda importa porque" in panel_text
     assert "Escolha manual atual" in panel_text
+    assert "O que está empatado" in panel_text
+    assert "empatados em custo global e leitura operacional principal" in panel_text
     assert "cand-04" in panel_text
-    assert "confirme o contraste antes de substituir a referência oficial" in panel_text.lower()
-    assert "revise runner-up e escolha manual antes de exportar" in panel_text.lower()
+    assert "confirme o critério humano antes de liberar a exportação assistida" in panel_text.lower()
+    assert "registre o critério humano do empate" in panel_text.lower()
     assert "Comparação assistida e contexto" in panel_text
     assert _find_component_by_id(panel, "decision-workspace-primary-fold") is not None
     assert _find_component_by_id(panel, "decision-workspace-state-hero") is not None
@@ -2647,6 +2649,8 @@ def test_primary_decision_panels_hide_raw_metric_keys_in_main_surface() -> None:
     assert "Technical tie em leitura humana" in contrast_text
     assert "decisão humana assistida" in contrast_text.lower()
     assert "Technical tie e trade-offs" in contrast_text
+    assert "O que está empatado" in contrast_text
+    assert "vencedor e runner-up ficaram empatados" in contrast_text.lower()
     assert "Perfis diferentes estão puxando winners diferentes" in contrast_text
     assert "`" not in decision_text
     assert "`" not in contrast_text

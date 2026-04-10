@@ -66,6 +66,7 @@ def _collect_text(component: object) -> str:
                 "decision_status": "technical_tie",
                 "technical_tie": True,
                 "feasible": True,
+                "key_factors": [{"summary": "winner e runner-up seguem empatados nas dimensões operacionais principais."}],
             },
             [
                 "Empate técnico",
@@ -73,6 +74,7 @@ def _collect_text(component: object) -> str:
                 "Explícito",
                 "Fechar escolha assistida",
                 "Empate técnico em revisão",
+                "O que está empatado",
             ],
         ),
         (
@@ -153,11 +155,15 @@ def test_technical_tie_state_keeps_assisted_language_across_secondary_panels() -
         "winner_reason_summary": "O perfil atual ainda não separou o winner com folga suficiente.",
         "key_factors": [{"summary": "winner e runner-up seguem praticamente empatados nas dimensões principais."}],
     }
+    workspace_text = _collect_text(render_decision_workspace_panel(summary, {"visible_candidate_count": 3}, {"candidate_id": "cand-03"}))
     contrast_text = _collect_text(render_decision_contrast_panel(summary))
     signal_text = _collect_text(render_decision_signal_panel(summary))
     justification_text = _collect_text(render_decision_justification_panel(summary))
 
-    assert "a escolha final pede leitura humana assistida" in contrast_text.lower()
+    assert "o que está empatado" in workspace_text.lower()
+    assert "registre o critério humano do empate" in workspace_text.lower()
+    assert "seguem tecnicamente empatados porque" in contrast_text.lower()
+    assert "o que está empatado" in contrast_text.lower()
     assert "a leitura continua em modo assistido" in signal_text.lower()
     assert "technical tie ativo; exporte apenas como decisão assistida" in justification_text.lower()
     assert "a escolha oficial segue viável na leitura atual do ranking" not in signal_text.lower()

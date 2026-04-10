@@ -6835,6 +6835,12 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
         or summary.get("contrast_state")
         or decision_state["contrast_state"]
     )
+    key_factor_summaries = [_humanize_decision_copy(item.get("summary")) for item in list(summary.get("key_factors", []) or []) if item.get("summary")]
+    technical_tie_reason = (
+        key_factor_summaries[0]
+        if key_factor_summaries
+        else "Os scores e sinais operacionais seguem próximos demais para a automação fechar a escolha sem decisão humana assistida."
+    )
     fallback_count = int(summary.get("fallback_component_count") or 0)
     if critical_routes:
         top_route = critical_routes[0]
@@ -6895,6 +6901,8 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
         if not candidate_id
         else "Escolha manual congelada; não exporte enquanto o winner oficial permanecer bloqueado."
         if summary.get("feasible") is False
+        else "Escolha manual registrada em contexto de technical tie; confirme o critério humano antes de liberar a exportação assistida."
+        if decision_status == "technical_tie" and selected_candidate_id
         else "Escolha manual alinhada com a referência oficial; prossiga para exportação quando a leitura humana confirmar."
         if selected_candidate_id and selected_candidate_id == official_product_candidate_id
         else "Escolha manual divergente; confirme o contraste antes de substituir a referência oficial."
@@ -6906,6 +6914,8 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
         if not candidate_id
         else "Volte para Runs e corrija o bloqueio antes de oficializar ou exportar."
         if summary.get("feasible") is False
+        else "Mantenha winner e runner-up lado a lado, registre o critério humano do empate e só então libere a exportação assistida."
+        if decision_status == "technical_tie"
         else "Revise runner-up e escolha manual antes de exportar."
         if selected_candidate_id and selected_candidate_id != official_product_candidate_id
         else "Confirme a referência oficial e siga para exportação."
@@ -6996,7 +7006,10 @@ def render_decision_workspace_panel(summary: dict[str, Any], catalog_summary: di
                             _guidance_card("Referência oficial do produto", f"{official_product_candidate_id or '-'} | {official_profile_label}"),
                             _guidance_card("Escolha manual atual", f"{selected_candidate_id or '-'} | {selected_state_label}. {manual_choice_signal}"),
                             _guidance_card("Runner-up ainda importa porque", runner_up_signal if runner_up_id else "Ainda não há contraste suficiente para pressionar a decisão."),
-                            _guidance_card("O que a revisão humana precisa observar", human_review_signal),
+                            _guidance_card(
+                                "O que está empatado" if decision_status == "technical_tie" else "O que a revisão humana precisa observar",
+                                technical_tie_reason if decision_status == "technical_tie" else human_review_signal,
+                            ),
                         ],
                     ),
                 ],
@@ -7244,10 +7257,15 @@ def render_decision_contrast_panel(summary: dict[str, Any]) -> Any:
     difference_lines = [_humanize_decision_copy(item.get("summary")) for item in summary.get("key_factors", []) if item.get("summary")]
     if summary.get("runner_up_total_cost") not in (None, ""):
         difference_lines.insert(0, f"Custo oficial vs runner-up: {winner_cost} vs {summary.get('runner_up_total_cost')}.")
+    tie_operational_reason = (
+        difference_lines[0]
+        if difference_lines
+        else "Winner e runner-up seguem próximos nos sinais principais; a automação não abriu separação confortável para encerrar a escolha."
+    )
     contrast_summary = (
         str(decision_mode["comparison_guidance"])
         if decision_mode["key"] == "winner_infeasible"
-        else "Winner e runner-up seguem tecnicamente empatados; a escolha final pede leitura humana assistida."
+        else f"Winner e runner-up seguem tecnicamente empatados porque {tie_operational_reason}"
         if decision_status == "technical_tie"
         else "O runner-up segue como melhor alternativa comparável, mas abaixo da escolha oficial no ranking."
     )
@@ -7286,6 +7304,14 @@ def render_decision_contrast_panel(summary: dict[str, Any]) -> Any:
                         if decision_status == "technical_tie"
                         else "Sem technical tie ativo nesta leitura.",
                         style={"fontWeight": 700, "lineHeight": "1.5", "marginTop": "10px"},
+                    ),
+                    html.Div(
+                        "O que está empatado" if decision_status == "technical_tie" else "Leitura do empate",
+                        style={"fontWeight": 700, "marginTop": "12px"},
+                    ),
+                    html.Div(
+                        tie_operational_reason if decision_status == "technical_tie" else "Sem fator dominante de empate nesta leitura.",
+                        style={"lineHeight": "1.6", "marginTop": "6px"},
                     ),
                     _bullet_list(
                         tie_dimensions[:3],
