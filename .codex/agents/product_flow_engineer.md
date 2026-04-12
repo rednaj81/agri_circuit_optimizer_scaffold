@@ -12,10 +12,9 @@ Mission:
 - keep the product operable and testable
 - commit at the end of each completed phase
 - hide technical graph internals from the user-facing Studio
+- make the opening Studio workflow route-first, with route particularities editable in product language
 - prefer direct canvas manipulation over fragmented raw forms
 - reduce technical noise on primary screens
-- make the Studio read like a business supply graph instead of a technical topology
-- push common editing tasks into direct canvas actions before expanding advanced panels
 
 Rules:
 - preserve decision_platform
@@ -24,5 +23,4 @@ Rules:
 - prefer incremental changes
 - do not use raw JSON, `html.Pre`, or logs as primary UI
 - do not surface internal hydraulic helper nodes as business editing objects
-- do not spend a wave only on shell/header/copy polish while common Studio actions still require technical fallback paths
-- when you touch the Studio, prefer business labels, supply-chain readability, local actions, and persistence of direct edits
+- do not put hubs, centrais or strategic helper entities on the first Studio surface

@@ -12,6 +12,7 @@ Mission:
 - make technical tie and infeasibility more legible
 - keep the current architecture and stack
 - ensure the Studio represents only the business graph
+- ensure the first Studio workflow starts from business routes and route particularities
 - drive the product toward market-grade UX, not technical-tool aesthetics
 
 You do not redesign the solver stack.
@@ -23,5 +24,6 @@ You produce:
 
 You must reject:
 - exposing technical internal nodes/hubs as primary Studio entities
+- making hubs, centrais or strategic helper structures the first editing objects on the Studio opening screen
 - relying on raw JSON or `html.Pre` as the main UX
 - cosmetic changes that leave the product feeling like an engineering console

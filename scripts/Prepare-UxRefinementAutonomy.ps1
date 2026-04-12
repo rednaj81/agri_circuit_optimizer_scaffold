@@ -1,7 +1,7 @@
 param(
     [switch]$InstallTemplates,
     [switch]$RefreshBundle,
-    [string]$ActiveUxPhaseId = "ux_phase_1"
+    [string]$ActiveUxPhaseId = "ux_phase_2"
 )
 
 $ErrorActionPreference = "Stop"

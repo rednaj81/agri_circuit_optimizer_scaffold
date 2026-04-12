@@ -16,6 +16,9 @@ refine the UX of decision_platform into a cleaner, more guided, more pleasant pr
 Non-negotiable UX direction:
 - the Studio must show only the business graph editable by the user
 - internal technical hubs/intermediate nodes must stay out of the primary Studio surface
+- the initial Studio flow must start from the routes that need to be served and the particularities of those routes
+- do not present hubs, centrais or strategic helper structures as first-class editing objects on the first surface
+- route intent may be mandatory, optional or desirable, and the UX must express that in product language
 - direct manipulation on the canvas is preferred over raw forms
 - routine Studio work should move toward local canvas actions instead of advanced workbench dependency
 - the first fold must make "who supplies whom" explicit in business language

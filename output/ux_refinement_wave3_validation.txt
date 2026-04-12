@@ -1,18 +1,14 @@
-Wave 3 targeted validation
+wave: 3
+phase: phase_ux_refinement
+date: 2026-04-10
 
-- python -m py_compile src\decision_platform\ui_dash\app.py
-- $env:PYTHONPATH='C:\d\dev\agri_circuit_optimizer_scaffold'; python -m pytest -q tests/decision_platform/test_studio_structure.py::test_dash_app_exposes_structural_studio_controls tests/decision_platform/test_studio_structure.py::test_create_route_between_business_nodes_adds_visible_route tests/decision_platform/test_studio_structure.py::test_apply_route_intent_from_edge_context_updates_matching_route tests/decision_platform/test_studio_structure.py::test_context_menu_action_starts_route_draft_from_selected_node tests/decision_platform/test_ui_smoke.py::test_studio_primary_surface_exposes_business_command_center tests/decision_platform/test_ui_smoke.py::test_studio_primary_workspace_avoids_technical_internal_terms
+validated_commands:
+- .\.venv\Scripts\python.exe -m py_compile src\decision_platform\ui_dash\app.py
+- .\.venv\Scripts\python.exe -m pytest tests\decision_platform\test_phase3_runs_ui_smoke.py tests\decision_platform\test_phase3_queue_acceptance.py tests\decision_platform\test_ui_smoke.py -q
 
-Result:
+result:
+- 127 passed in 456.87s
 
-- 6 passed in 1.14s
-
-Evidence:
-
-- output\ux_refinement_wave3_studio_snapshot.json
-
-Screenshot attempt:
-
-- Playwright browser capture failed with `spawn EPERM`
-- Browser GUI launch for OS-level screenshot was blocked by local policy
-- `output/playwright/studio-fullhd-wave3.png` could not be produced honestly in this environment
+evidence:
+- docs/2026-04-10_phase_ux_refinement_wave3_ui_snapshot.json
+- output/playwright/phase_ux_refinement_wave3_studio_runs.png

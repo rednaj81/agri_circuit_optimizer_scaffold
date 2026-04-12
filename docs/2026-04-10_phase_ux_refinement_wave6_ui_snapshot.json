@@ -1,8 +1,8 @@
 {
-  "created_at": "2026-04-10T15:31:47.5233235Z",
+  "created_at": "2026-04-10T15:49:03.3307253Z",
   "phase_id": "phase_ux_refinement",
   "wave_index": 6,
-  "repo_head": "5a4a660ae76f977e3fe0450286ab2a0422b240dd",
+  "repo_head": "f370adff80bbd9274d8d771e22bc39bb738d5745",
   "phase3_exit_status": "blocked_on_evidence",
   "capture_method": "environment_blocker_dossier",
   "capture_note": "Wave 6 formalizes the evidence blocker for ux_phase_3. Native browser capture was retried through reproducible commands and remained blocked by this environment; the dossier ties those failures to the same repo head and UI hierarchy represented in the structured snapshot.",
@@ -51,7 +51,7 @@
         "output_excerpt": "take_screenshot.ps1 failed with CopyFromScreen invalid handle."
       }
     ],
-    "size_bytes": 112787
+    "size_bytes": 112930
   },
   "sections": [
     {

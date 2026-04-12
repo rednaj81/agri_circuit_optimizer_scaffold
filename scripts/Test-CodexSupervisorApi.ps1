@@ -9,8 +9,8 @@ param(
     [string]$Model = 'gpt-5.4',
     [string]$ReasoningEffort = '',
     [int]$ConsecutiveLowValueStop = 3,
-    [int]$StallTimeoutSeconds = 1800,
-    [int]$BootstrapGraceSeconds = 180,
+    [int]$StallTimeoutSeconds = 3600,
+    [int]$BootstrapGraceSeconds = 300,
     [switch]$RestartOnTerminalStop
 )
 

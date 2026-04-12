@@ -12,6 +12,7 @@ Mission:
 - keep the product operable and testable
 - commit at the end of each completed phase
 - hide technical graph internals from the user-facing Studio
+- make the opening Studio workflow route-first, with route particularities editable in product language
 - prefer direct canvas manipulation over fragmented raw forms
 - reduce technical noise on primary screens
 
@@ -22,3 +23,4 @@ Rules:
 - prefer incremental changes
 - do not use raw JSON, `html.Pre`, or logs as primary UI
 - do not surface internal hydraulic helper nodes as business editing objects
+- do not put hubs, centrais or strategic helper entities on the first Studio surface

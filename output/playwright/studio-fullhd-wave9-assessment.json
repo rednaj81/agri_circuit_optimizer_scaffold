@@ -1,6 +1,6 @@
 {
   "url": "http://127.0.0.1:8060/?tab=studio",
-  "output": "C:\\d\\dev\\agri_circuit_optimizer_scaffold\\output\\playwright\\studio-fullhd-wave9.png",
+  "output": "C:\\d\\dev\\agri_circuit_optimizer_scaffold\\output\\playwright\\studio-fullhd-wave3.png",
   "edge_stdout_log": "C:\\d\\dev\\agri_circuit_optimizer_scaffold\\output\\playwright\\wave9-edge-native.stdout.log",
   "edge_stderr_log": "C:\\d\\dev\\agri_circuit_optimizer_scaffold\\output\\playwright\\wave9-edge-native.stderr.log",
   "edge_exit_code": -2147483645,

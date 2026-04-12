@@ -39,3 +39,5 @@ docs/codex_dual_agent_runtime/preflight.json
 docs/codex_dual_agent_runtime/supervisor_state.json
 docs/codex_dual_agent_runtime/wave_policy.override.json
 .npm-cache/
+.npm-cache-local
+output

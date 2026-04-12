@@ -1,8 +1,8 @@
 {
-  "created_at": "2026-04-10T14:44:13.9375261Z",
+  "created_at": "2026-04-10T14:52:14.0427892Z",
   "phase_id": "phase_ux_refinement",
   "wave_index": 4,
-  "repo_head": "95cb1f9a710fa8170d874ab02cf1a2e29cdc265c",
+  "repo_head": "a437d59e066b9642390867a55ac92f747fa5ea1e",
   "capture_method": "served_ui_report",
   "capture_note": "Versioned evidence built from the live Dash UI served over HTTP plus structured excerpts from the current app layout. Native Edge screenshot capture was attempted separately and remained blocked by local access-denied sandbox errors.",
   "browser_capture": {
@@ -26,7 +26,7 @@
     },
     "native_browser_attempt": "edge_headless_access_denied",
     "native_browser_error_excerpt": "Crashpad and sandbox access denied prevented Edge headless from writing a screenshot artifact.",
-    "size_bytes": 93622
+    "size_bytes": 93706
   },
   "sections": [
     {

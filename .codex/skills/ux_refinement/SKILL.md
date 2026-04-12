@@ -19,14 +19,13 @@ Use this skill when working on:
 - explicit state feedback
 - progressive disclosure
 - business-facing Studio
+- route-first business editing
 - direct manipulation over raw debug/form surfaces
 - market-grade product feel
-- explicit supply-chain readability on the Studio first fold
-- routine editing from canvas actions before advanced workbench use
 
 ## Never accept as primary UX
 - `html.Pre`
 - raw JSON blocks
 - raw logs
 - technical internal graph entities exposed as user-facing editing objects
-- shell-only polish while the Studio interaction model remains technical
+- hubs, centrais or strategic helper structures as the opening Studio editing surface

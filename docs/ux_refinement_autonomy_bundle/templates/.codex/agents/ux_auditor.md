@@ -19,3 +19,4 @@ A wave is low-value if:
 - it regresses clarity or consistency
 - it leaves the product feeling like an engineering console
 - it continues exposing technical internal graph entities to end users
+- it keeps the opening Studio workflow centered on hubs, centrais or strategic helper entities instead of business routes

@@ -1,0 +1,30 @@
+{
+  "created_at": "2026-04-10T14:27:55.475748+00:00",
+  "phase_id": "phase_ux_refinement",
+  "wave_index": 3,
+  "repo_head": "95cb1f9a710fa8170d874ab02cf1a2e29cdc265c",
+  "capture_method": "layout_render",
+  "capture_note": "Rendered evidence composed from the current Dash component tree after the wave commit.",
+  "sections": [
+    {
+      "title": "Studio local fix",
+      "component_id": "studio-workspace-local-fix-strip",
+      "excerpt": "Correção local mais curtaCorrigir no canvasA conexão L011 sai de Saída externa, mas Saída externa deve aparecer apenas como destino final.Misturador e Tanque de água é suprido por Incorporador, Produto 1, Produto 2 e mais 2 e supre Incorporador e Saída externa.Correção local orientadaFoco ainda insuficienteCorrigir medição agoraAbrir bancada completa"
+    },
+    {
+      "title": "Studio workspace",
+      "component_id": "studio-workspace-panel",
+      "excerpt": "Leitura do cenárioExige atençãoAinda há bloqueios estruturais impedindo a passagem segura para Runs.Correção local mais curtaCorrigir no canvasA conexão L011 sai de Saída externa, mas Saída externa deve aparecer apenas como destino final.Misturador e Tanque de água é suprido por Incorporador, Produto 1, Produto 2 e mais 2 e supre Incorporador e Saída externa.Correção local orientadaFoco ainda insuficienteCorrigir medição agoraAbrir bancada completaContexto dominante do StudioConexão em foco: Tanque de água -> Misturador.Agora no StudioA conexão L011 sai de Saída externa, mas Saída externa deve aparecer apenas como destino final.Próxima açãoCorrigir no canvas. A conexão L011 sai de Saída exte"
+    },
+    {
+      "title": "Runs recovery map",
+      "component_id": "runs-workspace-recovery-map",
+      "excerpt": "Se o problema for cenárioVoltar ao StudioA limitação principal ainda está no cenário; corrija o Studio antes de culpar a fila ou a execução.Se o problema for execuçãoReexecutar com correçãoRevise a causa dominante desta falha antes de repetir a rodada.Se o resultado já bastarDecisão ainda bloqueadaA Decisao continua bloqueada: esta run falhou antes de gerar contexto executivo utilizavel."
+    },
+    {
+      "title": "Runs workspace",
+      "component_id": "runs-workspace-panel",
+      "excerpt": "Leitura operacional de RunsAguardando readiness do StudioAinda há bloqueios estruturais impedindo a passagem segura para Runs.FalhouPronto0 na filaResultado pendenteRun em focoNenhumaEsta é a terminal mais crítica porque define a recuperação antes de outra rodada.Falha operacional em focoCorrija a causa dominante antes de repetir a rodada.Modo: -Na filaDepoisEm preparaçãoDepoisEm execuçãoDepoisConsolidando saídaDepoisConcluídaDepoisFalhouEstado finalA run encontrou um bloqueio operacional e terminou sem saída utilizável.Fila agoraSem pendênciaNada novo aguardando além do que a run em foco já explica.Execução agora: NenhumaHistórico terminalSem terminal recente relevanteA leitura principal co"
+    }
+  ]
+}

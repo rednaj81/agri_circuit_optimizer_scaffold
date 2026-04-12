@@ -1,0 +1,15 @@
+Próxima onda: empurre o Studio para interação direta de verdade.
+
+Prioridades:
+- usar o foco do canvas para edição rápida de propriedades comuns
+- reduzir a necessidade de abrir workbench avançado para tarefa rotineira
+- manter o grafo de negócio como única superfície principal
+- não recolocar JSON, tabelas cruas ou trilha técnica na primeira dobra
+
+Alvos preferenciais:
+- editar rótulo do nó em foco sem workbench
+- editar comprimento/family hint/direção da conexão em foco sem workbench
+- manter testes cobrindo esse fluxo direto
+
+Reprovação implícita:
+- se a onda ficar só em copy, cards ou shell, ela falhou de direção

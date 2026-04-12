@@ -27,6 +27,9 @@ Critical product direction:
 - the Studio must represent the business graph only
 - internal technical hubs, derived hydraulic nodes and solver-oriented intermediates must stay hidden from the primary Studio experience
 - if the solver needs extra internal graph structure, it must be derived behind the scenes
+- the initial Studio workflow must start from drawing the routes that need service and defining route-specific particularities
+- do not use hubs, centrais or strategic helper objects as first-class entities on the opening Studio surface
+- route intent should support mandatory, optional and desirable semantics in product language instead of forcing every route to be hard-constrained
 - direct manipulation on the canvas is a first-class requirement
 - the next waves must prioritize the Studio interaction model over more shell polish
 - the first-fold Studio reading must make who supplies whom explicit in business language
